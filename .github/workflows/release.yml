@@ -1,0 +1,124 @@
+name: Release
+
+# Push a tag matching `v*` (e.g. `v0.2.0`, `v0.2.0-rc.1`) to publish
+# `@glyphs-ai/glyph` to npm. The recommended flow is:
+#
+#   npm version <patch|minor|major>   # bumps package.json + creates v<X> tag
+#   git push --follow-tags             # pushes the tag, this workflow runs
+#
+# Prereleases (versions containing a `-`, e.g. `0.2.0-rc.1`) get tagged
+# `next` on npm so they don't override `latest`. Stable releases get the
+# default `latest` dist-tag.
+#
+# Authentication: npm Trusted Publishing via GitHub OIDC. No npm token
+# is stored anywhere; the registry verifies this workflow's identity via
+# the short-lived ID token requested by `id-token: write` and issues a
+# 10-minute publish credential. Maintainer prerequisite (one-time, after
+# the first manual publish that creates the package on npm): on the npm
+# package page, configure a trusted publisher pointing at this repo +
+# workflow file. See README "Releasing" section.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      # npm Trusted Publishing requires npm 11.5.1 or newer; Node 22
+      # currently ships npm 10.x. Pin to a known-good 11.x with --force.
+      #
+      # Why --force + pinned version (not `npm@latest`): Node 22's
+      # bundled npm 10.9.7 has a self-upgrade race where arborist
+      # nukes its own transitive deps mid-install, leaving npm in a
+      # broken state with `Cannot find module 'promise-retry'`. The
+      # `--force` flag skips the rebuild path that triggers the race.
+      # Pinning the version (rather than `@latest`) also makes
+      # release builds reproducible.
+      - name: Upgrade npm
+        run: |
+          npm install -g --force npm@11.5.1
+          # Sanity check: --provenance silently no-ops on npm < 11.5.1, so
+          # we want a loud failure here rather than publishing a release
+          # without an attestation.
+          installed=$(npm --version)
+          echo "npm version: $installed"
+          major=$(echo "$installed" | cut -d. -f1)
+          if [ "$major" -lt 11 ]; then
+            echo "::error::npm $installed is too old for Trusted Publishing (need 11.5.1+)"
+            exit 1
+          fi
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag matches package.json version
+        # Guards against accidentally tagging `v0.3.0` while package.json
+        # still says `0.2.0` — npm publish would happily push the wrong
+        # version. Strip the leading `v` and compare.
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version=$(node -p "require('./package.json').version")
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $pkg_version"
+            exit 1
+          fi
+          echo "publishing version $pkg_version"
+
+      - name: Publish
+        # `prepublishOnly: pnpm bundle` in package.json runs the bundle
+        # step here, so we don't have a separate Bundle job — running it
+        # twice (once in CI, once via prepublishOnly) would just double
+        # the build time and create ambiguity about which artefacts
+        # actually got uploaded.
+        #
+        # Prereleases (X.Y.Z-foo) → `next` dist-tag; stable → `latest`.
+        # Authentication is OIDC via Trusted Publishing — no token env.
+        run: |
+          version=$(node -p "require('./package.json').version")
+          case "$version" in
+            *-*) tag=next ;;
+            *)   tag=latest ;;
+          esac
+          echo "publishing with --tag $tag"
+          npm publish --provenance --access public --tag "$tag"
+
+      - name: Create GitHub Release
+        # Runs after npm publish so a missing GitHub Release can never be
+        # mistaken for "the npm publish failed". Auto-generates release
+        # notes from PRs merged since the previous tag (resolved by gh).
+        # Prereleases (`X.Y.Z-foo`) get marked as such so the GitHub UI
+        # doesn't promote them as the latest stable release.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          prerelease_flag=""
+          case "$version" in
+            *-*) prerelease_flag="--prerelease" ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            $prerelease_flag

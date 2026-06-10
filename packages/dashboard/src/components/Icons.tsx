@@ -1,0 +1,171 @@
+/**
+ * Inline SVG icons (Heroicons outline 24x24, stroke 1.5).
+ * No icon library dependency.
+ */
+
+interface IconProps {
+  className?: string;
+}
+
+const SVG = (path: React.ReactNode, { className }: IconProps, viewBox = "0 0 24 24") => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox={viewBox}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    {path}
+  </svg>
+);
+
+export const HomeIcon = (p: IconProps) =>
+  SVG(
+    <path d="m2.25 12 8.954-8.955a1.5 1.5 0 0 1 2.12 0L22.28 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />,
+    p,
+  );
+
+export const CatalogIcon = (p: IconProps) =>
+  SVG(
+    <path d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />,
+    p,
+  );
+
+export const SessionsIcon = (p: IconProps) =>
+  SVG(<path d="M3.75 13.5 10.5 9l4.5 3 6-4.5M21 7.5h-4.5m4.5 0v4.5" />, p);
+
+export const RuntimeIcon = (p: IconProps) =>
+  SVG(
+    <>
+      <path d="M3.75 6.75A2.25 2.25 0 0 1 6 4.5h12a2.25 2.25 0 0 1 2.25 2.25v10.5A2.25 2.25 0 0 1 18 19.5H6a2.25 2.25 0 0 1-2.25-2.25V6.75Z" />
+      <path d="M7.5 9.75 10.5 12l-3 2.25M13.5 14.25h3" />
+    </>,
+    p,
+  );
+
+/**
+ * Heroicons `user-circle` outline @ stroke 1.5. The sidebar Agents
+ * child reads as the runtime entity that owns sessions and tasks, not
+ * a duplicate of the parent group header.
+ */
+export const AgentsIcon = (p: IconProps) =>
+  SVG(
+    <path d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />,
+    p,
+  );
+
+export const TasksIcon = (p: IconProps) =>
+  SVG(
+    <path d="M9 5H7.2A2.2 2.2 0 0 0 5 7.2v9.6A2.2 2.2 0 0 0 7.2 19h9.6A2.2 2.2 0 0 0 19 16.8V7.2A2.2 2.2 0 0 0 16.8 5H15M9 5a2 2 0 1 0 6 0M9 5a2 2 0 1 1 6 0M9 12l2 2 4-4" />,
+    p,
+  );
+
+/**
+ * Heroicons `calendar-days` outline @ stroke 1.5 — the Schedules
+ * child icon. Distinct from RuntimeIcon (parent group) and the other
+ * three child icons so the sub-nav stays scannable.
+ */
+export const SchedulesIcon = (p: IconProps) =>
+  SVG(
+    <>
+      <path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+      <path d="M6.75 12.75h.008v.008H6.75v-.008Zm0 2.25h.008v.008H6.75V15Zm0 2.25h.008v.008H6.75v-.008Zm2.25-4.5h.008v.008H9v-.008Zm0 2.25h.008v.008H9V15Zm0 2.25h.008v.008H9v-.008Zm2.25-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H13.5v-.008Zm0 2.25h.008v.008H13.5V15Zm2.25-2.25h.008v.008H15.75v-.008Zm0 2.25h.008v.008H15.75V15Z" />
+    </>,
+    p,
+  );
+
+export const WorkflowsIcon = (p: IconProps) =>
+  SVG(
+    <>
+      <circle cx="5" cy="6" r="2.25" />
+      <circle cx="19" cy="6" r="2.25" />
+      <circle cx="12" cy="18" r="2.25" />
+      <path d="M5 8.25v3.5A2.25 2.25 0 0 0 7.25 14h9.5A2.25 2.25 0 0 0 19 11.75v-3.5" />
+      <path d="M12 14v1.75" />
+    </>,
+    p,
+  );
+
+export const SettingsIcon = (p: IconProps) =>
+  SVG(
+    <>
+      <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+      <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+    </>,
+    p,
+  );
+
+export const PlusIcon = (p: IconProps) => SVG(<path d="M12 4.5v15m7.5-7.5h-15" />, p);
+
+export const PlayIcon = (p: IconProps) =>
+  SVG(
+    <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347c-.75.412-1.667-.13-1.667-.986V5.653Z" />,
+    p,
+  );
+
+export const RefreshIcon = (p: IconProps) =>
+  SVG(
+    <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />,
+    p,
+  );
+
+export const CopyIcon = (p: IconProps) =>
+  SVG(
+    <path d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />,
+    p,
+  );
+
+export const TrashIcon = (p: IconProps) =>
+  SVG(
+    <path d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />,
+    p,
+  );
+
+export const CloseIcon = (p: IconProps) => SVG(<path d="M6 18 18 6M6 6l12 12" />, p);
+
+/**
+ * Filled rounded-square ("stop" affordance) — used by the row + detail
+ * Cancel buttons in the Tasks page. The child <rect> overrides the
+ * `SVG()` helper's outline defaults so the glyph reads as a solid
+ * filled square (visual mental model: ⏹ stop).
+ */
+export const StopIcon = (p: IconProps) =>
+  SVG(<rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" />, p);
+
+export const InfoIcon = (p: IconProps) =>
+  SVG(
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8h.01M11 12h1v5h1" />
+    </>,
+    p,
+  );
+
+export const PencilIcon = (p: IconProps) =>
+  SVG(
+    <path d="M16.862 4.487 18.549 2.8a2.121 2.121 0 1 1 3 3L19.862 7.487m-3-3L6.34 15.01a4.5 4.5 0 0 0-1.13 1.897l-1.07 3.213 3.213-1.07a4.5 4.5 0 0 0 1.897-1.13L19.862 7.487m-3-3 3 3" />,
+    p,
+  );
+
+export const CheckIcon = (p: IconProps) => SVG(<path d="m4.5 12.75 6 6 9-13.5" />, p);
+
+export const ArrowLeftIcon = (p: IconProps) =>
+  SVG(<path d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />, p);
+
+export const GlobeIcon = (p: IconProps) =>
+  SVG(
+    <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0a8.949 8.949 0 0 0 4.951-1.488A3.987 3.987 0 0 0 13 16h-1a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.458m12.385-7.512A8.99 8.99 0 0 1 21.542 9H21a2 2 0 0 0-2 2 2 2 0 0 1-2 2 2 2 0 0 0-2 2c0 1.097.602 2.052 1.49 2.563M12 3a8.949 8.949 0 0 0-4.951 1.488A3.987 3.987 0 0 1 11 8h1a2 2 0 0 1 2 2v1" />,
+    p,
+  );
+
+export const ChevronDownIcon = (p: IconProps) => SVG(<path d="m19.5 8.25-7.5 7.5-7.5-7.5" />, p);
+
+export const MoreHorizontalIcon = (p: IconProps) =>
+  SVG(
+    <path d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm6 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm6 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />,
+    p,
+  );

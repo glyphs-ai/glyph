@@ -1,0 +1,186 @@
+# @glyphs-ai/api
+
+The **T2 Application layer (orchestration)** — glyph's composition
+root that wires T0 foundations (`workspace`, `catalog`, `runtime`,
+`schedule`, `terminal`) and T1 execution modes (`session`, `task`,
+`workflow`) into per-workspace runtime contexts. Cross-package wire
+contracts (HTTP route catalog, request / response DTOs, out-of-band IPC
+files, `GLYPH_HOME` resolution) live in the sibling T2 package
+`@glyphs-ai/contracts`; `@glyphs-ai/api` re-exports the whole
+`@glyphs-ai/contracts` barrel so the in-process server boot path
+(`@glyphs-ai/server`) imports orchestration and contracts from one
+specifier.
+
+`@glyphs-ai/dashboard` and `@glyphs-ai/cli` must NOT import from
+`@glyphs-ai/api` — they use the HTTP transport and import wire shapes
+from `@glyphs-ai/contracts` (the structural fence is enforced by
+`packages/e2e/test/architecture/tier-invisibility.test.ts`).
+
+Orchestration (`composeApplication`, `WorkspaceContext`) and wire
+contracts (routes, request / response shapes, path helpers) live in
+sibling T2 pkgs: orchestration here, contracts in `@glyphs-ai/contracts`.
+The split gives the surfaces (`@glyphs-ai/dashboard`, `@glyphs-ai/cli`)
+a structural fence against pulling orchestration code into their
+bundles. See
+[`docs/architecture.md § Tier model`](../../docs/architecture.md#tier-model).
+
+## Internal layout
+
+```
+packages/api/src/
+├── application.ts            ← Application interface + composeApplication
+├── workspace-context.ts      ← WorkspaceContext + WorkspaceContextRegistry
+├── wiring/                   ← per-kind handler wiring (cross-package glue)
+│   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskService
+│   ├── workflow-coord-task-runner.ts    ← workflow coordinator node → TaskService
+│   └── workflow-task-runner.ts          ← workflow worker node → TaskService
+└── index.ts                  ← public barrel (orchestration + re-exports
+                                of @glyphs-ai/contracts)
+```
+
+Wire contracts (routes, response shapes, path helpers, etc.) live in
+`packages/contracts/src/` — see `@glyphs-ai/contracts/README.md` for
+that package's internal layout.
+
+## Public API
+
+The package exports:
+
+- `composeApplication`, `Application`, and `ApplicationOpts`.
+- `WorkspaceContext` and `WorkspaceHasLiveTasksError`.
+- Schedule wiring helpers: `makeTaskKindHandler` and
+  `TaskScheduleTargetError`.
+- Workflow task-runner helpers: `makeCoordNodeRunner`,
+  `makeWorkerNodeRunner`, their opts/spec types, poll constants, and
+  public validation errors.
+- Every public wire contract from `@glyphs-ai/contracts`.
+
+```ts
+import { composeApplication } from "@glyphs-ai/api";
+
+const app = await composeApplication({
+  workspace: { dbFile: "/abs/global.db" },
+  runtimeRegistry,                              // RuntimeRegistry
+  defaultWorkspaceParent: "/abs/home/workspaces",
+  logger,                                       // optional pino
+});
+
+app.workspaceService;                            // WorkspaceService -- direct access for read-only listing / getLastOpenedId / etc.
+
+// Orchestration (Stripe-style hybrid opts)
+await app.registerWorkspace({ name, workspaceDir? });
+await app.renameWorkspace(workspaceId, { newName });
+await app.unregisterWorkspace(workspaceId, { purge? });
+await app.reloadWorkspace(workspaceId);
+
+// Per-workspace contexts
+const ctx = await app.getContext(workspaceId);   // WorkspaceContext | null
+ctx.workspace;                                   // Workspace
+ctx.catalog;                                     // CatalogService
+ctx.sessions;                                    // SessionService
+ctx.tasks;                                       // TaskService
+ctx.schedules;                                   // ScheduleService
+ctx.workflows;                                   // WorkflowService
+await ctx.sessions.spawnInteractive(sid, { remote? }); // SpawnSessionResult
+
+app.loadedContexts();                            // snapshot of currently-loaded contexts
+
+await app.close();                               // closes every per-workspace context, then the global registry
+```
+
+Orchestration mutations (`registerWorkspace`, `renameWorkspace`,
+`unregisterWorkspace`, `reloadWorkspace`) go through the `Application`
+methods (which invalidate the per-workspace context) rather than
+calling `workspaceService.register` etc. directly.
+
+## WorkspaceContext fields
+
+Field naming follows the Stripe convention — singular for a
+single-entity registry, plural for a collection / surface that exposes
+list-like operations:
+
+| Field       | Type                  | Why singular / plural                                      |
+| ----------- | --------------------- | ---------------------------------------------------------- |
+| `workspace` | `Workspace`           | one workspace                                              |
+| `catalog`   | `CatalogService`      | one catalog (the registry)                                 |
+| `sessions`  | `SessionService`      | many sessions per workspace; service is the collection     |
+| `tasks`     | `TaskService`         | many tasks per workspace                                   |
+| `schedules` | `ScheduleService`     | many schedules per workspace; cron-driven task dispatch substrate |
+| `workflows` | `WorkflowService`     | many workflows per workspace; DAG orchestration substrate  |
+| `close()`   | `() => Promise<void>` | closes the five service handles in reverse-of-compose order; idempotent |
+
+`sessions.spawnInteractive(sid, { remote? })` (a method on
+`SessionService` from `@glyphs-ai/session`) builds the session's
+interactive launch command via `SessionService.buildInteractiveLaunch`
+and immediately hands it to `@glyphs-ai/terminal`'s `spawnTerminal`.
+The returned `display`
+field is always populated so callers can show a copy-paste command
+even on spawn failure. The result type `SpawnSessionResult` is
+canonical in `@glyphs-ai/session` — import it from there directly.
+
+`ctx.schedules.registerKind("task", ...)` is wired automatically by
+`composeApplication` (via `makeTaskKindHandler`); callers don't need
+to re-register the task kind on a freshly-loaded context.
+
+`ctx.workflows` is composed after the task and schedule services and is
+wired with coordinator and worker node runners that dispatch through the
+same `TaskService`. Callers use `WorkflowService` for DAG lifecycle
+operations; they do not register runners manually.
+
+## Concurrency invariants
+
+Per-workspace context resolution is concurrency-safe: a second
+`getContext(workspaceId)` racing the first load awaits the same in-flight
+promise. `reloadWorkspace(workspaceId)` first awaits any in-flight load, then
+closes and rebuilds — refused with `WorkspaceHasLiveTasksError` if
+the cached context's `tasks.liveCount() > 0`. `Application.close()`
+drains in-flight loads and closes every loaded context before
+disposing the global registry, so callers don't have to remember the
+ordering.
+
+The internal `WorkspaceContextRegistry` class is the source-of-truth
+holder of live SQLite handles, task supervisors, workflow engines, and
+SSE event buses. It is **not** an optimisation cache that can be
+silently dropped — dropping entries without `close()` leaks live
+resources. The class is intentionally not exported from
+`@glyphs-ai/api`; all access goes through `Application` methods.
+
+## Tier
+
+`@glyphs-ai/api` is the **T2 Application layer (orchestration)** in
+glyph's tier model
+(see [`docs/architecture.md § Tier model`](../../docs/architecture.md#tier-model)).
+Its sibling at T2 is `@glyphs-ai/contracts` (wire types). T0
+(foundations: `catalog`, `runtime`, `schedule`, `terminal`,
+`workspace`) and T1 (execution modes: `session`, `task`, `workflow`)
+sit below; T3 (`server`) and T_top (`dashboard`, `cli`) sit above.
+
+## Layering
+
+`@glyphs-ai/api` MAY import (value or type):
+
+- `@glyphs-ai/contracts` (re-exported from the public barrel).
+- T0/T1 packages it composes: `@glyphs-ai/workspace`,
+  `@glyphs-ai/catalog`, `@glyphs-ai/session`, `@glyphs-ai/task`,
+  `@glyphs-ai/workflow`, `@glyphs-ai/runtime`, `@glyphs-ai/schedule`,
+  and `@glyphs-ai/terminal` (for `spawnTerminal`, injected into
+  `composeSessionModule` as the canonical `SpawnFn`).
+
+`@glyphs-ai/api` MUST NOT import:
+
+- `@glyphs-ai/server` — server depends on api, not the reverse.
+- `@glyphs-ai/dashboard`, `@glyphs-ai/cli` — surfaces use HTTP and
+  `@glyphs-ai/contracts`; they must not depend on api.
+
+## Testing
+
+```sh
+pnpm --filter @glyphs-ai/api typecheck
+pnpm --filter @glyphs-ai/api test
+```
+
+Vitest runs in `forks` pool.
+
+## License
+
+MIT

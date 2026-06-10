@@ -1,0 +1,5749 @@
+/* ─── Theme ─────────────────────────────────────────────────────── */
+
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f7f8fa;
+  --color-surface-hover: #eef0f4;
+  --color-border: #e4e7eb;
+  --color-border-strong: #c8cdd5;
+  --color-text: #1a1d23;
+  --color-text-muted: #6b7280;
+  --color-text-subtle: #9aa1ac;
+  /* High-contrast metadata token for compact UI surfaces (>= 4.5:1 vs every
+     light surface in the theme, including the status-tinted DAG node bgs
+     `--color-{accent,success,warn,danger}-bg` where `--color-text-muted`
+     falls below WCAG AA. Use for small metadata that must remain legible
+     across every status-tinted surface, e.g. `.dag-node__timing`. */
+  --color-text-meta: #5d6470;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-bg: #eef4ff;
+  --color-success: #15803d;
+  --color-success-bg: #ecfdf5;
+  --color-warn: #b45309;
+  --color-warn-bg: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fef2f2;
+
+  --color-sidebar-bg: #fafbfc;
+  --color-sidebar-border: #e4e7eb;
+  --color-sidebar-text: #4b5563;
+  --color-sidebar-text-muted: #9aa1ac;
+  --color-sidebar-active-bg: #eef4ff;
+  --color-sidebar-active-text: #1d4ed8;
+  --color-sidebar-active-border: #2563eb;
+  --color-sidebar-hover-bg: #f0f1f5;
+  --color-sidebar-divider: #e4e7eb;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+
+  --sidebar-width: 240px;
+  --topbar-height: 72px;
+}
+
+/* ─── Reset / Base ──────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+pre,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+/* ─── Shell layout ──────────────────────────────────────────────── */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  height: 100vh;
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────────── */
+
+.sidebar {
+  background: var(--color-sidebar-bg);
+  border-right: 1px solid var(--color-sidebar-border);
+  color: var(--color-sidebar-text);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar__header {
+  height: var(--topbar-height);
+  padding: 0 var(--space-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-sidebar-divider);
+  flex-shrink: 0;
+}
+
+.sidebar__switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar__switcher-select-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar__switcher-select {
+  width: 100%;
+  background: transparent;
+  color: var(--color-sidebar-text, var(--color-text));
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.sidebar__switcher-select:hover,
+.sidebar__switcher-select:focus-visible {
+  background: var(--color-sidebar-hover-bg, var(--color-surface));
+  border-color: var(--color-sidebar-border, var(--color-border));
+  outline: none;
+}
+
+.sidebar__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-sidebar-text-muted, var(--color-text-muted));
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  flex-shrink: 0;
+}
+
+.sidebar__icon-btn:hover:not(:disabled),
+.sidebar__icon-btn:focus-visible:not(:disabled) {
+  background: var(--color-sidebar-hover-bg, var(--color-surface));
+  color: var(--color-sidebar-text, var(--color-text));
+  outline: none;
+}
+
+.sidebar__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sidebar__icon-btn-svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sidebar__rename {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar__rename-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+}
+
+.sidebar__rename-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(94, 106, 210, 0.2);
+}
+
+.sidebar__rename-error {
+  font-size: 11px;
+  color: var(--color-danger, #c84747);
+  padding: 0 var(--space-2);
+  word-break: break-word;
+}
+
+.sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-3);
+}
+
+.sidebar__group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-sidebar-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: var(--space-3) var(--space-3) var(--space-1);
+}
+
+/* Section group container. Holds the parent button + nested children
+   list (when present). No visual chrome of its own — the children list
+   handles indentation. */
+.sidebar__group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Indented child rows under a group parent. Indent visually mirrors
+   the icon-gutter width (16 px icon + 12 px gap = ~28 px) so child
+   labels line up with parent labels. */
+.sidebar__children {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--space-3);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar__item--parent {
+  /* No visual change to the parent — children expand below it. The
+     class is a CSS hook so future grouping treatments (e.g. removing
+     bottom margin when expanded) have a target. */
+  margin-bottom: 0;
+}
+.sidebar__item--child {
+  font-size: 13px;
+  padding-left: var(--space-3);
+}
+.sidebar__icon--child {
+  /* Slightly muted icon weight so the visual hierarchy reads
+     parent → child without a brand-new icon palette. */
+  opacity: 0.85;
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: 2px;
+  border-radius: var(--radius-md);
+  color: var(--color-sidebar-text);
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.sidebar__item:hover {
+  background: var(--color-sidebar-hover-bg);
+  color: var(--color-text);
+}
+
+.sidebar__item--active {
+  background: var(--color-sidebar-active-bg);
+  color: var(--color-sidebar-active-text);
+  font-weight: 600;
+}
+
+.sidebar__item--active:hover {
+  background: var(--color-sidebar-active-bg);
+}
+
+.sidebar__item--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sidebar__item--disabled:hover {
+  background: transparent;
+  color: var(--color-sidebar-text);
+}
+
+.sidebar__icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.sidebar__icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.sidebar__badge {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.sidebar__footer {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  flex-shrink: 0;
+}
+
+.sidebar__home-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-sidebar-text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.sidebar__home-link:hover,
+.sidebar__home-link:focus-visible {
+  background: var(--color-sidebar-hover-bg);
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+  outline: none;
+}
+
+.sidebar__home-link-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ─── TopBar ────────────────────────────────────────────────────── */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.topbar {
+  height: var(--topbar-height);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-6);
+  gap: var(--space-4);
+  background: var(--color-bg);
+}
+
+.topbar__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.topbar__crumb {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.topbar__spacer {
+  flex: 1;
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ─── Content area ──────────────────────────────────────────────── */
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6);
+}
+
+.section-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-5);
+}
+
+.section-tabs button {
+  background: transparent;
+  border: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: 14px;
+  color: var(--color-text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.section-tabs button:hover {
+  color: var(--color-text);
+}
+
+.section-tabs button.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.section-tabs .count {
+  margin-left: var(--space-2);
+  font-size: 11px;
+  background: var(--color-surface);
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+}
+
+.section-tabs button.active .count {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+/* ─── Buttons ───────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 13px;
+  transition: background 0.1s ease;
+}
+
+.btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn:hover {
+  background: var(--color-surface-hover);
+}
+
+.btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn--ghost {
+  border-color: transparent;
+  background: transparent;
+}
+
+.btn--ghost:hover {
+  background: var(--color-surface);
+}
+
+.btn--icon {
+  padding: var(--space-2);
+  line-height: 0;
+}
+
+.btn--icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn--danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #fff;
+}
+
+.btn--danger:hover {
+  background: #991b1b;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Page toolbar ──────────────────────────────────────────────── */
+
+.page-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-5);
+}
+
+.page-toolbar .section-tabs {
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+
+.page-toolbar__actions {
+  padding: 0 0 var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* ─── Catalog status filter menu ──────────────────────────────────
+ *
+ * Single popover-style button on the toolbar; opens a small panel
+ * with radio-style options. Built on native <details>/<summary> so
+ * close-on-outside-click and ESC-to-close come for free without any
+ * global handler bookkeeping.
+ *
+ * The trigger reuses the .btn .btn--ghost shape so it visually sits
+ * with the other toolbar buttons. When a non-default filter is
+ * active we slide the picked label in beside the icon so the user
+ * knows from the strip alone that the view is constrained.
+ */
+.filter-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.filter-menu__trigger {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.filter-menu__icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.filter-menu__sep {
+  color: var(--color-text-subtle);
+  margin: 0 2px;
+}
+
+.filter-menu__current {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.filter-menu__trigger--active {
+  /* Subtle indicator that a filter is constraining the view; the
+   * visible "Status: Blocked" label in the trigger does most of the
+   * work, but the dot reinforces the same signal at a glance. */
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+.filter-menu__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.filter-menu__group-label {
+  padding: var(--space-1) var(--space-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.filter-menu__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.filter-menu__option:hover {
+  background: var(--color-surface-hover);
+}
+
+.filter-menu__option--active {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.filter-menu__radio {
+  font-size: 12px;
+  width: 14px;
+  text-align: center;
+  color: var(--color-text-subtle);
+}
+
+.filter-menu__option--active .filter-menu__radio {
+  color: var(--color-accent);
+}
+
+.filter-menu__option-label {
+  flex: 1;
+}
+
+.filter-menu__option-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ─── Cards / panels ────────────────────────────────────────────── */
+
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.card__header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.card__title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-4);
+}
+
+.stat {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+}
+
+.stat__value {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.stat__value--warn {
+  color: var(--color-danger);
+}
+
+.stat__label {
+  margin-top: var(--space-1);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* ─── Tables ────────────────────────────────────────────────────── */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  /* Fixed layout: columns size by <th>/<td> width, not by content. Prevents
+     column widths from jumping between tabs (skill / agent / mcp) and stops
+     long names from squeezing the description column. */
+  table-layout: fixed;
+  /* Cap on very wide screens so version / status / actions don't drift far
+     from the description text; left-aligned table feels more anchored. */
+  max-width: 1100px;
+}
+
+.table th {
+  text-align: left;
+  padding: var(--space-3);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.table .name-cell {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  /* Long scoped names ellipsize; full string is in the title attr. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The clickable name button inside name-cell: respects ellipsis. */
+.table .name-cell .link-button {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.table .desc-cell {
+  color: var(--color-text-muted);
+  /* Single-line description with ellipsis. Description is the flexible
+     column but doesn't sprawl visually — long text wraps would push the
+     row very tall, while ellipsis keeps everything compact and the full
+     content is still available via hover. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table .desc-cell.mono {
+  /* Used by the MCP "Path" column. Truncate long absolute paths. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table .version-cell {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* ─── Column widths per table layout ───────────────────────────── */
+
+/* Skills / Agents: Name | Description | Version | Status | (Actions) */
+.table th.col-name {
+  width: 200px;
+}
+.table th.col-version {
+  width: 80px;
+}
+.table th.col-status {
+  width: 110px;
+}
+
+/* MCPs: Name | Path | (Actions) */
+.table th.col-path {
+  width: auto;
+}
+
+.actions-col {
+  width: 56px;
+}
+
+/* ─── Status badges ─────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge--ready {
+  background: rgba(21, 128, 61, 0.1);
+  color: var(--color-success);
+}
+
+.badge--disabled {
+  background: rgba(180, 83, 9, 0.1);
+  color: var(--color-warn);
+}
+
+.badge--ok {
+  background: rgba(21, 128, 61, 0.1);
+  color: var(--color-success);
+}
+
+/* succeeded tasks now use a dedicated success
+   tone (green) so the four status colours are visually distinct:
+   running → blue, succeeded → green, failed → red, cancelled → grey. */
+.badge--success {
+  background: rgba(21, 128, 61, 0.1);
+  color: var(--color-success);
+}
+
+.badge--danger {
+  background: var(--color-danger-bg, rgba(220, 38, 38, 0.1));
+  color: var(--color-danger);
+}
+
+.badge--muted {
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+}
+
+.badge--info {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-accent);
+}
+
+.badge--warn {
+  background: rgba(180, 83, 9, 0.1);
+  color: var(--color-warn);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+/* Single-line "label + value + copy" presentation used in launch/resume modals.
+   The text is monospace and ellipsizes; the copy button stays full-size. */
+.copy-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.copy-row__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.copy-row__btn {
+  flex: 0 0 auto;
+}
+
+/* ─── Empty / placeholder states ────────────────────────────────── */
+
+.empty {
+  text-align: center;
+  padding: var(--space-7) var(--space-5);
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.empty__icon {
+  font-size: 32px;
+  margin-bottom: var(--space-3);
+  opacity: 0.6;
+}
+
+.empty__icon svg {
+  width: 1em;
+  height: 1em;
+}
+
+.empty__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+}
+
+.empty__hint {
+  font-size: 13px;
+  margin: 0;
+}
+
+.empty__hint code {
+  background: var(--color-surface-hover);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ─── Alerts ────────────────────────────────────────────────────── */
+
+.alert {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.alert--error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.alert--info {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  font-size: 13px;
+  line-height: 1.5;
+  display: block;
+}
+
+.alert--info code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* ─── DetailDialog (read-only view for immutable entries) ──────────── */
+
+.detail-dialog {
+  /* Long URLs in dep lists must wrap, never push the modal wider. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ─── Hero header (rich modal title) ────────────────────────────── */
+
+.detail-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-hero__icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.detail-hero__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.detail-hero__kind {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.detail-hero__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.detail-hero__name {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.detail-hero__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.detail-hero__status--ready {
+  color: #1f7a3a;
+  background: rgba(31, 122, 58, 0.08);
+  border-color: rgba(31, 122, 58, 0.2);
+}
+
+.detail-hero__status--blocked {
+  color: #b54708;
+  background: rgba(181, 71, 8, 0.08);
+  border-color: rgba(181, 71, 8, 0.2);
+}
+
+.detail-hero__status-dot {
+  font-size: 8px;
+  line-height: 1;
+}
+
+.detail-hero__status-dot--ready {
+  color: #1f7a3a;
+}
+
+.detail-hero__status-dot--blocked {
+  color: #b54708;
+}
+
+.detail-hero__namespace {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  word-break: break-word;
+}
+
+/* ─── Tab nav inside the detail body ────────────────────────────── */
+
+.detail-dialog__tabs {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  margin: calc(-1 * var(--space-2)) 0 0 0;
+}
+
+.detail-dialog__tab {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.detail-dialog__tab:hover {
+  color: var(--color-text);
+}
+
+.detail-dialog__tab--active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+}
+
+.detail-dialog__dl {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-4) 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.detail-dialog__dl dt {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  padding-top: 2px;
+}
+
+.detail-dialog__dl dd {
+  margin: 0;
+  min-width: 0;
+  word-wrap: break-word;
+}
+
+.detail-dialog__dl code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.detail-dialog__origin {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 12px;
+  color: var(--color-accent);
+  word-break: break-all;
+  text-decoration: none;
+}
+
+.detail-dialog__origin:hover {
+  text-decoration: underline;
+}
+
+.detail-dialog__origin-scheme {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.detail-dialog__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-dialog__empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.detail-dialog__deps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.detail-dialog__deps li {
+  margin: 0;
+  min-width: 0;
+}
+
+.detail-dialog__dep {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text);
+  text-decoration: none;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.detail-dialog__dep:hover {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.detail-dialog__prereqs {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.detail-dialog__code {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 400px;
+}
+
+/* ─── Settings list ─────────────────────────────────────────────── */
+
+.kv-list {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: var(--space-3) var(--space-5);
+  font-size: 13px;
+}
+
+.kv-list dt {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.kv-list dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.env-hint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.env-hint__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  cursor: help;
+  border-radius: 999px;
+}
+
+.env-hint__trigger:hover,
+.env-hint__trigger:focus-visible {
+  color: var(--color-text);
+  outline: none;
+}
+
+.env-hint__icon {
+  width: 14px;
+  height: 14px;
+}
+
+.env-hint__bubble {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: max-content;
+  max-width: 260px;
+  padding: 5px 8px;
+  background: rgba(26, 29, 35, 0.92);
+  color: #f5f6f8;
+  border-radius: 4px;
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease, visibility 0.12s ease;
+  transition-delay: 0.15s;
+  z-index: 100;
+}
+
+.env-hint:hover .env-hint__bubble,
+.env-hint:focus-within .env-hint__bubble {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ─── Card grid (catalog entries) ──────────────────────────────── */
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--space-3);
+}
+
+.card-grid__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  cursor: pointer;
+  /* Status stripe lives on the left edge as a 3px inset border. The
+   * status pill in the footer keeps the explicit text label, but the
+   * stripe is what the eye picks up while scanning the grid — much
+   * calmer than a corner badge competing with the title for space. */
+  border-left-width: 3px;
+  transition:
+    border-color 0.1s ease,
+    box-shadow 0.1s ease,
+    transform 0.1s ease;
+}
+
+.card-grid__item[data-status="ready"] {
+  border-left-color: var(--color-success);
+}
+
+.card-grid__item[data-status="blocked"] {
+  border-left-color: var(--color-warn);
+  background: var(--color-surface);
+}
+
+.card-grid__item:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+/* Re-apply the status stripe after the hover rule (border-color is a
+ * shorthand-friendly target so the hover rule above also touched the
+ * left edge). */
+.card-grid__item[data-status="ready"]:hover {
+  border-left-color: var(--color-success);
+}
+
+.card-grid__item[data-status="blocked"]:hover {
+  border-left-color: var(--color-warn);
+}
+
+.card-grid__item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Transient highlight applied to a Catalog card when the user lands
+   here from AgentDetailPane's Configure button (`?agent=<fqn>`).
+   Catalog.tsx adds the class on mount and clears it after ~2s;
+   the animation runs once for that window. */
+.card-grid__item--highlight {
+  animation: card-grid-highlight 2s ease-out both;
+}
+@keyframes card-grid-highlight {
+  0% {
+    background: var(--color-accent-bg);
+    box-shadow: 0 0 0 2px var(--color-accent);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Header strip: small kind tag (uppercase + icon) on the left, hidden
+ * Remove icon on the right that fades in on hover. The Remove action
+ * is intentionally low-visibility — the primary path is click-card-to-
+ * edit, and a permanent "Remove" button creates visual clutter. */
+.card-grid__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 18px;
+}
+
+.card-grid__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+/* Two-line title: small muted namespace prefix above a bigger sans-serif
+ * short name. Replaces the old single mono fqn that lost the eye in
+ * `acme/longish-name` style identifiers. The full fqn is on the
+ * parent's `title` attribute for tooltip + a11y. */
+.card-grid__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+.card-grid__namespace {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  word-break: break-all;
+  /* Reserve the line height even when there's no namespace prefix so
+   * cards without a scope line up vertically
+   * with scoped ones in the same grid row. */
+  min-height: calc(11px * 1.2);
+}
+
+.card-grid__short {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  line-height: 1.25;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Single-row title strip. */
+.card-grid__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.card-grid__name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+/* Inline blocked-reason banner: muted warn color, no heavy background.
+ * Sits between description and footer. */
+/* Inline blocked-reason banner: reserved as a fixed-height row even
+ * when empty so blocked and ready cards have the same total height
+ * regardless of which reasons (if any) are populated. The `--filled`
+ * modifier paints the warn color text; the unfilled state just holds
+ * the slot with a non-breaking space. */
+.card-grid__reason {
+  margin: 0;
+  padding: var(--space-1) 0;
+  font-size: 12px;
+  color: transparent;
+  line-height: 1.4;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-height: calc(12px * 1.4 + var(--space-1) * 2);
+}
+
+.card-grid__reason--filled {
+  color: var(--color-warn);
+}
+
+/* Footer: meta items separated by thin vertical bars; status pill far right.
+ * Single-line, fixed-height so cards line up cleanly. */
+.card-grid__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.card-grid__meta-item {
+  font-family: var(--font-mono);
+}
+
+.card-grid__meta-sep {
+  width: 1px;
+  height: 12px;
+  background: var(--color-border);
+}
+
+.card-grid__meta-spacer {
+  flex: 1;
+}
+
+/* Status pill in footer: dot + word, color follows status. */
+.card-grid__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.card-grid__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.card-grid__status--ready {
+  color: var(--color-success);
+}
+
+.card-grid__status--blocked {
+  color: var(--color-warn);
+}
+
+/* Remove icon button — invisible until card hover, then fades in. */
+.card-grid__action--icon {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-subtle);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.1s ease,
+    background 0.1s ease,
+    color 0.1s ease;
+  flex-shrink: 0;
+}
+
+.card-grid__item:hover .card-grid__action--icon,
+.card-grid__action--icon:focus-visible {
+  opacity: 1;
+}
+
+.card-grid__action--icon:hover {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.card-grid__action--icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.card-grid__desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(13px * 1.45 * 2);
+}
+
+.card-grid__desc--mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.card-grid__sep {
+  color: var(--color-text-subtle);
+}
+
+.card-grid__version {
+  color: var(--color-text-muted);
+}
+
+/* Description variants for non-grid uses such as search results. */
+.card-grid__desc--needs {
+  color: var(--color-text);
+  -webkit-line-clamp: 2;
+}
+
+.card-grid__needs-icon {
+  font-size: 13px;
+  margin-right: 2px;
+}
+
+.card-grid__missing-line {
+  display: flex;
+  flex: 1 1 0;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 2px var(--space-2);
+  background: rgba(180, 83, 9, 0.08);
+  border-left: 2px solid var(--color-warn);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text);
+  min-width: 0;
+}
+
+.card-grid__missing-segment {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-grid__missing-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+
+.card-grid__missing-label--skill,
+.card-grid__missing-label--mcp {
+  color: var(--color-warn);
+}
+
+/* ─── Table actions column ──────────────────────────────────────── */
+
+.actions-col {
+  width: 56px;
+}
+
+.actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ─── Modal ─────────────────────────────────────────────────────── */
+
+.modal {
+  border: 0;
+  border-radius: var(--radius-lg);
+  padding: 0;
+  width: 480px;
+  max-width: 90vw;
+  /* Cap modal height so the body can scroll while header/footer stay sticky. */
+  max-height: 85vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.modal--large {
+  width: 800px;
+  max-width: 95vw;
+}
+
+.modal::backdrop {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.modal__inner {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/*
+ * Rich-header variant: used by DetailDialog. The hero block has its
+ * own visual weight (icon tile, name, namespace) so we ease back on
+ * vertical padding and align the close button to the top, not center,
+ * to avoid an awkward gap on the right.
+ */
+.modal__header--rich {
+  align-items: flex-start;
+  padding: var(--space-4) var(--space-3) var(--space-4) var(--space-5);
+}
+
+.modal__close {
+  flex-shrink: 0;
+}
+
+.modal__header--rich .modal__close {
+  margin-top: 4px;
+}
+
+.modal__title {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.modal__body {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * Form-wrapper bridge: when callers wrap `.modal__body` + `.modal__footer`
+ * inside a `<form>` (DispatchModal, CreateScheduleModal, EditScheduleModal),
+ * the form becomes the lone non-header child of `.modal__inner` and breaks
+ * the flex chain unless it propagates flex sizing through itself. Without
+ * this rule the form shrink-wraps its content, the body's `overflow-y:
+ * auto` never triggers, and tall modals (Schedules: 8 fields + cron
+ * preview + 5 next-runs) overflow the viewport with no scrollbar.
+ */
+.modal__inner > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.modal__body--scroll {
+  /* Editor and form variant: tighter top padding because content is dense. */
+  padding: var(--space-4) var(--space-5);
+}
+
+.modal__body p {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.modal__body p code {
+  background: var(--color-surface-hover);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+  flex-shrink: 0;
+}
+
+.modal__footer-secondary {
+  margin-right: auto;
+}
+
+/* ─── Form fields (used inside modal) ───────────────────────────── */
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.form-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* Inline "(optional)" hint sitting beside a form field's label. Lighter
+   weight + muted colour so the field still reads as primary while the
+   optionality is visible at a glance. */
+.form-label-aside {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.form-field input,
+.form-field textarea,
+.form-field select {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  resize: vertical;
+}
+
+.form-field input {
+  font-family: var(--font-mono);
+}
+
+.form-field select {
+  /* native chevron via SVG background; native arrow looks dated */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23666' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='3 4.5 6 7.5 9 4.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: 12px 12px;
+  padding-right: calc(var(--space-3) + 18px);
+  cursor: pointer;
+}
+
+.form-field input:focus,
+.form-field textarea:focus,
+.form-field select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+  border-color: var(--color-accent);
+}
+
+.form-field input:disabled,
+.form-field textarea:disabled,
+.form-field select:disabled {
+  background: var(--color-surface);
+  cursor: not-allowed;
+}
+
+/* Provider dropdown specifically: narrower, matches inline label feel. */
+.install-dialog__provider {
+  max-width: 200px;
+}
+
+.metadata-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ─── Chips input ───────────────────────────────────────────────── */
+
+.chips {
+  position: relative;
+}
+
+.chips__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  min-height: 36px;
+}
+
+.chips__row:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+  border-color: var(--color-accent);
+}
+
+.chips__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 4px 2px 8px;
+  background: var(--color-accent-bg);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-accent);
+}
+
+.chips__chip--invalid {
+  background: rgba(220, 38, 38, 0.1);
+  color: rgb(185, 28, 28);
+}
+
+.chips__chip--invalid .chips__chip-remove {
+  color: rgb(185, 28, 28);
+}
+
+.chips__chip--invalid .chips__chip-remove:hover {
+  background: rgba(220, 38, 38, 0.18);
+}
+
+.chips__chip-text {
+  line-height: 1.2;
+}
+
+.chips__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--color-accent);
+  padding: 0;
+  cursor: pointer;
+}
+
+.chips__chip-remove:hover {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.chips__chip-remove svg {
+  width: 12px;
+  height: 12px;
+}
+
+.chips__input {
+  flex: 1;
+  min-width: 100px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 4px;
+  color: var(--color-text);
+}
+
+.chips__empty {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  font-style: italic;
+  padding: 0 var(--space-1);
+}
+
+.chips__suggest {
+  position: fixed;
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-1);
+}
+
+.chips__suggest-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: left;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.chips__suggest-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.chips__suggest-item svg {
+  width: 12px;
+  height: 12px;
+  color: var(--color-text-subtle);
+}
+
+.form-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.form-hint code {
+  background: var(--color-surface-hover);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* ─── Code editor (CodeMirror wrapper) ─────────────────────────── */
+
+.code-editor {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.code-editor:focus-within {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.code-editor .cm-editor {
+  background: var(--color-bg);
+}
+
+.code-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+/* CodeMirror's internal scroller — fixed height comes from `height` prop,
+   this just makes scroll behavior nice. */
+.code-editor .cm-scroller {
+  overflow: auto;
+}
+
+.code-editor .cm-gutters {
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  color: var(--color-text-subtle);
+}
+
+.code-editor .cm-activeLine {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.code-editor .cm-activeLineGutter {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* ─── Code textarea ────────────────────────────────────────────── */
+
+.code-textarea {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+  min-height: 200px;
+  width: 100%;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+.code-textarea:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+  border-color: var(--color-accent);
+  background: var(--color-bg);
+}
+
+.code-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── Link-styled button (used as in-table action) ──────────────── */
+
+.link-button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+/* ─── Select (custom-styled native <select>) ────────────────────── */
+
+/* Native <select> on Windows/macOS/Linux looks completely different and
+   never matches our .btn aesthetic. This class normalizes it: same border,
+   radius, padding, focus ring as .btn, plus an inline SVG chevron so the
+   default platform arrow is hidden under the appearance:none reset. */
+.select {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: var(--space-2) var(--space-3);
+  padding-right: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: 12px;
+}
+
+.select:hover {
+  border-color: var(--color-border-strong);
+}
+
+.select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+  border-color: var(--color-accent);
+}
+
+.select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-surface);
+}
+
+.select--full {
+  width: 100%;
+}
+
+/* Standalone input matching .select styling for inline toolbar use. */
+.input {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+.input:hover {
+  border-color: var(--color-border-strong);
+}
+
+.input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+  border-color: var(--color-accent);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-surface);
+}
+
+/* ─── Segmented pills (e.g. time-range filter) ──────────────────── */
+
+.pills {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--color-bg);
+}
+
+/* Pin the tabs nav inside flex-column parents so it never gets
+   crushed by sibling `flex: 1` containers (e.g. .task-detail__body,
+   which carries its own min-height). The pills' `overflow: hidden`
+   would otherwise mask the shrinkage by clipping the buttons,
+   producing a "thin strip" bug instead of an obvious overflow. */
+.pills {
+  flex-shrink: 0;
+}
+
+.pills__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.pills__btn:not(:last-child) {
+  border-right: 1px solid var(--color-border);
+}
+
+.pills__btn:hover:not(.pills__btn--active) {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.pills__btn--active {
+  background-color: var(--color-accent);
+  color: #fff;
+  cursor: default;
+}
+
+.pills__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Sessions page ─────────────────────────────────────────────── */
+
+/* Sessions fills the page width so the activity column has room to breathe.
+   Each named column has a fixed width; Activity (the only un-classed column)
+   absorbs the remainder, which on wide screens leaves it generously sized. */
+.table--wide {
+  max-width: none;
+  /* Sessions table has a long-tail column (Agent fqn) that should
+     fit-content per row instead of being clipped to a fixed width.
+     Switch to auto layout and let column-level widths below describe
+     intent (1% = "as small as content allows"; the Activity column
+     gets the slack). */
+  table-layout: auto;
+}
+
+.table--wide th,
+.table--wide td {
+  /* Default: shrink to content; only Activity gets to take the slack. */
+  width: 1%;
+  white-space: nowrap;
+}
+
+.table--wide th.col-activity,
+.table--wide td.col-activity {
+  width: auto;
+  white-space: normal;
+}
+
+.table--wide td.col-actions,
+.table--wide th.col-actions {
+  text-align: right;
+}
+
+/* Agent column allows the chip to wrap onto two lines for long fqns
+   so the user sees the full name, not "...". Mono font keeps it
+   aligned even when wrapped. */
+.table--wide .agent-tag {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  text-overflow: clip;
+  /* Keep a minimum readable width so a row with a short agent doesn't
+     compress to nothing. */
+  min-width: 120px;
+}
+
+.table .col-session {
+  /* Override base 1% with explicit width so session id chip is comfy. */
+  width: 200px;
+}
+
+.table .col-agent {
+  /* Bound chip width: above min-width, lets text wrap; below the
+     bound, lets layout shrink the column on narrow viewports. */
+  max-width: 280px;
+}
+
+.table .col-runtime {
+  /* `width: 1%` from the cascade; nothing else needed. */
+}
+
+.table .col-actions {
+  /* `width: 1%` from the cascade; align-right via the rule above. */
+}
+
+.session-id {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+/* Subtler than .badge--ok — the agent name is contextual metadata, not a
+   status, so a low-contrast outline tag keeps the row from being a wall
+   of blue when many sessions share the same agent. */
+.agent-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The activity cell stays on a single line: long previews truncate with
+   an ellipsis; the relative-time tail never wraps. min-width: 0 on both
+   the cell and the count is required for ellipsis inside a flex child. */
+.activity-cell {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: 13px;
+}
+
+.activity-cell__count {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.activity-cell__label {
+  font-size: 12px;
+}
+
+.activity-cell__sep {
+  flex: 0 0 auto;
+  color: var(--color-text-subtle);
+}
+
+.activity-cell .muted {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.row-actions__launch {
+  width: 112px;
+  justify-content: center;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+/*  Landing / Hub ─ */
+
+.landing {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 1200px 600px at 50% -200px, rgba(37, 99, 235, 0.06), transparent 60%),
+    var(--color-bg);
+  padding: var(--space-7) var(--space-5) var(--space-7);
+}
+
+.landing__container {
+  width: 100%;
+  max-width: 920px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.landing__hero {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) 0 var(--space-3);
+}
+
+.landing__logo {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-accent), #6366f1);
+  color: #fff;
+  font-weight: 700;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-2);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.landing__brand {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.landing__tagline {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.landing__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.landing__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.landing__section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.landing__section-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-subtle);
+  background: var(--color-surface);
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.landing__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.landing__card {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+  min-height: 110px;
+  width: 100%;
+}
+
+.landing__card:hover:not([aria-disabled="true"]) {
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.10);
+  transform: translateY(-1px);
+}
+
+.landing__card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.landing__card--broken {
+  background: var(--color-surface);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.landing__card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.landing__card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing__card-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+  padding: 2px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.landing__card-badge--warn {
+  color: var(--color-warn);
+  background: #fef3c7;
+}
+
+.landing__card-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: var(--space-1);
+}
+
+.landing__card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.landing__card-meta {
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing__card-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-subtle);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+  flex-shrink: 0;
+}
+
+.landing__card-remove svg {
+  width: 13px;
+  height: 13px;
+}
+
+.landing__card-remove:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.landing__card-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.landing__empty {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  text-align: center;
+  background: var(--color-surface);
+}
+
+.landing__empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+}
+/*  Session list (per-session entries on Sessions page) ─
+
+   Card-row layout: each session is its own card (border + radius +
+   subtle hover-elevate) rather than a row in a table. Single column
+   so the chronological "most-recent-first" reading order survives —
+   sessions are time-ordered, unlike the Catalog grid where items are
+   peers without temporal weight.
+
+   Replaces the earlier `<table>` whose fixed columns left the actions
+   cell width-less and made chip widths jitter across rows depending
+   on the longest agent / runtime name in the visible window. */
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.session-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  transition:
+    border-color 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.session-list__item:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.session-list__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Headline = the agent name. Sessions don't have a status enum or
+   a brief/details pair the way Tasks do, so the most identifying
+   thing is "which agent does this session run". Wraps gracefully
+   on narrow columns (long agent names like "acme/foo-bar"
+   show on two lines instead of being truncated). */
+.session-list__headline {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.session-list__id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  word-break: break-all;
+}
+
+/* Footer line: runtime + id together, plain muted text. Wraps
+   gracefully — long mono ids on narrow columns break-all to a
+   second line rather than horizontally overflowing. */
+.session-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-1);
+  font-size: 12px;
+}
+
+.session-list__sep {
+  color: var(--color-text-muted, var(--color-text-subtle));
+  opacity: 0.5;
+}
+
+.session-list__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.session-list__activity {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*  Resume split button (Sessions list) ─
+
+   GitHub "Code"-button shape: a wide primary face + a narrow chevron
+   face that fall flush against each other. The wrapper is a `position:
+   relative` anchor for the dropdown menu, which uses `position:
+   absolute; right: 0; top: 100%` so it always opens *under* the
+   buttons regardless of which face the user clicked. */
+
+.resume-split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.resume-split__main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.resume-split__chevron {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+.resume-split__chevron svg {
+  width: 14px;
+  height: 14px;
+}
+
+.resume-split__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  min-width: 220px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resume-split__menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.1s ease;
+}
+
+.resume-split__menu-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.resume-split__menu-item--active {
+  background: var(--color-surface);
+}
+
+.resume-split__menu-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.resume-split__menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.resume-split__menu-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.resume-split__menu-hint {
+  font-size: 11px;
+  color: var(--color-text-subtle);
+}
+
+/*  Task list (split-pane left column) ─ */
+
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-list__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 120ms ease;
+}
+
+.task-list__item:last-child {
+  border-bottom: 0;
+}
+
+.task-list__item:hover {
+  background: var(--color-surface-hover);
+}
+
+.task-list__item--selected {
+  background: var(--color-surface-hover);
+  box-shadow: inset 3px 0 0 var(--color-accent, #3b82f6);
+}
+
+/* Row select target: a real <button> that owns the entire left column
+   so the visual row stays fully clickable. Reset native button chrome
+   (background/border/font) and inherit the row's flex-column body so
+   the inner badge/headline/meta/id stack identically to the previous
+   <li>-as-row layout. */
+.task-list__item-select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-list__item-select:focus-visible {
+  outline: 2px solid var(--color-accent, #3b82f6);
+  outline-offset: -2px;
+}
+
+.task-list__item-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.task-list__item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-1);
+  font-size: 12px;
+}
+
+.task-list__id {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  /* Long mono ids on narrow columns: break-all is OK because the id
+     is timestamp-prefixed and the visible truncation point doesn't
+     matter — we have the title attribute for the full value. */
+  word-break: break-all;
+}
+
+/*  Two-row body (replaces the old single meta/time pair).
+    The headline IS the task — `brief` gets the title role and visual
+    weight; the id and time live as footer metadata, matching how GitHub
+    Issues / Linear render "title above id". */
+
+.task-list__item-headline {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  /* Allow up to two lines so the headline isn't truncated mid-word
+     in narrow columns; the third-line+ clamp keeps row heights
+     bounded. The hover title carries the brief plus details. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.task-list__sep {
+  color: var(--color-text-muted, var(--color-text-subtle));
+  opacity: 0.5;
+}
+
+/*  Leading dot inside every status badge.
+    The dot uses `currentColor` so it picks up the badge's text color
+    automatically — running stays accent-blue, succeeded green, danger
+    red, muted grey. `.badge--with-dot` gives the badge the inline-flex
+    layout that aligns the dot with the label; `.badge__dot--pulse`
+    adds the keyframe animation, applied only on the running badge. */
+
+.badge--with-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge__dot--pulse {
+  animation: badge-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+.task-list__item--running .task-list__item-headline {
+  color: var(--color-text);
+}
+
+/*  Split-pane container for the Tasks page.
+    Detail-heavy layout: list is fixed-narrow (~360px), detail eats
+    the rest. Tasks lists rarely need more than 360px (id + chips +
+    headline + delete fit easily); detail content (events, activity
+    timeline, JSON) benefits from every extra px. Inverts the
+    "list-takes-most" pattern that was making the events log wrap
+    badly on 1280-wide screens. */
+
+.tasks-pane {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: stretch;
+  min-height: 0;
+}
+
+.tasks-pane__list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.tasks-pane__list-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The right detail pane fills the grid row's height so the inner
+   `.overview-tab` flex chain has a known parent height to resolve
+   `flex: 1 + min-height: 0` against. The Overview body is a flex
+   column whose Summary / Details cards want to fill the panel (50/50
+   or 100%); `height: auto` here broke the flex chain and left both
+   cards collapsed to their `min-height: 200px` with whitespace below.
+   Fill the row instead; the inner `overflow: auto` on
+   `.overview-card__body`, `.activity-view`, and `.artifacts` already
+   prevents long content from spilling. */
+.tasks-pane__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  height: 100%;
+  min-height: 240px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tasks-pane__detail--empty {
+  justify-content: center;
+  align-items: center;
+  min-height: 240px;
+}
+
+/* When the workspace itself is empty (not a filter-narrowed result),
+   the page collapses the two-column grid into a single full-width empty
+   state. Used by Tasks / Sessions / Agents for the shared empty /
+   filtered-empty / populated state machine. */
+.tasks-pane--zero {
+  grid-template-columns: minmax(0, 1fr);
+}
+.tasks-pane__zero {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+.tasks-pane__zero .empty__title {
+  margin: 0;
+}
+.tasks-pane__zero .empty__hint {
+  max-width: 480px;
+}
+
+/*  Below 1024px the side-by-side layout becomes cramped (the
+    detail panel demands ≥360px and the list ≥360px ≈ 720px just
+    for content; once you add the sidebar that's tight on a 1280
+    laptop). Stack vertically and let the user scroll. */
+
+@media (max-width: 1024px) {
+  .tasks-pane {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*  Detail panel chrome */
+
+.task-detail__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.task-detail__title {
+  /* User-supplied `Task.brief` (≤ 200 chars, single-line). Sized
+     as the panel's primary heading; falls back to no-render when
+     the task object hasn't loaded yet. */
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.task-detail__head-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/*  Chrome row: title fills the left, [× Close] pinned top-right. align-items
+    is `flex-start` so a long wrapped title doesn't drag the Close button
+    down with it. Convention matches Linear/Slack/Gmail side-panel close.  */
+.task-detail__chrome-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/*  State-conditional task action row (Cancel / Run again… / Delete).
+    Right-aligned within the header, visually separated from the
+    [× Close] chrome above so Cancel↔Close misclicks are minimised.  */
+.task-detail__actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.task-detail__id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.task-detail__head-spacer {
+  flex: 1 1 0;
+}
+
+/*  Stat-bar: agent · runtime · started · duration in a single line of
+    inline-block stats, each with a small grey label key. Wraps on
+    overflow rather than truncating. */
+
+.task-detail__statbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.task-detail__statbar-key {
+  color: var(--color-text-subtle);
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+.task-detail__details {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.45;
+  /* Preserve authored newlines + indentation. Without this the
+     expanded body collapses bullets, headers, and paragraphs into
+     a single wall of text — the source has structure (numbered
+     lists, double-newlines between sections), it should render
+     that way. `word-break: break-word` keeps long unbreakable
+     tokens (URLs, hashes) from blowing out the panel width. */
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.task-detail__body {
+  flex: 1;
+  overflow: auto;
+  min-height: 200px;
+}
+
+.task-detail__events {
+  white-space: pre-wrap;
+  /* Force long unbreakable JSON tokens (compact strings without
+     spaces) to break at any character. `word-break: break-word` is
+     non-standard; `overflow-wrap: anywhere` is the spec-compliant
+     way to guarantee no horizontal overflow regardless of content. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-size: 11px;
+  margin: 0;
+}
+
+/*  Result panel — the agent's final answer, shown above the tabs as
+    the headline content. Subtle accent border on the left so it
+    visually reads as "the answer to your question" without competing
+    with the events log below. */
+
+.task-detail__section-title {
+  margin: 0 0 var(--space-1);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.task-detail__result {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+.task-detail__result-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/*  Activity timeline — runtime-neutral list of user/assistant/summary
+    entries returned by /api/.../tasks/<id>/activity. Each row has a
+    role badge + relative timestamp + body. Tool calls inside an
+    assistant turn render as small chips below the message. */
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.activity-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  /* Allow the row to shrink inside its flex/grid parent so long
+     pre/code blocks (tool args/results) wrap rather than blow out
+     the column width. Without min-width: 0, an inner <pre> with
+     long unbreakable content forces the parent grid track wider
+     than the viewport. */
+  min-width: 0;
+}
+
+.activity-row--user {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.activity-row--summary {
+  background: var(--color-surface-hover);
+}
+
+.activity-row__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.activity-row__role {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.activity-row__role--user {
+  color: var(--color-accent);
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.activity-row__role--assistant {
+  color: var(--color-success);
+  background: rgba(21, 128, 61, 0.1);
+}
+
+.activity-row__role--summary {
+  color: var(--color-text-subtle);
+  background: var(--color-surface-hover);
+}
+
+.activity-row__time {
+  font-size: 11px;
+  color: var(--color-text-subtle);
+}
+
+.activity-row__body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  /* Same min-width: 0 reasoning as the parent — long
+     unbreakable tokens (URLs, hashes, base64 blobs) need a
+     break opportunity. word-break covers the long-words case;
+     overflow-wrap covers the no-spaces case. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Pre/code variant for tool args and tool results — bounded
+   height with vertical scroll so a 50KB file dump can't take
+   over the timeline. */
+.activity-row__pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  /* Wrap inside the container, not horizontally, so we never
+     introduce horizontal scroll on the timeline. Vertical
+     scroll caps tall results. */
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.activity-row__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: 2px;
+}
+
+.activity-row__tool {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+  color: var(--color-text-subtle);
+}
+
+.activity-row__summary-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+
+/*  ResolveTree (install preview) ─ */
+
+.resolve-tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.resolve-tree__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.resolve-tree__count {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.resolve-tree__count--new {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+.resolve-tree__count--existing {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-text-muted);
+}
+
+.resolve-tree__count--sync {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.resolve-tree__count--problem {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.resolve-tree__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resolve-tree__item {
+  margin: 0;
+}
+
+.resolve-tree__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.resolve-tree__row--root {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent-bg);
+}
+
+.resolve-tree__row--problem {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.resolve-tree__kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.resolve-tree__kind[data-kind="agent"] { background: #ede9fe; }
+.resolve-tree__kind[data-kind="skill"] { background: #dbeafe; }
+.resolve-tree__kind[data-kind="mcp"]   { background: #fef3c7; }
+
+.resolve-tree__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resolve-tree__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.resolve-tree__fqn {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 12px;
+  color: var(--color-text);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 8px;
+  border-radius: 4px;
+  word-break: break-all;
+  max-width: 100%;
+}
+
+.resolve-tree__root-tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.resolve-tree__badge {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.resolve-tree__status {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.resolve-tree__status--new {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+.resolve-tree__status--already-installed {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-text-muted);
+}
+
+.resolve-tree__status--will-sync {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.resolve-tree__status--would-conflict,
+.resolve-tree__status--fetch-failed,
+.resolve-tree__status--parse-failed {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.resolve-tree__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-danger);
+  line-height: 1.45;
+}
+
+.resolve-tree__error-icon {
+  flex-shrink: 0;
+}
+
+.resolve-tree__error-msg {
+  word-break: break-word;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 11px;
+}
+
+/* ==========================================================================
+   Tasks page (mission A)  master-detail redesign.
+   Adds filters, grouped list, detail tabs, markdown, and timeline styles
+   used by components/tasks/* introduced when Tasks.tsx was split. The
+   pre-existing .tasks-pane / .task-detail__body / .activity-* rules above
+   continue to drive the underlying layout.
+   ========================================================================== */
+
+/* Per-row `⋯` menu — controlled popover.
+   The previous /used native <details>/<summary> with a
+   comment claiming it gave close-on-outside-click + ESC for free.
+   That was wrong: browsers don't run a global handler on <details>,
+   and Esc only closes when focus is already inside the panel. The
+   current implementation is a state-driven popover (TaskListItem
+   owns `menuOpen`, TaskList holds the single openMenuId so opening
+   one row closes another, useClickOutside + a keydown listener
+   handle dismissal). The panel is `position: absolute` and a high
+   z-index so it floats above sibling rows and the detail pane
+   without altering row height when open. */
+.task-list__item-menu {
+  position: relative;
+  display: inline-flex;
+  padding: var(--space-3) var(--space-4) var(--space-3) 0;
+}
+.task-list__item-menu-trigger {
+  padding: 4px;
+}
+.task-list__item-menu-panel {
+  position: absolute;
+  right: 0;
+  min-width: 160px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-height: var(--menu-max-height, none);
+  overflow-y: auto;
+  transform-origin: top right;
+}
+.task-list__item-menu-panel--below {
+  top: calc(100% + 4px);
+  bottom: auto;
+  transform-origin: top right;
+}
+.task-list__item-menu-panel--above {
+  bottom: calc(100% + 4px);
+  top: auto;
+  transform-origin: bottom right;
+}
+.task-list__item-menu-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.task-list__item-menu-option:hover {
+  background: var(--color-surface-hover);
+}
+.task-list__item-menu-option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Mirror the native :disabled visual on `aria-disabled="true"` menuitems
+   (e.g. Run-now while the schedule is paused) — the element stays
+   keyboard-focusable so the inline helper copy explaining WHY it's
+   disabled is announced by screen readers. */
+.task-list__item-menu-option[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.task-list__item-menu-option--danger {
+  color: var(--color-danger, #c0392b);
+}
+.task-list__item-menu-option--danger:hover {
+  background: var(--color-danger-bg, rgba(192, 57, 43, 0.08));
+}
+
+/* Paused-row visual de-emphasis. The badge, the `⋯` trigger and the
+   row background are deliberately NOT dimmed: the row stays
+   unambiguously interactive, only the headline + meta read as
+   secondary so a long mixed list scans cleanly. */
+.task-list__item--paused .task-list__item-headline,
+.task-list__item--paused .task-list__item-meta {
+  color: var(--color-text-muted);
+}
+
+
+.task-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  flex: 0 0 auto;
+  background: var(--color-bg);
+}
+.task-filters__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.task-filters__row--compact {
+  gap: var(--space-2);
+}
+.task-filters__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-subtle);
+}
+/* Search collapses inline with the dropdowns + time pills.
+   `flex: 1 1 200px` lets it grow to fill the row at desktop widths
+   and wrap onto its own line at narrow widths without stretching
+   vertically (the relative-positioned wrap + fixed input height keep
+   the icon prefix glued to the field). */
+.task-filters__search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 200px;
+  min-width: 200px;
+}
+.task-filters__search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-subtle);
+  pointer-events: none;
+}
+.task-filters__search {
+  width: 100%;
+  height: 32px;
+  padding-left: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+/* Compact selects in the filter row keep the panel under ~100px. */
+.task-filters__select {
+  height: 30px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  font-size: 12px;
+  flex: 0 1 auto;
+  min-width: 92px;
+}
+.task-filters__pills {
+  flex: 0 1 auto;
+}
+
+.task-list-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2);
+}
+.task-list-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.task-list-group__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-text-muted);
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+.task-list-group__header:hover {
+  background: var(--color-surface-hover);
+}
+.task-list-group__caret {
+  display: inline-block;
+  width: 12px;
+  font-size: 10px;
+  color: var(--color-text-subtle);
+  transition: transform 120ms ease;
+}
+.task-list-group__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.task-list-group__count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  background: var(--color-surface);
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+}
+
+/* empty groups still render so users can see the
+   data shape transition (Running ↔ Completed). The header is dimmed
+   and the disabled toggle keeps clicks from doing nothing visible. */
+.task-list-group--empty .task-list-group__header {
+  opacity: 0.55;
+  cursor: default;
+}
+.task-list-group--empty .task-list-group__header:hover {
+  background: none;
+}
+
+.task-detail__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 0 var(--space-2);
+  flex-wrap: wrap;
+}
+.task-detail__title-row > .task-detail__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.task-detail__title-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Schedules-page Mode B fire-navigation pill, hosted by `TaskView`'s
+ * `headerTrailing` slot. Sits in the title row's trailing edge as a
+ * single compact chip cluster so prev/next/back don't consume their
+ * own vertical strip above the body. The fallback variant (loading /
+ * error / fire-not-found) collapses to just a back button rendered
+ * above the body, since prev/next are meaningless without a task. */
+.fire-task-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 0.85rem;
+  line-height: 1;
+  flex-wrap: nowrap;
+}
+.fire-task-nav--fallback {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  flex: 0 0 auto;
+}
+.fire-task-nav__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 180px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.fire-task-nav__back:hover {
+  background: var(--color-surface-hover);
+}
+.fire-task-nav__back-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+.fire-task-nav__sep {
+  width: 1px;
+  height: 16px;
+  background: var(--color-border);
+  margin: 0 2px;
+}
+.fire-task-nav__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.fire-task-nav__step:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+.fire-task-nav__step:disabled {
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.fire-task-nav__pos {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-subtle);
+  padding: 0 4px;
+  min-width: 36px;
+  text-align: center;
+  white-space: nowrap;
+}
+.task-detail__close {
+  background: none;
+  border: 0;
+  font-size: 18px;
+  color: var(--color-text-subtle);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+.task-detail__close:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.task-detail__meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-3);
+}
+.task-detail__meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+.task-detail__statbar-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--color-text-subtle);
+}
+.task-detail__statbar-id > code {
+  font: inherit;
+  color: inherit;
+}
+
+.task-tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.task-tabs__btn {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.task-tabs__btn:hover {
+  color: var(--color-text);
+}
+.task-tabs__btn--active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+/* Overview tab: vertical flex column of (optional) state strip +
+   Summary card + Details card. Cards share chrome and split
+   the available height 50/50 when both are present; otherwise the
+   present card fills the remaining height. The standard
+   `flex: 1 + min-height: 0` recipe lets the inner body scroll
+   independently per card rather than the whole tab scrolling. */
+.overview-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.overview-tab__section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-subtle);
+  margin: 0 0 var(--space-2);
+}
+
+.task-details {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.task-details__title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+.task-details__list {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+.task-details__key {
+  font-size: 12px;
+  color: var(--color-text-subtle);
+}
+.task-details__val {
+  font-size: 12px;
+  color: var(--color-text);
+  word-break: break-all;
+}
+.task-details__val--mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+/* keep monospace task IDs from breaking mid-string.
+   `word-break: break-all` was applied to every detail value, which is
+   right for prose but wrong for a fixed-width token. Specialise the
+   id cell to `nowrap` + ellipsis; the copy button always carries the
+   full id and the cell's title= attribute surfaces it on hover. */
+.task-details__id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.task-details__id-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.task-details__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--color-text-subtle);
+  line-height: 0;
+}
+.task-details__copy:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.task-details__copy-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ─── Artifact preview pane (vertical stack: header + full-bleed preview) ─── */
+
+/* Vertical layout: top header (dropdown selector + Download button) over
+   a full-bleed preview pane. The parent chain that supplies the determinate height is
+   `.tasks-pane__detail > .task-detail__body` (the ArtifactsTab root
+   wears both classes). `min-height: 0` is load-bearing in flex layouts:
+   without it the preview's `overflow: auto` cannot bind because the
+   flex child's implicit min-height equals its content size. */
+.artifacts-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+.artifacts-pane__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+}
+.artifacts-pane__selector-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.artifacts-pane__selector {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  font: inherit;
+  cursor: pointer;
+}
+.artifacts-pane__selector:focus-visible {
+  outline: 2px solid var(--color-accent, var(--color-text));
+  outline-offset: 1px;
+}
+.artifacts-pane__download {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--color-text-subtle);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface);
+}
+.artifacts-pane__download:hover {
+  color: var(--color-text);
+}
+.artifacts-pane__download--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.artifacts-pane__preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-3);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.artifacts-pane__preview > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.artifact-viewer {
+  font-size: 13px;
+  color: var(--color-text);
+  min-height: 60px;
+}
+.artifact-viewer--empty,
+.artifact-viewer--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6, 24px);
+  color: var(--color-text-subtle);
+  gap: var(--space-2);
+}
+.artifact-viewer--error { color: var(--color-danger, #c92a2a); }
+.artifact-viewer__spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-text);
+  border-radius: 50%;
+  animation: artifact-spinner 0.8s linear infinite;
+}
+@keyframes artifact-spinner {
+  to { transform: rotate(360deg); }
+}
+
+.artifact-viewer--code,
+.artifact-viewer--text {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--color-surface-elevated, var(--color-surface));
+  border-radius: var(--radius-sm, 4px);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+}
+.artifact-viewer--code code {
+  font: inherit;
+  background: none;
+  padding: 0;
+}
+
+.artifact-viewer--html {
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.artifact-viewer__html-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
+  gap: var(--space-2);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-elevated, var(--color-surface));
+  font-size: 12px;
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
+}
+.artifact-viewer__html-status {
+  font-variant-numeric: tabular-nums;
+}
+.artifact-viewer__html-status[data-scripts="on"] {
+  color: var(--color-accent, var(--color-text));
+  font-weight: 600;
+}
+.artifact-viewer__html-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--color-text);
+  user-select: none;
+}
+.artifact-viewer__html-toggle input {
+  cursor: pointer;
+  margin: 0;
+}
+.artifact-viewer__html-toggle input:focus-visible {
+  outline: 2px solid var(--color-accent, var(--color-text));
+  outline-offset: 2px;
+}
+.artifact-viewer__iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  border-radius: var(--radius-sm, 4px);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.artifact-viewer--image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+}
+.artifact-viewer__img {
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.artifact-viewer--binary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  align-items: center;
+  text-align: center;
+}
+.artifact-viewer__download {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.artifact-viewer__download:hover {
+  background: var(--color-surface-elevated, var(--color-surface));
+}
+
+/* ───  additions ──────────────────────────────────── */
+
+/* Clamp the list-row brief to 2 lines so a multi-line task title
+   doesn't blow out the row height. The tooltip on the row preserves
+   the full brief for accessibility/hover discoverability. */
+.task-list__item-headline--clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+/* Demote the task-id row to text-xs, mute the colour, and right-align
+   so the row's brief reads cleanly flush-left. */
+.task-list__id--muted {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--color-text-subtle);
+  text-align: right;
+  align-self: flex-end;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Overview tab: the `.overview-tab__failure` flex wrapper was removed
+   because state strip and Details card are now top-level children of
+   `.overview-tab`) and the `__brief*` rules (replaced by the shared
+   `.overview-card` chrome below). */
+.overview-tab__failure-callout {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+.overview-tab__strip {
+  margin: 0;
+  flex: 0 0 auto;
+}
+.overview-tab__failure-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+.overview-tab__failure-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.06);
+}
+.overview-tab__failure-message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.overview-tab__failure-meta {
+  margin: 0;
+  font-size: 12px;
+}
+.overview-tab__failure-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Shared Summary / Details card chrome. The pinned title bar
+   (`__head`) stays put while the body (`__body`) scrolls — this is
+   the standard `flex column + min-height: 0` recipe. `min-height` of
+   200px keeps each card readable; when the viewport is too short
+   for two 200px cards plus the strip, the outer `.tasks-pane__detail`
+   scroll container takes over (no internal scroll is lost — it just
+   joins the page scroll). */
+.overview-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+  flex: 1 1 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.overview-card__head {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+.overview-card__title {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-subtle);
+}
+.overview-card__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3);
+}
+.overview-card__pre {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.overview-tab__no-details {
+  margin: 0;
+  font-size: 13px;
+}
+.overview-tab__running-hint {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Inline link-styled <button> for jumping between tabs from prose
+   without pulling in a real anchor. */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-button:hover {
+  text-decoration: none;
+}
+
+.md {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+.md h1, .md h2, .md h3 { margin: var(--space-4) 0 var(--space-2); }
+.md h1 { font-size: 18px; }
+.md h2 { font-size: 16px; }
+.md h3 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.md p { margin: 0 0 var(--space-3); }
+.md ul, .md ol { margin: 0 0 var(--space-3); padding-left: var(--space-5); }
+.md li { margin-bottom: var(--space-1); }
+.md a { color: var(--color-accent); text-decoration: underline; }
+.md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 4px;
+}
+.md pre {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.md pre code { background: none; border: 0; padding: 0; }
+
+@media (max-width: 768px) {
+  .tasks-pane--with-detail {
+    grid-template-columns: 1fr;
+  }
+  /* .overview-tab is already a single-column flex stack, so no
+     narrow-viewport override is needed. */
+}
+
+/* ==========================================================================
+   Tasks page: viewport-fill + group status dot + copy icon.
+   ========================================================================== */
+
+/* Column flex wrapper so the tasks-pane stretches to fill the viewport.
+   The parent .content is flex: 1; overflow-y: auto inside
+   .main (a column flex parent at height: 100vh), so height: 100% here
+   resolves against the content area's definite height. Inner panes
+   get min-height: 0 + overflow: auto so they scroll internally rather
+   than letting the entire page grow. The page-top toolbar is portaled
+   into the workspace chrome header via <HeaderActions>, so .tasks-page
+   itself only contains the (optional) error alert + .tasks-pane. */
+.tasks-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.tasks-page > .alert {
+  flex: 0 0 auto;
+}
+.tasks-page > .tasks-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The detail panel's last child (the active tab body  OverviewTab,
+   ActivityTab, ArtifactsTab, or the loading placeholder) takes the
+   remaining vertical space and scrolls internally so the head + tabs
+   strip stay put. */
+.tasks-pane__detail > .task-detail__head,
+.tasks-pane__detail > .task-tabs {
+  flex: 0 0 auto;
+}
+.tasks-pane__detail > .overview-tab,
+.tasks-pane__detail > .task-detail__body,
+.tasks-pane__detail > .activity-view,
+.tasks-pane__detail > .artifacts {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Overview manages its own internal per-card scrolling; the others
+     scroll as a single body. Keeping `overflow: auto` here lets the
+     short-viewport fallback (cards below their min-height) spill into
+     the parent's scroll without losing content. */
+  overflow: auto;
+}
+
+/* The Agents page reuses the .tasks-pane__detail primitive as its right
+   pane (see .agents-page comment below for context). Mirror the
+   head-pinned / body-scrolls rules above for the agent-detail-specific
+   children so the AgentDetailPane header stays put while the Overview
+   grid / "not installed" alert / loading placeholder scrolls. */
+.tasks-pane__detail > .agent-detail__header {
+  flex: 0 0 auto;
+}
+.tasks-pane__detail > .agent-overview,
+.tasks-pane__detail > .empty,
+.tasks-pane__detail > .alert {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* SVG copy/check icon inside the title-strip CopyButton. It is smaller
+   (12px) and subtler than surrounding controls so it reads as inline
+   metadata rather than a primary action. The chip's own background,
+   border, and padding are declared once above. Nudge the icon down 1px:
+   the button's bounding box is centered with `align-items: center`, but
+   the icon's optical
+   center (no descender region in a 12px square) sits ~1px above the
+   x-height of the surrounding 11px monospace digits — the geometric
+   center isn't the visual center. A 1px translateY brings the icon's
+   optical center flush with the Task ID text. Stays correct at zoom
+   levels because it's measured in CSS px, not relative units. */
+.task-details__copy-icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.5;
+  transform: translateY(1px);
+}
+
+/* Visually hidden but still announced by AT. Used as a live region
+   sibling on CopyButton so the "Copied" announcement has a node
+   whose text content actually changes. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Succeeded-with-empty-output placeholder: muted and unobtrusive, with
+   no "Switch to Logs" call-to-action because the run already ended. */
+.overview-tab__no-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* Agent Overview clickable rows. */
+.agent-overview__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.agent-overview__item {
+  margin: 0;
+}
+.agent-overview__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.1s ease, border-color 0.1s ease;
+}
+.agent-overview__row:hover,
+.agent-overview__row:focus-visible {
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.04));
+  border-color: var(--color-border);
+  outline: none;
+  text-decoration: none;
+}
+.agent-overview__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-overview__meta {
+  flex: 0 0 auto;
+}
+
+/* Pre-selected (Overview  Sessions click) row highlight */
+.session-list__item--preselected {
+  border-color: var(--color-accent, var(--color-border-strong));
+  box-shadow: var(--shadow-md);
+}
+
+/* Runtime / Agent-centric pages.
+   Baseline layout for the class prefixes used by the runtime pages.
+   Theming refinements (dark mode, motion, status-icon system, animated
+   pulse on the running dot) are intentionally deferred; these rules make
+   the screens parseable. All tokens come from `:root` at the top of
+   this file; no new colors. */
+
+/* AgentsPage — /workspaces/<ws>/runtime/agents.
+   This page uses a master-detail split layout
+   mirroring the Tasks page; the .agents-page wrapper provides the same
+   flex-height context the .tasks-page wrapper gives over there, and the
+   actual grid (left list + right detail) reuses the existing .tasks-pane*
+   primitives directly. The companion
+   `.tasks-pane__detail > .agent-detail__header` rule below extends the
+   tasks-pane detail flex chain to cover the agent detail children too,
+   so the right pane's header stays pinned while the body scrolls. */
+.agents-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.agents-page > .alert {
+  flex: 0 0 auto;
+}
+.agents-page > .tasks-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Toolbar above the agents list: status filter menu + search box.
+   Right-aligned search keeps the filter control visually anchored to
+   the heading edge. The toolbar lives inside the left .tasks-pane__list
+   instead of spanning the full page width; padding + border-bottom give
+   it the same affordance the Tasks-page .task-filters has. */
+.agents-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  flex: 0 0 auto;
+  background: var(--color-bg);
+}
+.agents-list-toolbar__search {
+  margin-left: auto;
+  min-width: 160px;
+  max-width: 320px;
+  flex: 1 1 160px;
+}
+
+/* Agents-list row built around the shared
+   `<AgentAvatar>` + `<AgentFqn>` primitives. Three-column flex layout:
+   avatar | identity (FQN + subline) | status column (pill + activity).
+   The previous per-row kebab menu was deleted; the row is a single
+   "click to select" target, matching the equivalent row shape on
+   `/runtime/tasks` and `/runtime/sessions`. The accent stripe + tinted
+   bg + bold name on the selected row mirrors `.task-list__item--selected`
+   so the master-detail visual state reads identical across pages.
+
+   A11y model: the `<li>` is presentational; the click affordance is a
+   real `<button class="agents-list__item-select">`
+   inside it. The button owns the flex layout, padding, cursor, hover
+   bg, and focus-visible ring. The `<li>` only carries the border-bottom
+   separator and the `--selected` accent stripe / surface-hover tint
+   (the latter mirrors `.task-list__item--selected` so the selected
+   class lives on the row container, just as it does on Tasks). */
+.agents-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.agents-list__item {
+  position: relative;
+  margin: 0;
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.1s ease;
+}
+.agents-list__item:last-child {
+  border-bottom: 0;
+}
+/* Row select target: a real <button> that owns the entire row so the
+   visual click target stays the full row. Reset native button chrome
+   (background/border/font) and inherit the row's three-column flex
+   layout (avatar | identity | status-col) so the visual shape is
+   preserved verbatim from the previous `<li>`-as-row implementation. */
+.agents-list__item-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  margin: 0;
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+.agents-list__item-select:hover {
+  background: var(--color-surface-hover);
+}
+.agents-list__item-select:focus-visible {
+  outline: 2px solid var(--color-accent, #3b82f6);
+  outline-offset: -2px;
+}
+/* Selected-row visual highlight — mirrors `.task-list__item--selected`
+   (inset accent stripe + surface-hover background) so the master-detail
+   selected state reads identical across Tasks and Agents pages. The
+   bolder weight on the FQN's short half is applied by the
+   `.agent-fqn__short` rule and lives at `font-weight: 600` already;
+   the selected modifier nudges both the scope and the subline up so the
+   row stands out more clearly. Class lives on the `<li>` (mirroring
+   Tasks/Schedules) so the accent stripe anchors to the row container
+   and the descendant selectors below still resolve inside the wrapping
+   `<span id={headlineId}>` around `<AgentFqn>`. */
+.agents-list__item--selected {
+  background: var(--color-surface-hover);
+  box-shadow: inset 4px 0 0 var(--color-accent, #3b82f6);
+}
+.agents-list__item--selected .agent-fqn__short,
+.agents-list__item--selected .agent-fqn__sep {
+  font-weight: 700;
+}
+.agents-list__item--selected .agent-fqn__scope {
+  font-weight: 500;
+}
+.agents-list__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.agents-list__subline {
+  font-size: 12px;
+  line-height: 1.3;
+}
+.agents-list__status-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+}
+.agents-list__activity {
+  font-size: 12px;
+  min-height: 14px;
+  display: inline-flex;
+  align-items: center;
+}
+/* Tiny shimmer skeleton — reused for the activity tag while the
+   workspace-wide tasks fetch is still in flight. Width is fixed so the
+   right column doesn't jitter when the real count appears. */
+.skeleton {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-hover) 0%,
+    var(--color-surface) 50%,
+    var(--color-surface-hover) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+.skeleton--text {
+  width: 56px;
+  height: 10px;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* Status pill — shared between AgentsListPage rows and the detail
+   header. Running vs idle are distinguished by both a dot tone and a
+   subtle background tint so colour-blind users still get the contrast
+   from the border + label, not the dot alone. */
+.agent-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.agent-status-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-subtle);
+  flex: 0 0 auto;
+}
+.agent-status-pill--running {
+  background: rgba(21, 128, 61, 0.08);
+  border-color: rgba(21, 128, 61, 0.35);
+  color: var(--color-success);
+}
+.agent-status-pill--running .agent-status-pill__dot {
+  background: var(--color-success);
+}
+.agent-status-pill--idle {
+  /* Inherits the neutral defaults above. Declared explicitly so the
+     selector exists and downstream theming has a hook. */
+  background: var(--color-surface);
+}
+
+/* Sub-tab bar — Overview / Sessions / Tasks. **Removed** in
+/* Sub-tab bar  Overview / Sessions / Tasks. Removed because Overview
+   is the default and only per-agent tab; per-agent Sessions/Tasks were
+   merged into the global pages. The
+   same selectors. */
+
+/* Detail page header:
+   row 1 — avatar + name/scope + status pill + version chip + actions
+   row 2 — 3 KPI tiles
+   Layout uses flexbox so the action buttons trail right and wrap
+   below the title at narrow widths (< 1024 px).
+
+  : the inline `.agent-detail__avatar` markup was
+   replaced by the shared `<AgentAvatar size="lg">` primitive — its
+   `.agent-avatar--lg` rule sizes the square (56px) and the inline
+   style sets the deterministic bg/fg. The old selector is gone. */
+.agent-detail-page {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.agent-detail__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.agent-detail__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.agent-detail__name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.agent-detail__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.15;
+}
+.agent-detail__scope {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+.agent-detail__version {
+  font-size: 12px;
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono, monospace);
+}
+.agent-detail__spacer {
+  flex: 1;
+}
+.agent-detail__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* KPI tiles row: exactly 3 tiles (Running / Total 7d / Sessions 7d).
+   At 1024 px the row wraps to a 2-tile-per-line grid; at narrower
+   widths it collapses to a single column. It also uses
+   `auto-fit + minmax` so the row reflows inside the right
+   master-detail pane (which is narrower than the viewport), not just
+   at the explicit viewport breakpoints. */
+.agent-detail__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+@media (max-width: 1024px) {
+  .agent-detail__kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .agent-detail__kpis {
+    grid-template-columns: 1fr;
+  }
+}
+.kpi-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.kpi-tile__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kpi-tile__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.1;
+}
+.kpi-tile__caption {
+  font-size: 12px;
+}
+
+/* Informational banner variant shown above agent lists. */
+.legacy-url-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.legacy-url-banner__body {
+  flex: 1;
+  min-width: 0;
+}
+.legacy-url-banner__dismiss {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.legacy-url-banner__dismiss:hover,
+.legacy-url-banner__dismiss:focus-visible {
+  background: rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+/* Agent Overview — "View all →" links. Matches the row hover treatment
+   in `.agent-overview__row` so users learn the affordance once and see
+   the same shape on the row-level and section-level links. */
+.agent-overview__more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-accent);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+.agent-overview__more:hover,
+.agent-overview__more:focus-visible {
+  background: var(--color-accent-bg);
+  color: var(--color-accent-hover);
+  text-decoration: none;
+  outline: none;
+}
+.agent-overview__heading {
+  margin: 0 0 var(--space-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.agent-overview__section {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Default layout: single column of stacked sections. The 2x2 grid
+   variant below opts in via the `--grid` modifier. */
+.agent-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* 2x2 grid for the per-agent Overview. Capabilities cell is omitted
+   because no data pipe exists, so the third cell ("Current activity")
+   spans the full bottom row. Below 1024 px the grid degrades to a
+   Below 1024 px the grid degrades to a single column for readability. */
+.agent-overview--grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: var(--space-4);
+}
+@media (max-width: 1024px) {
+  .agent-overview--grid {
+    grid-template-columns: 1fr;
+  }
+}
+.agent-overview__cell {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  min-height: 140px;
+  /* Grid items default to `min-width: auto` (their intrinsic min-content
+     width), so a long unbreakable brief inside the cell would push the
+     `1fr 1fr` track past the container and trigger the detail pane's
+     horizontal scrollbar. Force the track back to 1fr by letting the
+     cell shrink below its content's min-content width; row-internal
+     `.agent-overview__title` already owns the ellipsis. */
+  min-width: 0;
+}
+.agent-overview__cell--wide {
+  grid-column: 1 / -1;
+}
+.agent-overview__activity {
+  /* `display: flex` (was `inline-flex`) so the paragraph fills the
+     cell width and child shrink rules can engage; pairs with the
+     `.agent-overview__activity > .agent-overview__title` override
+     below so a long brief ellipsises instead of pushing siblings
+     (activity dots + elapsed-time text) out of the cell. */
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+}
+.agent-overview__activity > .agent-overview__title {
+  /* Current-activity context: take all remaining width and shrink so
+     the inherited ellipsis on `.agent-overview__title` (L4436) can
+     trigger. `.agent-overview__title` already declares `overflow`,
+     `text-overflow`, and `white-space: nowrap` — no re-declaration. */
+  flex: 1 1 0;
+  min-width: 0;
+}
+.agent-overview__activity-dots {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.agent-overview__activity-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: agent-activity-pulse 1.2s ease-in-out infinite;
+}
+.agent-overview__activity-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.agent-overview__activity-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes agent-activity-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.agent-overview__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
+}
+.agent-overview__badge--running {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-accent);
+}
+.agent-overview__badge--succeeded {
+  background: rgba(21, 128, 61, 0.1);
+  color: var(--color-success);
+}
+.agent-overview__badge--failed {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.agent-overview__badge--cancelled {
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+}
+
+/* ─── Shared agent identity primitives ────────
+   `<AgentAvatar>` and `<AgentFqn>` live in
+   src/components/agents/ and are reused by the agents-list row, the
+   AgentDetailPane header, and (future) agent-mention chips. CSS lives
+   here so consumers don't import per-component stylesheets. */
+
+.agent-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 0 0 auto;
+  user-select: none;
+  /* `width`, `height`, `background-color`, and `color` are set
+     inline via the component (size preset + deterministic palette
+     pick + readable foreground). */
+}
+.agent-avatar--sm {
+  font-size: 11px;
+}
+.agent-avatar--md {
+  font-size: 14px;
+}
+.agent-avatar--lg {
+  font-size: 18px;
+}
+
+/* Two-tone `scope/short` FQN renderer. Same colour, same size — visual
+   hierarchy comes from font-weight only. Scope is at normal weight (NOT
+   muted: it disambiguates same-short / different-scope agents). Separator
+   + short share the semibold weight. Font-size is inherited from the
+   parent so consumers can drop the primitive into a row (14px) or a
+   page header (24px) without overrides. */
+.agent-fqn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  min-width: 0;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+.agent-fqn__scope {
+  font-weight: 400;
+  color: var(--color-text);
+  min-width: 0;
+}
+.agent-fqn--truncate-scope .agent-fqn__scope {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-fqn__sep {
+  font-weight: 600;
+  color: var(--color-text);
+  padding: 0 1px;
+}
+.agent-fqn__short {
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  /* short never truncates — it's the most scannable token. */
+}
+
+
+/* ====================================================================
+   Schedule UI refinements.
+   Surgical additions on top of the schedules surface:
+     - .schedule-cron: a chip-style treatment for inline cron expressions
+       so they read as code in both the list rows and the detail header.
+     - .schedule-detail__head + __head-row + __head-left/right: two-column
+       header so the temporal facts (Next fire / Last fired) sit on the
+       right instead of leaving that edge dead. Identity (name, badge,
+       cron, agent) stays on the left where users scan from.
+     - .schedule-detail__temporal-line: shared "muted label : strong
+       value" line shape used by both Next fire and Last fired so they
+       stack as a compact, consistent temporal block.
+     - .task-list__item--button: makes the <button> variant of a task-list
+       row span the full width of its <li>. Buttons default to shrink-to-
+       fit even with `display: flex`, so without this the Recent fires
+       rows render as narrow tabs against the left edge. The properties
+       reset all the chrome a native <button> ships with so it looks and
+       behaves like the <Link> sibling.
+   No tokens or palette additions; everything reuses existing CSS vars. */
+.schedule-cron {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--color-surface-hover);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.schedule-detail__head {
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.schedule-detail__head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.schedule-detail__head-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.schedule-detail__head-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.schedule-detail__temporal-line {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.schedule-detail__temporal-line strong {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/*
+ * Button variant of `.task-list__item`. Native <button> shrink-wraps
+ * its content even with `display: flex`, so without `width: 100%` the
+ * Recent fires rows render as a narrow column against the left edge
+ * instead of filling the panel. The other resets (background, border,
+ * font, color, text-align) make it visually indistinguishable from the
+ * <Link> sibling so the two-row-shape contract holds whether the row
+ * is button-driven (Mode B swap) or link-driven (fallback deep-link).
+ */
+.task-list__item--button {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+/*
+ * Dense single-row variant of `.task-list__item` used by the schedules
+ * Recent fires panel — packs `[status] [clock] [duration] [id]` into
+ * one line so the latest 10 fires fit a viewport without an internal
+ * scrollbar. CSS Grid is used so the four columns line up perfectly
+ * across rows even when the contents differ in width (a `23s` row
+ * lines up with a `1h 12m` row). The base `.task-list__item` is a
+ * vertical flex column for the brief-led task rows used elsewhere
+ * (Tasks page, sessions, etc) so this variant explicitly resets the
+ * display + flex-direction.
+ *
+ * The id column uses `1fr` so it absorbs all leftover horizontal
+ * space and truncates with an ellipsis on narrow viewports — the
+ * full id stays available via `title=` for hover recovery.
+ */
+.task-list__item--row {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.task-list__row-clock {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-list__row-duration {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  /* Reserve a stable minimum so the id column doesn't jitter when
+     adjacent rows have very different duration widths (12s vs 1h 23m). */
+  min-width: 56px;
+}
+
+.task-list__row-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+
+/* Workflow DAG (vertical top-to-bottom layout).
+   Top-to-bottom by phase: each phase is a row, sibling nodes in a
+   phase lay out left-to-right within that row. An SVG overlay above
+   the grid draws straight bottom-centre → top-centre arrows between
+   parents and children; the .workflow-dag container is the relative
+   positioning context for that overlay.
+
+   Status tone uses the dashboard's theme tokens (--color-accent,
+   --color-success, --color-warn, --color-danger) so the DAG row
+   tint stays in step with the master-list row badges. No rogue
+   color literals here — all tones flow from the :root tokens. */
+.workflow-dag {
+  position: relative;
+  display: block;
+  padding: var(--space-3) var(--space-2);
+  overflow: auto;
+}
+
+.workflow-dag--empty {
+  display: block;
+  padding: var(--space-4);
+}
+
+.workflow-dag__edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+.workflow-dag__edge {
+  stroke: var(--color-border-strong);
+  stroke-width: 1.5;
+  fill: none;
+}
+.workflow-dag__arrow-head {
+  fill: var(--color-border-strong);
+  stroke: none;
+}
+
+.workflow-dag__phases {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.workflow-dag__phase {
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.workflow-dag__phase-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.workflow-dag__phase-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+.dag-node {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  min-width: 200px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dag-node[aria-disabled="true"] {
+  cursor: help;
+}
+.dag-node:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.dag-node--selected,
+.dag-node[aria-current="true"] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.dag-node__kind-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.dag-node__id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.dag-node__agent {
+  grid-column: 1 / -1;
+  /*
+     `official/engineer`); the user-authored brief on row 3 is the headline.
+     Demote agent to 12px + muted so the brief reads as primary on a
+     glance. */
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dag-node__brief {
+  grid-column: 1 / -1;
+  /*
+     is this node doing". Match the master-list `.task-list__item-headline`
+     scale (13px / weight 500) so the DAG card and the list rows share
+     the same primary-text rank. */
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.dag-node__timing {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  /*.5:1 on every status-tinted node bg. The default
+     `--color-text-muted` (#6b7280) falls to 4.34–4.42:1 on the running /
+     cancelled / failed tints; `--color-text-meta` (#5d6470) clears AA
+     at ≥ 5.35:1 on every variant. See the token definition in :root. */
+  color: var(--color-text-meta);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-1);
+}
+.dag-node__status {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  justify-self: end;
+}
+
+.dag-node--coordinator {
+  border-left-color: var(--color-accent);
+}
+.dag-node--worker {
+  border-left-color: var(--color-border-strong);
+}
+
+.dag-node--running {
+  background: var(--color-accent-bg);
+}
+.dag-node--succeeded {
+  background: var(--color-success-bg);
+}
+.dag-node--failed {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger);
+}
+.dag-node--cancelled {
+  background: var(--color-warn-bg);
+}
+
+.dag-node__status--running {
+  color: var(--color-accent);
+}
+.dag-node__status--succeeded {
+  color: var(--color-success);
+}
+.dag-node__status--failed {
+  color: var(--color-danger);
+}
+.dag-node__status--cancelled {
+  color: var(--color-warn);
+}
+.dag-node__status--ready {
+  color: var(--color-text-muted);
+}
+
+/* Workflow detail pane (3-tab chrome). */
+/* Header chrome reuses `.task-detail__head` from the Tasks detail
+ * pane (see the Tasks-detail block). The `.workflow-detail__title`
+ * selector below adds a workflow-specific single-line ellipsis
+ * override on top of the shared title styles. */
+.workflow-detail__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Meta-stats `Created · Ended · Duration · Phases` are rendered as
+ * siblings of the workflow-id span inside the shared
+ * `.task-detail__statbar` flex row (see WorkflowView.tsx). The
+ * dedicated chip selectors were removed to keep visual parity with
+ * Tasks' flat statbar. */
+
+/* WAI-ARIA tablist chrome — visuals share `.task-tabs*` (see
+ * `TaskView.tsx`); the workflow tab bar adds the full tablist
+ * semantics (role=tab + aria-selected + aria-controls + roving
+ * tabindex + Arrow/Home/End keys) on top of the same flat
+ * underline visual. Tasks' tab bar uses a simpler `aria-pressed`
+ * pattern, but the CSS chrome is identical, so the visuals are
+ * collapsed onto a single selector and the a11y wiring stays
+ * per-component. */
+
+.workflow-tabpanel {
+  /* Workflows wraps its tab body in an explicit `role="tabpanel"`
+   * element so the WAI-ARIA tablist contract is complete. Tasks
+   * inlines its tab body as a sibling of the tab bar (no panel
+   * wrapper, no panel role), so there is no shared `.task-tabpanel`
+   * selector to fold into — `.workflow-tabpanel` stays as a thin
+   * shape-only selector for the panel padding + focus ring. */
+  padding: var(--space-3) 0;
+}
+.workflow-tabpanel:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Overview tab — body lives in shared `.overview-tab` / `.overview-card*`
+ * selectors (defined alongside Task's OverviewTab). The metadata `<dl>`
+ * still wants per-row alignment + a mono value column, so we keep just
+ * the metadata-related shape selectors. */
+.workflow-overview__metadata {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.workflow-overview__meta-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+.workflow-overview__meta-row dt {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.workflow-overview__meta-row dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+/* Graph tab — container that hosts WorkflowDagView */
+.workflow-graph {
+  display: block;
+}
+
+/* Node navigation pill — mirror of .fire-task-nav structurally */
+.workflow-node-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+}
+.workflow-node-nav--fallback {
+  display: flex;
+  padding: var(--space-2);
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: transparent;
+}
+.workflow-node-nav__back,
+.workflow-node-nav__step {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-sm);
+}
+.workflow-node-nav__back:hover,
+.workflow-node-nav__step:hover {
+  background: var(--color-surface-hover);
+}
+.workflow-node-nav__step[disabled] {
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+.workflow-node-nav__sep {
+  width: 1px;
+  height: 14px;
+  background: var(--color-border);
+}
+.workflow-node-nav__pos {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  min-width: 32px;
+  text-align: center;
+}
+
+/* ─── Workflow loading skeletons ────────────────────────────────────
+   Placeholder shapes for the list + detail right-pane while their
+   per-pane fetches are in flight. Both reuse the `.skeleton` shimmer
+   block defined in the AgentsList section above (single source of
+   truth for the animation primitive) — no new keyframe is introduced
+   here. */
+.workflow-list-skeleton {
+  display: block;
+  width: 100%;
+}
+.workflow-list-skeleton__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.workflow-list-skeleton__row {
+  background: transparent;
+}
+.workflow-list-skeleton__row:hover {
+  background: transparent;
+}
+.workflow-list-skeleton__cell {
+  cursor: default;
+}
+.workflow-list-skeleton__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.workflow-list-skeleton__badge {
+  width: 64px;
+  height: 14px;
+  border-radius: 999px;
+}
+.workflow-list-skeleton__headline {
+  width: 80%;
+  height: 13px;
+}
+.workflow-list-skeleton__meta {
+  width: 55%;
+  height: 11px;
+}
+.workflow-list-skeleton__id {
+  width: 40%;
+  height: 10px;
+}
+
+.workflow-detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.workflow-detail-skeleton__inner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.workflow-detail-skeleton__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.workflow-detail-skeleton__title {
+  width: 60%;
+  height: 18px;
+}
+.workflow-detail-skeleton__meta-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.workflow-detail-skeleton__chip {
+  width: 72px;
+  height: 18px;
+  border-radius: 999px;
+}
+.workflow-detail-skeleton__chip--wide {
+  width: 140px;
+}
+.workflow-detail-skeleton__statbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.workflow-detail-skeleton__stat {
+  width: 96px;
+  height: 12px;
+}
+.workflow-detail-skeleton__tabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+.workflow-detail-skeleton__tab {
+  width: 72px;
+  height: 16px;
+}
+.workflow-detail-skeleton__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+.workflow-detail-skeleton__line {
+  height: 12px;
+}
+.workflow-detail-skeleton__line--long {
+  width: 92%;
+}
+.workflow-detail-skeleton__line--med {
+  width: 70%;
+}
+.workflow-detail-skeleton__line--short {
+  width: 48%;
+}

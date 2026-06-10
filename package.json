@@ -1,0 +1,72 @@
+{
+  "name": "@glyphs-ai/glyph",
+  "version": "0.1.0",
+  "description": "glyph — orchestrate agentic systems built on the MetaAgents format spec",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/glyphs-ai/glyph.git"
+  },
+  "homepage": "https://github.com/glyphs-ai/glyph#readme",
+  "bugs": {
+    "url": "https://github.com/glyphs-ai/glyph/issues"
+  },
+  "keywords": [
+    "agents",
+    "ai",
+    "copilot",
+    "metaagents",
+    "mcp",
+    "skills"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.33.4",
+  "bin": {
+    "glyph": "bundle/glyph.js"
+  },
+  "files": [
+    "bundle/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" run build",
+    "test": "pnpm -r --filter \"./packages/**\" run test",
+    "typecheck": "pnpm -r --filter \"./packages/**\" run typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "dev": "pnpm -r --parallel --filter \"./packages/**\" run dev",
+    "bundle": "pnpm build && pnpm --filter @glyphs-ai/dashboard build && node scripts/inline-migrations.mjs && node esbuild.config.js && node scripts/copy-dashboard.mjs",
+    "prepublishOnly": "pnpm bundle",
+    "new-pkg": "node scripts/new-pkg.mjs",
+    "knip": "knip"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "1.0.0-beta.4",
+    "better-sqlite3": "^12.10.0",
+    "bindings": "^1.5.0",
+    "pino": "^9.5.0",
+    "pino-pretty": "^11.3.0",
+    "pino-roll": "^3.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "esbuild": "^0.25.0",
+    "knip": "^6.14.1",
+    "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "msw"
+    ],
+    "overrides": {
+      "better-sqlite3": "^12.10.0",
+      "mute-stream": "^3.0.0"
+    }
+  }
+}

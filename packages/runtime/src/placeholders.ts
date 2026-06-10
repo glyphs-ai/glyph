@@ -1,0 +1,159 @@
+/**
+ * Placeholder substitution for runtime-projected configuration strings.
+ *
+ * Portable MCP specs (and, in the future, agent / skill
+ * frontmatter that reaches a runtime) cannot embed machine-specific
+ * absolute paths and cannot rely on shell variable expansion (the MCP
+ * spec at modelcontextprotocol.io has no `${VAR}` mechanism, and
+ * wrapping commands in `bash -c "..."` so the shell does the expansion
+ * breaks Windows immediately). This module provides glyph's own
+ * placeholder grammar — a tiny, scheme-free `${name}` syntax with a
+ * fixed vocabulary — so spec authors can write portable references
+ * without leaking the host OS into their JSON.
+ *
+ * Vocabulary (intentionally small):
+ *
+ *   ${workspaceDir}   the absolute path of the workspace this
+ *                     work item belongs to (`<workspaceDir>`, the
+ *                     root for glyph-owned session, task, and
+ *                     workflow artifacts).
+ *                     Pick this for state that should be PRIVATE to one
+ *                     workspace — playwright cookies tied to one
+ *                     project, repo-scoped credential caches.
+ *
+ *   ${sharedDir}      a stable per-user directory (`<GLYPH_HOME>/shared`
+ *                     by default). Pick this for state that should be
+ *                     SHARED across all workspaces and launch types on
+ *                     this machine — a single playwright login the
+ *                     user wants every project to reuse, a global API
+ *                     token cache.
+ *
+ * The two placeholders carve a clean scope axis (per-workspace vs
+ * per-machine) without leaking glyph's product name into spec authors'
+ * configs. `${HOME}`, `$HOME`, `~`, `${userHome}`, `${glyphHome}`,
+ * and per-run directory placeholders are intentionally unsupported:
+ * catalog specs choose between project-private state
+ * (`${workspaceDir}`), user-account state (`${sharedDir}`), or
+ * relative paths under the subprocess cwd for transient files.
+ *
+ * Substitution is purely lexical: `${workspaceDir}` is replaced
+ * verbatim wherever it appears in a string, anywhere. There is no
+ * conditional, no fallback, no `${var:-default}` shell-style syntax.
+ * If a placeholder name isn't recognised, {@link substitutePlaceholders}
+ * throws {@link UnknownPlaceholderError} so a typo surfaces at provision
+ * time instead of producing a literal `${typo}` path that some downstream
+ * tool then opens against `cwd`.
+ *
+ * Paths produced by substitution are always returned with FORWARD
+ * slashes, even on Windows — Node's `fs` accepts `C:/Users/...` natively
+ * and shipping forward-slash paths in JSON keeps catalog specs
+ * visually identical across platforms (no `\\` escaping).
+ */
+
+// Loose match `${...}` so any name we DON'T recognise still surfaces as
+// {@link UnknownPlaceholderError} instead of silently passing through.
+// Strict validation happens in {@link substitutePlaceholders}: only
+// {@link PLACEHOLDER_NAMES} resolve; everything else throws. The
+// rationale is "fail loud on a typo" — a stray `${workspceDir}` in a
+// spec would otherwise expand to a literal `${workspceDir}` substring
+// that downstream MCP servers would dutifully open against `cwd`,
+// producing inscrutable runtime errors instead of a clear provision-time
+// rejection.
+const PLACEHOLDER_RE = /\$\{([^}]+)\}/g;
+
+/** Names of supported placeholders, public so callers can validate / autocomplete. */
+export const PLACEHOLDER_NAMES = ["workspaceDir", "sharedDir"] as const;
+export type PlaceholderName = (typeof PLACEHOLDER_NAMES)[number];
+
+/**
+ * Resolution context for {@link substitutePlaceholders}. Both fields
+ * are required absolute paths; the substituter does not fall back to
+ * any default — providing the values is the caller's responsibility
+ * (server bootstrap derives them from `GLYPH_HOME` and the active
+ * workspace's `workdir`).
+ *
+ * The field name `sharedDir` matches the placeholder vocabulary
+ * (`${sharedDir}`) AND the env var glyph injects into spawned
+ * subprocesses (`GLYPH_SHARED_DIR`) — three names for one concept,
+ * deliberately consistent across the contract surface.
+ */
+export interface PlaceholderContext {
+  readonly workspaceDir: string;
+  readonly sharedDir: string;
+}
+
+export class UnknownPlaceholderError extends Error {
+  override readonly name = "UnknownPlaceholderError";
+  constructor(
+    readonly placeholder: string,
+    readonly source: string,
+  ) {
+    super(
+      `unknown placeholder \${${placeholder}} in ${source}; ` +
+        `supported: ${PLACEHOLDER_NAMES.map((n) => `\${${n}}`).join(", ")}`,
+    );
+  }
+}
+
+/**
+ * Replace every `${name}` occurrence in `input` with the matching value
+ * from `context`. `source` is a human-readable label (e.g. an MCP name)
+ * used only in error messages so a typo points back at the offending
+ * spec.
+ *
+ * Substituted paths are normalised to forward slashes regardless of
+ * host OS — see file-level docstring for rationale.
+ */
+export function substitutePlaceholders(
+  input: string,
+  context: PlaceholderContext,
+  source: string,
+): string {
+  return input.replace(PLACEHOLDER_RE, (_match, name: string) => {
+    if (name === "workspaceDir") return toForwardSlash(context.workspaceDir);
+    if (name === "sharedDir") return toForwardSlash(context.sharedDir);
+    throw new UnknownPlaceholderError(name, source);
+  });
+}
+
+/**
+ * Recursively walk a JSON-shaped value, applying
+ * {@link substitutePlaceholders} to every string leaf. Non-string leaves
+ * (numbers, booleans, null) are returned unchanged. Arrays and plain
+ * objects are reconstructed with substituted contents.
+ *
+ * Projects an MCP server config so `args`, `env` values, and
+ * any nested string field carry resolved paths instead of placeholders.
+ */
+export function substitutePlaceholdersDeep<T>(
+  value: T,
+  context: PlaceholderContext,
+  source: string,
+): T {
+  if (typeof value === "string") {
+    return substitutePlaceholders(value, context, source) as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => substitutePlaceholdersDeep(v, context, source)) as unknown as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = substitutePlaceholdersDeep(v, context, source);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}
+
+/**
+ * Normalise a filesystem path to forward slashes. Windows tolerates
+ * forward slashes in `node:fs` calls, in `child_process.spawn` arg
+ * strings (programs receive what we pass; very few are picky about
+ * separator), and in playwright/most MCP servers' file-handling code.
+ * Forward-slash paths also keep catalog JSON visually clean (no
+ * doubled `\\\\`) and bytewise identical across hosts.
+ */
+function toForwardSlash(p: string): string {
+  return p.replaceAll("\\", "/");
+}

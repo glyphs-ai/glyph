@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Schema/migration drift
+        # Catches: dev edited schema.ts but forgot to run db:generate.
+        # We regenerate everything; if any drizzle/ tree changes, the
+        # working copy is dirty and we fail with a pointer to the fix.
+        run: |
+          for pkg in workspace session task catalog workflow schedule; do
+            pnpm -F "@glyphs-ai/$pkg" db:generate
+          done
+          if ! git diff --exit-code packages/*/drizzle/; then
+            echo "::error::schema.ts changed without a regenerated migration. Run 'pnpm -F @glyphs-ai/<pkg> db:generate' and commit drizzle/ + src/migrations.ts."
+            exit 1
+          fi
+
+  ts:
+    name: TypeScript (${{ matrix.os }} / Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['22']
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # `pnpm test` is `pnpm -r --filter ./packages/** run test`, which
+      # picks up every workspace package automatically — including the
+      # `@glyphs-ai/e2e` cross-package smoke pkg (CLI subprocess + real
+      # server boot). Total e2e runtime is well under 20s on Windows so
+      # we keep it in this job rather than splitting it out.
+      - name: Test
+        run: pnpm test
+
+      # `pnpm bundle` only ran as part of `prepublishOnly` before this
+      # step landed, so a bundle break only surfaced at release time
+      # (see RELEASING.md recovery dance). Run it on every matrix entry
+      # — bundling is platform-independent but esbuild + the
+      # dashboard / migrations copy steps have hit Windows-specific
+      # path bugs in the past, so adding the cost on all three OSes
+      # buys cheap regression coverage.
+      - name: Bundle
+        run: pnpm bundle
+
+      - name: Verify inline migrations match bundle output
+        # If `pnpm bundle` regenerated any src/migrations.ts differently
+        # from the committed version, the drizzle hash on boot will not
+        # match and the runtime will refuse to start. Fail CI here
+        # rather than at deploy time.
+        shell: bash
+        run: |
+          if ! git diff --exit-code packages/*/src/migrations.ts; then
+            echo "::error::src/migrations.ts is out of sync with bundle output. Run 'pnpm bundle' locally and commit the result, OR investigate CRLF / generator drift."
+            exit 1
+          fi
+
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check internal links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: "docs/index.html README.md --no-progress --offline"
+          fail: true

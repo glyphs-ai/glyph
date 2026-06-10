@@ -1,0 +1,46 @@
+{
+  "name": "@glyphs-ai/contracts",
+  "version": "0.0.1",
+  "description": "Wire contracts for glyph. The strict-isolation entrypoint for dashboard + CLI: pure types only, with no orchestration code in the runtime graph.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@glyphs-ai/catalog": "workspace:*",
+    "@glyphs-ai/runtime": "workspace:*",
+    "@glyphs-ai/schedule": "workspace:*",
+    "@glyphs-ai/session": "workspace:*",
+    "@glyphs-ai/task": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/glyphs-ai/glyph.git",
+    "directory": "packages/contracts"
+  }
+}

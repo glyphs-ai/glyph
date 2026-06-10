@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>What we believe about agentic systems — glyph</title>
+<meta name="description" content="A short essay on how we think agent systems should be built — and why we keep glyph small on purpose." />
+<meta name="theme-color" content="#0f172a" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#1f2328;
+    --ink-soft:#475569;
+    --muted:#64748b;
+    --line:#e5e7eb;
+    --line-soft:#f1f5f9;
+    --paper:#fdfcf9;
+    --accent:#0f766e;
+    --accent-soft:#ccfbf1;
+    --code-bg:#f6f8fa;
+    --max:680px;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Source Serif 4", Charter, "Iowan Old Style", Georgia, serif;
+    font-size:19px;
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  html[lang="zh"] body{
+    font-family:"Noto Serif SC","Source Han Serif SC","Songti SC", serif;
+    font-size:18px;
+    line-height:1.85;
+  }
+
+  /* lang switching */
+  html[lang="en"] [data-lang="zh"]{display:none}
+  html[lang="zh"] [data-lang="en"]{display:none}
+
+  /* top bar */
+  .topbar{
+    position:sticky;
+    top:0;
+    z-index:10;
+    background:rgba(253,252,249,0.85);
+    backdrop-filter:saturate(180%) blur(12px);
+    -webkit-backdrop-filter:saturate(180%) blur(12px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .topbar-inner{
+    max-width:880px;
+    margin:0 auto;
+    padding:14px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+  }
+  .brand{
+    font-family:"Inter", system-ui, sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:0.02em;
+    color:var(--ink);
+    text-decoration:none;
+  }
+  .brand .dot{color:var(--accent)}
+  .lang-toggle{
+    display:inline-flex;
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:2px;
+    background:#fff;
+    font-family:"Inter", system-ui, sans-serif;
+    font-size:12px;
+  }
+  .lang-toggle button{
+    border:0;
+    background:transparent;
+    padding:5px 11px;
+    border-radius:999px;
+    cursor:pointer;
+    color:var(--muted);
+    font:inherit;
+    letter-spacing:0.04em;
+  }
+  .lang-toggle button.active{
+    background:var(--ink);
+    color:#fff;
+  }
+
+  /* article container */
+  article{
+    max-width:var(--max);
+    margin:0 auto;
+    padding:64px 28px 96px;
+  }
+
+  /* header */
+  header.post{
+    margin-bottom:56px;
+  }
+  .kicker{
+    font-family:"Inter", system-ui, sans-serif;
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:18px;
+  }
+  h1{
+    font-family:"Source Serif 4", Charter, Georgia, serif;
+    font-weight:600;
+    font-size:42px;
+    line-height:1.18;
+    letter-spacing:-0.015em;
+    margin:0 0 22px;
+    color:var(--ink);
+  }
+  html[lang="zh"] h1{
+    font-family:"Noto Serif SC","Source Han Serif SC", serif;
+    font-size:34px;
+    line-height:1.35;
+    letter-spacing:0;
+  }
+  .lede{
+    font-size:21px;
+    line-height:1.55;
+    color:var(--ink-soft);
+    margin:0 0 28px;
+    font-style:italic;
+  }
+  html[lang="zh"] .lede{
+    font-size:18px;
+    line-height:1.75;
+    font-style:normal;
+  }
+  .byline{
+    font-family:"Inter", system-ui, sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px;
+    padding-top:18px;
+    border-top:1px solid var(--line-soft);
+  }
+  .byline .sep{color:var(--line)}
+  .byline a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line)}
+  .byline a:hover{color:var(--accent);border-color:var(--accent)}
+
+  /* body */
+  article p{
+    margin:0 0 22px;
+  }
+  article h2{
+    font-family:"Source Serif 4", Charter, Georgia, serif;
+    font-weight:600;
+    font-size:26px;
+    line-height:1.3;
+    letter-spacing:-0.005em;
+    margin:56px 0 20px;
+    color:var(--ink);
+  }
+  html[lang="zh"] article h2{
+    font-family:"Noto Serif SC","Source Han Serif SC", serif;
+    font-size:22px;
+    line-height:1.45;
+  }
+  article h3{
+    font-family:"Source Serif 4", Charter, Georgia, serif;
+    font-weight:600;
+    font-size:18px;
+    line-height:1.4;
+    margin:36px 0 12px;
+    color:var(--ink);
+  }
+  html[lang="zh"] article h3{
+    font-family:"Noto Serif SC","Source Han Serif SC", serif;
+    font-size:17px;
+  }
+  article a{
+    color:var(--ink);
+    text-decoration:none;
+    border-bottom:1px solid var(--accent);
+    padding-bottom:1px;
+    transition:color 0.15s;
+  }
+  article a:hover{color:var(--accent)}
+  article strong{font-weight:600;color:var(--ink)}
+  article em{font-style:italic}
+
+  /* pull quote */
+  .pull{
+    margin:36px 0;
+    padding:0 0 0 22px;
+    border-left:3px solid var(--accent);
+    font-size:20px;
+    line-height:1.55;
+    color:var(--ink);
+    font-style:italic;
+  }
+  html[lang="zh"] .pull{
+    font-style:normal;
+    font-size:18px;
+    line-height:1.75;
+  }
+
+  /* code & inline */
+  code{
+    font-family:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size:0.86em;
+    background:var(--code-bg);
+    padding:2px 6px;
+    border-radius:4px;
+    color:#0f172a;
+  }
+  pre{
+    background:var(--code-bg);
+    border:1px solid var(--line-soft);
+    border-radius:8px;
+    padding:16px 18px;
+    overflow-x:auto;
+    margin:24px 0;
+  }
+  pre code{
+    background:transparent;
+    padding:0;
+    font-size:13.5px;
+    line-height:1.6;
+    color:#1f2328;
+  }
+
+  /* lists */
+  article ul, article ol{
+    margin:0 0 22px;
+    padding-left:24px;
+  }
+  article li{margin-bottom:8px}
+
+  /* numbered emphasis */
+  .belief{
+    margin:32px 0;
+    padding:24px 26px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    position:relative;
+  }
+  .belief .num{
+    font-family:"Inter", system-ui, sans-serif;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:0.16em;
+    color:var(--accent);
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  .belief h3{
+    margin:0 0 10px;
+    font-size:19px;
+  }
+  .belief p:last-child{margin-bottom:0}
+
+  /* section divider */
+  .rule{
+    border:0;
+    border-top:1px solid var(--line);
+    margin:64px auto;
+    width:80px;
+  }
+
+  /* footer */
+  footer.post{
+    margin-top:80px;
+    padding-top:32px;
+    border-top:1px solid var(--line-soft);
+    font-family:"Inter", system-ui, sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.7;
+  }
+  footer.post a{
+    color:var(--muted);
+    border-bottom:1px solid var(--line);
+    text-decoration:none;
+  }
+  footer.post a:hover{color:var(--accent);border-color:var(--accent)}
+
+  /* tighter on phones */
+  @media (max-width:640px){
+    body{font-size:18px}
+    article{padding:40px 22px 72px}
+    h1{font-size:32px}
+    html[lang="zh"] h1{font-size:26px}
+    .lede{font-size:18px}
+    article h2{font-size:22px;margin:44px 0 16px}
+    .pull{font-size:18px}
+    .topbar-inner{padding:12px 22px}
+  }
+
+  /* print: just the prose */
+  @media print{
+    .topbar{display:none}
+    body{background:#fff;font-size:11pt;color:#000}
+    article{padding:0;max-width:none}
+    .belief{break-inside:avoid;border-color:#999}
+    article a{color:#000;border-bottom:1px solid #999}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="https://github.com/glyphs-ai/glyph">glyph<span class="dot">.</span></a>
+    <div class="lang-toggle" role="group" aria-label="Language">
+      <button type="button" data-set-lang="en" class="active">EN</button>
+      <button type="button" data-set-lang="zh">中文</button>
+    </div>
+  </div>
+</div>
+
+<article>
+
+<!-- =============== ENGLISH =============== -->
+<div data-lang="en">
+
+<header class="post">
+  <div class="kicker">Essay · glyph</div>
+  <h1>What we believe about agentic systems</h1>
+  <p class="lede">The harness should shrink as the model grows. The one part that should grow is the AI's own ability to extend it.</p>
+  <div class="byline">
+    <span>The glyph team</span>
+    <span class="sep">·</span>
+    <span>2026</span>
+    <span class="sep">·</span>
+    <span>~7 min read</span>
+    <span class="sep">·</span>
+    <a href="https://github.com/glyphs-ai/glyph">github.com/glyphs-ai/glyph</a>
+  </div>
+</header>
+
+<p>We've spent the last while building <a href="https://github.com/glyphs-ai/glyph">glyph</a> — a small system for running AI agents on real work. While building it, our taste for what an agentic system <em>is</em> has slowly drifted away from the mainstream. This is a short post about where it's drifted to, and why.</p>
+
+<p>It's not a manifesto. It's the way we've come to think after enough cycles of writing code, throwing it out, and writing simpler code in its place.</p>
+
+<h2>What we've been noticing</h2>
+
+<p>Most agent frameworks are getting bigger. More node types, more graph primitives, more orchestration languages, more handlers for cases the model didn't quite get right. There's a quiet assumption running through all of this: <em>the framework is what makes the agent capable</em>. If the model is the engine, the framework is the chassis, the suspension, the steering, the seatbelts, and most of the dashboard.</p>
+
+<p>We don't think that's how it's going to age.</p>
+
+<p>The models keep getting better. Not in a smooth line, but in lurches that quietly retire whole categories of scaffolding. The clever planner you wrote last year is what the model now does in one sampling. The state machine you built around tool use is what the model now handles in its head. Each lurch makes a particular shape of harness embarrassing.</p>
+
+<p>If you squint at the trend long enough, a question becomes hard to avoid: <strong>what part of the harness is actually durable?</strong></p>
+
+<h2>A bet on the model curve</h2>
+
+<p>Our bet is straightforward. The model is going to absorb more and more of what frameworks currently do — planning, decomposition, recovery from mistakes, choosing when to use a tool, choosing what shape of answer to give. The boundary between "what the framework does" and "what the model does" will keep moving toward the model.</p>
+
+<p>If you believe that, the design problem flips. You stop asking <em>"what should the framework do for the model?"</em> and start asking <em>"what's the smallest scaffold the model needs to do real work?"</em></p>
+
+<p class="pull">A good harness in 2026 is not the one that does the most. It's the one that does the least, while still letting the model reach further every quarter.</p>
+
+<h2>Three things we keep coming back to</h2>
+
+<p>Underneath the day-to-day code we write, three convictions keep showing up. They're the lens behind most decisions in glyph.</p>
+
+<div class="belief">
+  <div class="num">One</div>
+  <h3>Agents are data, not code.</h3>
+  <p>An agent is a markdown file with a name and instructions. Not a class, not a node in a graph, not a subclass of <code>BaseAgent</code>. The model knows how to read prose; it doesn't need a typed wrapper around it. Treating agents as data means the AI itself can author them — read them, edit them, version them, recombine them — without round-tripping through a programmer.</p>
+</div>
+
+<div class="belief">
+  <div class="num">Two</div>
+  <h3>The harness should shrink as the model grows.</h3>
+  <p>Every line of orchestration code we write is a bet that the model won't get good enough to do this itself. Most of those bets lose, on a long enough timeline. So the rule we try to hold ourselves to is: don't add structure unless the model genuinely cannot do it; and when the model gets good enough, take that structure out.</p>
+</div>
+
+<div class="belief">
+  <div class="num">Three</div>
+  <h3>What the harness <em>does</em> grow is the AI's ability to extend itself.</h3>
+  <p>We don't shrink the harness toward zero. We shrink it toward one shape: a clean surface where the model can add new capabilities — skills, tools, sub-agents — as data, on its own, without us. The harness's job is to make that surface safe, observable, and composable. Everything else is negotiable.</p>
+</div>
+
+<h2>The parts that stay small</h2>
+
+<p>Three things stay in the harness, on purpose, because they're structurally outside what a language model can solve from inside its own context window:</p>
+
+<p><strong>A sandbox.</strong> The model needs somewhere to run that isn't your laptop. Filesystems, processes, network — bounded, observable, recoverable. This is engineering, not intelligence. No model upgrade removes the need for it.</p>
+
+<p><strong>Scheduling.</strong> Multiple agents, multiple tasks, shared state, human interrupts. Deciding what runs, when, with which inputs. This is also engineering. We try to make it as boring and reliable as possible.</p>
+
+<p><strong>Observability.</strong> If the AI is going to extend itself, somebody — eventually the AI itself — needs to be able to see what happened and why. Logs, traces, replay, diffs. Without this, every other belief on this list collapses into wishful thinking.</p>
+
+<p>That's the whole list. Sandbox, scheduling, observability. Everything else we've been tempted to put in the harness, we've eventually pulled back out.</p>
+
+<h2>The one part that grows</h2>
+
+<p>The shape we keep wide open is <strong>capability</strong>: the surface where new powers enter the system. In glyph today, that surface has three flavors and one rule.</p>
+
+<p>The flavors are <strong>skills</strong> (a markdown file teaching the model how to do something), <strong>MCPs</strong> (an external tool the model can call), and <strong>agents</strong> (a markdown file describing a role the model can play). All three are data. All three live in a folder. All three can be authored by a human or by the AI.</p>
+
+<p>The rule is: <em>anything the AI can do, the AI can also extend.</em> If the AI can write code, it can write a skill. If it can call a tool, it can install one. If it can act as an agent, it can describe a new agent. The harness doesn't gate that; it just makes it observable and undoable.</p>
+
+<p class="pull">The harness's job is not to be smart. It's to make the AI's own intelligence accumulate.</p>
+
+<h2>What this lets us do</h2>
+
+<p>If you accept the three beliefs, a lot of design questions stop being interesting.</p>
+
+<p>You don't argue about graph DSLs vs. chains vs. event buses, because there isn't supposed to be one — the model picks the shape of its own work. You don't argue about whether agents should be classes or functions, because they're files. You don't build a planner, because the model plans. You don't build a router, because the model routes. You don't build a memory subsystem, because memory is just files in the workspace.</p>
+
+<p>What you <em>do</em> spend your energy on is the boring stuff: the sandbox not leaking, the scheduler not deadlocking, the trace being actually readable, the capability surface being actually safe to extend at runtime. Unglamorous work. But it's the work that compounds, because none of it has to be redone when the model gets stronger. It just gets more leverage.</p>
+
+<h2>About glyph</h2>
+
+<p><a href="https://github.com/glyphs-ai/glyph">glyph</a> is our reference implementation of all this. Today it's a pnpm monorepo of small TypeScript packages running locally, exposing a single HTTP server (Hono) with a bundled React dashboard, with a workspace abstraction, a runtime registry, a capability catalog (skills, MCPs, agents), and a thin task/session model. The code is deliberately small. If we did our jobs right, it should keep shrinking — not growing — as the models get better.</p>
+
+<p>If you want to see how the beliefs map onto code, the <a href="https://github.com/glyphs-ai/glyph/blob/main/docs/architecture.md">architecture guide</a> is the right next read. It's the engineering view of the same picture: where the layers are, what the runtime contract looks like, how the repository pattern keeps the storage backend swappable.</p>
+
+<p>The engineering will change. The runtime might consolidate to a single backend; the storage layer might collapse into something simpler; the catalog might absorb new flavors of capability we haven't thought of yet. None of that changes what's in this post. The beliefs are the slow-moving part. The code is just where they currently land.</p>
+
+<h2>If you're nodding along</h2>
+
+<p>This post is mostly here to find the people who already think this way and don't quite have words for it yet. If you've been quietly suspicious that your framework is doing too much, or that the next model release is going to make a third of your codebase pointless — you're not alone, and you're probably right.</p>
+
+<p>We'd love to compare notes. Open an issue on <a href="https://github.com/glyphs-ai/glyph">the repo</a>, or just read the code and tell us where we're wrong. The whole point of keeping the harness small is that being wrong is cheap; we'd rather find out fast.</p>
+
+<hr class="rule" />
+
+<footer class="post">
+  <p>Published 2026 by the glyph team. Source on <a href="https://github.com/glyphs-ai/glyph">GitHub</a>. The companion architecture guide is <a href="https://github.com/glyphs-ai/glyph/blob/main/docs/architecture.md">here</a>.</p>
+</footer>
+
+</div>
+
+
+<!-- =============== 中文 =============== -->
+<div data-lang="zh">
+
+<header class="post">
+  <div class="kicker">随笔 · glyph</div>
+  <h1>我们对 agentic system 的一些看法</h1>
+  <p class="lede">harness 应该随着模型变强而变薄。harness 里唯一应该变厚的部分，是 AI 自己扩展自己的能力。</p>
+  <div class="byline">
+    <span>glyph 团队</span>
+    <span class="sep">·</span>
+    <span>2026</span>
+    <span class="sep">·</span>
+    <span>约 8 分钟</span>
+    <span class="sep">·</span>
+    <a href="https://github.com/glyphs-ai/glyph">github.com/glyphs-ai/glyph</a>
+  </div>
+</header>
+
+<p>过去一段时间我们在做 <a href="https://github.com/glyphs-ai/glyph">glyph</a>——一个用来跑 AI agent 干真活的小系统。一边做一边发现，我们对一个 agentic system <em>应该是什么样</em> 的看法，慢慢和主流分道扬镳了。这篇文章就是想把这个分歧讲出来，以及为什么我们这么想。</p>
+
+<p>这不是宣言。只是写过一些代码、扔掉一些代码、又用更简单的代码替换它们之后，自然形成的某种 taste。</p>
+
+<h2>我们看到的现象</h2>
+
+<p>大部分 agent 框架在变大。更多种 node、更多 graph primitive、更多 orchestration 语法、更多用来兜底"模型没做对"的 handler。这些设计背后有一个不说出口的假设：<em>是框架让 agent 变能干的</em>。如果模型是引擎，那框架就是底盘、悬挂、方向、安全带，再加上仪表盘的大部分。</p>
+
+<p>我们觉得这个范式经不起时间。</p>
+
+<p>模型一直在变强。不是平滑地变，而是一阵一阵地把整类脚手架直接淘汰掉。你去年写的那个聪明 planner，模型现在一次采样就做了。你为 tool use 搭起来的状态机，模型现在在脑子里就处理了。每一次跳跃，都让某种形态的 harness 显得有点尴尬。</p>
+
+<p>看久了这个趋势，一个问题就很难绕开：<strong>harness 里到底什么是耐用的？</strong></p>
+
+<h2>对模型曲线的押注</h2>
+
+<p>我们的押注很直白：模型会越来越多地吸收掉今天框架在做的事——planning、任务拆分、错误恢复、判断什么时候用工具、判断答案的结构。"框架在做"和"模型在做"之间的边界，会持续向模型那一侧移动。</p>
+
+<p>如果你接受这一点，设计问题就反过来了。你不再问 <em>"框架应该替模型做什么？"</em>，而开始问 <em>"模型干真活，最小需要的脚手架是什么？"</em></p>
+
+<p class="pull">2026 年的好 harness，不是做得最多的那个。是做得最少、同时仍能让模型每个季度都伸得更远一点的那个。</p>
+
+<h2>我们反复回到的三件事</h2>
+
+<p>在每天写的代码底下，有三个判断一直反复出现。它们基本上就是 glyph 大部分决策背后的那副镜片。</p>
+
+<div class="belief">
+  <div class="num">其一</div>
+  <h3>Agent 是数据，不是代码。</h3>
+  <p>一个 agent 就是一个 markdown 文件，有个名字，写着指令。不是类，不是 graph 里的节点，不是 <code>BaseAgent</code> 的子类。模型本来就会读散文，根本不需要一层带类型的封装。把 agent 当作数据，意味着 AI 自己就可以创作 agent——读、改、版本管理、组合——不需要绕一圈让程序员介入。</p>
+</div>
+
+<div class="belief">
+  <div class="num">其二</div>
+  <h3>harness 应该随着模型变强而变薄。</h3>
+  <p>每一行 orchestration 代码，都是一个赌注：赌模型不会进步到能自己做这件事。时间线拉长，这种赌注大部分会输。所以我们试着守住一个规矩：除非模型真的搞不定，否则不要加结构；一旦模型搞得定了，就把那段结构拆出去。</p>
+</div>
+
+<div class="belief">
+  <div class="num">其三</div>
+  <h3>harness 里 <em>该</em> 变厚的，是 AI 自己扩展自己的能力。</h3>
+  <p>我们不是要把 harness 缩到零。我们要把它缩到一种形状：一个干净的扩展面，让模型可以自己往上加新能力——skill、工具、子 agent——以数据的形式，自主完成，不需要我们插手。harness 的工作是让这个面安全、可观测、可组合。其它都可以谈。</p>
+</div>
+
+<h2>那些有意保持小的部分</h2>
+
+<p>三样东西我们刻意留在 harness 里，因为它们结构上就在语言模型自己的 context window 之外，模型靠自己解决不了：</p>
+
+<p><strong>沙箱。</strong>模型需要一个不在你笔记本上的地方运行。文件系统、进程、网络——有边界、可观察、可恢复。这是工程问题，不是智力问题。模型再升级也消除不掉这个需求。</p>
+
+<p><strong>调度。</strong>多 agent、多任务、共享状态、人类中断。决定什么时候跑什么、用什么输入。也是工程问题。我们尽量把它做得无聊、可靠。</p>
+
+<p><strong>可观测性。</strong>如果 AI 要扩展自己，那总得有人——最终是 AI 自己——能看到发生了什么、为什么发生。日志、trace、回放、diff。没有这一层，上面所有信念都会塌成一厢情愿。</p>
+
+<p>就这三样。沙箱、调度、可观测性。除此以外那些我们曾经想塞进 harness 的东西，最后都被我们拆出来了。</p>
+
+<h2>那个我们留得很大的部分</h2>
+
+<p>我们坚决留宽的那个面，是 <strong>capability</strong>——新能力进入系统的接口。今天在 glyph 里，这个面有三种形态、一条规矩。</p>
+
+<p>三种形态分别是：<strong>skill</strong>（一个 markdown 文件，教模型做某件事）、<strong>MCP</strong>（一个模型可以调用的外部工具）、<strong>agent</strong>（一个 markdown 文件，描述模型可以扮演的某个角色）。三者都是数据。三者都住在文件夹里。三者都可以由人写，也可以由 AI 写。</p>
+
+<p>那条规矩是：<em>AI 能做的事，AI 也能扩展。</em>如果 AI 能写代码，那它就能写 skill。如果它能调用工具，那它就能装新工具。如果它能扮演 agent，那它就能描述新 agent。harness 不去把守这件事；它只负责让这件事可观测、可撤回。</p>
+
+<p class="pull">harness 的工作不是变聪明。是让 AI 自己的智能能积累下来。</p>
+
+<h2>这让我们能做什么</h2>
+
+<p>如果你接受这三个信念，很多设计问题就不再有趣了。</p>
+
+<p>你不会再纠结 graph DSL 还是 chain 还是 event bus，因为本来就不该有一个固定的形——模型自己选它工作的形状。你不会再纠结 agent 是类还是函数，因为它是文件。你不会再去搭 planner，因为模型会 plan。你不会再去搭 router，因为模型会 route。你不会再去搭 memory 子系统，因为 memory 就是 workspace 里的文件。</p>
+
+<p>你<em>真正</em>把精力投进去的是那些无聊的部分：沙箱不要漏、调度器不要死锁、trace 真的可读、capability 这个扩展面在运行时真的安全。一点都不光鲜的工作。但这些工作会复利，因为模型变强的时候，这些代码一行都不用重写，只是被赋予了更大的杠杆。</p>
+
+<h2>关于 glyph</h2>
+
+<p><a href="https://github.com/glyphs-ai/glyph">glyph</a> 是我们对这套思路的参考实现。今天它是一个 pnpm monorepo，由若干个小的 TypeScript 包组成，跑在本地，对外暴露一个 HTTP 服务器（Hono）加一个打包好的 React dashboard，里面有 workspace 抽象、runtime registry、capability catalog（skill、MCP、agent），以及一层很薄的 task/session 模型。代码刻意保持很小。如果我们做对了，它应该会随着模型变强而变得更小，而不是更大。</p>
+
+<p>如果你想看这些信念落到代码上是什么样子，下一步推荐读 <a href="https://github.com/glyphs-ai/glyph/blob/main/docs/architecture.md">architecture 文档</a>——那是同一幅图的工程视角：层次怎么分、runtime contract 长什么样、repository 模式怎么让存储后端可替换。</p>
+
+<p>工程会变。runtime 也许有一天会收敛到单一后端；存储层也许会塌成更简单的东西；catalog 也许会吸收掉我们今天还没想到的新形态的能力。这些都不影响这篇文章里写的东西。信念是慢变量。代码只是它们当前的落脚点。</p>
+
+<h2>如果你也这么想</h2>
+
+<p>写这篇文章主要是想找到那些已经这么想、但还没找到合适的话讲出来的人。如果你心里一直有点怀疑——觉得自己用的框架做得太多了，或者觉得下一次模型升级会让自己 codebase 里三分之一变得没意义——你不是一个人，你大概率也是对的。</p>
+
+<p>我们很想跟你交换看法。可以去 <a href="https://github.com/glyphs-ai/glyph">repo</a> 里开 issue，或者直接读代码、告诉我们哪里想错了。harness 保持小的好处之一就是：错的成本很低，我们更愿意快点知道自己错在哪。</p>
+
+<hr class="rule" />
+
+<footer class="post">
+  <p>2026 年由 glyph 团队发布。源码在 <a href="https://github.com/glyphs-ai/glyph">GitHub</a>。配套的 architecture 文档在 <a href="https://github.com/glyphs-ai/glyph/blob/main/docs/architecture.md">这里</a>。</p>
+</footer>
+
+</div>
+
+</article>
+
+<script>
+(function(){
+  var KEY = "glyph-paradigm-lang";
+  var html = document.documentElement;
+  var buttons = document.querySelectorAll("[data-set-lang]");
+
+  function apply(lang){
+    html.setAttribute("lang", lang);
+    buttons.forEach(function(b){
+      b.classList.toggle("active", b.getAttribute("data-set-lang") === lang);
+    });
+    try { localStorage.setItem(KEY, lang); } catch(e){}
+    document.title = (lang === "zh"
+      ? "我们对 agentic system 的一些看法 — glyph"
+      : "What we believe about agentic systems — glyph");
+  }
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch(e){}
+  if (saved === "en" || saved === "zh") {
+    apply(saved);
+  } else {
+    var nav = (navigator.language || "en").toLowerCase();
+    apply(nav.indexOf("zh") === 0 ? "zh" : "en");
+  }
+
+  buttons.forEach(function(b){
+    b.addEventListener("click", function(){
+      apply(b.getAttribute("data-set-lang"));
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

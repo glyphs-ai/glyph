@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "name": "io.playwright/mcp"
+  },
+  "type": "stdio",
+  "command": "npx",
+  "args": [
+    "-y",
+    "@playwright/mcp@latest",
+    "--headless",
+    "--storage-state",
+    "${workspaceDir}/.playwright/storage-state.json"
+  ]
+}

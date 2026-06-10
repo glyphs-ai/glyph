@@ -1,0 +1,70 @@
+{
+  "name": "@glyphs-ai/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "HTTP API surface (Hono) for glyph -- workspace-scoped catalog / sessions / tasks / schedules over a per-workspace context registry. Pure transport adapter over @glyphs-ai/api.",
+  "keywords": [
+    "glyph",
+    "server",
+    "hono",
+    "agentic",
+    "workspace",
+    "catalog",
+    "sessions",
+    "tasks",
+    "schedules"
+  ],
+  "_devPortNote": "The PORT=41817 in scripts.dev MUST stay in lock-step with the proxy target in packages/dashboard/vite.config.ts. If they drift, dev /api/* requests silently ECONNREFUSED.",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "cross-env PORT=41817 node --watch --import tsx src/bin.ts --no-serve-static",
+    "build": "tsc",
+    "start": "node dist/bin.js --serve-static",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.typecheck.json"
+  },
+  "dependencies": {
+    "@glyphs-ai/api": "workspace:*",
+    "@glyphs-ai/catalog": "workspace:*",
+    "@glyphs-ai/runtime": "workspace:*",
+    "@glyphs-ai/schedule": "workspace:*",
+    "@glyphs-ai/session": "workspace:*",
+    "@glyphs-ai/task": "workspace:*",
+    "@glyphs-ai/workflow": "workspace:*",
+    "@glyphs-ai/workspace": "workspace:*",
+    "@hono/node-server": "^1.14.1",
+    "hono": "^4.7.11",
+    "pino": "^9.5.0",
+    "pino-pretty": "^11.3.0",
+    "pino-roll": "^3.0.0"
+  },
+  "devDependencies": {
+    "@glyphs-ai/terminal": "workspace:*",
+    "@types/node": "^22.19.17",
+    "cross-env": "^7.0.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/glyphs-ai/glyph.git",
+    "directory": "packages/server"
+  }
+}

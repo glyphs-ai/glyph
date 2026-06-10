@@ -1,0 +1,244 @@
+import { useMemo } from "react";
+import type { OrphanManifestEntry, ResolveManifest, ResolveNode } from "../api";
+import { KIND_ICON } from "../kind-meta";
+
+/**
+ * Two-phase install / sync preview tree.
+ *
+ * Read-only display of the {@link ResolveManifest}: per-node FQN,
+ * status pill, kind icon, and a "default scope" badge for entries
+ * whose frontmatter omitted `scope:` (so the user knows they'll land
+ * under `public/<name>`).
+ *
+ * Sync-only sections (rendered when `manifest.isSync`):
+ *   - identity-changed callout when upstream renamed under the same URL
+ *   - "Up to date" hint when nothing changed
+ *   - orphans block listing deps the new closure dropped
+ *
+ * Scope is NOT editable here — glyph's install flow has no per-call
+ * scope override. Forking under a different scope means editing the
+ * upstream's frontmatter and installing from your fork; this dialog
+ * only shows what you'd get with the current upstream sources.
+ *
+ * Conflicts (status=`would-conflict`) and failures (`fetch-failed`,
+ * `parse-failed`) are surfaced inline so the user can cancel or fix
+ * before committing.
+ */
+export interface ResolveTreeProps {
+  manifest: ResolveManifest;
+}
+
+export function ResolveTree({ manifest }: ResolveTreeProps) {
+  const rootIdx = manifest.nodes.findIndex((n) => n.fqn === manifest.rootFqn);
+  const ordered = useMemo(() => {
+    if (rootIdx <= 0) return manifest.nodes;
+    const root = manifest.nodes[rootIdx];
+    if (!root) return manifest.nodes;
+    return [root, ...manifest.nodes.filter((_, i) => i !== rootIdx)];
+  }, [manifest, rootIdx]);
+
+  const counts = useMemo(() => {
+    const c = {
+      new: 0,
+      willSync: 0,
+      alreadyInstalled: 0,
+      upToDate: 0,
+      identityChanged: 0,
+      problem: 0,
+    };
+    for (const n of manifest.nodes) {
+      if (n.status === "new") c.new++;
+      else if (n.status === "will-sync") c.willSync++;
+      else if (n.status === "already-installed") c.alreadyInstalled++;
+      else if (n.status === "up-to-date") c.upToDate++;
+      else if (n.status === "identity-changed") c.identityChanged++;
+      else c.problem++;
+    }
+    return c;
+  }, [manifest]);
+
+  return (
+    <div className="resolve-tree">
+      {manifest.isSync && manifest.upToDate && (
+        <div className="alert alert--info" style={{ marginBottom: 12 }}>
+          ✓ Already up to date — nothing to apply.
+        </div>
+      )}
+      {manifest.identityChange && (
+        <div className="alert alert--warn" style={{ marginBottom: 12 }}>
+          ⚠ Upstream identity changed: <code>{manifest.identityChange.oldFqn}</code> →{" "}
+          <code>{manifest.identityChange.newFqn}</code>. Applying will replace the local entry with
+          a new one under the new fqn.
+        </div>
+      )}
+
+      <div className="resolve-tree__summary">
+        <span className="resolve-tree__count">
+          {manifest.nodes.length} {manifest.nodes.length === 1 ? "node" : "nodes"}
+        </span>
+        {counts.new > 0 && (
+          <span className="resolve-tree__count resolve-tree__count--new">{counts.new} new</span>
+        )}
+        {counts.willSync > 0 && (
+          <span className="resolve-tree__count resolve-tree__count--sync">
+            {counts.willSync} will sync
+          </span>
+        )}
+        {counts.alreadyInstalled > 0 && (
+          <span className="resolve-tree__count resolve-tree__count--existing">
+            {counts.alreadyInstalled} already installed
+          </span>
+        )}
+        {counts.upToDate > 0 && (
+          <span className="resolve-tree__count resolve-tree__count--existing">
+            {counts.upToDate} up to date
+          </span>
+        )}
+        {counts.identityChanged > 0 && (
+          <span className="resolve-tree__count resolve-tree__count--problem">
+            {counts.identityChanged} identity changed
+          </span>
+        )}
+        {counts.problem > 0 && (
+          <span className="resolve-tree__count resolve-tree__count--problem">
+            {counts.problem} {counts.problem === 1 ? "problem" : "problems"}
+          </span>
+        )}
+      </div>
+
+      <ul className="resolve-tree__list">
+        {ordered.map((node) => (
+          <li key={`${node.kind}:${node.origin}`} className="resolve-tree__item">
+            <ResolveTreeRow node={node} isRoot={node.fqn === manifest.rootFqn} />
+          </li>
+        ))}
+      </ul>
+
+      {manifest.orphans.length > 0 && (
+        <div className="resolve-tree__orphans">
+          <div className="resolve-tree__orphans-header">
+            <strong>Orphans</strong> — these deps will be flagged orphaned (kept on disk; no longer
+            referenced):
+          </div>
+          <ul className="resolve-tree__list">
+            {manifest.orphans.map((o) => (
+              <li key={`orphan:${o.kind}:${o.origin}`} className="resolve-tree__item">
+                <OrphanRow entry={o} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface RowProps {
+  node: ResolveNode;
+  isRoot: boolean;
+}
+
+function ResolveTreeRow({ node, isRoot }: RowProps) {
+  const isProblem =
+    node.status === "fetch-failed" ||
+    node.status === "parse-failed" ||
+    node.status === "would-conflict" ||
+    node.status === "identity-changed";
+  const displayLabel = node.fqn !== "" ? node.fqn : node.origin;
+  return (
+    <div
+      className={[
+        "resolve-tree__row",
+        isRoot ? "resolve-tree__row--root" : "",
+        isProblem ? "resolve-tree__row--problem" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span className="resolve-tree__kind" data-kind={node.kind} title={node.kind}>
+        {kindIcon(node.kind)}
+      </span>
+      <div className="resolve-tree__main">
+        <div className="resolve-tree__line">
+          <code className="resolve-tree__fqn" title={node.origin}>
+            {displayLabel}
+          </code>
+          {isRoot && <span className="resolve-tree__root-tag">root</span>}
+          <StatusPill status={node.status} />
+        </div>
+        {node.identityChange && (
+          <div className="resolve-tree__error">
+            <span className="resolve-tree__error-icon" aria-hidden="true">
+              ⚠
+            </span>
+            <span className="resolve-tree__error-msg">
+              renamed: <code>{node.identityChange.oldFqn}</code> →{" "}
+              <code>{node.identityChange.newFqn}</code>
+            </span>
+          </div>
+        )}
+        {node.error && (
+          <div className="resolve-tree__error">
+            <span className="resolve-tree__error-icon" aria-hidden="true">
+              ⚠
+            </span>
+            <span className="resolve-tree__error-msg" title={node.error.name}>
+              {node.error.message}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrphanRow({ entry }: { entry: OrphanManifestEntry }) {
+  return (
+    <div className="resolve-tree__row resolve-tree__row--problem">
+      <span className="resolve-tree__kind" data-kind={entry.kind} title={entry.kind}>
+        {kindIcon(entry.kind)}
+      </span>
+      <div className="resolve-tree__main">
+        <div className="resolve-tree__line">
+          <code className="resolve-tree__fqn" title={entry.origin}>
+            {entry.fqn}
+          </code>
+          <span className="resolve-tree__status resolve-tree__status--removed">orphan</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: ResolveNode["status"] }) {
+  return (
+    <span className={`resolve-tree__status resolve-tree__status--${status}`}>
+      {statusLabel(status)}
+    </span>
+  );
+}
+
+function kindIcon(kind: ResolveNode["kind"]): string {
+  return KIND_ICON[kind];
+}
+
+function statusLabel(status: ResolveNode["status"]): string {
+  switch (status) {
+    case "new":
+      return "new";
+    case "will-sync":
+      return "will sync";
+    case "already-installed":
+      return "installed";
+    case "up-to-date":
+      return "up to date";
+    case "identity-changed":
+      return "identity changed";
+    case "would-conflict":
+      return "conflict";
+    case "fetch-failed":
+      return "fetch failed";
+    case "parse-failed":
+      return "parse failed";
+  }
+}

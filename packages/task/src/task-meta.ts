@@ -1,0 +1,28 @@
+import type { Task } from "./types.js";
+
+/**
+ * Typed reader for the runtime metadata `TaskService` deposits on
+ * every task. All fields are `undefined` until the relevant lifecycle
+ * event has been applied (for example, `runtimeSessionId` is undefined
+ * before the runtime returns its headless session id).
+ *
+ * The fields live in `task.metadata` (an open-shape bag the kernel
+ * doesn't introspect). This helper centralises the strict typing so
+ * runtime callers don't have to repeat the conditional narrowing.
+ */
+export interface TaskRuntimeMetadata {
+  readonly workdir?: string;
+  readonly runtime?: string;
+  readonly runtimeSessionId?: string;
+}
+
+export function readTaskRuntimeMetadata(task: Pick<Task, "metadata">): TaskRuntimeMetadata {
+  const m = task.metadata;
+  if (!m || typeof m !== "object") return {};
+  const out: TaskRuntimeMetadata = {};
+  if (typeof m.workdir === "string") (out as { workdir?: string }).workdir = m.workdir;
+  if (typeof m.runtime === "string") (out as { runtime?: string }).runtime = m.runtime;
+  if (typeof m.runtimeSessionId === "string")
+    (out as { runtimeSessionId?: string }).runtimeSessionId = m.runtimeSessionId;
+  return out;
+}

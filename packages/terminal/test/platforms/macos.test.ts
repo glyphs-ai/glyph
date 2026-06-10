@@ -1,0 +1,75 @@
+import { describe, expect, it } from "vitest";
+import {
+  type LaunchCommand,
+  spawnTerminalWith,
+  TerminalSpawnFailedError,
+} from "../../src/index.js";
+import { makeDeps, sample, sampleResume } from "../_helpers.js";
+
+describe("spawnTerminalWith > macOS", () => {
+  it("uses osascript with Terminal.app and quotes paths safely", async () => {
+    const { deps, calls } = makeDeps({ platform: "darwin" });
+    const result = await spawnTerminalWith(sample, deps);
+    expect(result.launcher).toBe("Terminal");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.file).toBe("osascript");
+    expect(calls[0]?.args[0]).toBe("-e");
+    const script = calls[0]?.args[1];
+    expect(script).toMatch(/^tell application "Terminal" to do script /);
+    // shell command should be single-quoted around the workdir
+    expect(script).toContain("cd '/tmp/wd' && exec 'copilot'");
+  });
+
+  it("escapes embedded double-quotes and backslashes for AppleScript", async () => {
+    const { deps, calls } = makeDeps({ platform: "darwin" });
+    const cmd: LaunchCommand = { ...sample, cwd: "/tmp/has\\back\\slash" };
+    await spawnTerminalWith(cmd, deps);
+    const script = calls[0]?.args[1] as string;
+    // The AppleScript-level escape doubles backslashes; the inner shell
+    // quoting also single-quotes the path. Verify both layers happen.
+    expect(script).toContain("\\\\back\\\\slash");
+  });
+
+  it("includes resume args verbatim", async () => {
+    const { deps, calls } = makeDeps({ platform: "darwin" });
+    await spawnTerminalWith(sampleResume, deps);
+    const script = calls[0]?.args[1] as string;
+    expect(script).toContain("exec 'copilot' '--session-id=12345678-1234-1234-1234-1234567890ab'");
+  });
+
+  it("throws TerminalSpawnFailedError when osascript fails", async () => {
+    const { deps } = makeDeps({ platform: "darwin", failures: { 0: "ENOENT" } });
+    await expect(spawnTerminalWith(sample, deps)).rejects.toThrow(TerminalSpawnFailedError);
+  });
+
+  it("inlines cmd.env as `export K='v' && ` before cd in the do-script payload", async () => {
+    // Terminal.app is a daemon — env handed to osascript does NOT propagate
+    // to the child shell it forks. Inlining `export ... && ` into the
+    // shell line is the only reliable way to make GLYPH_* show up in
+    // the eventual `copilot` process.
+    const { deps, calls } = makeDeps({ platform: "darwin" });
+    const cmd: LaunchCommand = {
+      ...sample,
+      env: {
+        GLYPH_WORKSPACE: "ws-uuid-1",
+        GLYPH_WORK_ID: "01HZZZ",
+        GLYPH_SERVER: "http://127.0.0.1:8787",
+      },
+    };
+    await spawnTerminalWith(cmd, deps);
+    const script = calls[0]?.args[1] as string;
+    // Order-preserving export with single-quoted values.
+    expect(script).toContain(
+      "export GLYPH_WORKSPACE='ws-uuid-1' GLYPH_WORK_ID='01HZZZ' GLYPH_SERVER='http://127.0.0.1:8787' && cd '/tmp/wd' && exec 'copilot'",
+    );
+  });
+
+  it("does not emit `export … && ` when cmd.env is empty", async () => {
+    const { deps, calls } = makeDeps({ platform: "darwin" });
+    const cmd: LaunchCommand = { ...sample, env: {} };
+    await spawnTerminalWith(cmd, deps);
+    const script = calls[0]?.args[1] as string;
+    expect(script).not.toContain("export ");
+    expect(script).toContain("cd '/tmp/wd' && exec 'copilot'");
+  });
+});
