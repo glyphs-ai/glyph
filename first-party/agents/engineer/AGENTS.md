@@ -2,7 +2,7 @@
 name: engineer
 scope: official
 description: "Engineering agent for glyph — implements features, fixes bugs, and opens PRs on glyphs-ai/glyph"
-version: 0.1.0
+version: 0.1.1
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/git-pr"
@@ -97,6 +97,7 @@ scripts/
 
 docs/
   architecture.md   tier layering + glossary (read first)
+  paradigm.md       conceptual paper — what we believe about agentic systems
   pkg-template.md   conventions every package follows
   RELEASING.md      cut a release + npm publish flow
 ```
