@@ -33,7 +33,7 @@ packages/api/src/
 ├── wiring/                   ← per-kind handler wiring (cross-package glue)
 │   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskService
 │   ├── workflow-coord-task-runner.ts    ← workflow coordinator node → TaskService
-│   └── workflow-task-runner.ts          ← workflow worker node → TaskService
+│   └── workflow-worker-task-runner.ts   ← workflow worker node → TaskService
 └── index.ts                  ← public barrel (orchestration + re-exports
                                 of @glyphs-ai/contracts)
 ```
@@ -46,13 +46,11 @@ that package's internal layout.
 
 The package exports:
 
-- `composeApplication`, `Application`, and `ApplicationOpts`.
+- `composeApplication` and `Application`.
 - `WorkspaceContext` and `WorkspaceHasLiveTasksError`.
-- Schedule wiring helpers: `makeTaskKindHandler` and
-  `TaskScheduleTargetError`.
-- Workflow task-runner helpers: `makeCoordNodeRunner`,
-  `makeWorkerNodeRunner`, their opts/spec types, poll constants, and
-  public validation errors.
+- Schedule validation error: `TaskScheduleTargetError`.
+- Workflow public validation errors: `WorkflowCoordAgentNotCapableError`,
+  `WorkflowCoordSpecError`, and `WorkflowWorkerSpecError`.
 - Every public wire contract from `@glyphs-ai/contracts`.
 
 ```ts

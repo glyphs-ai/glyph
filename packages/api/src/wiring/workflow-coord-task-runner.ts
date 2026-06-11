@@ -8,7 +8,7 @@
  * WorkflowNodeRunner} that maps a workflow coordinator node to a
  * `@glyphs-ai/task` task.
  *
- * Structurally the same machine as `workflow-task-runner.ts`
+ * Structurally the same machine as `workflow-worker-task-runner.ts`
  * (worker): same per-node interval Map, same `clearForNode` /
  * `fireTerminal` helpers, same poll-tick state machine, same cancel
  * reconciliation, same dispose. The two runners are intentionally
@@ -26,13 +26,12 @@
  *     (read via `getService().getWorkflow(workflowId)` at dispatch
  *     time), NOT from the node spec. Coordinators are launched at
  *     workflow-create time with `{ agent: args.coordinatorAgent }`
- *     and inherit the workflow's prose for their TASK.md body — see
- *     `workflow-service.ts:438` for the bootstrap insert shape.
+ *     and inherit the workflow's prose for their TASK.md body.
  *   - Two-phase init via the `getService` thunk: the workflow
  *     service is constructed by `composeWorkflowModule`, which
  *     itself requires the runners. The thunk lets the caller
  *     assign the service ref after compose returns — mirrors the
- *     engine ↔ service two-phase init at `compose.ts:113`.
+ *     engine ↔ service two-phase init in `@glyphs-ai/workflow`.
  *
  * # Why `setInterval` lives here, not in `@glyphs-ai/workflow/_engine.ts`
  *
@@ -44,7 +43,7 @@
  * # Spec invariants honored
  *
  *   - `task.metadata.workflowNodeId` is the canonical reverse-lookup
- *     key (per `packages/workflow/src/types.ts:222`). Worker and
+ *     key documented by `@glyphs-ai/workflow`. Worker and
  *     coord runners use the SAME key — `tasks.hasInFlightForWorkflowNode`
  *     covers both kinds via the existing partial index.
  *   - `onTerminal` is fired exactly once per dispatched node by this
@@ -54,9 +53,8 @@
  *   - `dispatch` returns `void`. The runner logs the substrate-side
  *     identifier (the task id) at info level inside `dispatch` so
  *     operators can correlate substrate events with the underlying
- *     task; the substrate explicitly does NOT persist that id (per
- *     the same `types.ts:222` comment) because reverse-lookup goes
- *     through the unit's metadata.
+ *     task; the substrate explicitly does NOT persist that id because
+ *     reverse-lookup goes through the unit's metadata.
  *   - No retry / no exponential backoff at the runner level; a
  *     single runner-local poll-error budget (`maxPollErrors`,
  *     default 3) maps repeated `tasks.get` failures to
@@ -103,7 +101,7 @@ export const DEFAULT_COORD_MAX_POLL_ERRORS = 3;
  *
  * Single-line printable ASCII by the same invariant as the default
  * (see `framing.ts` — cmd.exe `/c` argv treats LF as a statement
- * separator on Windows). The assertion below catches any future edit
+ * separator on Windows). The assertion below catches any unsafe edit
  * that breaks that invariant at module load; the task pkg also
  * re-runs the same check at dispatch time.
  */
@@ -132,10 +130,8 @@ assertFramingPromptIsSafe(COORD_FRAMING_PROMPT_COPILOT);
 /**
  * Validated coord-spec shape. The substrate persists this as
  * `spec_json` and hands it back verbatim on dispatch. Matches the
- * bootstrap insert shape at `workflow-service.ts:438`
- * (`coordSpec = { agent: args.coordinatorAgent }`). Kept narrow
- * (single `agent` field) — additional per-coord configuration can
- * grow later without a contract break by widening this shape.
+ * bootstrap insert shape (`coordSpec = { agent: args.coordinatorAgent }`).
+ * Kept narrow (single `agent` field).
  */
 export interface CoordNodeSpec {
   readonly agent: string;
@@ -145,7 +141,7 @@ export interface CoordNodeSpec {
  * Wire-shape error for a malformed coord node spec. Lives next to
  * the runner (rather than in `@glyphs-ai/workflow`) because the
  * workflow pkg is kind-agnostic. Mirrors {@link WorkflowWorkerSpecError}
- * placement at `workflow-task-runner.ts:101`.
+ * placement in the sibling worker runner.
  */
 export class WorkflowCoordSpecError extends Error {
   override readonly name = "WorkflowCoordSpecError";
@@ -190,7 +186,7 @@ export interface MakeCoordNodeRunnerOpts {
    * impossible for the caller to construct the runner before compose
    * returns. The thunk lets the caller capture a ref, build the
    * runner, call compose, then assign the ref — mirrors the engine
-   * ↔ service two-phase init at `compose.ts:113`.
+   * ↔ service two-phase init in `@glyphs-ai/workflow`.
    */
   readonly getService: () => WorkflowService;
   /**
@@ -297,7 +293,7 @@ export function makeCoordNodeRunner(
         }
       }
 
-      // Catalog existence — mirrors `workflow-task-runner.ts:212-218`.
+      // Catalog existence — mirrors the sibling worker runner.
       // Checked at validate time so a bad agent name cannot land in
       // the DB and surface as a non-recoverable dispatch failure
       // later.
@@ -348,11 +344,11 @@ export function makeCoordNodeRunner(
         // Conditional spread: passing `details: undefined` into
         // `tasks.dispatch` can serialize as the literal string
         // "undefined" downstream. Mirrors the worker runner's
-        // conditional spread at `workflow-task-runner.ts:223-224`.
+        // conditional spread.
         ...(wf.details !== undefined ? { details: wf.details } : {}),
         origin: "workflow",
         // `workflowNodeId` is the canonical reverse-lookup metadata
-        // key per `packages/workflow/src/types.ts:222`; `workflowId`
+        // key documented by `@glyphs-ai/workflow`; `workflowId`
         // is included for log correlation only. Worker and coord
         // runners use the SAME key — `tasks.hasInFlightForWorkflowNode`
         // covers both kinds via the existing partial index.
@@ -482,7 +478,7 @@ export function makeCoordNodeRunner(
               );
               return;
             default: {
-              // Defense against a future TaskStatus arm we don't
+              // Defense against an unknown TaskStatus arm we don't
               // know about. Treat as failure rather than silently
               // dropping; the runner is the layer that owns the
               // mapping and should fail loudly if it drifts.
@@ -520,9 +516,9 @@ export function makeCoordNodeRunner(
         );
         return;
       }
-      // Best-effort, idempotent — per `WorkflowNodeRunner` contract
-      // (`types.ts:282`). A throw on one task doesn't abort the
-      // others; we log and continue.
+      // Best-effort, idempotent — per `WorkflowNodeRunner` contract.
+      // A throw on one task doesn't abort the others; we log and
+      // continue.
       for (const t of inFlight) {
         try {
           await tasks.cancel(t.id);

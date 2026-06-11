@@ -26,25 +26,12 @@ export * from "@glyphs-ai/contracts";
 // Orchestration (composeApplication + per-workspace WorkspaceContext)
 export {
   type Application,
-  type ApplicationOpts,
   composeApplication,
 } from "./application.js";
-export { makeTaskKindHandler, TaskScheduleTargetError } from "./wiring/schedule-task-handler.js";
+export { TaskScheduleTargetError } from "./wiring/schedule-task-handler.js";
 export {
-  type CoordNodeSpec,
-  DEFAULT_COORD_MAX_POLL_ERRORS,
-  DEFAULT_COORD_POLL_INTERVAL_MS,
-  type MakeCoordNodeRunnerOpts,
-  makeCoordNodeRunner,
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "./wiring/workflow-coord-task-runner.js";
-export {
-  DEFAULT_WORKER_MAX_POLL_ERRORS,
-  DEFAULT_WORKER_POLL_INTERVAL_MS,
-  type MakeWorkerNodeRunnerOpts,
-  makeWorkerNodeRunner,
-  type WorkerNodeSpec,
-  WorkflowWorkerSpecError,
-} from "./wiring/workflow-task-runner.js";
+export { WorkflowWorkerSpecError } from "./wiring/workflow-worker-task-runner.js";
 export { type WorkspaceContext, WorkspaceHasLiveTasksError } from "./workspace-context.js";

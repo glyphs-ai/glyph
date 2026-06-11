@@ -42,7 +42,7 @@ import {
   makeWorkerNodeRunner,
   WorkflowWorkerNotInCoordMenuError,
   WorkflowWorkerSpecError,
-} from "../../src/wiring/workflow-task-runner.js";
+} from "../../src/wiring/workflow-worker-task-runner.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal Task stub for status-mapping tests; full Task type not needed.
 function fakeTaskRow(overrides: Partial<{ id: string; status: string }> = {}): any {

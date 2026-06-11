@@ -11,7 +11,7 @@
  * `getService` thunk that closes over a mutable holder; after
  * `composeWorkflowModule` returns, the holder is populated with the
  * actual `WorkflowService`. Mirrors the engine ↔ service two-phase
- * init at `compose.ts:113`.
+ * init in `@glyphs-ai/workflow`.
  *
  * The worker runner is a passthrough stub that never gets exercised
  * by these scenarios (no `addNode kind:'worker'` calls land); it
@@ -91,7 +91,7 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
   const catalog = { getAgent } as unknown as CatalogService;
 
   // Two-phase init holder. Populated after `composeWorkflowModule`
-  // returns. See `compose.ts:113` for the engine ↔ service precedent.
+  // returns, matching the engine ↔ service composition pattern.
   const serviceHolder: { service: import("@glyphs-ai/workflow").WorkflowService | null } = {
     service: null,
   };

@@ -10,7 +10,7 @@ import type { Workspace, WorkspaceService } from "@glyphs-ai/workspace";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeCoordNodeRunner } from "./wiring/workflow-coord-task-runner.js";
-import { makeWorkerNodeRunner } from "./wiring/workflow-task-runner.js";
+import { makeWorkerNodeRunner } from "./wiring/workflow-worker-task-runner.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
@@ -244,7 +244,7 @@ export class WorkspaceContextRegistry {
     // by `composeWorkflowModule` which itself requires the runner.
     // The thunk lets us build the runner first, call compose, then
     // assign the ref. Mirrors the engine ↔ service two-phase init
-    // at `packages/workflow/src/compose.ts:113`.
+    // in `@glyphs-ai/workflow`.
     let workflowSvc: WorkflowService | null = null;
     const getWorkflowService = (): WorkflowService => {
       if (workflowSvc === null) {
@@ -365,7 +365,7 @@ export class WorkspaceContextRegistry {
         //
         // Ordering: workflow FIRST, then schedule, then task /
         // session / catalog (reverse of compose). workflow's
-        // close() awaits `engine.stop()` which drains in-flight
+        // close() awaits `engine.drain()` which awaits in-flight
         // ticks; those ticks dispatch through `TaskService`, so
         // tasks must still be alive while workflow drains.
         // schedule's close() likewise awaits `service.shutdown()`

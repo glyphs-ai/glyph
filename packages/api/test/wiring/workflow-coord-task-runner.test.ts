@@ -1,7 +1,7 @@
 /**
  * Tests for `makeCoordNodeRunner`. Mirrors the structure of the
  * sibling worker runner tests
- * (`workflow-task-runner.test.ts`) — same `vi`-based `TaskService` /
+ * (`workflow-worker-task-runner.test.ts`) — same `vi`-based `TaskService` /
  * `CatalogService` stubs, same `vi.useFakeTimers()` pattern for the
  * poll-tick scenarios, same `fakeTaskRow` helper.
  *

@@ -1,8 +1,3 @@
-// "task" in this filename refers to the @glyphs-ai/task dispatch
-// mechanism this runner uses (visible at the tasks.dispatch call
-// inside dispatch()), not the workflow-node wire `kind` — which is
-// "worker" (this runner) or "coordinator" (sibling runner).
-
 /**
  * `makeWorkerNodeRunner` — the worker-kind {@link
  * WorkflowNodeRunner} that maps a workflow worker node to a
@@ -50,7 +45,7 @@
  * # Spec invariants honored
  *
  * - `task.metadata.workflowNodeId` is the canonical reverse-lookup
- *   key (per `packages/workflow/src/types.ts:222`). This module never
+ *   key documented by `@glyphs-ai/workflow`. This module never
  *   asks the substrate to persist the task id; reverse-lookup goes
  *   through this metadata key via
  *   `TaskService.hasInFlightForWorkflowNode` / `listInFlightForWorkflowNode`.
@@ -60,9 +55,8 @@
  * - `dispatch` returns `void`. The runner logs the substrate-side
  *   identifier (the task id) at info level inside `dispatch` so
  *   operators can correlate substrate events with the underlying
- *   task; the substrate explicitly does NOT persist that id (per the
- *   same `types.ts:222` comment) because reverse-lookup goes through
- *   the unit's metadata.
+ *   task; the substrate explicitly does NOT persist that id because
+ *   reverse-lookup goes through the unit's metadata.
  * - No retry, no exponential backoff at the runner level; a single
  *   runner-local poll-error budget (`maxPollErrors`, default 3)
  *   maps repeated `tasks.get` failures to
@@ -88,9 +82,7 @@ export const DEFAULT_WORKER_MAX_POLL_ERRORS = 3;
 /**
  * Validated worker-spec shape. The substrate persists this as
  * `spec_json` and hands it back verbatim on dispatch. Kept narrow
- * (`agent`/`brief`/optional `details`/optional `runtime`) — adaptive
- * fields or per-runtime hints can grow later without a contract
- * break by spreading them onto the same object.
+ * (`agent`/`brief`/optional `details`/optional `runtime`).
  */
 export interface WorkerNodeSpec {
   readonly agent: string;
@@ -204,7 +196,10 @@ export function makeWorkerNodeRunner(
     try {
       onTerminal(result);
     } catch (err) {
-      logger.warn({ nodeId, err, result }, "workflow-task-runner: onTerminal callback threw");
+      logger.warn(
+        { nodeId, err, result },
+        "workflow-worker-task-runner: onTerminal callback threw",
+      );
     }
   };
 
@@ -296,7 +291,7 @@ export function makeWorkerNodeRunner(
         ...(spec.runtime !== undefined ? { runtime: spec.runtime } : {}),
         origin: "workflow",
         // `workflowNodeId` is the canonical reverse-lookup metadata
-        // key per `packages/workflow/src/types.ts:222`; `workflowId`
+        // key documented by `@glyphs-ai/workflow`; `workflowId`
         // is included for log correlation only. Do NOT rename either
         // key without updating the corresponding partial-index /
         // hasInFlightForWorkflowNode SQL predicate.
@@ -329,7 +324,7 @@ export function makeWorkerNodeRunner(
       const onTerminal = opts.onTerminal;
       logger.info(
         { workflowId: opts.workflowId, nodeId, taskId },
-        "workflow-task-runner: dispatched worker task",
+        "workflow-worker-task-runner: dispatched worker task",
       );
 
       // If a previous dispatch on the same nodeId left an orphan
@@ -357,7 +352,7 @@ export function makeWorkerNodeRunner(
                 consecutivePollErrors,
                 err,
               },
-              "workflow-task-runner: tasks.get threw",
+              "workflow-worker-task-runner: tasks.get threw",
             );
             if (consecutivePollErrors >= maxPollErrors) {
               fireTerminal(
@@ -423,7 +418,7 @@ export function makeWorkerNodeRunner(
               );
               return;
             default: {
-              // Defense against a future TaskStatus arm we don't
+              // Defense against an unknown TaskStatus arm we don't
               // know about. Treat as failure rather than silently
               // dropping; the runner is the layer that owns the
               // mapping and should fail loudly if it drifts.
@@ -432,7 +427,7 @@ export function makeWorkerNodeRunner(
                 nodeId,
                 {
                   status: "failed",
-                  reason: `workflow-task-runner: unexpected task status: ${unexpected as string}`,
+                  reason: `workflow-worker-task-runner: unexpected task status: ${unexpected as string}`,
                 },
                 onTerminal,
               );
@@ -457,18 +452,21 @@ export function makeWorkerNodeRunner(
       } catch (err) {
         logger.warn(
           { nodeId, err },
-          "workflow-task-runner: listInFlightForWorkflowNode threw during cancel",
+          "workflow-worker-task-runner: listInFlightForWorkflowNode threw during cancel",
         );
         return;
       }
-      // Best-effort, idempotent — per `WorkflowNodeRunner` contract
-      // (`types.ts:282`). A throw on one task doesn't abort the
-      // others; we log and continue.
+      // Best-effort, idempotent — per `WorkflowNodeRunner` contract.
+      // A throw on one task doesn't abort the others; we log and
+      // continue.
       for (const t of inFlight) {
         try {
           await tasks.cancel(t.id);
         } catch (err) {
-          logger.warn({ nodeId, taskId: t.id, err }, "workflow-task-runner: tasks.cancel threw");
+          logger.warn(
+            { nodeId, taskId: t.id, err },
+            "workflow-worker-task-runner: tasks.cancel threw",
+          );
         }
       }
     },

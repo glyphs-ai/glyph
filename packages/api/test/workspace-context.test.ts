@@ -147,7 +147,7 @@ vi.mock("../src/wiring/workflow-coord-task-runner.js", () => ({
   }),
 }));
 
-vi.mock("../src/wiring/workflow-task-runner.js", () => ({
+vi.mock("../src/wiring/workflow-worker-task-runner.js", () => ({
   makeWorkerNodeRunner: vi.fn(() => ({
     validate: vi.fn(),
     dispatch: vi.fn(),

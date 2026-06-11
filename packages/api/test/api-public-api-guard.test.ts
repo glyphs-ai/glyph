@@ -2,50 +2,48 @@
  * Compile-time public API guard for `@glyphs-ai/api`.
  *
  * WHAT this file does:
- *   Uses Vitest's `expectTypeOf<T>()` to lock the workflow-related
- *   additions to the pkg's public surface — specifically the
- *   {@link makeWorkerNodeRunner} factory + {@link WorkerNodeSpec} +
- *   {@link WorkflowWorkerSpecError} exports.
+ *   Uses Vitest's `expectTypeOf<T>()` to lock the package-root
+ *   orchestration and public error exports.
  *
  * WHY it is valuable:
- *   These factories are consumed by server wiring and integration
- *   harnesses. Locking the public shape here makes
- *   accidental renames or breaking-shape changes surface as a
- *   compile-time test failure rather than a downstream runtime
- *   surprise.
+ *   The server imports these classes from the package root for route
+ *   error policies. Locking the public shape here makes accidental
+ *   renames surface as a compile-time test failure rather than a
+ *   downstream runtime surprise.
  */
 
 import { describe, expectTypeOf, it } from "vitest";
 import {
-  DEFAULT_WORKER_MAX_POLL_ERRORS,
-  DEFAULT_WORKER_POLL_INTERVAL_MS,
-  type MakeWorkerNodeRunnerOpts,
-  makeWorkerNodeRunner,
-  type WorkerNodeSpec,
+  type Application,
+  composeApplication,
+  TaskScheduleTargetError,
+  WorkflowCoordAgentNotCapableError,
+  WorkflowCoordSpecError,
   WorkflowWorkerSpecError,
+  type WorkspaceContext,
+  WorkspaceHasLiveTasksError,
 } from "../src/index.js";
 
-describe("@glyphs-ai/api public API guard — workflow runner exports", () => {
-  it("exposes makeWorkerNodeRunner factory + opts shape + spec type", () => {
-    expectTypeOf(makeWorkerNodeRunner).toBeFunction();
-    expectTypeOf<MakeWorkerNodeRunnerOpts>().toHaveProperty("tasks");
-    expectTypeOf<MakeWorkerNodeRunnerOpts>().toHaveProperty("catalog");
-    expectTypeOf<MakeWorkerNodeRunnerOpts>().toHaveProperty("logger");
-    expectTypeOf<MakeWorkerNodeRunnerOpts>().toHaveProperty("pollIntervalMs");
-    expectTypeOf<MakeWorkerNodeRunnerOpts>().toHaveProperty("maxPollErrors");
-    expectTypeOf<WorkerNodeSpec>().toHaveProperty("agent");
-    expectTypeOf<WorkerNodeSpec>().toHaveProperty("brief");
-    expectTypeOf<WorkerNodeSpec["agent"]>().toBeString();
-    expectTypeOf<WorkerNodeSpec["brief"]>().toBeString();
+describe("@glyphs-ai/api public API guard", () => {
+  it("exposes the application composition surface", () => {
+    expectTypeOf(composeApplication).toBeFunction();
+    expectTypeOf<Application>().toHaveProperty("getContext");
+    expectTypeOf<Application>().toHaveProperty("close");
+    expectTypeOf<WorkspaceContext>().toHaveProperty("tasks");
+    expectTypeOf<WorkspaceContext>().toHaveProperty("workflows");
   });
 
-  it("exposes WorkflowWorkerSpecError as an Error subclass with canonical .name", () => {
-    const err = new WorkflowWorkerSpecError("bad spec");
-    expectTypeOf(err).toExtend<Error>();
-  });
-
-  it("exposes the default worker poll constants", () => {
-    expectTypeOf(DEFAULT_WORKER_POLL_INTERVAL_MS).toBeNumber();
-    expectTypeOf(DEFAULT_WORKER_MAX_POLL_ERRORS).toBeNumber();
+  it("exposes public error classes with canonical .name values", () => {
+    const errors = [
+      new WorkspaceHasLiveTasksError("ws", 1),
+      new TaskScheduleTargetError("bad target"),
+      new WorkflowCoordAgentNotCapableError("official/coord"),
+      new WorkflowCoordSpecError("bad coord"),
+      new WorkflowWorkerSpecError("bad worker"),
+    ];
+    for (const err of errors) {
+      expectTypeOf(err).toExtend<Error>();
+      expectTypeOf(err.name).toBeString();
+    }
   });
 });
