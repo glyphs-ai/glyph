@@ -262,13 +262,13 @@ function validateNodeRefWire(raw: unknown): ValidationResult<NodeRefWire> {
     if (typeof raw.nodeId !== "string" || raw.nodeId.length === 0) {
       return { ok: false, error: "ref.nodeId must be a non-empty string" };
     }
-    return { ok: true, value: { kind: "existing", nodeId: raw.nodeId } };
+    return { ok: true, value: { nodeId: raw.nodeId } };
   }
   if ("tempId" in raw) {
     if (typeof raw.tempId !== "string" || raw.tempId.length === 0) {
       return { ok: false, error: "ref.tempId must be a non-empty string" };
     }
-    return { ok: true, value: { kind: "temp", tempId: raw.tempId } };
+    return { ok: true, value: { tempId: raw.tempId } };
   }
   return { ok: false, error: 'ref must have key "nodeId" OR "tempId"' };
 }
@@ -478,7 +478,7 @@ function validateCancelWorkflowBody(raw: unknown): ValidationResult<ValidatedCan
  * caller has already proven the input is a valid wire shape.
  */
 function nodeRefFromWire(ref: NodeRefWire): NodeRef {
-  if (ref.kind === "existing") return { kind: "existing", id: ref.nodeId };
+  if ("nodeId" in ref) return { kind: "existing", id: ref.nodeId };
   return { kind: "temp", tempId: ref.tempId };
 }
 

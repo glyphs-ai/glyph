@@ -363,12 +363,14 @@ export interface AddEdgeResultWire {
 
 /**
  * Wire-shape projection of the substrate's `NodeRef` discriminated
- * union. The route boundary translates `nodeId` to the substrate's
- * internal `id` field before calling the service.
+ * union. Structural-discriminator union — exactly one of `nodeId`
+ * (resolve to an existing node) or `tempId` (resolve to a temp node
+ * declared in the same `addSubgraph` batch). The server route
+ * boundary tags this with `kind` and renames `nodeId`→`id` before
+ * calling the substrate, so the wire stays JSON-friendly (no extra
+ * discriminator field) while the substrate stays type-friendly.
  */
-export type NodeRefWire =
-  | { readonly kind: "existing"; readonly nodeId: string }
-  | { readonly kind: "temp"; readonly tempId: string };
+export type NodeRefWire = { readonly nodeId: string } | { readonly tempId: string };
 
 /**
  * One declared temp node in an `addSubgraph` batch. Mirrors

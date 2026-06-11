@@ -70,9 +70,12 @@ import type {
   AddEdgeBody,
   AddNodeBody,
   AddSubgraphBody,
+  AddSubgraphEdgeInputWire,
+  AddSubgraphNodeInputWire,
   CancelWorkflowBody,
   CreateWorkflowBody,
   FinishWorkflowBody,
+  NodeRefWire,
   ReplaceNodeSpecBody,
   WorkflowHeaderWire,
   WorkflowNodeKindWire,
@@ -412,25 +415,6 @@ function parseParents(raw: string | undefined): readonly string[] {
     .filter((p) => p !== "");
 }
 
-type AddSubgraphFileNodeRef = { readonly nodeId: string } | { readonly tempId: string };
-
-interface AddSubgraphFileNode {
-  readonly tempId: string;
-  readonly kind: WorkflowNodeKindWire;
-  readonly spec: unknown;
-  readonly existingParents?: readonly string[];
-}
-
-interface AddSubgraphFileEdge {
-  readonly from: AddSubgraphFileNodeRef;
-  readonly to: AddSubgraphFileNodeRef;
-}
-
-interface AddSubgraphFileBody {
-  readonly nodes: readonly AddSubgraphFileNode[];
-  readonly edges: readonly AddSubgraphFileEdge[];
-}
-
 function validateAddSubgraphBody(
   raw: unknown,
 ): { ok: true; body: AddSubgraphBody } | { ok: false; error: string } {
@@ -449,7 +433,7 @@ function validateAddSubgraphBody(
     };
   }
 
-  const nodes: AddSubgraphFileNode[] = [];
+  const nodes: AddSubgraphNodeInputWire[] = [];
   for (let i = 0; i < nodesRaw.length; i += 1) {
     const node = nodesRaw[i];
     if (!isPlainObject(node)) return { ok: false, error: `nodes[${i}] must be an object` };
@@ -498,7 +482,7 @@ function validateAddSubgraphBody(
     });
   }
 
-  const edges: AddSubgraphFileEdge[] = [];
+  const edges: AddSubgraphEdgeInputWire[] = [];
   for (let i = 0; i < edgesRaw.length; i += 1) {
     const edge = edgesRaw[i];
     if (!isPlainObject(edge)) return { ok: false, error: `edges[${i}] must be an object` };
@@ -509,14 +493,13 @@ function validateAddSubgraphBody(
     edges.push({ from: from.value, to: to.value });
   }
 
-  const body: AddSubgraphFileBody = { nodes, edges };
-  return { ok: true, body: body as AddSubgraphBody };
+  return { ok: true, body: { nodes, edges } };
 }
 
 function validateNodeRefInput(
   raw: unknown,
   path: string,
-): { ok: true; value: AddSubgraphFileNodeRef } | { ok: false; error: string } {
+): { ok: true; value: NodeRefWire } | { ok: false; error: string } {
   if (!isPlainObject(raw)) return { ok: false, error: `${path} must be an object` };
   const keys = Object.keys(raw);
   if (keys.length !== 1) {
