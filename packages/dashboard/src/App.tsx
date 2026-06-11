@@ -384,9 +384,9 @@ function LandingPage() {
       <AddWorkspaceModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onCreated={(id) => {
+        onCreated={async () => {
           setAddOpen(false);
-          enterWorkspace(id);
+          await refresh();
         }}
       />
 
