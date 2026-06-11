@@ -92,6 +92,24 @@ describe("WorkflowDagView — phase grouping", () => {
     expect(phases[2]?.getAttribute("data-phase")).toBe("2");
   });
 
+  it("renders the human-visible phase label 1-indexed (Phase 1 for wire phase 0)", () => {
+    // Wire / DOM scripting selectors stay 0-indexed (asserted by the
+    // surrounding test); only the human-visible string + aria-label
+    // carry the `+ 1`. This matches the "Steps 1 / N" / "Pages 1 / N"
+    // convention already used by `WorkflowMetaStats`.
+    render(
+      <WorkflowDagView
+        dag={makeDag([makeNode({ id: "n-a", phase: 0 }), makeNode({ id: "n-b", phase: 1 })])}
+      />,
+    );
+    const phase0 = screen.getByTestId("workflow-dag-phase-0");
+    const phase1 = screen.getByTestId("workflow-dag-phase-1");
+    expect(phase0.getAttribute("aria-label")).toBe("Phase 1");
+    expect(phase1.getAttribute("aria-label")).toBe("Phase 2");
+    expect(phase0.querySelector(".workflow-dag__phase-label")?.textContent).toBe("Phase 1");
+    expect(phase1.querySelector(".workflow-dag__phase-label")?.textContent).toBe("Phase 2");
+  });
+
   it("within a phase, sorts nodes by createdAt ascending", () => {
     render(
       <WorkflowDagView

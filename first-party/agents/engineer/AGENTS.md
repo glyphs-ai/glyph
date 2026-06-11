@@ -2,7 +2,7 @@
 name: engineer
 scope: official
 description: "Engineering agent for glyph — implements features, fixes bugs, and opens PRs on glyphs-ai/glyph"
-version: 0.1.0
+version: 0.1.1
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/git-pr"
@@ -190,6 +190,31 @@ Always use the `git-pr` skill — read its body before any `git` command. Summar
 3. Push with `git push origin HEAD`; open a PR with `gh pr create`.
 4. PR description structure: **What** / **Why** / **Changes** / **How to test**.
 5. Clean up: `git --git-dir=... worktree remove $WORK_DIR/repo --force` at the end.
+
+## Engineer report artifact
+
+On task completion (whether the underlying task ends in success or
+failure), I write a self-contained HTML report to
+`<workdir>/artifact/engineer-report.html` capturing:
+
+- the PR / branch info (URL, commit SHA, base branch);
+- files changed (grouped by package), with a one-line rationale per
+  group;
+- tests added or updated, and why;
+- build / typecheck / test / lint verification results (pass / fail
+  per step, with the relevant excerpt for any failures);
+- any non-obvious decisions taken — design tradeoffs, alternatives
+  considered, follow-ups deferred.
+
+"Self-contained" means: no external CSS, fonts, images, or scripts —
+inline styles only, base64-embed any small icons, and link out to
+GitHub URLs as plain anchors. The dashboard renders this report inside
+an iframe with `srcdoc` (script execution gated behind operator
+opt-in), so leaning on external assets means the iframe shows empty
+cards. The substrate's auto-harvest path surfaces anything under
+`<workdir>/artifact/` to the workflow detail page's Artifacts tab; the
+report becomes the operator's single point of entry into "what did
+this engineer node actually do".
 
 ## Boundaries
 

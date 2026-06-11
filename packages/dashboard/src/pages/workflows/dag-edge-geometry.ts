@@ -21,6 +21,22 @@ import type { WorkflowEdgeWire, WorkflowNodeWire } from "../../api";
  * the geometry (slot assignment) is grid-only.
  */
 
+/**
+ * Format a wire phase (0-indexed topological depth) as a human-facing
+ * label. Display is 1-indexed so the first phase reads as "Phase 1" —
+ * matches the Steps / Pages convention elsewhere in the dashboard and
+ * the precedent set by `WorkflowMetaStats` (`current + 1 / total`).
+ *
+ * Wire / engine remain 0-indexed (see `packages/workflow/src/_dag.ts`
+ * for the substrate's `phase = max(parents.phase) + 1` rule and the
+ * `roots = 0` invariant). Only human-visible strings get the `+ 1`;
+ * `data-phase` / `data-testid` selectors and the React `key={phase}`
+ * stay wire-aligned.
+ */
+export function formatPhaseLabel(phase: number): string {
+  return `Phase ${phase + 1}`;
+}
+
 export interface NodeSlot {
   readonly nodeId: string;
   /** Phase index (the substrate's `node.phase`). */

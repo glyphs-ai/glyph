@@ -5234,8 +5234,31 @@ button {
    * inlines its tab body as a sibling of the tab bar (no panel
    * wrapper, no panel role), so there is no shared `.task-tabpanel`
    * selector to fold into — `.workflow-tabpanel` stays as a thin
-   * shape-only selector for the panel padding + focus ring. */
+   * shape-only selector for the panel padding + focus ring.
+   *
+   * Flex column so the active tab body can opt-in to filling the
+   * remaining vertical space (load-bearing for the Artifacts tab,
+   * whose `.artifacts-pane { height: 100% }` resolves against this
+   * panel — without `flex: 1 1 auto` + `min-height: 0` the panel
+   * would shrink to content height and the iframe-based preview
+   * would collapse to its `min-height: 60px` floor). `overflow:
+   * hidden` keeps tab-body scrolling internal (the Tasks chain
+   * does the same on its tab-body children directly). */
   padding: var(--space-3) 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.workflow-tabpanel > * {
+  /* The active tab body fills the panel. `.overview-tab` and
+   * `.artifacts-pane` already set their own flex / height rules; this
+   * is the catch-all that makes `.workflow-graph` (Graph tab wrapper)
+   * grow too, so its `.workflow-dag` child's `overflow: auto` binds
+   * to a bounded box and the dag scrolls instead of pushing the page. */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .workflow-tabpanel:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -5269,9 +5292,18 @@ button {
   word-break: break-word;
 }
 
-/* Graph tab — container that hosts WorkflowDagView */
+/* Graph tab — container that hosts WorkflowDagView. Becomes a flex
+ * column inside `.workflow-tabpanel > *` (which gives it
+ * `flex: 1 1 auto; min-height: 0`) so its `.workflow-dag` child can
+ * fill and scroll instead of pushing the page. */
 .workflow-graph {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.workflow-graph > .workflow-dag {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Node navigation pill — mirror of .fire-task-nav structurally */

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowDagWire, WorkflowHeaderWire } from "../../../src/api";
 
@@ -11,7 +11,10 @@ vi.mock("../../../src/api", async () => {
   };
 });
 
+import * as api from "../../../src/api";
 import { WorkflowView } from "../../../src/pages/workflows/WorkflowView";
+
+const mockListWorkflowArtifacts = api.listWorkflowArtifacts as unknown as ReturnType<typeof vi.fn>;
 
 function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
   return {
@@ -130,5 +133,52 @@ describe("WorkflowView  detail-page action surface", () => {
       />,
     );
     expect(screen.queryByTestId("workflow-detail-cancel")).toBeNull();
+  });
+});
+
+describe("WorkflowView — Artifacts tab badge", () => {
+  it("renders the bare 'Artifacts' label when no artifacts have surfaced yet", async () => {
+    // Empty-list default — the tab label stays clean (no `(0)` chip),
+    // matching the Task variant's convention.
+    mockListWorkflowArtifacts.mockResolvedValueOnce({ artifacts: [] });
+    const wf = makeWf();
+    render(
+      <WorkflowView workflow={wf} dag={makeDag(wf)} dagError={null} onSelectNode={() => {}} />,
+    );
+    // Wait for the hook to resolve so the loaded state is settled.
+    await waitFor(() => {
+      // Empty fetch resolves; label still reads "Artifacts" (no count).
+      expect(screen.getByTestId("workflow-tab-artifacts").textContent).toBe("Artifacts");
+    });
+  });
+
+  it("renders 'Artifacts (N)' once the parent's hook surfaces a non-zero count", async () => {
+    mockListWorkflowArtifacts.mockResolvedValueOnce({
+      artifacts: [
+        {
+          kind: "workflow-summary",
+          path: "summary.html",
+          size: 100,
+          modifiedAt: "2026-05-28T00:00:00.000Z",
+          mimeBucket: "html",
+        },
+        {
+          kind: "node",
+          nodeId: "n1",
+          taskId: "task-1",
+          path: "log.txt",
+          size: 200,
+          modifiedAt: "2026-05-28T00:00:00.000Z",
+          mimeBucket: "text",
+        },
+      ],
+    });
+    const wf = makeWf();
+    render(
+      <WorkflowView workflow={wf} dag={makeDag(wf)} dagError={null} onSelectNode={() => {}} />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("workflow-tab-artifacts").textContent).toBe("Artifacts (2)");
+    });
   });
 });

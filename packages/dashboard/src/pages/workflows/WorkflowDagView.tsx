@@ -5,6 +5,7 @@ import { formatAbsolute, formatDuration, formatRelative } from "../../utils/time
 import {
   buildSlotMap,
   type EdgeEndpoints,
+  formatPhaseLabel,
   groupByPhase,
   projectEndpoints,
   type Rect,
@@ -158,12 +159,12 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
           <li
             key={phase}
             className="workflow-dag__phase"
-            aria-label={`Phase ${phase}`}
+            aria-label={formatPhaseLabel(phase)}
             data-phase={phase}
             data-testid={`workflow-dag-phase-${phase}`}
           >
             <div className="workflow-dag__phase-label muted" aria-hidden="true">
-              Phase {phase}
+              {formatPhaseLabel(phase)}
             </div>
             <div className="workflow-dag__phase-row">
               {nodes.map((node) => {

@@ -1,8 +1,9 @@
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
 import { CopyButton } from "../../components/tasks/TaskDetail/CopyButton";
 import { WorkflowMetaStats } from "../../components/workflows/WorkflowMetaStats";
 import { WorkflowStatusBadge } from "../../components/workflows/WorkflowStatusBadge";
+import { useWorkflowArtifacts } from "../../hooks/useWorkflowArtifacts";
 import { ArtifactsTab } from "./ArtifactsTab";
 import { GraphTab } from "./GraphTab";
 import { OverviewTab } from "./OverviewTab";
@@ -11,7 +12,7 @@ export type WorkflowTab = "overview" | "graph" | "artifacts";
 
 const TAB_ORDER: readonly WorkflowTab[] = ["overview", "graph", "artifacts"];
 
-const TAB_LABEL: Record<WorkflowTab, string> = {
+const TAB_LABEL_BASE: Record<WorkflowTab, string> = {
   overview: "Overview",
   graph: "Graph",
   artifacts: "Artifacts",
@@ -75,6 +76,30 @@ export function WorkflowView({
 }: WorkflowViewProps) {
   const [active, setActive] = useState<WorkflowTab>("overview");
   const tabRefs = useRef<Map<WorkflowTab, HTMLButtonElement | null>>(new Map());
+
+  // Lift the artifact-list hook here (instead of inside `<ArtifactsTab />`)
+  // so the Artifacts tab label can carry a count badge (`Artifacts (N)`)
+  // without the tab having to mount first. Polling is gated on
+  // `isRunning` inside the hook, so this stays cheap once the workflow
+  // is terminal.
+  const isRunning = workflow.status === "running";
+  const {
+    artifacts: artifactsResponse,
+    error: artifactsError,
+    loaded: artifactsLoaded,
+  } = useWorkflowArtifacts(workflow.id, isRunning);
+  const artifacts = artifactsResponse?.artifacts ?? null;
+  const artifactCount = artifactsLoaded ? (artifacts?.length ?? 0) : 0;
+
+  const tabLabel = useMemo<Record<WorkflowTab, string>>(
+    () => ({
+      ...TAB_LABEL_BASE,
+      // Mirror the Tasks tab convention (`TaskView.tsx:139`): badge stays
+      // hidden when count is 0 or while artifacts are still loading.
+      artifacts: artifactCount > 0 ? `Artifacts (${artifactCount})` : TAB_LABEL_BASE.artifacts,
+    }),
+    [artifactCount],
+  );
 
   const setTabRef = useCallback(
     (tab: WorkflowTab) => (el: HTMLButtonElement | null) => {
@@ -167,7 +192,7 @@ export function WorkflowView({
               onClick={() => setActive(tab)}
               onKeyDown={onTabKeyDown}
             >
-              {TAB_LABEL[tab]}
+              {tabLabel[tab]}
             </button>
           );
         })}
@@ -191,7 +216,15 @@ export function WorkflowView({
             onSelectNode={onSelectNode}
           />
         ) : null}
-        {active === "artifacts" ? <ArtifactsTab workflow={workflow} dag={dag} /> : null}
+        {active === "artifacts" ? (
+          <ArtifactsTab
+            workflow={workflow}
+            dag={dag}
+            artifacts={artifacts}
+            loaded={artifactsLoaded}
+            error={artifactsError}
+          />
+        ) : null}
       </div>
     </aside>
   );

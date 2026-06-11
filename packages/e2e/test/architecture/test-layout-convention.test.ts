@@ -97,9 +97,9 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
       "grouped by area (hooks/); imports span hooks/ + api/ + components/tasks/ sibling subdirs of src/ — rule says flat. Mirrors src/hooks/useWorkflows.ts; co-location with the source aids editor navigation.",
   },
   {
-    file: "packages/dashboard/test/pages/workflows/ArtifactsTab.test.tsx",
+    file: "packages/dashboard/test/pages/workflows/WorkflowView.test.tsx",
     rationale:
-      "grouped by area (pages/workflows/); imports span pages/workflows/ + api sibling subdirs of src/ — rule says flat. Mirrors src/pages/workflows/ArtifactsTab.tsx; co-location with the source aids editor navigation.",
+      "grouped by area (pages/workflows/); imports span pages/workflows/ + api sibling subdirs of src/ — rule says flat. Mirrors src/pages/workflows/WorkflowView.tsx; co-location with the source aids editor navigation.",
   },
   // e2e
   {

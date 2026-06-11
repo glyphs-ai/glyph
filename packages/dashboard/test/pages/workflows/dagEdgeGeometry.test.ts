@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { WorkflowEdgeWire, WorkflowNodeWire } from "../../../src/api";
 import {
   buildSlotMap,
+  formatPhaseLabel,
   groupByPhase,
   projectEndpoints,
   type Rect,
@@ -114,5 +115,15 @@ describe("projectEndpoints", () => {
     const rects = new Map<string, Rect>([["a", { left: 0, top: 0, width: 10, height: 10 }]]);
     const segs = [{ id: "a->b", fromNodeId: "a", toNodeId: "b", fromRow: 0, toRow: 1 }];
     expect(projectEndpoints(segs, rects)).toEqual([]);
+  });
+});
+
+describe("formatPhaseLabel", () => {
+  it("renders wire phase 0 as 'Phase 1' (1-indexed for display)", () => {
+    expect(formatPhaseLabel(0)).toBe("Phase 1");
+  });
+
+  it("renders wire phase 2 as 'Phase 3'", () => {
+    expect(formatPhaseLabel(2)).toBe("Phase 3");
   });
 });
