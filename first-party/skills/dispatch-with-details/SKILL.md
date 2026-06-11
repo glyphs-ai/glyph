@@ -2,7 +2,7 @@
 name: dispatch-with-details
 scope: official
 description: "Wrapper over `glyph task dispatch` that takes a brief-file path, auto-derives a ≤200-char summary for `--brief`, forwards the body via `--details-file`, and returns the parsed task id"
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Dispatch With Details Skill
@@ -48,6 +48,43 @@ Empirical pain recurring across orchestrator runs:
 
 This skill canonicalises the workaround so callers stop rediscovering
 it.
+
+## Pre-flight read (mandatory)
+
+Before writing a brief or `--details-file`, READ the current contents
+of every agent, skill, and MCP the brief will reference or prescribe
+behavior for:
+
+- The dispatched agent's `AGENTS.md` IN FULL (do not rely on grep
+  snippets — agents are typically 100-300 lines and the prescriptions
+  in the brief must complement, not duplicate or contradict, the
+  agent's own constitution).
+- **Every skill the dispatched agent depends on** (per
+  `dependencies.skills` in the agent's frontmatter). If a skill
+  already covers a topic (e.g. `git-pr` covers repo setup, branch
+  naming, worktree management, PR creation; `karpathy-guidelines`
+  covers code style), the brief MUST NOT restate those instructions.
+  Restate only the PROJECT-SPECIFIC overrides.
+- Adjacent agents whose work product the dispatched agent will read.
+
+Failure modes pre-flight catches:
+
+- **"Add X" when X already exists** — most common; brief asks for a
+  convention that is already in the agent's constitution.
+- **Restating what a depended-on skill covers** — wastes context
+  tokens; a "helpful" restatement that drifts from the skill's
+  wording becomes a contradiction.
+- **Path / naming conflict** — brief prescribes a path that the
+  agent's prompt or related skill puts elsewhere.
+- **Version-bump misalignment** — brief tells engineer to bump to a
+  version that already exists.
+- **Contradicting an existing rule** — brief prescribes behavior that
+  the agent's "Boundaries" section forbids.
+
+The grep tool's `head_limit` default truncates results; rely on
+`view` for any file the brief will prescribe changes to. When in
+doubt, the brief should describe WHAT outcome is wanted, not HOW to
+achieve it — the agent's skills already encode the HOW.
 
 ## Primitive
 

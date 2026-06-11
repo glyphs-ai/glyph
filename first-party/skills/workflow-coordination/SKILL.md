@@ -2,7 +2,7 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Glyph Workflow Coordination Skill
@@ -126,7 +126,7 @@ The substrate resolves the `tempId`s within the transaction and returns the assi
 
 ## §C — verdict.json schema (universal)
 
-Reviewer workers (any worker whose output a coord parses to decide "continue or finish") write a `verdict.json` to their task workdir; every strategy that uses reviewer parents consumes it via this schema.
+Reviewer workers (any worker whose output a coord parses to decide "continue or finish") write a `verdict.json` to `<workdir>/artifact/verdict.json` (the substrate auto-harvests files under `<workdir>/artifact/` into the task's `success.artifacts`, which is what makes them visible to coord wake-ups and to the dashboard Artifacts tab). Every strategy that uses reviewer parents consumes the verdict via this schema.
 
 ```
 verdict.json schema:
@@ -159,10 +159,16 @@ Strategy skills SHOULD re-quote this schema (verbatim, or as a worked example wi
 
 Treat workers as pure specialists: they MUST NOT depend on any workflow-specific skill or know they are inside a workflow. All workflow context reaches them via the task brief coord writes when dispatching them. Every worker brief a strategy template emits MUST follow this pattern:
 
-- **Always include**: workflow id (so the worker can call `glyph workflow show --wfid $WF --json` itself), `workflow.brief` verbatim (no trim, no summary, no paraphrase), `workflow.details` verbatim (empty string if `null`), and concrete fetch instructions for any prior-iter outputs the worker needs (e.g. `glyph task show --tid ${PRIOR_<role>_TASK_ID}` then `<task-workdir>/verdict.json`). Workers do their own fetching; coord does not pre-digest.
+- **Always include**: workflow id (so the worker can call `glyph workflow show --wfid $WF --json` itself), `workflow.brief` verbatim (no trim, no summary, no paraphrase), `workflow.details` verbatim (empty string if `null`), and concrete fetch instructions for any prior-iter outputs the worker needs (e.g. `glyph task show --tid ${PRIOR_<role>_TASK_ID}` then `<task-workdir>/artifact/verdict.json`). Workers do their own fetching; coord does not pre-digest.
 - **Never include**: technical content (quality bars, fix suggestions, design opinions — workers own those domains), coord's interpretation of prior-iter findings (the worker reads the raw `verdict.json` itself), or hints about future coord wake-ups (workers are workflow-unaware).
-- **Always inline the output protocol**: for reviewer workers, the §C `verdict.json` schema (verbatim, or as a worked example) plus validation rules and the optional narrative-file convention. For implementer workers, the expected branch / PR convention the next coord wake-up relies on.
+- **Always inline the output protocol**: for reviewer workers, the §C `verdict.json` schema (verbatim, or as a worked example) plus validation rules and the optional narrative-file convention (also under `<workdir>/artifact/`). For implementer workers, the expected branch / PR convention the next coord wake-up relies on.
 - **Use `${PLACEHOLDER}` substitution** for every per-dispatch slot. Coord fills slots via plain string replacement before writing the brief into `add-subgraph`. Substitution is total — a literal `${...}` in the dispatched brief is a bug. Unresolved placeholders (e.g. `${WORKFLOW_DETAILS}` when the creator passed nothing) substitute the empty string.
+- **Pre-flight validation against the dispatched agent's current constitution.** Before writing the `add-subgraph` payload, SKIM each dispatched agent's `AGENTS.md` (sections: "Required output protocol" / equivalent, "Boundaries" / "What I do NOT do", `dependencies.skills`). Compare against the strategy's brief template prescriptions:
+  - **Output path / protocol drift** — template says `<workdir>/X` but agent's current AGENTS.md says `<workdir>/artifact/X`. Severity: blocker → coord MUST `finishWorkflow(failed, "template drift: <agent>'s output protocol moved to <new path>; strategy <fqn> v<X.Y.Z> templates need re-validation")`.
+  - **Restated skill content** — template restates instructions already covered by one of the agent's depended-on skills (e.g. branch naming when `git-pr` is a dep). Severity: warning → log to coord-decisions, continue dispatch (worker will pick the skill's version anyway).
+  - **Forbidden behavior** — template asks for something the agent's "Boundaries" section explicitly forbids. Severity: blocker → finishWorkflow(failed).
+
+  Coord does NOT edit the template to fix drift — coord is a robot template-filler by design. Coord's only job in validation is to detect drift and escalate. Fixing the template is the strategy author's job, done out-of-band via a new strategy skill version + re-dispatch.
 
 ---
 
@@ -190,6 +196,7 @@ Content-only: **no `dependencies:`** (the coord agent already declares the gener
 3. **Placeholder resolution table** — for every `${...}` slot used in any template, the source it resolves from (`workflow.id`, `workflow.brief`, a parent `taskId`, a DAG-derived counter, etc.). Coord reads this table to resolve the slot before dispatch.
 4. **Stop condition** — the explicit predicate that triggers `finishWorkflow(succeeded, ...)`. Strategies without a clean terminal state MUST NOT exist in this catalog.
 5. **Failure-mode coverage** — an explicit `(role, terminal status)` matrix mapping each cell to the case that catches it, so a future author editing the case bank can re-check coverage without re-deriving it.
+6. **Agent compatibility statement** — at the bottom of the skill body, list each agent the strategy dispatches with the minimum AGENTS.md version it was validated against. When any of those agents publishes a new minor / major version, the strategy author re-reads the agent's AGENTS.md and bumps the strategy's version if any template needs updating. Coord uses this list at runtime pre-flight (see §D) to decide whether the template + agent are still in sync.
 
 ### Optional body sections
 

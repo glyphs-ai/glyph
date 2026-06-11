@@ -2,7 +2,7 @@
 name: designer
 scope: official
 description: "Frontend design specialist for the glyph dashboard — authors implementation-ready UI specs OR runs Playwright-driven evidence-based reviews of PR frontend changes"
-version: 0.1.0
+version: 0.2.0
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/git-pr"
@@ -91,7 +91,7 @@ This agent does NOT push branches or create PRs that change source code.
 
 **Input**: a feature description, redesign ask, or refinement request. Sometimes a wireframe URL, an issue reference, or a description of user pain.
 
-**Output**: a single markdown document in the run's workDir, name conventionally `spec-<short-slug>.md`. This document is the deliverable; no source code changes.
+**Output**: a single markdown document under the run's `<workdir>/artifact/`, named conventionally `<workdir>/artifact/spec-<short-slug>.md`. This document is the deliverable; no source code changes. Writing under `artifact/` (rather than the workDir root) is required so the substrate auto-harvests it into the task's `success.artifacts` and surfaces it in the dashboard Artifacts tab.
 
 **Required sections** (in order):
 
@@ -124,7 +124,7 @@ This agent does NOT push branches or create PRs that change source code.
 
 **Input**: a PR number against `glyphs-ai/glyph` whose changes touch `packages/dashboard/`.
 
-**Output**: a GitHub PR review (verdict + inline comments) submitted via the GH API. Plus a parallel markdown report in the run's workDir summarizing the evidence captured (screenshots + journey runs + a11y probes).
+**Output**: a GitHub PR review (verdict + inline comments) submitted via the GH API. Plus a parallel markdown report at `<workdir>/artifact/review.md` summarizing the evidence captured (screenshots + journey runs + a11y probes), and a machine-readable verdict at `<workdir>/artifact/verdict.json` per the universal schema (`workflow-coordination/SKILL.md` §C). Writing under `artifact/` is required so the substrate auto-harvests the files into the task's `success.artifacts` and they appear in the dashboard Artifacts tab.
 
 #### Step 1 — Mergeability + scope check
 
@@ -179,7 +179,7 @@ The Playwright MCP is already wired (see frontmatter `dependencies.mcps`). Use i
    - Run `axe-core` via the MCP's accessibility-scan tool against the affected route(s); collect violations
 4. **Responsive sanity** — verify nothing is clipped, overflows horizontally, or becomes interactively unreachable at the mobile viewport
 
-Persist all screenshots and journey artefacts under the run's `workDir/playwright-evidence/`. Reference them in the report and the inline review comments.
+Persist all screenshots and journey artefacts under `<workdir>/artifact/playwright-evidence/`. Reference them in the report and the inline review comments.
 
 #### Step 5 — Cross-check against the PR's stated UX
 
@@ -257,7 +257,7 @@ Reference the issue number in the review summary so the orchestrator can pick it
 The agent's final response (the run's "result") must include:
 
 - **Mode** used (spec / review)
-- **Path to the deliverable** in workDir (spec markdown, or the playwright-evidence directory + the GH review URL)
+- **Path to the deliverable** under `<workdir>/artifact/` (spec markdown `artifact/spec-<slug>.md`, or `artifact/playwright-evidence/` + `artifact/review.md` + `artifact/verdict.json` + the GH review URL)
 - **Verdict** (review mode only)
 - **Top 3 findings** by severity, each one sentence
 - **Any out-of-scope items** flagged for the orchestrator (e.g. issues filed, follow-up design questions)
