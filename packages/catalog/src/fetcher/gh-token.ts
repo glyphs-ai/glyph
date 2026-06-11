@@ -43,9 +43,9 @@ const SPAWN_TIMEOUT_MS = 5_000;
  *   - `gho_` OAuth, `ghp_` PAT, `ghs_` server-to-server, `ghu_` user-to-server,
  *   - `github_pat_` fine-grained PAT.
  *
- * Defensive validation: if `gh auth token` ever prints stderr text on stdout
- * (or a future gh version changes its output shape), this regex prevents us
- * from sending garbage into an `Authorization: Bearer …` header.
+ * Defensive validation: if `gh auth token` prints stderr text on stdout
+ * or changes its output shape, this regex prevents us from sending garbage
+ * into an `Authorization: Bearer …` header.
  */
 const TOKEN_RE = /^(gho|ghp|ghs|ghu|github_pat)_[A-Za-z0-9_]+$/;
 
@@ -62,7 +62,7 @@ const TOKEN_RE = /^(gho|ghp|ghs|ghu|github_pat)_[A-Za-z0-9_]+$/;
  * Stdin is wired to `"ignore"` so `gh` can never prompt the user for input.
  * If the keyring is locked or the user isn't logged in, gh exits non-zero
  * immediately rather than blocking — but the timeout is the belt-and-braces
- * fallback in case some future gh version behaves differently.
+ * fallback in case `gh` behaves differently.
  *
  * Host names are lower-cased before being passed to `gh`. Hostnames are
  * case-insensitive at the DNS / `gh` level, but the cache in
@@ -121,8 +121,8 @@ export async function tryGhAuthToken(host: string): Promise<string | null> {
       }
       // Distinct case from "gh isn't configured here": gh exited 0 but the
       // stdout isn't a recognised GitHub token shape. That means either
-      // (a) a future gh version changed its output format, or (b) something
-      // else printed to stdout (extension wrapper, login banner, …).
+      // `gh` changed its output format or something else printed to stdout
+      // (extension wrapper, login banner, …).
       // Either way it's an unexpected condition the user almost certainly
       // wants to know about — emit a one-shot Node warning so it surfaces
       // in CI logs and process.on("warning") handlers without forcing the

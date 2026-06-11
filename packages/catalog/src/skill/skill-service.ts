@@ -1,5 +1,6 @@
 import matter from "gray-matter";
 import { normaliseOriginDeps, type OriginDeps } from "../_shared/dep-keys.js";
+import { CatalogError } from "../errors.js";
 import { type EntryFile, sameOrigin } from "../fetcher/index.js";
 import type { McpRepository } from "../mcp/mcp-repository.js";
 import { ImmutableOriginError, isOriginMutable } from "../origin-mutability.js";
@@ -174,7 +175,7 @@ export class SkillService {
       const plan = await this.resolve(planOrOrigin);
       if (plan.conflict !== null) throw conflictToError(plan.conflict);
       if (plan.node === null) {
-        throw new Error("unreachable: resolve returned neither node nor conflict");
+        throw new CatalogError("unreachable: resolve returned neither node nor conflict");
       }
       node = plan.node;
     } else {

@@ -1,5 +1,4 @@
 import {
-  type DependencyRef,
   depsToJSON,
   emptyDeps,
   emptyOriginDeps,
@@ -155,9 +154,6 @@ function applyAgentAnchorPatch(
     updatedAt: new Date().toISOString(),
   };
 }
-
-/** A resolved fqn-form dep reference. */
-export type AgentDependencyRef = DependencyRef;
 
 /** Resolved fqn-form deps view (catalog-side projection). */
 export type AgentDependencies = FqnDeps<AgentDepKind>;

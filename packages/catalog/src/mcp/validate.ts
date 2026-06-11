@@ -50,13 +50,3 @@ export function validateMcpName(name: unknown): asserts name is string {
     }
   }
 }
-
-/**
- * Split a validated MCP name into its `{ namespace, shortName }` parts.
- * Caller MUST have already passed `validateMcpName(name)` — this
- * function does not re-validate.
- */
-export function splitMcpName(name: string): { namespace: string; shortName: string } {
-  const idx = name.indexOf("/");
-  return { namespace: name.slice(0, idx), shortName: name.slice(idx + 1) };
-}

@@ -3,8 +3,8 @@
  * (no IO), thrown errors are catalog errors so the route layer can
  * map to status codes uniformly.
  *
- * Shared across HTTP / future CLI / future programmatic SDK so all
- * channels enforce the same body shape rules.
+ * Shared across HTTP boundaries so all channels enforce the same body
+ * shape rules.
  *
  * **Wire shape**: clients send `{ origin: string }`. The origin URI
  * is the canonical identity in every layer of the system (catalog DB

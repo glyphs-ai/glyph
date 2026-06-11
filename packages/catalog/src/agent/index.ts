@@ -1,6 +1,5 @@
 export {
   type AgentDependencies,
-  type AgentDependencyRef,
   AgentEntity,
 } from "./agent-entity.js";
 export type { AgentFrontmatter, ParsedAgentMd } from "./agent-frontmatter.js";

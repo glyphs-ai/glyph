@@ -11,7 +11,7 @@ import { OriginParseError } from "./errors.js";
  * - `azure-devops` — an Azure DevOps Services URL of the form
  *   `https://dev.azure.com/<org>/<project>/_git/<repo>?path=/<path>`. Unlike
  *   `github`, the catalog deliberately does NOT accept a ref pin (`&version=`)
- *   here: ADO's GB/GT/GC ref-prefix grammar differs from git and is not yet
+ *   here: ADO's GB/GT/GC ref-prefix grammar differs from git and is not
  *   modelled. The install always reads the repo's default branch. Legacy
  *   `<org>.visualstudio.com` and on-prem TFS hosts (`tfs.<x>.com` or any
  *   URL whose path starts with `/tfs/`) are rejected at parse time with
@@ -160,7 +160,7 @@ export function parseOrigin(uri: string): ParsedOrigin {
     }
     // ADO's ref-pinning grammar (`&version=GBmain`, `&version=GTtag1.0`,
     // `&version=GCsha`) doesn't map cleanly onto git refs and the catalog
-    // does not yet model the prefix → ref kind dispatch. Rejecting here
+    // does not model the prefix → ref kind dispatch. Rejecting here
     // rather than silently dropping the ref preserves install-from-default-
     // branch semantics and avoids surprising the user with a divergent ref.
     if (parsed.searchParams.has("version")) {
@@ -168,7 +168,7 @@ export function parseOrigin(uri: string): ParsedOrigin {
         uri,
         "&version= is not supported on dev.azure.com URLs: " +
           "ADO's ref-pinning prefixes (GB branch / GT tag / GC commit) differ from git refs " +
-          "and are not yet modelled. Omit &version= to install from the repo's default branch.",
+          "and are not modelled. Omit &version= to install from the repo's default branch.",
       );
     }
     const segs = parsed.pathname.split("/");

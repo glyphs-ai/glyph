@@ -1,10 +1,8 @@
 /**
- * Parametric dep keys. Each anchored kind (agent, skill, future kinds)
+ * Parametric dep keys. Each anchored kind (agent, skill)
  * declares its own dep-spec set as a const array (e.g. agents:
  * `["skills", "mcps"]`). Helpers in this file operate generically over
- * `<K extends string>` and never name a specific dep-kind, so adding a
- * new kind never requires changes here — only a new spec declaration
- * in the per-kind frontmatter module.
+ * `<K extends string>` and never name a specific dep-kind.
  */
 
 /** A resolved fqn-form dep reference. */

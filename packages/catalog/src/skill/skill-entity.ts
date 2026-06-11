@@ -1,5 +1,4 @@
 import {
-  type DependencyRef,
   depsToJSON,
   emptyDeps,
   emptyOriginDeps,
@@ -155,9 +154,6 @@ function applySkillAnchorPatch(
     updatedAt: new Date().toISOString(),
   };
 }
-
-/** A resolved fqn-form dep reference. */
-export type SkillDependencyRef = DependencyRef;
 
 export type SkillDependencies = FqnDeps<SkillDepKind>;
 export type SkillDepRefs = OriginDeps<SkillDepKind>;

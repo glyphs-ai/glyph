@@ -10,10 +10,6 @@ import { CatalogError } from "../errors.js";
 
 export class FetcherError extends CatalogError {
   override readonly name: string = "FetcherError";
-
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-  }
 }
 
 /**

@@ -80,8 +80,8 @@ export interface Skill {
   /**
    * True iff the entry can be edited via PUT/PATCH: mutable iff origin
    * starts with `file:`. Remote-sourced entries (GitHub / Azure DevOps
-   * URLs and future registry-backed origins) are read-only mirrors — to
-   * pick up upstream changes, re-install via the same origin.
+   * URLs) are read-only mirrors — to pick up upstream changes, re-install
+   * via the same origin.
    */
   readonly mutable: boolean;
   /**

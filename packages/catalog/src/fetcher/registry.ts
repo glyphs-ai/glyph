@@ -1,4 +1,5 @@
 import { AzureDevOpsFetcher } from "./azure-devops-fetcher.js";
+import { FetcherError } from "./errors.js";
 import type { EntryFile, Fetcher } from "./fetcher.js";
 import { FileFetcher } from "./file-fetcher.js";
 import { GitHubFetcher } from "./github-fetcher.js";
@@ -6,16 +7,13 @@ import { type ParsedOrigin, parseOrigin } from "./origin.js";
 
 /**
  * Lookup table from origin scheme → fetcher implementation. Built once at
- * construction so adding a new scheme is just `register(new MyFetcher())`.
+ * construction and extended via {@link FetcherRegistry.register}.
  *
- * Why a registry rather than a switch? Two reasons:
+ * Why a registry rather than a switch?
  *
- *  1. Tests can install a mock fetcher for a real scheme (e.g. swap
- *     GitHubFetcher for one that yields from an in-memory tarball
- *     fixture) without monkey-patching call sites.
- *
- *  2. Future schemes (e.g. `npm:`, generic `git+ssh://`) can be added in
- *     their own subpackage that depends only on the fetcher contract.
+ * Tests can install a mock fetcher for a real scheme (e.g. swap
+ * GitHubFetcher for one that yields from an in-memory tarball
+ * fixture) without monkey-patching call sites.
  */
 export class FetcherRegistry {
   private readonly bySchemeMap = new Map<string, Fetcher>();
@@ -32,7 +30,7 @@ export class FetcherRegistry {
   resolve(origin: ParsedOrigin): Fetcher {
     const f = this.get(origin.scheme);
     if (!f) {
-      throw new Error(
+      throw new FetcherError(
         `no fetcher registered for scheme "${origin.scheme}" (origin: ${origin.raw})`,
       );
     }

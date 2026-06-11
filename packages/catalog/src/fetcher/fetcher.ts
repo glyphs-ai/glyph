@@ -22,8 +22,7 @@
  *
  * The contract has **no filesystem side-effect** in the public
  * surface: `FileFetcher` does touch fs internally because it has to,
- * `GitHubFetcher` streams over HTTPS without ever touching disk, and
- * any future fetcher (npm:, oci:) just produces bytes.
+ * `GitHubFetcher` streams over HTTPS without ever touching disk.
  *
  * Fetchers MUST be safe to call concurrently.
  */

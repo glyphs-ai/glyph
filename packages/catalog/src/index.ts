@@ -8,7 +8,7 @@
  *   - DTOs are the wire shapes returned by the facade; they
  *     intentionally avoid leaking entity-class methods.
  *   - Errors are exported per-entity so HTTP status mapping in
- *     `server/_shared.ts` can name them.
+ *     `server/src/routes/_error-policies/catalog.ts` can name them.
  */
 
 export {
@@ -72,7 +72,7 @@ export {
   stripMeta as stripMcpMeta,
   writeMeta as writeMcpMeta,
 } from "./mcp/mcp-format.js";
-export { splitMcpName, validateMcpName } from "./mcp/validate.js";
+export { validateMcpName } from "./mcp/validate.js";
 // ─── Origin mutability ──────────────────────────────
 export { ImmutableOriginError, isOriginMutable } from "./origin-mutability.js";
 // ─── Drizzle schema (low-level row access for tests/migrations) ─

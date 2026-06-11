@@ -9,4 +9,4 @@ export type { McpFile, McpMeta } from "./mcp-format.js";
 export * as McpFormat from "./mcp-format.js";
 export { McpRepository } from "./mcp-repository.js";
 export { type McpFetcher, McpService, type McpServiceOpts } from "./mcp-service.js";
-export { splitMcpName, validateMcpName } from "./validate.js";
+export { validateMcpName } from "./validate.js";

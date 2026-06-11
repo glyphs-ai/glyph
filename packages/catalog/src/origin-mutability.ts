@@ -8,13 +8,12 @@ import { parseOrigin } from "./fetcher/index.js";
  * An entry is mutable iff its origin's parsed scheme is in
  * {@link MUTABLE_SCHEMES}. Currently `file:` only — local working
  * copies are mutable; remote-sourced entries (GitHub / Azure DevOps
- * URLs and future registry-backed origins) are read-only mirrors that
- * can only be refreshed from upstream via re-install (which is upsert).
+ * URLs) are read-only mirrors that can only be refreshed from upstream
+ * via re-install (which is upsert).
  *
  * Mutation is **catalog-only**: editing a `file:` entry in the
  * dashboard updates the SQLite copy WITHOUT writing back to the
- * origin file. A future `export` flow can write the catalog back to
- * the origin path.
+ * origin file.
  *
  * Why route through `parseOrigin` instead of a `startsWith("file:")`
  * substring check? Two reasons:
@@ -22,8 +21,8 @@ import { parseOrigin } from "./fetcher/index.js";
  *      for what "valid origin" means). A garbled URI that the fetcher
  *      would reject must also be considered immutable here, otherwise
  *      a malformed `file:foo` could slip past mutability gating.
- *   2. Adding a new scheme (e.g. `oci:`) only touches `MUTABLE_SCHEMES`
- *      below, not every call site that does string prefix tests.
+ *   2. The mutability policy stays coupled to parsed origin schemes
+ *      rather than raw string prefixes.
  *
  * Calling sites:
  *   - `SkillService.updateAnchor`
@@ -35,12 +34,6 @@ import { parseOrigin } from "./fetcher/index.js";
  *
  * The three services throw {@link ImmutableOriginError} when the check
  * fails; the server route layer maps that error name to HTTP 405.
- *
- * **Future**: when the Fetcher count grows (npm/oci/registry-backed
- * fetchers), consider lifting this into `Fetcher.readonly: boolean` so
- * each fetcher self-declares (and `FileFetcher` can even pre-check
- * `access(W_OK)` to surface "the file is read-only" as immutable). For
- * now a centralized scheme set keeps the policy in one place.
  */
 
 const MUTABLE_SCHEMES = new Set<string>(["file"]);
