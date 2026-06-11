@@ -1,5 +1,6 @@
 {
   "name": "@glyphs-ai/catalog",
+  "private": true,
   "version": "0.0.1",
   "description": "Agent + Skill + MCP dependency-aware registry (file-system backed)",
   "license": "MIT",

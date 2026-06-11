@@ -1,5 +1,6 @@
 {
   "name": "@glyphs-ai/workflow",
+  "private": true,
   "version": "0.0.1",
   "description": "Workflow DAG substrate for glyph (workflows / workflow_nodes / workflow_edges)",
   "license": "MIT",

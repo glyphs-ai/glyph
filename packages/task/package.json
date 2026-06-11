@@ -1,5 +1,6 @@
 {
   "name": "@glyphs-ai/task",
+  "private": true,
   "version": "0.0.1",
   "description": "TaskService for autonomous agent runs - Drizzle-backed task registry, dispatch / cancel / delete lifecycle, runtime-driven exit watcher",
   "license": "MIT",
