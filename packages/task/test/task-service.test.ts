@@ -783,11 +783,12 @@ describe("dispatch — error paths", () => {
   it("rolls back the workdir when the runtime throws during dispatch", async () => {
     const rt = new StubRuntime();
     rt.dispatchError = new Error("boom in spawn");
-    const { m } = await makeManager({ runtime: rt });
+    const { m, repo } = await makeManager({ runtime: rt });
 
     await expect(m.dispatch(dispatchOf())).rejects.toThrow(/boom in spawn/);
     const entries = await safeReaddir(tasksDir);
     expect(entries).toEqual([]);
+    expect(await repo.read("20260508-01010101")).toBeNull();
   });
 
   it("EntryNotReadyError when the agent is blocked due to prereqs", async () => {

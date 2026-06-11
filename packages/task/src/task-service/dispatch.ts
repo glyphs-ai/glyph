@@ -49,7 +49,7 @@ const KERNEL_ENV_KEYS: ReadonlySet<string> = new Set<string>([
  * dereference `runtime.launchHeadless` without a second defensive
  * check.
  */
-export interface RunDispatchArgs {
+interface RunDispatchArgs {
   readonly id: string;
   readonly workdir: string;
   readonly agentName: string;
@@ -122,7 +122,7 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
   try {
     assertFramingPromptIsSafe(framingPrompt);
   } catch (err) {
-    await safeRm(workdir, ctx.logger);
+    await rollbackInitialTask(ctx, id, workdir);
     throw err;
   }
 
@@ -155,7 +155,7 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
   try {
     await ctx.repository.save(initial);
   } catch (err) {
-    await safeRm(workdir, ctx.logger);
+    await rollbackInitialTask(ctx, id, workdir);
     throw err;
   }
 
@@ -173,13 +173,13 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
     await mkdir(path.join(workdir, TASK_TEMP_SUBDIR), { recursive: true });
     await mkdir(path.join(workdir, TASK_ARTIFACT_SUBDIR), { recursive: true });
   } catch (err) {
-    await safeRm(workdir, ctx.logger);
+    await rollbackInitialTask(ctx, id, workdir);
     throw err;
   }
 
   // 5. Spawn. The runtime owns the subprocess and returns a handle.
   //    Pre-running failures (provision throws, spawn ENOENT) roll
-  //    back the workdir.
+  //    back the workdir and initial row.
   let handle: RuntimeHandle;
   try {
     handle = await runtime.launchHeadless({
@@ -216,7 +216,7 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
       },
     });
   } catch (err) {
-    await safeRm(workdir, ctx.logger);
+    await rollbackInitialTask(ctx, id, workdir);
     throw err;
   }
 
@@ -237,21 +237,29 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
     } catch {
       // exit promise should never reject by construction.
     }
-    await safeRm(workdir, ctx.logger);
+    await rollbackInitialTask(ctx, id, workdir);
     throw new ManagerShuttingDownError();
   }
 
   // 6. Fold runtime-session id into metadata. Status is already
   //    `running` from create-time, so no separate state transition.
-  //    Persistence failure here is NOT rolled back (subprocess is
-  //    live; orphan recovery handles it on next boot).
+  //    Persistence failure here is NOT rolled back or rethrown: the
+  //    subprocess is live, and terminal persistence will retry with
+  //    the same enriched metadata.
   let running: TaskEntity = initial;
   if (handle.runtimeSessionId !== undefined) {
     running = initial.withMetadata({
       ...initial.metadata,
       runtimeSessionId: handle.runtimeSessionId,
     });
-    await ctx.repository.save(running);
+    try {
+      await ctx.repository.save(running);
+    } catch (err) {
+      ctx.logger.warn(
+        { taskId: id, err },
+        "tasks: failed to persist runtime session id; terminal save will retry metadata",
+      );
+    }
   }
 
   // 7. Wire post-spawn background work: watch exit + persist
@@ -266,9 +274,7 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
     id,
     handle,
     killReason: null,
-    // `settled` is filled in just below; we need the object
-    // reference first so the IIFE can close over it.
-    settled: undefined as unknown as Promise<void>,
+    settled: Promise.resolve(),
   };
   const settled = (async () => {
     let exitInfo: Awaited<RuntimeHandle["exit"]>;
@@ -297,9 +303,25 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
     await applyTerminal(ctx, workdir, running, decision);
     ctx.live.delete(id);
   })();
-  (liveEntry as { settled: Promise<void> }).settled = settled;
+  liveEntry.settled = settled;
 
   ctx.live.set(id, liveEntry);
 
   return running;
+}
+
+async function rollbackInitialTask(
+  ctx: TaskServiceCtx,
+  id: string,
+  workdir: string,
+): Promise<void> {
+  await safeRm(workdir, ctx.logger);
+  try {
+    await ctx.repository.delete(id);
+  } catch (err) {
+    ctx.logger.warn(
+      { taskId: id, err },
+      "tasks: failed to remove task row during dispatch rollback",
+    );
+  }
 }

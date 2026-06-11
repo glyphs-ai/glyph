@@ -52,10 +52,7 @@ export type TerminalStatus = "succeeded" | "failed" | "cancelled";
  * type error.
  *
  * The repository / service layers use this to express "task is *not*
- * terminal" without hard-coding the status name `"running"`. That keeps
- * forward compatibility when a future non-terminal status (e.g.
- * `"queued"`) is added: it will automatically be treated as in-flight by
- * `hasInFlightForSchedule` and skipped by `deleteTerminalForSchedule`.
+ * terminal" without hard-coding the status name `"running"`.
  */
 export const TERMINAL_TASK_STATUSES = [
   "succeeded",
@@ -68,10 +65,6 @@ export const TERMINAL_TASK_STATUSES = [
  * standalone, workflow-, and schedule-launched tasks share the
  * same T1 task table. New dispatches default to `'standalone'`
  * (a direct CLI / dashboard / MCP call).
- *
- * String union (not enum) so future additions are additive — adding
- * a new origin later does not break consumers that only branch on
- * existing values.
  */
 export type TaskOrigin = "standalone" | "workflow" | "schedule";
 
@@ -143,8 +136,7 @@ export type TaskFailure =
  *                flavour specifically.
  *
  * Discriminator is `kind` (not `source`) to stay consistent with
- * {@link TaskFailure} and to fit future event-shaped variants
- * (`timeout`, `budget`) that aren't actors.
+ * {@link TaskFailure}.
  */
 export type TaskCancellation =
   | { readonly kind: "user"; readonly message: string }

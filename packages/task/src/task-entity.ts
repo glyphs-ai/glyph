@@ -1,5 +1,6 @@
 import { CorruptedTaskError, InvalidTaskIdError, InvalidTransition } from "./errors.js";
 import type {
+  Task,
   TaskCancellation,
   TaskFailure,
   TaskOrigin,
@@ -223,6 +224,21 @@ export class TaskEntity {
         "task.cancellation is required when status is 'cancelled'",
       );
     }
+    if (args.status !== "succeeded" && args.success !== undefined) {
+      throw new CorruptedTaskError(
+        args.id,
+        "task.success is only allowed when status is 'succeeded'",
+      );
+    }
+    if (args.status !== "failed" && args.failure !== undefined) {
+      throw new CorruptedTaskError(args.id, "task.failure is only allowed when status is 'failed'");
+    }
+    if (args.status !== "cancelled" && args.cancellation !== undefined) {
+      throw new CorruptedTaskError(
+        args.id,
+        "task.cancellation is only allowed when status is 'cancelled'",
+      );
+    }
     return new TaskEntity(
       args.id,
       args.agent,
@@ -365,7 +381,7 @@ export class TaskEntity {
    * Exactly one of `success` / `failure` / `cancellation` is present
    * for the matching terminal status; none appear for `running`.
    */
-  toJSON(): Record<string, unknown> {
+  toJSON(): Task {
     return {
       id: this._id,
       agent: this._agent,

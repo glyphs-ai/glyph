@@ -116,8 +116,7 @@ export class TaskRepository {
    *
    * Non-terminal (rather than `status = 'running'`) is the right
    * semantic for both the scheduler's concurrency=1 check and the
-   * schedule-delete guard: a future non-terminal status (e.g.
-   * `"queued"`) would otherwise silently slip past both checks.
+   * schedule-delete guard.
    */
   async hasInFlightForSchedule(scheduleId: string): Promise<boolean> {
     const row = this.db
@@ -140,15 +139,13 @@ export class TaskRepository {
    * `metadata.workflowNodeId === nodeId` is non-terminal (i.e. status
    * is not in {@link TERMINAL_TASK_STATUSES}). Used by the workflow
    * package's `hasInFlightForNode` reverse lookup for worker nodes
-   * (see `packages/api/src/wiring/workflow-task-runner.ts`).
+   * (see `packages/api/src/wiring/workflow-worker-task-runner.ts`).
    *
    * Unlike {@link hasInFlightForSchedule} there is no functional
    * index on `metadata.workflowNodeId`; the planner falls back to
    * filtering by `origin='workflow'` first (still index-eligible
    * via the same row's `origin` column path) and applying the
-   * `json_extract` predicate on the matched rows only. Workflow
-   * worker volume is currently low enough that a functional index
-   * is not yet worth the migration cost.
+   * `json_extract` predicate on the matched rows only.
    *
    * `workflowNodeId` is the canonical metadata key per
    * `packages/workflow/src/types.ts:222` (substrate-side denorm of
@@ -218,10 +215,8 @@ export class TaskRepository {
    *   1. No `notInArray(tasks.status, TERMINAL_TASK_STATUSES)` filter
    *      — a succeeded / failed / cancelled node still wants to
    *      navigate to its task.
-   *   2. `ORDER BY createdAt DESC LIMIT 1` — if a worker was
-   *      re-dispatched after a cancel (unlikely today, but possible
-   *      when an operator manually retries a failed node), surface
-   *      the latest task.
+   *   2. `ORDER BY createdAt DESC LIMIT 1` — if several rows carry
+   *      the same node id, surface the latest task.
    *
    * Returns `null` when no task has been dispatched for the node
    * (only possible in the tight window between node insert and
@@ -229,9 +224,8 @@ export class TaskRepository {
    *
    * `workflowNodeId` is the canonical metadata key per
    * `packages/workflow/src/types.ts:222`. Same `json_extract`
-   * predicate as the in-flight variants — no functional index yet
-   * (workflow worker volume is low; revisit if dashboards start to
-   * lag on the `/dag` route).
+   * predicate as the in-flight variants; filtering by `origin` stays
+   * index-eligible before the JSON predicate is applied.
    */
   async findTaskByWorkflowNode(nodeId: string): Promise<TaskEntity | null> {
     const row = this.db

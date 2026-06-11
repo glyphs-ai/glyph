@@ -4,10 +4,9 @@
  * so cancel cannot race past a just-spawned subprocess.
  *
  * External HTTP callers cannot reach this branch (the id is unknown
- * until dispatch returns), but the invariant matters for future
- * internal callers (queueing, agent self-extension, parallel test
- * fixtures, etc). This test reaches into the manager's private
- * `dispatchInProgress` set via a cast to set up the race condition.
+ * until dispatch returns). This test reaches into the manager's
+ * private `dispatchInProgress` set via a cast to set up the race
+ * condition.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

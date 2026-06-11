@@ -293,7 +293,7 @@ export async function recoverOrphaned(ctx: TaskServiceCtx): Promise<void> {
  * for tens of seconds. Both continuations re-enqueue so a prior
  * failure never stalls the queue.
  */
-export function scheduleBackgroundPurge(
+function scheduleBackgroundPurge(
   ctx: TaskServiceCtx,
   id: string,
   existing: TaskEntity,

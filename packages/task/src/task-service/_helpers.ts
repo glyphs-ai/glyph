@@ -78,7 +78,7 @@ export interface LiveTask {
   readonly id: string;
   readonly handle: RuntimeHandle;
   /** Resolves once the post-exit persistence has finished. */
-  readonly settled: Promise<void>;
+  settled: Promise<void>;
   killReason: "shutdown" | "cancel" | null;
 }
 
@@ -88,7 +88,7 @@ export interface LiveTask {
  * entity. `exitCode` / `signal` live strictly inside the `failure`
  * payload — they are not mirrored onto the task metadata bag.
  */
-export type TerminalDecision =
+type TerminalDecision =
   | { readonly kind: "succeeded" }
   | { readonly kind: "failed"; readonly failure: TaskFailure }
   | { readonly kind: "cancelled"; readonly cancellation: TaskCancellation };

@@ -170,7 +170,7 @@ export class TaskService {
    * True if any non-terminal task originated from the workflow with
    * `metadata.workflowNodeId === nodeId`. Narrow surface that mirrors
    * {@link TaskService.hasInFlightForSchedule}; used by
-   * `@glyphs-ai/api/src/wiring/workflow-task-runner.ts` to implement
+   * `@glyphs-ai/api/src/wiring/workflow-worker-task-runner.ts` to implement
    * `WorkflowNodeRunner.hasInFlightForNode` for worker nodes without
    * broadening {@link ListTaskOpts} with a generic metadata filter.
    *
@@ -277,7 +277,7 @@ function defaultRandomBytes(n: number): Buffer {
 }
 
 function toTask(task: TaskEntity): Task {
-  return task.toJSON() as unknown as Task;
+  return task.toJSON();
 }
 
 /**

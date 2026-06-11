@@ -33,8 +33,7 @@ export async function listTasks(
 
   // Newest first. createdAt is ISO 8601 → lexicographic sort. Id is
   // the deterministic tiebreaker for tasks created in the same
-  // millisecond. (We sort here rather than in the repository so the
-  // sort order stays consistent across future repo backends.)
+  // millisecond. Sorting here keeps the repository read path simple.
   tasks.sort((a, b) => {
     const d = b.createdAt.localeCompare(a.createdAt);
     return d !== 0 ? d : b.id.localeCompare(a.id);
@@ -63,7 +62,7 @@ export async function hasInFlightForSchedule(
  * True if any non-terminal task with `origin='workflow'` and
  * `metadata.workflowNodeId === nodeId` exists. Used by the workflow
  * worker runner's `hasInFlightForNode` implementation (see
- * `packages/api/src/wiring/workflow-task-runner.ts`). Narrow
+ * `packages/api/src/wiring/workflow-worker-task-runner.ts`). Narrow
  * additive surface mirroring {@link hasInFlightForSchedule} —
  * deliberately NOT a generic `metadata` filter on `ListTaskOpts` so
  * the broadening stays contained to the one call site that needs

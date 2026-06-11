@@ -403,6 +403,38 @@ describe("TaskEntity.fromStored — typed payload invariants", () => {
     ).toThrow(/task.success is required when status is 'succeeded'/);
   });
 
+  it("rejects terminal payloads that do not match the status", () => {
+    expect(() =>
+      TaskEntity.fromStored({
+        id: FIXED_ID,
+        agent: "a",
+        brief: "do",
+        origin: "standalone",
+        status: "succeeded",
+        metadata: {},
+        createdAt: fixedNow,
+        startedAt: fixedNow,
+        endedAt: fixedNow,
+        success: { output: "ok" },
+        failure: { kind: "internal", message: "extra" },
+      }),
+    ).toThrow(/task.failure is only allowed when status is 'failed'/);
+
+    expect(() =>
+      TaskEntity.fromStored({
+        id: FIXED_ID,
+        agent: "a",
+        brief: "do",
+        origin: "standalone",
+        status: "running",
+        metadata: {},
+        createdAt: fixedNow,
+        startedAt: fixedNow,
+        success: { output: "extra" },
+      }),
+    ).toThrow(/task.success is only allowed when status is 'succeeded'/);
+  });
+
   it("rejects an out-of-union failure kind", () => {
     expect(() =>
       TaskEntity.fromStored({
