@@ -17,11 +17,7 @@
  * `./test/_helpers.ts`.
  */
 
-export {
-  composeScheduleModule,
-  type ScheduleModule,
-  type ScheduleModuleOptions,
-} from "./compose.js";
+export { composeScheduleModule } from "./compose.js";
 export { describeCron } from "./cron.js";
 export {
   InvalidCronExprError,
@@ -37,12 +33,8 @@ export {
   ScheduleKindRegistryFrozenError,
   ScheduleNotFoundError,
 } from "./errors.js";
-export { ScheduleService, type ScheduleServiceOpts } from "./schedule-service.js";
+export { ScheduleService } from "./schedule-service.js";
 export type {
-  CreateScheduleOpts,
-  ListScheduleOpts,
-  PatchScheduleOpts,
-  PreviewScheduleOpts,
   PreviewScheduleResult,
   Schedule,
   ScheduleKindHandler,

@@ -84,7 +84,7 @@ packages/schedule/
     ├── schema.ts             Drizzle table definition (private)
     ├── testing.ts            openTestScheduleDb() in-memory test helper
     ├── types.ts              Schedule, ScheduleKindHandler, envelope, service opts
-    └── validate.ts           SCHEDULE_ID_RE + generateScheduleId
+    └── validate.ts           generateScheduleId + assertValidScheduleId
 ```
 
 ## Invariants

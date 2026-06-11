@@ -4,7 +4,7 @@
  * WHAT this file does:
  *   Uses Vitest's `expectTypeOf<T>()` to lock the pkg's public surface
  *   at the TYPE level. Every public method on the service class, every
- *   exported error class, every exported DTO / option shape, and the
+ *   exported error class, every exported DTO shape, and the
  *   `describeCron` helper get a `expectTypeOf(...)` assertion below.
  *
  * WHY it is valuable:
@@ -38,18 +38,15 @@
  * classes on a real BC.
  */
 
+import type { Logger } from "pino";
 import { describe, expectTypeOf, it } from "vitest";
 import {
-  type CreateScheduleOpts,
   composeScheduleModule,
   describeCron,
   InvalidCronExprError,
   InvalidJsonPathError,
   InvalidScheduleIdError,
   InvalidTimezoneError,
-  type ListScheduleOpts,
-  type PatchScheduleOpts,
-  type PreviewScheduleOpts,
   type PreviewScheduleResult,
   type Schedule,
   ScheduleEnabledError,
@@ -60,8 +57,6 @@ import {
   ScheduleKindMismatchError,
   ScheduleKindNotRegisteredError,
   ScheduleKindRegistryFrozenError,
-  type ScheduleModule,
-  type ScheduleModuleOptions,
   ScheduleNotFoundError,
   type ScheduleService,
   type ScheduleTargetEnvelope,
@@ -89,7 +84,7 @@ describe("@glyphs-ai/schedule public API guard", () => {
     expectTypeOf(errs[0]!).toExtend<Error>();
   });
 
-  it("preserves the public DTO + option shapes", () => {
+  it("preserves the public DTO shapes", () => {
     // Schedule wire DTO — projected by the server to a kind-specific
     // shape; a rename here breaks both the projection and the dashboard.
     expectTypeOf<Schedule>().toHaveProperty("id");
@@ -104,8 +99,7 @@ describe("@glyphs-ai/schedule public API guard", () => {
     expectTypeOf<ScheduleTargetEnvelope>().toHaveProperty("kind");
     expectTypeOf<ScheduleTargetEnvelope>().toHaveProperty("data");
 
-    // Trigger discriminator — only "cron" today but locked so a future
-    // additive variant is a deliberate change to this guard.
+    // Trigger discriminator — only "cron" today.
     expectTypeOf<ScheduleTrigger>().toHaveProperty("kind");
     expectTypeOf<ScheduleTrigger>().toHaveProperty("expr");
     expectTypeOf<ScheduleTrigger>().toHaveProperty("tz");
@@ -117,22 +111,6 @@ describe("@glyphs-ai/schedule public API guard", () => {
     expectTypeOf<ScheduleKindHandler>().toHaveProperty("dispatch");
     expectTypeOf<ScheduleKindHandler>().toHaveProperty("hasInFlightForSchedule");
     expectTypeOf<ScheduleKindHandler>().toHaveProperty("deleteForSchedule");
-
-    // Opts consumed by the service surface.
-    expectTypeOf<CreateScheduleOpts>().toHaveProperty("name");
-    expectTypeOf<CreateScheduleOpts>().toHaveProperty("trigger");
-    expectTypeOf<CreateScheduleOpts>().toHaveProperty("target");
-    expectTypeOf<PatchScheduleOpts>().toHaveProperty("name");
-    expectTypeOf<PatchScheduleOpts>().toHaveProperty("trigger");
-    expectTypeOf<PatchScheduleOpts>().toHaveProperty("enabled");
-    expectTypeOf<PatchScheduleOpts>().toHaveProperty("target");
-    expectTypeOf<PatchScheduleOpts>().toHaveProperty("expectedKind");
-    expectTypeOf<ListScheduleOpts>().toHaveProperty("enabled");
-    expectTypeOf<ListScheduleOpts>().toHaveProperty("kind");
-    expectTypeOf<ListScheduleOpts>().toHaveProperty("dataEquals");
-    expectTypeOf<PreviewScheduleOpts>().toHaveProperty("expr");
-    expectTypeOf<PreviewScheduleOpts>().toHaveProperty("tz");
-    expectTypeOf<PreviewScheduleOpts>().toHaveProperty("n");
 
     // preview() return shape — dashboard renders both fields.
     expectTypeOf<PreviewScheduleResult>().toHaveProperty("describe");
@@ -150,22 +128,43 @@ describe("@glyphs-ai/schedule public API guard", () => {
     expectTypeOf<ScheduleService>().toHaveProperty("preview");
     expectTypeOf<ScheduleService>().toHaveProperty("recover");
     expectTypeOf<ScheduleService>().toHaveProperty("shutdown");
-    expectTypeOf<ScheduleService["create"]>().parameters.toEqualTypeOf<[CreateScheduleOpts]>();
-    expectTypeOf<ScheduleService["patch"]>().parameters.toEqualTypeOf<
-      [string, PatchScheduleOpts]
+    expectTypeOf<ScheduleService["create"]>().parameters.toEqualTypeOf<
+      [
+        {
+          readonly name: string;
+          readonly trigger: ScheduleTrigger;
+          readonly target: ScheduleTargetEnvelope;
+          readonly enabled?: boolean;
+        },
+      ]
     >();
-    expectTypeOf<ScheduleService["preview"]>().parameters.toEqualTypeOf<[PreviewScheduleOpts]>();
+    expectTypeOf<ScheduleService["patch"]>().parameters.toEqualTypeOf<
+      [
+        string,
+        {
+          readonly name?: string;
+          readonly trigger?: ScheduleTrigger;
+          readonly enabled?: boolean;
+          readonly target?: { readonly patch: unknown };
+          readonly expectedKind?: string;
+        },
+      ]
+    >();
+    expectTypeOf<ScheduleService["preview"]>().parameters.toEqualTypeOf<
+      [{ readonly expr: string; readonly tz: string; readonly n?: number }]
+    >();
   });
 
   it("preserves the re-exported describeCron helper", () => {
     expectTypeOf(describeCron).toBeFunction();
   });
 
-  it("preserves the composition surface (composeScheduleModule + ScheduleModule + ScheduleModuleOptions)", () => {
-    expectTypeOf(composeScheduleModule).parameters.toEqualTypeOf<[ScheduleModuleOptions]>();
-    expectTypeOf(composeScheduleModule).returns.resolves.toEqualTypeOf<ScheduleModule>();
+  it("preserves the composition surface", () => {
+    expectTypeOf(composeScheduleModule).parameters.toEqualTypeOf<
+      [{ readonly dbFile: string; readonly logger?: Logger }]
+    >();
 
-    expectTypeOf<ScheduleModule>().toHaveProperty("service");
-    expectTypeOf<ScheduleModule>().toHaveProperty("close");
+    expectTypeOf<Awaited<ReturnType<typeof composeScheduleModule>>>().toHaveProperty("service");
+    expectTypeOf<Awaited<ReturnType<typeof composeScheduleModule>>>().toHaveProperty("close");
   });
 });

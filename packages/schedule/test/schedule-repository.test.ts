@@ -84,9 +84,6 @@ describe("ScheduleRepository.findAll({ kind, dataEquals }) — generic JSON-extr
   });
 
   it("accepts a nested $.workflow.id path (grammar allows multi-segment field reads)", async () => {
-    // The grammar `^\$(\.[a-zA-Z_][a-zA-Z0-9_]*)+$` is multi-segment
-    // by design so future kinds can store nested data and still
-    // filter via the generic mechanism.
     await insert("550e8400-e29b-41d4-a716-446655440000", {
       name: "n",
       trigger: { kind: "cron", expr: "0 9 * * *", tz: "UTC" },

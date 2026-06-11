@@ -12,8 +12,7 @@ import { InvalidScheduleIdError } from "./errors.js";
 // task/session/workflow use. Those pkgs have an FS workdir whose
 // ls-grouping benefits from the date prefix; schedule has no workdir so
 // plain UUID v4 is enough.
-export const SCHEDULE_ID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SCHEDULE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function assertValidScheduleId(id: unknown): asserts id is string {
   if (typeof id !== "string" || !SCHEDULE_ID_RE.test(id)) {

@@ -61,9 +61,7 @@ export function nextRuns(expr: string, tz: string, after: Date, n: number): stri
 /**
  * English human-readable description for the `describe` field of
  * `PreviewScheduleResult`. The library default (English) is the right choice for
- * consumers that don't carry locale context (server JSON, CLI). When
- * full dashboard i18n lands, locale negotiation should happen at the
- * presentation layer — not be plumbed through this seam.
+ * consumers that don't carry locale context (server JSON, CLI).
  */
 export function describeCron(expr: string): string {
   return cronstrue.toString(expr, { locale: "en" });

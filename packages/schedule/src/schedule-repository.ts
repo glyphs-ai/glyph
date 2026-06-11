@@ -21,12 +21,10 @@ type Db = BetterSQLite3Database<typeof schema>;
  * The `target_kind = 'task'` predicate ALONG WITH the matching
  * `json_extract(target_json, '$.agent') = ?` predicate is what
  * engages SQLite's partial index `schedules_target_agent_idx`
- * (defined `WHERE target_kind = 'task'`); future kinds add their
- * own partial indexes when they need them.
+ * (defined `WHERE target_kind = 'task'`).
  *
  * Defense-in-depth id validation lives here so the table grammar is
- * enforced even if a future caller forgets to validate at the
- * boundary.
+ * enforced even if callers forget to validate at the boundary.
  */
 export class ScheduleRepository {
   private readonly db: Db;

@@ -19,9 +19,7 @@ import type { ScheduleTrigger } from "./types.js";
  *   - then any of lowercase letters, digits, underscore, hyphen
  *
  * This rules out empty / whitespace-only registrations (the kind would
- * otherwise be a confusing "" in error messages) and forbids special
- * characters that might collide with JSON-path syntax or future
- * URL-discriminated route segments.
+ * otherwise be a confusing "" in error messages).
  */
 const KIND_NAME_RE = /^[a-z][a-z0-9_-]*$/;
 
@@ -42,11 +40,7 @@ export function assertValidKindName(kind: unknown): asserts kind is string {
  *
  * Grammar: `$` followed by one or more `.field` segments where each
  * field is a JS-identifier-shaped token. Bracket-notation, wildcards,
- * array indices, and quoted keys are intentionally NOT supported —
- * the schedule pkg only ever exposes opaque top-level field equality
- * to its callers (`{ kind: "task", dataEquals: { path: "$.agent" } }`
- * et al). If a future kind needs richer paths, extend this regex
- * (and add tests) at that point.
+ * array indices, and quoted keys are intentionally NOT supported.
  */
 const JSON_PATH_RE = /^\$(\.[a-zA-Z_][a-zA-Z0-9_]*)+$/;
 
@@ -72,8 +66,7 @@ export function assertValidName(name: unknown): asserts name is string {
  * Kind-agnostic invariants on the `trigger` field. Shared by service
  * (pre-validate gate) and entity (constructor / withTrigger). The
  * full per-kind validation (cron expr + tz for `kind === "cron"`)
- * lives here; future trigger kinds (`interval`, etc.) extend the
- * switch.
+ * lives here.
  */
 export function assertValidTrigger(trigger: ScheduleTrigger): void {
   if (trigger === null || typeof trigger !== "object") {

@@ -18,6 +18,7 @@ function baseCreateOpts(over: Partial<CreateScheduleOpts> = {}): CreateScheduleO
 
 describe("ScheduleService.run + private fire flow", () => {
   let h: ScheduleTestHandle;
+  const maxTimerDelayMs = 2_147_483_647;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -76,6 +77,7 @@ describe("ScheduleService.run + private fire flow", () => {
     // on a skip).
     const after = await h.service.get(VALID_UUIDS[0]!);
     expect(after?.lastFiredAt).toBeUndefined();
+    expect(after?.nextFireAt).toBe("2026-05-02T09:00:00.000Z");
   });
 
   it("automated fire dispatches when no in-flight; records fire + re-arms", async () => {
@@ -87,5 +89,24 @@ describe("ScheduleService.run + private fire flow", () => {
     const after = await h.service.get(VALID_UUIDS[0]!);
     expect(after?.lastFiredAt).toBe("2026-05-01T09:00:00.000Z");
     expect(after?.nextFireAt).toBe("2026-05-02T09:00:00.000Z");
+  });
+
+  it("chunks automated timers that exceed Node's maximum setTimeout delay", async () => {
+    h.setNow(new Date("2026-01-02T00:00:00.000Z"));
+    await h.service.create(
+      baseCreateOpts({ trigger: { kind: "cron", expr: "0 0 1 * *", tz: "UTC" } }),
+    );
+
+    h.setNow(new Date(Date.parse("2026-01-02T00:00:00.000Z") + maxTimerDelayMs));
+    await vi.advanceTimersByTimeAsync(maxTimerDelayMs);
+    expect(h.taskHandler.dispatchCalls).toHaveLength(0);
+
+    h.setNow(new Date("2026-02-01T00:00:00.000Z"));
+    const remainingDelayMs =
+      Date.parse("2026-02-01T00:00:00.000Z") -
+      Date.parse("2026-01-02T00:00:00.000Z") -
+      maxTimerDelayMs;
+    await vi.advanceTimersByTimeAsync(remainingDelayMs);
+    expect(h.taskHandler.dispatchCalls).toHaveLength(1);
   });
 });

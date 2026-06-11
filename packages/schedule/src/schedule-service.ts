@@ -25,6 +25,7 @@ import type {
 import { generateScheduleId } from "./validate.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export interface ScheduleServiceOpts {
   readonly repo: ScheduleRepository;
@@ -296,9 +297,10 @@ export class ScheduleService {
   async run(id: string): Promise<{ readonly dispatchId: string }> {
     const entity = await this.repo.findById(id);
     if (entity === undefined) throw new ScheduleNotFoundError(id);
-    const firedAt = this.now().toISOString();
+    const now = this.now();
+    const firedAt = now.toISOString();
     const dispatchId = await this.dispatch(entity, firedAt);
-    const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, this.now(), 1);
+    const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, now, 1);
     await this.repo.recordFired(id, firedAt, nextIso ?? null);
     return { dispatchId };
   }
@@ -409,14 +411,31 @@ export class ScheduleService {
   private armNext(entity: ScheduleEntity): void {
     if (this.shutdownCalled) return;
     if (!entity.enabled) return;
-    const [iso] = nextRuns(entity.trigger.expr, entity.trigger.tz, this.now(), 1);
+    const now = this.now();
+    const [computedIso] =
+      entity.nextFireAt === undefined
+        ? nextRuns(entity.trigger.expr, entity.trigger.tz, now, 1)
+        : [];
+    const iso = entity.nextFireAt ?? computedIso;
     if (iso === undefined) return;
-    const delay = Math.max(0, new Date(iso).getTime() - this.now().getTime());
+    const delay = new Date(iso).getTime() - now.getTime();
+    const timeoutDelay = Math.max(0, Math.min(delay, MAX_TIMER_DELAY_MS));
     const id = entity.id;
     const handle = setTimeout(() => {
-      void this.fire(id);
-    }, delay);
+      if (delay > MAX_TIMER_DELAY_MS) {
+        void this.rearmNext(id, iso);
+      } else {
+        void this.fire(id);
+      }
+    }, timeoutDelay);
     this.timers.set(id, handle);
+  }
+
+  private async rearmNext(id: string, plannedIso: string): Promise<void> {
+    this.timers.delete(id);
+    if (this.shutdownCalled) return;
+    const entity = await this.repo.findById(id);
+    if (entity?.enabled) this.armNext(entity.withNextFireAt(entity.nextFireAt ?? plannedIso));
   }
 
   /**
@@ -435,7 +454,10 @@ export class ScheduleService {
         { scheduleId: entity.id },
         "schedule fire skipped (previous dispatch still running)",
       );
-      this.armNext(entity);
+      const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, this.now(), 1);
+      const rearmed = entity.withNextFireAt(nextIso);
+      await this.repo.update(id, rearmed.toRow());
+      this.armNext(rearmed);
       return;
     }
     const firedAt = this.now().toISOString();
@@ -447,7 +469,7 @@ export class ScheduleService {
     }
     const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, this.now(), 1);
     await this.repo.recordFired(entity.id, firedAt, nextIso ?? null);
-    this.armNext(entity);
+    this.armNext(entity.withFired(firedAt, nextIso));
   }
 
   /**
