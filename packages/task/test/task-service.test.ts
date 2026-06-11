@@ -3,8 +3,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   AgentContentSource,
+  BuildInteractiveLaunchOpts,
   LaunchCommand,
   LaunchHeadlessOpts,
+  ReadActivityOpts,
   ResolvedAgent,
   Runtime,
   RuntimeHandle,
@@ -262,12 +264,10 @@ class StubRuntime implements Runtime {
   readMetadata?: (
     runtimeSessionId: string,
   ) => Promise<import("@glyphs-ai/runtime").RuntimeSessionMetadata | null>;
-  readActivity?: (opts: {
-    runtimeSessionId: string;
-    before?: number;
-    after?: number;
-    limit?: number;
-  }) => Promise<import("@glyphs-ai/runtime").ActivityResult | null>;
+  readActivity?: (
+    runtimeSessionId: string,
+    opts?: ReadActivityOpts,
+  ) => Promise<import("@glyphs-ai/runtime").ActivityResult | null>;
   getLastAgentActivity?: (
     runtimeSessionId: string,
   ) => Promise<import("@glyphs-ai/runtime").AgentActivity | null>;
@@ -317,8 +317,11 @@ class StubRuntime implements Runtime {
   async provision(): Promise<{ runtimeSessionId: string | null }> {
     return { runtimeSessionId: null };
   }
-  async buildInteractiveLaunch(_rsid: string | null, workdir: string): Promise<LaunchCommand> {
-    return { cmd: "stub", args: [], cwd: workdir, display: "stub" };
+  async buildInteractiveLaunch(
+    _rsid: string | null,
+    opts: BuildInteractiveLaunchOpts,
+  ): Promise<LaunchCommand> {
+    return { cmd: "stub", args: [], cwd: opts.workdir, display: "stub" };
   }
 
   /** Records every call to deleteState so tests can assert on cleanup. */

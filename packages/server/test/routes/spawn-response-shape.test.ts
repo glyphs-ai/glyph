@@ -28,7 +28,7 @@ import {
   type LaunchCommand,
   type Session,
   SessionService,
-  type SessionServiceConfig,
+  type SessionServiceOpts,
 } from "@glyphs-ai/session";
 import { openTestSessionDb } from "@glyphs-ai/session/testing";
 import type { TaskService } from "@glyphs-ai/task";
@@ -70,7 +70,7 @@ function buildService(spawnError: Error): {
   close: () => void;
 } {
   const handle = openTestSessionDb();
-  const config: SessionServiceConfig = {
+  const config: SessionServiceOpts = {
     agentResolver: {
       // sessions are pre-fabricated via spy below; resolver is unused.
       async resolveAgent() {

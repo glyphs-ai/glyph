@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   AgentContentSource,
+  BuildInteractiveLaunchOpts,
   LaunchCommand,
   LaunchHeadlessOpts,
   ResolvedAgent,
@@ -82,8 +83,11 @@ export class TestRuntime implements Runtime {
   async provision(): Promise<{ runtimeSessionId: string | null }> {
     return { runtimeSessionId: null };
   }
-  async buildInteractiveLaunch(_rsid: string | null, workdir: string): Promise<LaunchCommand> {
-    return { cmd: "stub", args: [], cwd: workdir, display: "stub" };
+  async buildInteractiveLaunch(
+    _rsid: string | null,
+    opts: BuildInteractiveLaunchOpts,
+  ): Promise<LaunchCommand> {
+    return { cmd: "stub", args: [], cwd: opts.workdir, display: "stub" };
   }
 
   async deleteState(runtimeSessionId: string): Promise<void> {

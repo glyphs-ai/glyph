@@ -20,7 +20,7 @@
  *    runtime contract test); tracked as future work in the plan.
  */
 
-import { type CatalogOptions, CatalogService } from "@glyphs-ai/catalog";
+import { type CatalogServiceOpts, CatalogService } from "@glyphs-ai/catalog";
 import pino from "pino";
 
 const silentLogger = pino({ level: "silent" });
@@ -266,4 +266,4 @@ const _typeChecks: { spec: RouteSpec; method: HttpMethod; mgr?: typeof CatalogSe
 };
 void _typeChecks;
 void silentLogger;
-void ({} as CatalogOptions);
+void ({} as CatalogServiceOpts);
