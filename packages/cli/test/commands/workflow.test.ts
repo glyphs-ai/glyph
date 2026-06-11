@@ -33,6 +33,7 @@ import {
   workflowRemoveEdge,
   workflowRemoveNode,
   workflowReplaceSpec,
+  workflowRm,
   workflowShow,
 } from "../../src/commands/workflow.js";
 import { runCli } from "../_helpers/run-cli.js";
@@ -121,6 +122,7 @@ const cancelledHeader = {
 const LIST_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows`;
 const CREATE_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows`;
 const GET_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}`;
+const DELETE_URL = GET_URL;
 const DAG_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/dag`;
 const CANCEL_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/cancel`;
 
@@ -890,6 +892,59 @@ describe("workflowCancel — server error envelope", () => {
   });
 });
 
+// ─── rm ─────────────────────────────────────────────────────────────────
+
+describe("workflowRm — happy path", () => {
+  it("DELETEs /workflows/:wfid and exits 0 on 204", async () => {
+    const { calls } = stubFetchMulti([{ status: 204, body: "" }]);
+    const r = await workflowRm(WFID, { ...commonOpts() });
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.method).toBe("DELETE");
+    expect(calls[0]?.url).toBe(DELETE_URL);
+    expect(calls[0]?.body).toBeUndefined();
+    expect(r.stdout).toBe(`workflow ${WFID} removed\n`);
+  });
+
+  it("--purge forwards purge=1", async () => {
+    const { calls } = stubFetchMulti([{ status: 204, body: "" }]);
+    const r = await workflowRm(WFID, { ...commonOpts(), purge: true });
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(calls[0]?.method).toBe("DELETE");
+    expect(calls[0]?.url).toBe(`${DELETE_URL}?purge=1`);
+    expect(r.stdout).toBe(`workflow ${WFID} removed (purged)\n`);
+  });
+});
+
+describe("workflowRm — validation (no fetch)", () => {
+  it("empty --wfid → exit 2", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await workflowRm("", { ...commonOpts() });
+    expect(r.exitCode).toBe(2);
+    expect(r.stderr).toMatch(/--wfid/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("workflowRm — server error envelope", () => {
+  it("409 WorkflowDeleteRequiresTerminalError surfaces via formatError (exit 4)", async () => {
+    stubFetchMulti([
+      {
+        status: 409,
+        body: JSON.stringify({
+          error: "workflow must be terminal before delete",
+          code: "WorkflowDeleteRequiresTerminalError",
+          transition: "delete",
+        }),
+      },
+    ]);
+    const r = await workflowRm(WFID, { ...commonOpts() });
+    expect(r.exitCode).toBe(4);
+    expect(r.stderr).toMatch(/WorkflowDeleteRequiresTerminalError/);
+    expect(r.stderr).toMatch(/HTTP 409/);
+  });
+});
+
 // ─── commander wiring (argv → action) ──────────────────────────────────
 
 describe("`glyph workflow …` commander wiring (argv → action)", () => {
@@ -908,6 +963,15 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe("GET");
     expect(calls[0]?.url).toBe(LIST_URL);
+  });
+
+  it("`workflow rm --wfid` routes through commander to DELETE", async () => {
+    const { calls } = stubFetchMulti([{ status: 204, body: "" }]);
+    const r = await runCli(["workflow", "rm", "--workspace", WSID, "--wfid", WFID], env());
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.method).toBe("DELETE");
+    expect(calls[0]?.url).toBe(DELETE_URL);
   });
 
   it("`workflow create --brief --coord-agent` routes through commander to a POST with mapped body", async () => {

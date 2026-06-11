@@ -55,8 +55,7 @@ export type ParamsOf<K extends RouteKey> =
  * (e.g. `Last-Event-ID` for SSE resume on `tasks.activity.stream`,
  * see `commands/task.ts`). Keep the route-level body / query / params
  * as the primary contract — reach for `headers` only when the wire
- * protocol genuinely lives outside the JSON body (SSE, future
- * upload streams, etc.).
+ * protocol genuinely lives outside the JSON body (SSE, etc.).
  */
 export type CallOpts<K extends RouteKey> = ([BodyOf<K>] extends [never]
   ? { readonly body?: never }

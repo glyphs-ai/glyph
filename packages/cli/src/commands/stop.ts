@@ -14,9 +14,7 @@
  * server's persistence is SQLite (WAL + transactions), which means
  * mid-write torn writes don't corrupt the DB even on hard kill;
  * in-flight task subprocesses can still be orphaned and are cleaned
- * up on the next server boot via the `recoverOrphaned` sweep. A
- * future graceful-shutdown HTTP endpoint can improve this without
- * changing the current cleanup path.
+ * up on the next server boot via the `recoverOrphaned` sweep.
  */
 
 import { setTimeout as delay } from "node:timers/promises";

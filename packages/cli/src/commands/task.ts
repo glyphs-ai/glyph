@@ -1,10 +1,9 @@
 /**
- * `glyph task …` — 5 subcommands wrapping the workspace-scoped tasks
- * HTTP surface (list / dispatch / show / rm / activity).
+ * `glyph task …` — 6 subcommands wrapping the workspace-scoped tasks
+ * HTTP surface (list / dispatch / show / rm / cancel / activity).
  *
  * `activity` returns the runtime-parsed `ActivityItem[]` timeline as
- * JSON — runtime-neutral, so multi-runtime futures work without the
- * client needing to know how each CLI persists its log.
+ * JSON — runtime-neutral.
  */
 
 import { makeClient, resolveWorkspace } from "../connect.js";
@@ -39,10 +38,10 @@ export interface TaskListOpts extends CommonFlags {
 /**
  * `glyph task list` — lists standalone tasks for the workspace.
  *
- * `/scheduled-tasks` was split out of `/tasks` at the REST layer; this
+ * `/scheduled-tasks` is split from `/tasks` at the REST layer; this
  * command targets the standalone-only `/tasks` route. Schedule-launched
- * tasks will get a dedicated `glyph task list-scheduled` (or equivalent)
- * command in the future; until then they are not surfaced through the CLI.
+ * tasks are exposed through `glyph schedule` and its underlying
+ * `/scheduled-tasks` surface, not through this command.
  */
 export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> {
   const client = await makeClient(opts);

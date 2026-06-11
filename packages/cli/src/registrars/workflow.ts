@@ -29,6 +29,7 @@ import {
   workflowRemoveEdge,
   workflowRemoveNode,
   workflowReplaceSpec,
+  workflowRm,
   workflowShow,
 } from "../commands/workflow.js";
 import {
@@ -190,6 +191,17 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
         ...parseWorkspaceFlags(opts),
         ...optionalString(opts, "message"),
         ...optionalString(opts, "kind"),
+      });
+    });
+
+  withWorkspaceFlags(workflowCmd.command("rm"))
+    .description("Remove a terminal workflow")
+    .requiredOption("--wfid <id>", "Workflow id")
+    .option("--purge", "Hard delete: also remove workflow/task workdirs and runtime state")
+    .action(async (opts: Record<string, unknown>) => {
+      slot.result = await workflowRm(pickString(opts, "wfid") ?? "", {
+        ...parseWorkspaceFlags(opts),
+        purge: opts.purge === true,
       });
     });
 

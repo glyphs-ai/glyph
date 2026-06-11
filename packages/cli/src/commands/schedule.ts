@@ -52,12 +52,11 @@ export async function scheduleList(opts: ScheduleListOpts = {}): Promise<Command
       stdout: formatTable(
         ["id", "name", "agent", "cron", "tz", "enabled"],
         list.map((s) => {
-          // The wire shape for the task kind is flat
-          // (`TaskScheduleTargetWire`); future kinds project as
-          // opaque `{ kind, data }`. Cast through `unknown` for the
-          // task case so TypeScript accepts the property access
-          // even though the union member type isn't fully
-          // narrowable on a `kind: string` supertype.
+          // `ScheduleTargetWire` is a kind-discriminated union; the
+          // `task` arm carries `agent` flat. Cast through `unknown`
+          // for the task case so TypeScript accepts the property
+          // access — the union isn't narrowable on a `kind: string`
+          // supertype here.
           const target = s.target as { kind: string; agent?: string };
           return [
             s.id ?? "",
@@ -437,9 +436,10 @@ export async function schedulePatch(
 
     if (touchesTrigger) {
       const existingTrigger = current?.trigger;
-      // v1 only models `cron` triggers (see types.ts); guard so a
-      // future `interval` schedule doesn't get silently coerced by
-      // the CLI's --cron / --tz flags.
+      // `trigger` is type-unioned over kinds; cron is currently the
+      // only modelled kind. Refuse `--cron / --tz` if the existing
+      // trigger is a non-cron kind so a contract addition doesn't
+      // get silently coerced through these flags.
       if (existingTrigger !== undefined && existingTrigger.kind !== "cron") {
         return {
           exitCode: 2,

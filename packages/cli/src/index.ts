@@ -10,7 +10,7 @@
  * The bin (`./bin.ts`) calls `run(process.argv)` and exits with the
  * returned code.
  *
- * Why commander (not cac): nested subcommands. The CLI ships ~30
+ * Why commander (not cac): nested subcommands. The CLI ships many
  * grouped commands (`workspace list`, `catalog skill install`, …) and
  * cac matches commands by single argv tokens — `cli.command("workspace
  * list", ...)` registers a literal "workspace list" name that nothing

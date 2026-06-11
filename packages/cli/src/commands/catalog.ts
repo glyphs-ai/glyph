@@ -2,12 +2,14 @@
  * `glyph catalog …` — wraps the workspace-scoped catalog HTTP surface.
  *
  * Three resource families behind one parent command:
- *  - `skill {list,resolve,show,install,update,patch,rm}` (7)
- *  - `agent {list,resolve,show,install,update,patch,rm}` (7)
- *  - `mcp   {list,show,install,update,rm}` (5)
+ *  - `skill {list, resolve, show, install, update, patch, rm, sync-resolve, sync, ack-prereqs}`
+ *  - `agent {list, resolve, show, install, update, patch, rm, sync-resolve, sync, ack-prereqs, enable, disable}`
+ *  - `mcp   {list, show, install, update, rm, sync-resolve, sync}`
  *
- * Plus `catalog overview` for the per-workspace counts. Total: 20
- * functions exported here, mapping 1:1 to the manifest entries.
+ * Plus `catalog overview` for the per-workspace counts. Each exported
+ * function maps 1:1 to a `ROUTES` manifest entry; counts are
+ * intentionally not stated here because the per-family verb sets
+ * evolve and the precise count is recoverable from this file.
  */
 
 import { readFile } from "node:fs/promises";

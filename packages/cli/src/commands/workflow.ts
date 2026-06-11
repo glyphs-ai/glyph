@@ -1,7 +1,7 @@
 /**
  * `glyph workflow …` — workspace-scoped DAG run commands.
  *
- * Read/control subcommands: list / create / show / dag / cancel.
+ * Read/control subcommands: list / create / show / node-show / dag / cancel / rm.
  *
  * Coord-callback mutation primitives that back the coordinator-agent
  * contract:
@@ -17,13 +17,13 @@
  * pure business logic so tests can call the functions directly without
  * going through argv parsing.
  *
- * Flag-name choices for create / show / dag / cancel:
+ * Flag-name choices for create / show / dag / cancel / rm:
  *  - `--brief` (not `--name`) for create — matches
  *    `CreateWorkflowBody.brief` on the wire and the
  *    `schedule create --brief` / `task dispatch --brief` precedent.
  *  - `--coord-agent` for the coordinator agent FQN, mapping to
  *    `CreateWorkflowBody.coordinatorAgent`.
- *  - `--wfid` (not a positional `<wfid>`) for show/dag/cancel — keeps
+ *  - `--wfid` (not a positional `<wfid>`) for show/dag/cancel/rm — keeps
  *    the surface uniform with the rest of the workflow tree (no
  *    workflow command takes a positional id; an explicit flag pairs
  *    naturally with `--workspace` / `GLYPH_WORKSPACE`).
@@ -274,18 +274,7 @@ export async function workflowDag(
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(dag) };
     const nodesTable = formatTable(
       ["phase", "nodeId", "kind", "status", "agent"],
-      dag.nodes.map((n) => [
-        String(n.phase),
-        n.id,
-        n.spec.kind,
-        n.status,
-        // `agent` is present on both task-kind and coordinator-kind
-        // spec wires (flattened by the contracts package). For any
-        // future kind that projects through as the opaque envelope
-        // `{ kind, spec }`, leave the agent column blank rather than
-        // poking at `spec.agent` blindly.
-        agentForSpec(n.spec),
-      ]),
+      dag.nodes.map((n) => [String(n.phase), n.id, n.spec.kind, n.status, agentForSpec(n.spec)]),
     );
     const edgeLines =
       dag.edges.length === 0
@@ -346,6 +335,36 @@ export async function workflowCancel(
   }
 }
 
+// ─── rm ─────────────────────────────────────────────────────────────────
+export interface WorkflowRmOpts extends CommonFlags {
+  readonly purge?: boolean;
+}
+
+export async function workflowRm(
+  workflowId: string,
+  opts: WorkflowRmOpts = {},
+): Promise<CommandResult> {
+  if (typeof workflowId !== "string" || workflowId.trim() === "") {
+    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+  }
+  const client = await makeClient(opts);
+  try {
+    const workspaceId = await resolveWorkspace(opts);
+    const query: { purge?: "1" } = {};
+    if (opts.purge === true) query.purge = "1";
+    await client.call("workflows.delete", {
+      params: { id: workspaceId, wfid: workflowId },
+      query,
+    });
+    return {
+      exitCode: 0,
+      stdout: `workflow ${workflowId} removed${opts.purge === true ? " (purged)" : ""}\n`,
+    };
+  } catch (err) {
+    return formatError(err);
+  }
+}
+
 // ─── helpers ───────────────────────────────────────────────────────────
 
 /** Render a {@link WorkflowHeaderWire} via either JSON or the record formatter. */
@@ -358,12 +377,6 @@ function renderHeader(
   return formatRecord({ ...header });
 }
 
-/**
- * Pluck the `agent` field off a workflow-node wire spec. Task-kind
- * and coordinator-kind both carry it as a flat field; any future
- * opaque-envelope kind returns blank rather than risking a nonsense
- * key extraction on `spec.spec`.
- */
 function agentForSpec(spec: { readonly kind: string; readonly agent?: string }): string {
   return typeof spec.agent === "string" ? spec.agent : "";
 }
@@ -399,16 +412,144 @@ function parseParents(raw: string | undefined): readonly string[] {
     .filter((p) => p !== "");
 }
 
+type AddSubgraphFileNodeRef = { readonly nodeId: string } | { readonly tempId: string };
+
+interface AddSubgraphFileNode {
+  readonly tempId: string;
+  readonly kind: WorkflowNodeKindWire;
+  readonly spec: unknown;
+  readonly existingParents?: readonly string[];
+}
+
+interface AddSubgraphFileEdge {
+  readonly from: AddSubgraphFileNodeRef;
+  readonly to: AddSubgraphFileNodeRef;
+}
+
+interface AddSubgraphFileBody {
+  readonly nodes: readonly AddSubgraphFileNode[];
+  readonly edges: readonly AddSubgraphFileEdge[];
+}
+
+function validateAddSubgraphBody(
+  raw: unknown,
+): { ok: true; body: AddSubgraphBody } | { ok: false; error: string } {
+  if (!isPlainObject(raw)) {
+    return {
+      ok: false,
+      error: "--spec-file must be a JSON object with `nodes` and `edges` arrays",
+    };
+  }
+  const nodesRaw = raw.nodes;
+  const edgesRaw = raw.edges;
+  if (!Array.isArray(nodesRaw) || !Array.isArray(edgesRaw)) {
+    return {
+      ok: false,
+      error: "--spec-file must be a JSON object with `nodes` and `edges` arrays",
+    };
+  }
+
+  const nodes: AddSubgraphFileNode[] = [];
+  for (let i = 0; i < nodesRaw.length; i += 1) {
+    const node = nodesRaw[i];
+    if (!isPlainObject(node)) return { ok: false, error: `nodes[${i}] must be an object` };
+
+    const tempId = node.tempId;
+    if (typeof tempId !== "string" || tempId.length === 0) {
+      return { ok: false, error: `nodes[${i}].tempId must be a non-empty string` };
+    }
+
+    const kind = node.kind;
+    if (typeof kind !== "string" || !isNodeKind(kind)) {
+      return {
+        ok: false,
+        error: `nodes[${i}].kind must be one of: ${KNOWN_NODE_KINDS.join(", ")}`,
+      };
+    }
+
+    if (!("spec" in node)) {
+      return { ok: false, error: `nodes[${i}].spec is required` };
+    }
+
+    const existingParentsRaw = node.existingParents;
+    let existingParents: readonly string[] | undefined;
+    if (existingParentsRaw !== undefined) {
+      if (!Array.isArray(existingParentsRaw)) {
+        return { ok: false, error: `nodes[${i}].existingParents must be an array` };
+      }
+      const parents: string[] = [];
+      for (const parent of existingParentsRaw) {
+        if (typeof parent !== "string" || parent.length === 0) {
+          return {
+            ok: false,
+            error: `nodes[${i}].existingParents entries must be non-empty strings`,
+          };
+        }
+        parents.push(parent);
+      }
+      existingParents = parents;
+    }
+
+    nodes.push({
+      tempId,
+      kind,
+      spec: node.spec,
+      ...(existingParents !== undefined ? { existingParents } : {}),
+    });
+  }
+
+  const edges: AddSubgraphFileEdge[] = [];
+  for (let i = 0; i < edgesRaw.length; i += 1) {
+    const edge = edgesRaw[i];
+    if (!isPlainObject(edge)) return { ok: false, error: `edges[${i}] must be an object` };
+    const from = validateNodeRefInput(edge.from, `edges[${i}].from`);
+    if (!from.ok) return from;
+    const to = validateNodeRefInput(edge.to, `edges[${i}].to`);
+    if (!to.ok) return to;
+    edges.push({ from: from.value, to: to.value });
+  }
+
+  const body: AddSubgraphFileBody = { nodes, edges };
+  return { ok: true, body: body as AddSubgraphBody };
+}
+
+function validateNodeRefInput(
+  raw: unknown,
+  path: string,
+): { ok: true; value: AddSubgraphFileNodeRef } | { ok: false; error: string } {
+  if (!isPlainObject(raw)) return { ok: false, error: `${path} must be an object` };
+  const keys = Object.keys(raw);
+  if (keys.length !== 1) {
+    return { ok: false, error: `${path} must have exactly one key: nodeId or tempId` };
+  }
+  if ("nodeId" in raw) {
+    return typeof raw.nodeId === "string" && raw.nodeId.length > 0
+      ? { ok: true, value: { nodeId: raw.nodeId } }
+      : { ok: false, error: `${path}.nodeId must be a non-empty string` };
+  }
+  if ("tempId" in raw) {
+    return typeof raw.tempId === "string" && raw.tempId.length > 0
+      ? { ok: true, value: { tempId: raw.tempId } }
+      : { ok: false, error: `${path}.tempId must be a non-empty string` };
+  }
+  return { ok: false, error: `${path} must have key nodeId or tempId` };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /**
  * Read a `<flagName> <path>` JSON file. Returns the parsed value or
  * an `{ ok: false, error }` envelope the caller surfaces as
  * exit-code-2 usage feedback. The parsed value is intentionally typed
- * `unknown` — the per-kind runner is the validator on the server, and
- * the CLI's job is to forward the JSON faithfully.
+ * `unknown` so each caller can apply the relevant shape check.
  *
  * The `flagName` parameter (e.g. `"--spec-file"`, `"--metadata-file"`)
  * is woven into both the "failed to read" and "JSON parse error"
  * messages so callers don't have to post-process the result.
+ *
+ * Callers validate the parsed `unknown` value before forwarding it.
  *
  * Exported because the workflow-create registrar reuses this helper
  * for `--metadata-file`, keeping the read+parse+error-wrap pattern
@@ -491,9 +632,9 @@ export async function workflowAddNode(
 // ─── add-subgraph ──────────────────────────────────────────────────────
 export interface WorkflowAddSubgraphOpts extends CommonFlags {
   /**
-   * Path to a JSON file matching {@link AddSubgraphBody}:
+   * Path to a JSON file with
    * `{ nodes: [{tempId, kind, spec, existingParents?}], edges: [{from, to}] }`.
-   * NodeRefWire shapes (`{nodeId}` / `{tempId}`) are forwarded as-is.
+   * Node refs (`{nodeId}` / `{tempId}`) are forwarded as-is.
    */
   readonly specFile: string;
 }
@@ -512,19 +653,11 @@ export async function workflowAddSubgraph(
   if (!payloadResult.ok) {
     return { exitCode: 2, stderr: `${payloadResult.error}\n` };
   }
-  const payload = payloadResult.value;
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !Array.isArray((payload as { nodes?: unknown }).nodes) ||
-    !Array.isArray((payload as { edges?: unknown }).edges)
-  ) {
-    return {
-      exitCode: 2,
-      stderr: "--spec-file must be a JSON object with `nodes` and `edges` arrays\n",
-    };
+  const bodyResult = validateAddSubgraphBody(payloadResult.value);
+  if (!bodyResult.ok) {
+    return { exitCode: 2, stderr: `${bodyResult.error}\n` };
   }
-  const body = payload as unknown as AddSubgraphBody;
+  const { body } = bodyResult;
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);

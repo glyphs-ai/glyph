@@ -5,19 +5,17 @@ client).
 
 ## Scope
 
-What the CLI provides:
+The CLI surface is organized into:
 
-- Lifecycle commands that manage a local server process: `serve` (run
-  in the foreground), `start` (spawn detached), `stop`, `restart`,
-  `status`, `logs` (tail the rolled server log).
-- Top-level singletons that hit unscoped endpoints: `health`, `config`.
-- A `runtime` subtree (`runtime list`) for inspecting the runtime
-  registry.
-- A `workspace` subtree wired inline in `src/index.ts` (`list`, `add`,
-  `current`, `use`, `show`, `update`, `rm`, `reload`).
-- Five bulk-registered subtrees, one per workspace-scoped resource:
-  `session`, `schedule`, `task`, `workflow`, `catalog` -- each
-  registered from a dedicated file under `src/registrars/`.
+- Server lifecycle commands: `serve` (run in the foreground), `start`
+  (spawn detached), `stop`, `restart`, `status`, `logs` (tail the
+  rolled server log).
+- Unscoped singletons: `health`, `config`.
+- A `runtime` subtree: `runtime list` (inspect the runtime registry).
+- Workspace-scoped resource subtrees: `workspace`, `session`,
+  `schedule`, `task`, `workflow`, `catalog` — each registered from a
+  dedicated file under `src/registrars/`. Handler functions for every
+  subtree live under `src/commands/`; there is no inline wiring.
 
 Every API-mapping command goes through `ApiClient` (see
 `api-client.ts`), which is keyed by the `ROUTES` manifest exported
@@ -72,9 +70,10 @@ inlined).
 
 ## Why commander
 
-The CLI ships ~50 grouped commands across workspace, session, task,
-catalog (agent / skill / mcp), schedule, and runtime — each one
-wrapping a server route via the typed `client.call(...)` helper from
+The CLI ships many grouped commands across the resource subtrees
+(workspace, session, task, workflow, catalog, schedule, runtime, plus
+lifecycle and singleton commands) — each wrapping a server route via
+the typed `client.call(...)` helper from
 `packages/contracts/src/routes.ts` (`workspace list`,
 `catalog skill install`, ...). `cac` matches commands by single argv
 tokens, so `cli.command("workspace list", ...)` would register a
