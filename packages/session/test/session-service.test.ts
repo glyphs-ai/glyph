@@ -15,18 +15,18 @@ import {
   RuntimeStateDeletionFailed,
   UnknownRuntimeError,
 } from "@glyphs-ai/runtime";
-import type { Logger } from "pino";
+import pino, { type Logger } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AgentNotFoundError,
   AgentResolutionFailedError,
-  type AgentResolverPort,
   InvalidSessionIdError,
   SessionNotFoundError,
-  SessionRepository,
   SessionService,
   type SessionServiceOpts,
 } from "../src/index.js";
+import type { AgentResolverPort } from "../src/ports.js";
+import { SessionRepository } from "../src/session-repository.js";
 import { openTestSessionDb } from "../src/testing.js";
 
 // ───── helpers ──────────────────────────────────────────────
@@ -248,19 +248,14 @@ const seqRandom = () => {
 };
 
 const recorder = () => {
-  // Matches pino's API shape: (meta, msg). Tight-loop assertion
-  // timing rules out a real pino-backed captureLogger here. Only
-  // `warn` is exercised by SessionService (the only level production
-  // code reaches in the paths under test); the cast is safe because
-  // the stub satisfies the surface SessionService actually calls.
   const calls: { msg: string; meta?: object }[] = [];
+  const logger = pino({ level: "silent" });
+  logger.warn = ((meta: object | string, msg?: string) => {
+    if (typeof meta === "string") calls.push({ msg: meta });
+    else calls.push({ msg: msg ?? "", meta });
+  }) as Logger["warn"];
   return {
-    logger: {
-      warn: (meta: object | string, msg?: string) => {
-        if (typeof meta === "string") calls.push({ msg: meta });
-        else calls.push({ msg: msg ?? "", meta });
-      },
-    } as unknown as Logger,
+    logger,
     calls,
   };
 };

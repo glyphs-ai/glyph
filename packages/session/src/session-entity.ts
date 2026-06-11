@@ -3,7 +3,7 @@
  * representing the **persisted slice** of a session.
  *
  * Layer position:
- *   - `SessionRow` (schema.ts)          — Drizzle ORM shape; private
+ *   - `sessions.$inferSelect`           — Drizzle ORM shape; private
  *   - `SessionEntity` (this file)       — pkg-owned domain shape;
  *                                          what `SessionRepository`
  *                                          returns. Mirrors the

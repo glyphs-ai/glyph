@@ -1,7 +1,7 @@
 import path from "node:path";
 
 /** Subdirectory under `<workspaceDir>/` where per-session workdirs live. */
-export const SESSIONS_SUBDIR = "sessions";
+const SESSIONS_SUBDIR = "sessions";
 
 /** Resolve the absolute root directory for this workspace's session workdirs. */
 export function sessionsRoot(workspaceDir: string): string {

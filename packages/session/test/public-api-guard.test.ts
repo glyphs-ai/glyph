@@ -4,7 +4,7 @@
  * WHAT this file does:
  *   Uses Vitest's `expectTypeOf<T>()` to lock the pkg's public surface
  *   at the TYPE level. Every public method on the service class, every
- *   exported error class (including the 6 runtime errors re-exported
+ *   exported error class (including the runtime errors re-exported
  *   through this barrel), and every exported DTO / option shape gets a
  *   `expectTypeOf(...)` assertion below.
  *
@@ -30,43 +30,34 @@
  *
  * HOW to extend it:
  *   Every time you ADD / RENAME / REMOVE a public method on the
- *   service, an exported error class, or an exported DTO field,
- *   update the matching `expectTypeOf` line in the SAME PR. Review
- *   enforces the coupling — a public-surface change without a guard
- *   update is a missing assertion.
+ *   service, an exported error class, or an exported DTO field, update
+ *   the matching `expectTypeOf` line in the SAME PR. Review enforces
+ *   the coupling — a public-surface change without a guard update is a
+ *   missing assertion.
  *
  * Worked example: see `packages/catalog/test/public-api-guard.test.ts`
  * for a fully-populated version locking 25+ methods and 19 error
  * classes on a real BC.
  */
 
-import { describe, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
-  type AgentEntry,
   AgentNotFoundError,
   AgentResolutionFailedError,
-  type BuildInteractiveLaunchSessionOpts,
-  type CreateSessionOpts,
   composeSessionModule,
-  type DeleteSessionOpts,
   InvalidSessionIdError,
   type LaunchCommand,
-  // Re-exported from @glyphs-ai/runtime — locked here so the re-export
-  // contract can't silently drop a class downstream callers catch by
-  // `instanceof`.
+  // Re-exported from @glyphs-ai/runtime — locked here so the re-export contract
+  // can't silently drop a class downstream callers catch by `instanceof`.
   RuntimeDoesNotSupportRemoteError,
   RuntimeProvisionFailed,
-  RuntimeRefreshFailed,
   RuntimeStateDeletionFailed,
   type Session,
-  SessionError,
   SessionIdAllocationFailedError,
-  type SessionModule,
-  type SessionModuleOptions,
   SessionNotFoundError,
   type SessionService,
   type SessionServiceOpts,
-  type SpawnInteractiveResult,
+  type SpawnFn,
   TrustRegistrationFailed,
   UnknownRuntimeError,
 } from "../src/index.js";
@@ -74,7 +65,6 @@ import {
 describe("@glyphs-ai/session public API guard", () => {
   it("exports the concrete error classes with their canonical constructor signatures", () => {
     const errs: Error[] = [
-      new SessionError("boom"),
       new InvalidSessionIdError("bad-id"),
       new SessionNotFoundError("20260101-deadbeef"),
       new SessionIdAllocationFailedError(5),
@@ -84,7 +74,6 @@ describe("@glyphs-ai/session public API guard", () => {
       new AgentResolutionFailedError("public/demo", new Error("upstream")),
       // Runtime re-exports — same constructor shapes as in @glyphs-ai/runtime.
       new UnknownRuntimeError("copilot"),
-      new RuntimeRefreshFailed("copilot", "runtime-session-id", new Error("upstream")),
       new RuntimeStateDeletionFailed("copilot", "runtime-session-id", new Error("upstream")),
       new RuntimeProvisionFailed("copilot", "/workdir", new Error("upstream")),
       new RuntimeDoesNotSupportRemoteError("copilot"),
@@ -106,17 +95,6 @@ describe("@glyphs-ai/session public API guard", () => {
     expectTypeOf<Session>().toHaveProperty("preview");
     expectTypeOf<Session>().toHaveProperty("lastLaunchMode");
 
-    // Option bags consumed by the service surface.
-    expectTypeOf<CreateSessionOpts>().toHaveProperty("agent");
-    expectTypeOf<DeleteSessionOpts>().toHaveProperty("purge");
-    expectTypeOf<BuildInteractiveLaunchSessionOpts>().toHaveProperty("remote");
-
-    // Port DTO produced for spawnInteractive results.
-    expectTypeOf<SpawnInteractiveResult>().toHaveProperty("launcher");
-
-    // Catalog-side port shape consumed at create() time.
-    expectTypeOf<AgentEntry>().toHaveProperty("status");
-
     // LaunchCommand is re-exported from @glyphs-ai/runtime so callers
     // only need one import; locking the field names here protects
     // the re-export contract.
@@ -124,6 +102,8 @@ describe("@glyphs-ai/session public API guard", () => {
     expectTypeOf<LaunchCommand>().toHaveProperty("args");
     expectTypeOf<LaunchCommand>().toHaveProperty("cwd");
     expectTypeOf<LaunchCommand>().toHaveProperty("display");
+
+    expectTypeOf<SpawnFn>().returns.resolves.toHaveProperty("launcher");
   });
 
   it("preserves the SessionService class and its public method names", () => {
@@ -135,19 +115,16 @@ describe("@glyphs-ai/session public API guard", () => {
     expectTypeOf<SessionService>().toHaveProperty("spawnInteractive");
   });
 
-  it("preserves the composition surface (composeSessionModule + SessionModule + SessionModuleOptions)", () => {
-    expectTypeOf(composeSessionModule).parameters.toEqualTypeOf<[SessionModuleOptions]>();
-    expectTypeOf(composeSessionModule).returns.resolves.toEqualTypeOf<SessionModule>();
-
-    expectTypeOf<SessionModule>().toHaveProperty("service");
-    expectTypeOf<SessionModule>().toHaveProperty("close");
-
-    expectTypeOf<SessionModuleOptions>().toHaveProperty("dbFile");
-    expectTypeOf<SessionModuleOptions>().toHaveProperty("agentResolver");
-    expectTypeOf<SessionModuleOptions>().toHaveProperty("contentSource");
-    expectTypeOf<SessionModuleOptions>().toHaveProperty("runtimeRegistry");
-    expectTypeOf<SessionModuleOptions>().toHaveProperty("workspaceDir");
-    expectTypeOf<SessionModuleOptions>().toHaveProperty("workspaceId");
+  it("preserves the composition surface", () => {
+    expect(composeSessionModule).toBeTypeOf("function");
+    expectTypeOf<Parameters<typeof composeSessionModule>[0]>().toHaveProperty("dbFile");
+    expectTypeOf<Parameters<typeof composeSessionModule>[0]>().toHaveProperty("agentResolver");
+    expectTypeOf<Parameters<typeof composeSessionModule>[0]>().toHaveProperty("contentSource");
+    expectTypeOf<Parameters<typeof composeSessionModule>[0]>().toHaveProperty("runtimeRegistry");
+    expectTypeOf<Parameters<typeof composeSessionModule>[0]>().toHaveProperty("workspaceDir");
+    expectTypeOf<Parameters<typeof composeSessionModule>[0]>().toHaveProperty("workspaceId");
+    expectTypeOf<Awaited<ReturnType<typeof composeSessionModule>>>().toHaveProperty("service");
+    expectTypeOf<Awaited<ReturnType<typeof composeSessionModule>>>().toHaveProperty("close");
 
     expectTypeOf<SessionServiceOpts>().toHaveProperty("agentResolver");
     expectTypeOf<SessionServiceOpts>().toHaveProperty("contentSource");

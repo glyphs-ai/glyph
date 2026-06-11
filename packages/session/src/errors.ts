@@ -2,10 +2,9 @@
  * Errors thrown by the sessions package. All have stable `name` strings so
  * callers can branch by `e.name` without instanceof checks across realms.
  *
- * Runtime-level errors (UnknownRuntimeError, RuntimeRefreshFailed,
- * RuntimeStateDeletionFailed, RuntimeProvisionFailed) are imported directly
- * from `@glyphs-ai/runtime` — they are not re-wrapped here so callers can
- * distinguish "runtime adapter failed" from "session-layer logic failed".
+ * Runtime-level errors surfaced by session APIs are imported directly from
+ * `@glyphs-ai/runtime` — they are not re-wrapped here so callers can distinguish
+ * "runtime adapter failed" from "session-layer logic failed".
  */
 
 export class SessionError extends Error {

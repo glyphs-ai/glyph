@@ -36,19 +36,20 @@ from the `LaunchCommand` returned by `buildInteractiveLaunch`.
 
 ```
 packages/session/src/
-  schema.ts                Drizzle table def (private; only types exported)
+  schema.ts                Drizzle table def (private)
   errors.ts                Domain error classes (exported)
-  types.ts                 Public DTOs (Session, LaunchCommand, SpawnFn,
-                           SpawnInteractiveResult, SpawnSessionResult, opts shapes)
+  types.ts                 Public DTOs (Session, LaunchCommand,
+                           SpawnSessionResult, opts shapes)
+  ports.ts                 Structural ports (AgentResolverPort, SpawnFn)
   validate.ts              id regex + assertValidSessionId + generators
-  session-repository.ts    Drizzle CRUD (exported as type for advanced reads)
+  session-repository.ts    Drizzle CRUD (internal)
   session-entity.ts        SessionEntity (private; service projects to DTO)
   session-service.ts       SessionService  create/get/list/delete/
                            buildInteractiveLaunch/spawnInteractive
   paths.ts                 Pure path builders for per-session workdirs
   migrations.ts            applySessionMigrations (drizzle migration applier)
-  compose.ts               composeSessionModule({ dbFile, catalog,
-                           runtimeRegistry, spawnFn?, … })
+  compose.ts               composeSessionModule({ dbFile, agentResolver,
+                           contentSource, runtimeRegistry, spawnFn?, … })
   testing.ts               openTestSessionDb helper (via /testing subpath)
   index.ts                 public barrel
 drizzle/                   generated SQL migrations (committed)
@@ -100,7 +101,8 @@ import { composeSessionModule } from "@glyphs-ai/session";
 // which case `service.spawnInteractive` throws on call).
 const { service, close } = await composeSessionModule({
   dbFile: "/abs/path/to/workspace.db",
-  catalog,                                  // CatalogService
+  agentResolver: catalog,                   // CatalogService
+  contentSource: catalog,                   // CatalogService
   runtimeRegistry,                          // RuntimeRegistry from @glyphs-ai/runtime
   workspaceDir: "/abs/workspace-dir",
   workspaceId: "<uuid>",
@@ -167,9 +169,9 @@ whatever the runtime returned.
   a `runtimeSessionId` and threads it through `--session-id=<id>` on
   every launch — first launch creates the Copilot session, subsequent
   launches resume the same one.
-- **Path matching**: case-insensitive on Windows, case-sensitive
-  elsewhere (no special handling for case-insensitive macOS volumes —
-  pull requests welcome).
+- **Path matching**: session ids are validated before path construction;
+  the path guard compares resolved strings exactly as a defense-in-depth
+  check.
 - **`delete(id, { purge: true })`** may fail with `EBUSY` on Windows
   if Copilot currently has the session open. The error is surfaced;
   the metadata row is left intact.

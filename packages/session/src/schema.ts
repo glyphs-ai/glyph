@@ -19,6 +19,3 @@ export const sessions = sqliteTable(
   },
   (t) => [index("sessions_agent_idx").on(t.agent)],
 );
-
-export type SessionRow = typeof sessions.$inferSelect;
-export type NewSessionRow = typeof sessions.$inferInsert;

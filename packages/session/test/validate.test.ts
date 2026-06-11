@@ -60,6 +60,7 @@ describe("assertValidSessionId", () => {
   });
 
   it("rejects non-string input", () => {
-    expect(() => assertValidSessionId(123 as unknown as string)).toThrow(InvalidSessionIdError);
+    const assertRuntimeInput = assertValidSessionId as (id: unknown) => void;
+    expect(() => assertRuntimeInput(123)).toThrow(InvalidSessionIdError);
   });
 });
