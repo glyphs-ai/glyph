@@ -31,6 +31,37 @@ export class WorkspaceHasLiveTasksError extends Error {
 }
 
 /**
+ * Thrown by the HTTP middleware when an on-demand `load()` for a
+ * cold workspace fails. The original cause is attached via `cause`
+ * so request loggers can render the underlying error, but the
+ * surface message stays generic so the gated 503 envelope doesn't
+ * leak host paths or fs error strings.
+ */
+export class WorkspaceLoadError extends Error {
+  override readonly name = "WorkspaceLoadError";
+
+  constructor(
+    public readonly workspaceId: string,
+    cause: unknown,
+  ) {
+    super(`workspace "${workspaceId}" failed to load`);
+    if (cause !== undefined) {
+      (this as { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
+/**
+ * Result of a non-loading peek at a workspace's context state.
+ *
+ *   - `cached`         — context is already resolved and in memory
+ *   - `loading`        — a prior `get()` is mid-flight
+ *   - `unloaded`       — workspace is registered but never loaded
+ *   - `not-registered` — workspace id is unknown to the global DB
+ */
+export type WorkspaceContextState = "cached" | "loading" | "unloaded" | "not-registered";
+
+/**
  * Per-workspace bundle of long-lived state. Holds the SQLite-backed
  * catalog, session, task, schedule, and workflow services sharing one
  * `workspace.db` via WAL, plus the cross-package orchestration methods
@@ -112,6 +143,26 @@ export class WorkspaceContextRegistry {
     });
     this.inflight.set(workspaceId, promise);
     return promise;
+  }
+
+  /**
+   * Non-loading classification of a workspace's current context state.
+   *
+   * Returns synchronously-derived `"cached"` / `"loading"` when the
+   * in-memory maps already know about the workspace, otherwise falls
+   * back to a global-DB row lookup to distinguish `"unloaded"` (the
+   * workspace exists but no per-workspace context has been built
+   * yet) from `"not-registered"` (the workspace id is unknown).
+   *
+   * MUST NOT trigger a `load()` — callers use this to pick between
+   * "wait", "warm-up response", "boot a fresh load", and "404 fast"
+   * without paying the per-workspace SQLite startup cost.
+   */
+  async peek(workspaceId: string): Promise<WorkspaceContextState> {
+    if (this.entries.has(workspaceId)) return "cached";
+    if (this.inflight.has(workspaceId)) return "loading";
+    const workspace = await this.workspaceService.get(workspaceId);
+    return workspace === null ? "not-registered" : "unloaded";
   }
 
   async invalidate(workspaceId: string): Promise<void> {

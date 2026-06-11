@@ -8,7 +8,7 @@ process.env.UV_THREADPOOL_SIZE ??= "16";
 import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import path, { sep as pathSep } from "node:path";
-import { type Application, composeApplication, type WorkspaceContext } from "@glyphs-ai/api";
+import { composeApplication } from "@glyphs-ai/api";
 import {
   assertCopilotSdkResolvable,
   CopilotRuntime,
@@ -18,14 +18,14 @@ import {
 import { globalDbPath, workspacesParentDir } from "@glyphs-ai/workspace";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { assertBindIsSafe, isLoopbackBind } from "./auth.js";
 import { logsDir, resolveGlyphHome } from "./glyph-home.js";
 import { buildLogger, type Logger, type LogLevel } from "./log/build-logger.js";
 import { accessLog } from "./middleware/access-log.js";
 import { requestId } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/request-logger.js";
-import { errorBody } from "./routes/_shared.js";
+import { type WorkspaceVars, workspaceContextMiddleware } from "./middleware/workspace-context.js";
 import { catalogRoutes } from "./routes/catalog/index.js";
 import { configRoutes } from "./routes/config.js";
 import { healthRoutes } from "./routes/health.js";
@@ -53,10 +53,10 @@ export * from "./glyph-home.js";
 /**
  * Per-request variables stashed on the Hono context by `workspaceContextMiddleware`.
  * Both managers point at the same workspace; routes pull whichever they need.
+ *
+ * The type itself is re-exported via the middleware module so route
+ * factories can import it from a single source.
  */
-type WorkspaceVars = {
-  workspaceContext: WorkspaceContext;
-};
 
 /**
  * Options accepted by {@link runServer}. Every field is optional; unset
@@ -259,7 +259,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // c.var; each route family reads the bits it needs. 404 if id is not
   // registered; 5xx if workspace.db cannot be opened.
   const sessionsApp = new Hono<{ Variables: WorkspaceVars }>();
-  sessionsApp.use("/:id/sessions/*", workspaceContextMiddleware(application));
+  sessionsApp.use("/:id/sessions/*", workspaceContextMiddleware(application, logger));
   sessionsApp.route(
     "/:id/sessions",
     sessionsRoutes((c) => c.get("workspaceContext")),
@@ -267,7 +267,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", sessionsApp);
 
   const tasksApp = new Hono<{ Variables: WorkspaceVars }>();
-  tasksApp.use("/:id/tasks/*", workspaceContextMiddleware(application));
+  tasksApp.use("/:id/tasks/*", workspaceContextMiddleware(application, logger));
   tasksApp.route(
     "/:id/tasks",
     tasksRoutes((c) => c.get("workspaceContext").tasks),
@@ -281,7 +281,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // layer, not the service layer, keeps the seam at the URL where it
   // belongs.
   const scheduledTasksApp = new Hono<{ Variables: WorkspaceVars }>();
-  scheduledTasksApp.use("/:id/scheduled-tasks/*", workspaceContextMiddleware(application));
+  scheduledTasksApp.use("/:id/scheduled-tasks/*", workspaceContextMiddleware(application, logger));
   scheduledTasksApp.route(
     "/:id/scheduled-tasks",
     scheduledTasksRoutes((c) => c.get("workspaceContext").tasks),
@@ -293,7 +293,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // route owns the trigger entities themselves. Both share the same
   // workspace-scoped per-context state via the middleware.
   const schedulesApp = new Hono<{ Variables: WorkspaceVars }>();
-  schedulesApp.use("/:id/schedules/*", workspaceContextMiddleware(application));
+  schedulesApp.use("/:id/schedules/*", workspaceContextMiddleware(application, logger));
   schedulesApp.route(
     "/:id/schedules",
     schedulesRoutes((c) => c.get("workspaceContext").schedules),
@@ -305,7 +305,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // projection in `routes/_workflow-projection.ts` flattens the
   // per-kind shapes for the dashboard / CLI.
   const workflowsApp = new Hono<{ Variables: WorkspaceVars }>();
-  workflowsApp.use("/:id/workflows/*", workspaceContextMiddleware(application));
+  workflowsApp.use("/:id/workflows/*", workspaceContextMiddleware(application, logger));
   workflowsApp.route(
     "/:id/workflows",
     workflowsRoutes(
@@ -317,7 +317,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", workflowsApp);
 
   const catalogApp = new Hono<{ Variables: WorkspaceVars }>();
-  catalogApp.use("/:id/catalog/*", workspaceContextMiddleware(application));
+  catalogApp.use("/:id/catalog/*", workspaceContextMiddleware(application, logger));
   catalogApp.route(
     "/:id/catalog",
     catalogRoutes((c) => c.get("workspaceContext").catalog),
@@ -345,12 +345,13 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   }
 
   const displayHost = hostname === "0.0.0.0" ? "localhost" : hostname;
+  const wsList = await workspaceService.list();
   logger.info(
     {
       listen: `http://${displayHost}:${port}`,
       home: home,
       globalDb: globalDbPath(home),
-      workspaces: (await workspaceService.list()).length,
+      workspaces: wsList.length,
       runtimes: runtimeRegistry.kinds(),
       static: serveStaticFiles ? staticDir : null,
       logsDir: logsDir(home),
@@ -364,6 +365,53 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
     );
   }
   const server = serve({ fetch: app.fetch, port, hostname });
+
+  // Fire-and-forget pre-warm. Every registered workspace gets a
+  // load() kicked off in the background so its per-workspace
+  // schedule-task timer arms (see `scheduleModule.service.recover()`
+  // inside `WorkspaceContextRegistry.load()`). Without this, a
+  // workspace whose dashboard / CLI never touched its routes would
+  // silently never fire its scheduled tasks.
+  //
+  // We deliberately do NOT await Promise.all — with N workspaces and
+  // a ~500ms per-workspace cold load, blocking listener startup on
+  // the full fan-out becomes N × 500ms (50s at N=100). The HTTP
+  // listener is up before this loop starts; in-flight cold-load
+  // requests are handled by the 202 / 503 protocol in
+  // `workspaceContextMiddleware`.
+  if (wsList.length > 0) {
+    const prewarmStart = performance.now();
+    logger.info({ count: wsList.length }, "pre-warming workspace contexts (background)");
+    let remaining = wsList.length;
+    for (const ws of wsList) {
+      application.getContext(ws.id).then(
+        () => {
+          remaining -= 1;
+          if (remaining === 0) {
+            const elapsedMs = Math.round(performance.now() - prewarmStart);
+            logger.info({ count: wsList.length, elapsedMs }, "workspace pre-warm complete");
+          }
+        },
+        (err: unknown) => {
+          remaining -= 1;
+          // Log enough to triage without spamming stack frames into
+          // every metrics scraper. Lazy retry continues to surface
+          // through the middleware's 503 envelope on next access.
+          logger.error(
+            { err, workspaceId: ws.id, workspaceName: ws.name },
+            "workspace pre-warm failed; scheduled tasks for this workspace will not fire until next attempted access succeeds",
+          );
+          if (remaining === 0) {
+            const elapsedMs = Math.round(performance.now() - prewarmStart);
+            logger.info(
+              { count: wsList.length, elapsedMs },
+              "workspace pre-warm complete (with failures)",
+            );
+          }
+        },
+      );
+    }
+  }
 
   // Graceful shutdown: kill every in-flight task subprocess and wait for
   // the post-exit persistence to finish, so the dashboard sees consistent
@@ -435,48 +483,6 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   process.on("SIGINT", () => {
     void gracefulShutdown("SIGINT");
   });
-}
-
-/**
- * Hono middleware: pulls `:id` from the route params, asks the
- * application for its `WorkspaceContext`, and stashes it on
- * `c.var.workspaceContext` as a single field. Sub-routes pull
- * whichever service they need off the context (sessions read
- * `c.get("workspaceContext").sessions`; catalog reads
- * `c.get("workspaceContext").catalog`; etc.).
- *
- *   - 400 if `:id` is missing (shouldn't happen given the route shape;
- *     defensive)
- *   - 404 if the id isn't in the registry
- *   - 5xx if the workspace row is corrupted or workspace.db cannot be opened (getContext throws)
- */
-function workspaceContextMiddleware(
-  application: Application,
-): MiddlewareHandler<{ Variables: WorkspaceVars }> {
-  return async (c, next) => {
-    const id = c.req.param("id");
-    if (!id) return c.json({ error: "missing workspace id" }, 400);
-    let context: WorkspaceContext | null;
-    try {
-      context = await application.getContext(id);
-    } catch (err) {
-      // Use the canonical `errorBody` envelope so the 500 body goes
-      // through the same `SAFE_ERROR_NAMES` allow-list every other 5xx
-      // response uses. Echoing raw `err.message` here would bypass the
-      // gate and leak host paths / Node fs error strings behind a
-      // reverse proxy (loopback bind mitigates exploitability today,
-      // not tomorrow).
-      return c.json(errorBody(err), 500);
-    }
-    if (!context) {
-      return c.json(
-        { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegisteredError" },
-        404,
-      );
-    }
-    c.set("workspaceContext", context);
-    await next();
-  };
 }
 
 /**

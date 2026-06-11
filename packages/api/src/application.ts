@@ -9,7 +9,11 @@ import {
   type WorkspaceService,
 } from "@glyphs-ai/workspace";
 import type { Logger } from "pino";
-import { type WorkspaceContext, WorkspaceContextRegistry } from "./workspace-context.js";
+import {
+  type WorkspaceContext,
+  WorkspaceContextRegistry,
+  type WorkspaceContextState,
+} from "./workspace-context.js";
 
 /**
  * Composition root for the global registry plus on-demand
@@ -75,6 +79,16 @@ export interface Application {
    * first request. Returns `null` when the workspaceId is not registered.
    */
   getContext(workspaceId: string): Promise<WorkspaceContext | null>;
+
+  /**
+   * Non-loading peek at a workspace's context state. MUST NOT trigger
+   * a `load()` — used by the HTTP middleware to pick between waiting,
+   * a warming-up response, kicking off a fresh load, or 404 without
+   * paying the per-workspace SQLite startup cost.
+   *
+   * See {@link WorkspaceContextState} for the four values.
+   */
+  peekContextState(workspaceId: string): Promise<WorkspaceContextState>;
 
   /**
    * Snapshot of every {@link WorkspaceContext} currently held in the
@@ -157,6 +171,10 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
 
     getContext(workspaceId) {
       return registry.get(workspaceId);
+    },
+
+    peekContextState(workspaceId) {
+      return registry.peek(workspaceId);
     },
 
     loadedContexts() {
