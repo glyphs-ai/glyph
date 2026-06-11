@@ -237,15 +237,6 @@ button {
   padding: var(--space-4) var(--space-3);
 }
 
-.sidebar__group-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-sidebar-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: var(--space-3) var(--space-3) var(--space-1);
-}
-
 /* Section group container. Holds the parent button + nested children
    list (when present). No visual chrome of its own — the children list
    handles indentation. */
@@ -840,10 +831,6 @@ button {
 /* MCPs: Name | Path | (Actions) */
 .table th.col-path {
   width: auto;
-}
-
-.actions-col {
-  width: 56px;
 }
 
 /* ─── Status badges ─────────────────────────────────────────────── */
@@ -1476,24 +1463,6 @@ button {
   overflow-wrap: anywhere;
 }
 
-/* Single-row title strip. */
-.card-grid__top {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.card-grid__name {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: -0.01em;
-  color: var(--color-text);
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  line-height: 1.35;
-}
-
 /* Inline blocked-reason banner: muted warn color, no heavy background.
  * Sits between description and footer. */
 /* Inline blocked-reason banner: reserved as a fixed-height row even
@@ -1613,79 +1582,6 @@ button {
   -webkit-box-orient: vertical;
   overflow: hidden;
   min-height: calc(13px * 1.45 * 2);
-}
-
-.card-grid__desc--mono {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  display: block;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.card-grid__sep {
-  color: var(--color-text-subtle);
-}
-
-.card-grid__version {
-  color: var(--color-text-muted);
-}
-
-/* Description variants for non-grid uses such as search results. */
-.card-grid__desc--needs {
-  color: var(--color-text);
-  -webkit-line-clamp: 2;
-}
-
-.card-grid__needs-icon {
-  font-size: 13px;
-  margin-right: 2px;
-}
-
-.card-grid__missing-line {
-  display: flex;
-  flex: 1 1 0;
-  gap: var(--space-3);
-  margin: 0;
-  padding: 2px var(--space-2);
-  background: rgba(180, 83, 9, 0.08);
-  border-left: 2px solid var(--color-warn);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--color-text);
-  min-width: 0;
-}
-
-.card-grid__missing-segment {
-  flex: 1 1 0;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card-grid__missing-label {
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 10px;
-}
-
-.card-grid__missing-label--skill,
-.card-grid__missing-label--mcp {
-  color: var(--color-warn);
-}
-
-/* ─── Table actions column ──────────────────────────────────────── */
-
-.actions-col {
-  width: 56px;
-}
-
-.actions-cell {
-  text-align: right;
-  white-space: nowrap;
 }
 
 /* ─── Modal ─────────────────────────────────────────────────────── */
@@ -2080,37 +1976,6 @@ button {
   background: rgba(37, 99, 235, 0.06);
 }
 
-/* ─── Code textarea ────────────────────────────────────────────── */
-
-.code-textarea {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.5;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  resize: vertical;
-  min-height: 200px;
-  width: 100%;
-  white-space: pre;
-  overflow-wrap: normal;
-  overflow-x: auto;
-}
-
-.code-textarea:focus {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -1px;
-  border-color: var(--color-accent);
-  background: var(--color-bg);
-}
-
-.code-textarea:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 /* ─── Link-styled button (used as in-table action) ──────────────── */
 
 .link-button {
@@ -2259,46 +2124,10 @@ button {
 /* Sessions fills the page width so the activity column has room to breathe.
    Each named column has a fixed width; Activity (the only un-classed column)
    absorbs the remainder, which on wide screens leaves it generously sized. */
-.table--wide {
-  max-width: none;
-  /* Sessions table has a long-tail column (Agent fqn) that should
-     fit-content per row instead of being clipped to a fixed width.
-     Switch to auto layout and let column-level widths below describe
-     intent (1% = "as small as content allows"; the Activity column
-     gets the slack). */
-  table-layout: auto;
-}
-
-.table--wide th,
-.table--wide td {
-  /* Default: shrink to content; only Activity gets to take the slack. */
-  width: 1%;
-  white-space: nowrap;
-}
-
-.table--wide th.col-activity,
-.table--wide td.col-activity {
-  width: auto;
-  white-space: normal;
-}
-
-.table--wide td.col-actions,
-.table--wide th.col-actions {
-  text-align: right;
-}
 
 /* Agent column allows the chip to wrap onto two lines for long fqns
    so the user sees the full name, not "...". Mono font keeps it
    aligned even when wrapped. */
-.table--wide .agent-tag {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-all;
-  text-overflow: clip;
-  /* Keep a minimum readable width so a row with a short agent doesn't
-     compress to nothing. */
-  min-width: 120px;
-}
 
 .table .col-session {
   /* Override base 1% with explicit width so session id chip is comfy. */
@@ -2319,31 +2148,9 @@ button {
   /* `width: 1%` from the cascade; align-right via the rule above. */
 }
 
-.session-id {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 13px;
-  color: var(--color-text);
-}
-
 /* Subtler than .badge--ok — the agent name is contextual metadata, not a
    status, so a low-contrast outline tag keeps the row from being a wall
    of blue when many sessions share the same agent. */
-.agent-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--color-text);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* The activity cell stays on a single line: long previews truncate with
    an ellipsis; the relative-time tail never wraps. min-width: 0 on both
@@ -2366,10 +2173,6 @@ button {
   color: var(--color-text);
 }
 
-.activity-cell__label {
-  font-size: 12px;
-}
-
 .activity-cell__sep {
   flex: 0 0 auto;
   color: var(--color-text-subtle);
@@ -2378,17 +2181,6 @@ button {
 .activity-cell .muted {
   flex: 0 0 auto;
   white-space: nowrap;
-}
-
-.row-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.row-actions__launch {
-  width: 112px;
-  justify-content: center;
 }
 
 @keyframes spin {
@@ -2467,30 +2259,6 @@ button {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
-}
-
-.landing__topbar-iconlink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  text-decoration: none;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
-}
-
-.landing__topbar-iconlink:hover {
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.landing__topbar-iconlink svg {
-  width: 18px;
-  height: 18px;
 }
 
 .landing__search {
@@ -3227,42 +2995,13 @@ button {
   word-break: break-word;
 }
 
-.task-detail__head-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
 /*  Chrome row: title fills the left, [× Close] pinned top-right. align-items
     is `flex-start` so a long wrapped title doesn't drag the Close button
     down with it. Convention matches Linear/Slack/Gmail side-panel close.  */
-.task-detail__chrome-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
 
 /*  State-conditional task action row (Cancel / Run again… / Delete).
     Right-aligned within the header, visually separated from the
     [× Close] chrome above so Cancel↔Close misclicks are minimised.  */
-.task-detail__actions-row {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.task-detail__id {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--color-text);
-}
-
-.task-detail__head-spacer {
-  flex: 1 1 0;
-}
 
 /*  Stat-bar: agent · runtime · started · duration in a single line of
     inline-block stats, each with a small grey label key. Wraps on
@@ -3282,72 +3021,16 @@ button {
   margin-right: 2px;
 }
 
-.task-detail__details {
-  margin: 0;
-  font-size: 13px;
-  color: var(--color-text);
-  line-height: 1.45;
-  /* Preserve authored newlines + indentation. Without this the
-     expanded body collapses bullets, headers, and paragraphs into
-     a single wall of text — the source has structure (numbered
-     lists, double-newlines between sections), it should render
-     that way. `word-break: break-word` keeps long unbreakable
-     tokens (URLs, hashes) from blowing out the panel width. */
-  white-space: pre-wrap;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .task-detail__body {
   flex: 1;
   overflow: auto;
   min-height: 200px;
 }
 
-.task-detail__events {
-  white-space: pre-wrap;
-  /* Force long unbreakable JSON tokens (compact strings without
-     spaces) to break at any character. `word-break: break-word` is
-     non-standard; `overflow-wrap: anywhere` is the spec-compliant
-     way to guarantee no horizontal overflow regardless of content. */
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  font-size: 11px;
-  margin: 0;
-}
-
 /*  Result panel — the agent's final answer, shown above the tabs as
     the headline content. Subtle accent border on the left so it
     visually reads as "the answer to your question" without competing
     with the events log below. */
-
-.task-detail__section-title {
-  margin: 0 0 var(--space-1);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.task-detail__result {
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface);
-  border-left: 3px solid var(--color-accent);
-  border-radius: var(--radius-sm);
-}
-
-.task-detail__result-body {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--color-text);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 
 /*  Activity timeline — runtime-neutral list of user/assistant/summary
     entries returned by /api/.../tasks/<id>/activity. Each row has a
@@ -3459,13 +3142,6 @@ button {
   overflow-y: auto;
 }
 
-.activity-row__tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  margin-top: 2px;
-}
-
 .activity-row__tool {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -3482,7 +3158,6 @@ button {
   font-size: 12px;
   color: var(--color-text);
 }
-
 
 /*  ResolveTree (install preview) ─ */
 
@@ -3615,14 +3290,6 @@ button {
   letter-spacing: 0.04em;
   color: var(--color-accent);
   background: var(--color-accent-bg);
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
-.resolve-tree__badge {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  background: rgba(0, 0, 0, 0.05);
   padding: 2px 6px;
   border-radius: 3px;
 }
@@ -3776,7 +3443,6 @@ button {
   color: var(--color-text-muted);
 }
 
-
 .task-filters {
   display: flex;
   flex-direction: column;
@@ -3795,13 +3461,7 @@ button {
 .task-filters__row--compact {
   gap: var(--space-2);
 }
-.task-filters__label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-subtle);
-}
+
 /* Search collapses inline with the dropdowns + time pills.
    `flex: 1 1 200px` lets it grow to fill the row at desktop widths
    and wrap onto its own line at narrow widths without stretching
@@ -4011,19 +3671,7 @@ button {
   text-align: center;
   white-space: nowrap;
 }
-.task-detail__close {
-  background: none;
-  border: 0;
-  font-size: 18px;
-  color: var(--color-text-subtle);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-}
-.task-detail__close:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text);
-}
+
 .task-detail__meta-row {
   display: flex;
   flex-wrap: wrap;
@@ -4092,13 +3740,6 @@ button {
   flex: 1 1 auto;
   min-height: 0;
 }
-.overview-tab__section-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-subtle);
-  margin: 0 0 var(--space-2);
-}
 
 .task-details {
   background: var(--color-surface);
@@ -4106,52 +3747,13 @@ button {
   border-radius: var(--radius-md);
   padding: var(--space-3);
 }
-.task-details__title {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-  margin: 0 0 var(--space-2);
-}
-.task-details__list {
-  display: grid;
-  grid-template-columns: 80px 1fr;
-  gap: var(--space-1) var(--space-3);
-  margin: 0;
-}
-.task-details__key {
-  font-size: 12px;
-  color: var(--color-text-subtle);
-}
-.task-details__val {
-  font-size: 12px;
-  color: var(--color-text);
-  word-break: break-all;
-}
-.task-details__val--mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-}
+
 /* keep monospace task IDs from breaking mid-string.
    `word-break: break-all` was applied to every detail value, which is
    right for prose but wrong for a fixed-width token. Specialise the
    id cell to `nowrap` + ellipsis; the copy button always carries the
    full id and the cell's title= attribute surfaces it on hover. */
-.task-details__id {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.task-details__id-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
+
 .task-details__copy {
   display: inline-flex;
   align-items: center;
@@ -4955,12 +4557,6 @@ button {
    replaced by the shared `<AgentAvatar size="lg">` primitive — its
    `.agent-avatar--lg` rule sizes the square (56px) and the inline
    style sets the deterministic bg/fg. The old selector is gone. */
-.agent-detail-page {
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
 .agent-detail__header {
   display: flex;
   flex-direction: column;
@@ -5051,39 +4647,6 @@ button {
   font-size: 12px;
 }
 
-/* Informational banner variant shown above agent lists. */
-.legacy-url-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-md);
-  background: var(--color-accent-bg);
-  color: var(--color-accent);
-  font-size: 13px;
-  line-height: 1.5;
-}
-.legacy-url-banner__body {
-  flex: 1;
-  min-width: 0;
-}
-.legacy-url-banner__dismiss {
-  flex: 0 0 auto;
-  background: transparent;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-}
-.legacy-url-banner__dismiss:hover,
-.legacy-url-banner__dismiss:focus-visible {
-  background: rgba(37, 99, 235, 0.12);
-  outline: none;
-}
-
 /* Agent Overview — "View all →" links. Matches the row hover treatment
    in `.agent-overview__row` so users learn the affordance once and see
    the same shape on the row-level and section-level links. */
@@ -5112,10 +4675,6 @@ button {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
-}
-.agent-overview__section {
-  display: flex;
-  flex-direction: column;
 }
 
 /* Default layout: single column of stacked sections. The 2x2 grid
@@ -5304,7 +4863,6 @@ button {
   /* short never truncates — it's the most scannable token. */
 }
 
-
 /* ====================================================================
    Schedule UI refinements.
    Surgical additions on top of the schedules surface:
@@ -5444,7 +5002,6 @@ button {
   text-overflow: ellipsis;
   min-width: 0;
 }
-
 
 /* Workflow DAG (vertical top-to-bottom layout).
    Top-to-bottom by phase: each phase is a row, sibling nodes in a
