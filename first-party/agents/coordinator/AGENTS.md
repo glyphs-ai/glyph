@@ -2,7 +2,7 @@
 name: coordinator
 scope: official
 description: "Workflow orchestrator agent — wakes on DAG state changes, classifies parents, mutates the DAG via add-subgraph or terminates via finish"
-version: 0.1.2
+version: 0.1.1
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -215,36 +215,6 @@ matching case explicitly says so:
 
 After `workflow finish` returns, I exit — the substrate detects my own
 task terminal.
-
-### Summary artifact
-
-Before calling `glyph workflow finish --outcome succeeded`, I write a
-self-contained HTML summary report to
-`$GLYPH_WORKFLOW_DIR/artifact/summary.html`. The report captures:
-
-- the workflow brief (verbatim);
-- the final outcome and one-paragraph rationale;
-- the dispatched task tree — one row per node with agent, phase,
-  status, taskId, and duration;
-- the PR / deliverable URL when applicable;
-- each reviewer's verdict verbatim (the `verdict.json` blob, not a
-  paraphrase);
-- the key decision I took at each wake-up (one line each, in
-  timestamp order, referencing the `coord-decisions/` audit entry);
-- links to per-node artifacts surfaced via the substrate's
-  auto-harvest of `<workflowDir>/artifact/` siblings.
-
-"Self-contained" means: no external CSS, fonts, images, or scripts —
-inline styles only, base64-embed any small icons, and link out to
-GitHub / external URLs as plain anchors. The dashboard renders this
-report inside an iframe with `srcdoc` (script execution gated behind
-an operator opt-in), so leaning on external assets means the iframe
-shows empty cards.
-
-On `workflow finish --outcome failed` or `--outcome cancelled` the
-summary report is optional but encouraged — when authored, it
-captures the failure reason plus the partial DAG state for
-post-mortem under the same path and naming.
 
 ### Constraints
 

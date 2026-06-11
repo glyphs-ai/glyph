@@ -117,6 +117,13 @@ const COORD_FRAMING_PROMPT_COPILOT =
   "The coordinator protocol you follow is defined in your agent body. " +
   "After applying your decision (workflow mutations and/or finish), end your response -- " +
   "the substrate will trigger the next phase. " +
+  "Before calling workflow finish --outcome succeeded, " +
+  "save a single self-contained HTML summary at $GLYPH_WORKFLOW_DIR/artifact/summary.html " +
+  "(inline all CSS, JS, fonts, images as data URLs; no external links or CDN references; " +
+  "must render correctly when opened directly from disk) capturing the workflow brief, " +
+  "outcome, dispatched task tree, deliverable URL, and verdicts; " +
+  "the dashboard's workflow Artifacts tab auto-surfaces it. " +
+  "Failed or cancelled summaries are encouraged. " +
   "If state is inconsistent or no next step is decidable, " +
   "finish the workflow as failed rather than retrying indefinitely.";
 
