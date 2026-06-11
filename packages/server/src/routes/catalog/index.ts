@@ -11,7 +11,7 @@ import { skillsRoutes } from "./skills.js";
  * reads) off the Hono context, set up by the workspace middleware.
  *
  * Tests can pass a `CatalogService` directly. The catalog brings its
- * own `FetcherRegistry` via `CatalogOptions.fetchers`; routes don't
+ * own `FetcherRegistry` via `CatalogServiceOpts.fetchers`; routes don't
  * thread fetchers through.
  */
 export function catalogRoutes(arg: CatalogResolver | CatalogService): Hono {
