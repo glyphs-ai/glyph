@@ -116,7 +116,7 @@ describe("@glyphs-ai/runtime public API guard", () => {
       new RuntimeRefreshFailed("copilot", "sid", new Error("upstream")),
       new RuntimeStateDeletionFailed("copilot", "sid", new Error("upstream")),
       new RuntimeProvisionFailed("copilot", "/workdir", new Error("upstream")),
-      new RuntimeHeadlessLaunchFailed("copilot", "/task-dir", new Error("upstream")),
+      new RuntimeHeadlessLaunchFailed("copilot", "/workdir", new Error("upstream")),
       new RuntimeDoesNotSupportRemoteError("gemini"),
       new RuntimeReadActivityInvalidArgs("before and after are mutually exclusive"),
       // Placeholder substitution.
@@ -208,7 +208,7 @@ describe("@glyphs-ai/runtime public API guard", () => {
     expectTypeOf<CopilotPreflightDeps>().toHaveProperty("resolveSpecifier");
     expectTypeOf<CopilotPreflightDeps>().toHaveProperty("createRequireAt");
     expectTypeOf<EventBuffer>().toHaveProperty("events");
-    expectTypeOf<LaunchCopilotHeadlessOpts>().toHaveProperty("taskDir");
+    expectTypeOf<LaunchCopilotHeadlessOpts>().toHaveProperty("workdir");
     expectTypeOf<LaunchCopilotHeadlessOpts>().toHaveProperty("agent");
     expectTypeOf<LaunchCopilotHeadlessDeps>().toBeObject();
 

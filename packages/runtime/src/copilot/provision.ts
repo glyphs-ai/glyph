@@ -27,7 +27,7 @@ function applyFrontmatterPatch(raw: string, patch: Record<string, unknown>): str
 const DOT_DIR = ".github";
 /**
  * Filename of the workspace-level MCP config that this module writes
- * inside the spawn cwd (`taskDir` in the low-level headless launcher)
+ * inside the spawn cwd (`workdir` in the low-level headless launcher)
  * when the resolved agent declares any MCP servers. Single source of
  * truth for the `.mcp.json` literal —
  * `launch-headless.ts` re-exports this so its existence probe and the

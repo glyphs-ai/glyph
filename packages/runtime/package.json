@@ -1,7 +1,7 @@
 {
   "name": "@glyphs-ai/runtime",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Runtime — per-CLI adapters (provision, buildInteractiveLaunch, launchHeadless, readActivity, deleteState) used by sessions and tasks",
   "license": "MIT",
   "type": "module",

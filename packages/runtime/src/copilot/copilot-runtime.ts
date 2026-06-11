@@ -363,7 +363,7 @@ export class CopilotRuntime implements Runtime {
     }
     return launchCopilotHeadless(
       {
-        taskDir: opts.workdir,
+        workdir: opts.workdir,
         agent: opts.agent,
         catalog: opts.catalog,
         prompt: opts.prompt,

@@ -325,7 +325,7 @@ describe("catalogErrorPolicy mapping", () => {
 // Pin the runtime error contract: every Runtime*Failed `.message` (the
 // piece that lands in the JSON `error` field) must contain the runtime
 // kind ONLY — no on-disk paths, no caller-controlled identifiers
-// (sessionId / taskDir), no underlying `cause.message` (which is
+// (sessionId / workdir), no underlying `cause.message` (which is
 // typically a Node `fs` error like `EACCES: permission denied,
 // open '/etc/...'`). The full diagnostic stays accessible via instance
 // fields + `cause` for server-side `console.error` logging.
@@ -412,6 +412,6 @@ describe("RuntimeXxxFailed message sanitization", () => {
     expect(p.workdir).toBe("/abs/wd");
 
     const d = new RuntimeHeadlessLaunchFailed("copilot", "/abs/td", fsCause);
-    expect(d.taskDir).toBe("/abs/td");
+    expect(d.workdir).toBe("/abs/td");
   });
 });
