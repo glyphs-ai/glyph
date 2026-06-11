@@ -490,12 +490,6 @@ export interface ScheduleRunResponse {
   readonly dispatchId: string;
 }
 
-/** Standard error envelope. Returned by handlers via `errorBody(err)`. */
-export interface ApiError {
-  readonly error: string;
-  readonly code?: string;
-}
-
 // Common path-param shapes ─────────────────────────────────────────────
 
 /** Workspace-scoped resource path params. */
@@ -1156,21 +1150,3 @@ export const ROUTES = {
 
 /** Union of every key in {@link ROUTES}. Use as the generic param of `ApiClient.call`. */
 export type RouteKey = keyof typeof ROUTES;
-
-/**
- * Flat enumeration of `{ method, path }` pairs for every entry in
- * {@link ROUTES}. The reflection test in
- * `packages/server/test/route-manifest.test.ts` uses this to compare
- * against `app.routes` (the side-effect registry Hono keeps after
- * `.get` / `.post` / ...) and refuses any mismatch.
- *
- * Exposed as a helper so external tooling (docs generators, OpenAPI
- * exporters, MCP wrappers) can consume the inventory without
- * importing every type.
- */
-export function listRoutes(): readonly { readonly method: HttpMethod; readonly path: string }[] {
-  return (Object.keys(ROUTES) as RouteKey[]).map((k) => {
-    const r = ROUTES[k];
-    return { method: r.method, path: r.path };
-  });
-}

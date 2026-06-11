@@ -1,9 +1,9 @@
 /**
  * Public surface of `@glyphs-ai/contracts`.
  *
- * Pure types plus the route manifest (`ROUTES` / `defineRoute` /
- * `listRoutes`). No orchestration, no DB handles, no subprocess
- * spawning. Safe for the SPA bundle and the CLI alike.
+ * Pure types plus the route manifest (`ROUTES` / `defineRoute`). No
+ * orchestration, no DB handles, no subprocess spawning. Safe for the
+ * SPA bundle and the CLI alike.
  *
  * Re-exports are grouped by source file rather than by category so the
  * "where does `Foo` live?" answer is one `grep` away. The cross-pkg

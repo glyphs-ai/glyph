@@ -28,6 +28,7 @@ export {
   type Application,
   composeApplication,
 } from "./application.js";
+export { listRoutes } from "./route-manifest.js";
 export { TaskScheduleTargetError } from "./wiring/schedule-task-handler.js";
 export {
   WorkflowCoordAgentNotCapableError,

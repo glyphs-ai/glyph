@@ -22,7 +22,6 @@ export type {
   CatalogKind,
   CatalogSyncResult,
   Mcp,
-  McpInstallBody,
   MissingDep,
   Skill,
   SkillEntry,
@@ -32,4 +31,4 @@ export type {
 export type { ActivityItem, TruncationInfo } from "@glyphs-ai/runtime";
 export type { PreviewScheduleResult, Schedule } from "@glyphs-ai/schedule";
 export type { Session } from "@glyphs-ai/session";
-export type { Task, TaskStatus } from "@glyphs-ai/task";
+export type { Task } from "@glyphs-ai/task";
