@@ -20,7 +20,7 @@
  *    runtime contract test); tracked as future work in the plan.
  */
 
-import { type CatalogServiceOpts, CatalogService } from "@glyphs-ai/catalog";
+import { CatalogService, type CatalogServiceOpts } from "@glyphs-ai/catalog";
 import pino from "pino";
 
 const silentLogger = pino({ level: "silent" });

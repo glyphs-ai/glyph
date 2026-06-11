@@ -48,7 +48,9 @@ const WID = "20260607-aabbccdd";
 const COORD_NID = "550e8400-e29b-41d4-a716-446655440001";
 const WORKER_NID = "550e8400-e29b-41d4-a716-446655440002";
 
-function makeHeader(overrides: Partial<{ status: WorkflowStatus; endedAt: string }> = {}): WorkflowEntity {
+function makeHeader(
+  overrides: Partial<{ status: WorkflowStatus; endedAt: string }> = {},
+): WorkflowEntity {
   const status = (overrides.status ?? "running") as WorkflowStatus;
   return WorkflowEntity.fromRow({
     id: WID,
