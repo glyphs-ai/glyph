@@ -1,7 +1,7 @@
 {
   "name": "@glyphs-ai/__PKG__",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "TODO: one-line description of __PKG__",
   "license": "MIT",
   "type": "module",

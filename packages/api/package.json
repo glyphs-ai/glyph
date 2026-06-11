@@ -1,7 +1,7 @@
 {
   "name": "@glyphs-ai/api",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "Application layer for glyph: orchestration of T0/T1 packages into a composable runtime. Re-exports `@glyphs-ai/contracts` so server has a single import site; dashboard / cli should depend on `@glyphs-ai/contracts` directly.",
   "license": "MIT",
   "type": "module",

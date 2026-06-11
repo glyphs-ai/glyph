@@ -1,7 +1,7 @@
 {
   "name": "@glyphs-ai/cli",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "Command-line interface for glyph (lifecycle commands + HTTP API client)",
   "license": "MIT",
   "type": "module",
