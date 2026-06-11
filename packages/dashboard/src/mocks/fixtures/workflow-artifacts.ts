@@ -7,14 +7,22 @@ import { fixtureWorkflowMockIds } from "./workflows";
  * Keyed by workflow id (`20260608-1f3a7b9c`, …) and laid out to
  * cover the four interesting list shapes:
  *
- *   - `20260608-1f3a7b9c`  workflow-summary entries (one md +
- *     one png) + per-node entries for the task running in phase 3.
+ *   - `20260608-1f3a7b9c`  workflow-summary entries (one self-
+ *     contained HTML summary that auto-selects on mount,
+ *     one md, and one png) + per-node entries for the task
+ *     running in phase 3. The HTML entry exercises the
+ *     `<iframe srcdoc>` viewer end-to-end so the C4 height-
+ *     chain fix and the C5 summary-first auto-select effect
+ *     are both visible in `pnpm dev:mock`.
  *   - `20260607-2e4b8cad`    per-node entries for both workers in
  *     phase 1; no curated workflow-summary content.
  *   - `20260606-3d5c9dbe`       — empty (`[]`), exercising the empty
  *     state in the Artifacts tab.
  *   - `20260605-4e6dabcf`     — workflow-summary entry only (the
- *     coordinator left a final report.md before cancel).
+ *     coordinator left a `summary.html` before cancel, per the
+ *     D convention added in coordinator agent 0.1.2). Single
+ *     entry auto-selects on mount so the C5 pin and the C4
+ *     iframe height chain are both visible at a glance.
  *
  * Per-node `nodeId` + `taskId` values are pulled from the shared
  * `fixtureWorkflowMockIds` map exported by `workflows.ts` so the
@@ -34,6 +42,13 @@ export const fixtureWorkflowArtifacts: ReadonlyMap<string, readonly WorkflowArti
     [
       "20260608-1f3a7b9c",
       [
+        {
+          kind: "workflow-summary",
+          path: "summary.html",
+          size: 5_812,
+          modifiedAt: iso(-60),
+          mimeBucket: "text",
+        },
         {
           kind: "workflow-summary",
           path: "report.md",
@@ -97,8 +112,8 @@ export const fixtureWorkflowArtifacts: ReadonlyMap<string, readonly WorkflowArti
       [
         {
           kind: "workflow-summary",
-          path: "final-report.md",
-          size: 980,
+          path: "summary.html",
+          size: 5_120,
           modifiedAt: iso(-4200),
           mimeBucket: "text",
         },

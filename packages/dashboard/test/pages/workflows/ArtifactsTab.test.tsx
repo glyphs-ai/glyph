@@ -1,12 +1,16 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowArtifactsResponse, WorkflowHeaderWire } from "../../../src/api";
+import type {
+  WorkflowArtifactWire,
+  WorkflowDagWire,
+  WorkflowHeaderWire,
+  WorkflowNodeWire,
+} from "../../../src/api";
 
 vi.mock("../../../src/api", async () => {
   const actual = await vi.importActual<typeof import("../../../src/api")>("../../../src/api");
   return {
     ...actual,
-    listWorkflowArtifacts: vi.fn(),
     workflowArtifactUrl: (id: string, subPath: string) =>
       `/api/wf/${id}/${encodeURIComponent(subPath)}`,
   };
@@ -18,10 +22,7 @@ vi.mock("../../../src/components/tasks/TaskDetail/MarkdownSummary", () => ({
   MarkdownSummary: ({ source }: { source: string }) => <div data-testid="md">{source}</div>,
 }));
 
-import * as api from "../../../src/api";
 import { ArtifactsTab } from "../../../src/pages/workflows/ArtifactsTab";
-
-const mockListWorkflowArtifacts = api.listWorkflowArtifacts as unknown as ReturnType<typeof vi.fn>;
 
 function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
   return {
@@ -36,8 +37,36 @@ function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire
   };
 }
 
+function makeNode(overrides: Partial<WorkflowNodeWire> = {}): WorkflowNodeWire {
+  return {
+    id: "n-default",
+    workflowId: "wf-1",
+    status: "running",
+    phase: 0,
+    spec: { kind: "worker", agent: "official/engineer", brief: "x" },
+    metadata: {},
+    createdAt: "2026-05-28T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function makeDag(nodes: WorkflowNodeWire[]): WorkflowDagWire {
+  return {
+    workflow: {
+      id: "wf-1",
+      brief: "x",
+      status: "succeeded",
+      coordinatorAgent: "official/engineer",
+      metadata: {},
+      createdAt: "2026-05-28T00:00:00.000Z",
+      iterationCount: 0,
+    },
+    nodes,
+    edges: [],
+  };
+}
+
 beforeEach(() => {
-  mockListWorkflowArtifacts.mockReset();
   // jsdom's `fetch` polyfill differs across versions — stub a 404 so
   // the preview pane lands in a deterministic state for tests that
   // don't care about the body bytes.
@@ -53,46 +82,61 @@ afterEach(() => {
 
 describe("ArtifactsTab — empty + error states", () => {
   it("renders an empty state when the workflow has no artifacts", async () => {
-    mockListWorkflowArtifacts.mockResolvedValue({ artifacts: [] } as WorkflowArtifactsResponse);
-    render(<ArtifactsTab workflow={makeWf()} dag={null} />);
+    render(
+      <ArtifactsTab workflow={makeWf()} dag={null} artifacts={[]} loaded={true} error={null} />,
+    );
     await waitFor(() => {
       expect(screen.getByTestId("workflow-artifacts-empty")).toBeTruthy();
     });
   });
 
   it("renders an error banner when the list fetch fails", async () => {
-    mockListWorkflowArtifacts.mockRejectedValue(new Error("boom"));
-    render(<ArtifactsTab workflow={makeWf()} dag={null} />);
+    render(
+      <ArtifactsTab workflow={makeWf()} dag={null} artifacts={null} loaded={true} error="boom" />,
+    );
     await waitFor(() => {
       expect(screen.getByTestId("workflow-artifacts-error").textContent).toContain("boom");
     });
+  });
+
+  it("renders a loading placeholder while the parent's fetch is still in flight", async () => {
+    render(
+      <ArtifactsTab workflow={makeWf()} dag={null} artifacts={null} loaded={false} error={null} />,
+    );
+    expect(screen.getByTestId("workflow-artifacts-loading")).toBeTruthy();
   });
 });
 
 describe("ArtifactsTab — dropdown UX", () => {
   it("renders a <select> with `<optgroup>` per source (Summary + per-node)", async () => {
-    mockListWorkflowArtifacts.mockResolvedValue({
-      artifacts: [
-        {
-          kind: "workflow-summary",
-          path: "report.md",
-          size: 100,
-          modifiedAt: "2026-05-28T00:00:00.000Z",
-          mimeBucket: "text",
-        },
-        {
-          kind: "node",
-          nodeId: "n-a",
-          taskId: "t-a",
-          path: "logs.txt",
-          size: 200,
-          modifiedAt: "2026-05-28T00:00:00.000Z",
-          mimeBucket: "text",
-        },
-      ],
-    } as WorkflowArtifactsResponse);
+    const artifacts: WorkflowArtifactWire[] = [
+      {
+        kind: "workflow-summary",
+        path: "report.md",
+        size: 100,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+      {
+        kind: "node",
+        nodeId: "n-a",
+        taskId: "t-a",
+        path: "logs.txt",
+        size: 200,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
 
-    render(<ArtifactsTab workflow={makeWf()} dag={null} />);
+    render(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={null}
+        artifacts={artifacts}
+        loaded={true}
+        error={null}
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("workflow-artifacts-selector")).toBeTruthy();
@@ -114,21 +158,27 @@ describe("ArtifactsTab — dropdown UX", () => {
     // `Node n-12345-` with no visible character after it. Trim
     // trailing dashes off the short slice so the label always ends
     // on a glyph.
-    mockListWorkflowArtifacts.mockResolvedValue({
-      artifacts: [
-        {
-          kind: "node",
-          nodeId: "n-12345-extra-bytes-here",
-          taskId: "t-x",
-          path: "logs.txt",
-          size: 200,
-          modifiedAt: "2026-05-28T00:00:00.000Z",
-          mimeBucket: "text",
-        },
-      ],
-    } as WorkflowArtifactsResponse);
+    const artifacts: WorkflowArtifactWire[] = [
+      {
+        kind: "node",
+        nodeId: "n-12345-extra-bytes-here",
+        taskId: "t-x",
+        path: "logs.txt",
+        size: 200,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
 
-    render(<ArtifactsTab workflow={makeWf()} dag={null} />);
+    render(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={null}
+        artifacts={artifacts}
+        loaded={true}
+        error={null}
+      />,
+    );
     await waitFor(() => {
       expect(screen.getByTestId("workflow-artifacts-selector")).toBeTruthy();
     });
@@ -140,19 +190,25 @@ describe("ArtifactsTab — dropdown UX", () => {
   });
 
   it("auto-selects the first artifact on mount and renders a download link to it", async () => {
-    mockListWorkflowArtifacts.mockResolvedValue({
-      artifacts: [
-        {
-          kind: "workflow-summary",
-          path: "report.md",
-          size: 100,
-          modifiedAt: "2026-05-28T00:00:00.000Z",
-          mimeBucket: "text",
-        },
-      ],
-    } as WorkflowArtifactsResponse);
+    const artifacts: WorkflowArtifactWire[] = [
+      {
+        kind: "workflow-summary",
+        path: "report.md",
+        size: 100,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
 
-    render(<ArtifactsTab workflow={makeWf()} dag={null} />);
+    render(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={null}
+        artifacts={artifacts}
+        loaded={true}
+        error={null}
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("workflow-artifacts-selector")).toBeTruthy();
@@ -165,22 +221,176 @@ describe("ArtifactsTab — dropdown UX", () => {
   });
 
   it("renders the preview pane container regardless of fetch outcome", async () => {
-    mockListWorkflowArtifacts.mockResolvedValue({
-      artifacts: [
-        {
-          kind: "workflow-summary",
-          path: "report.md",
-          size: 100,
-          modifiedAt: "2026-05-28T00:00:00.000Z",
-          mimeBucket: "text",
-        },
-      ],
-    } as WorkflowArtifactsResponse);
+    const artifacts: WorkflowArtifactWire[] = [
+      {
+        kind: "workflow-summary",
+        path: "report.md",
+        size: 100,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
 
-    render(<ArtifactsTab workflow={makeWf()} dag={null} />);
+    render(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={null}
+        artifacts={artifacts}
+        loaded={true}
+        error={null}
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("workflow-artifacts-preview")).toBeTruthy();
     });
+  });
+});
+
+describe("ArtifactsTab — node group label (agent · Phase + disambiguator)", () => {
+  it("labels a node group as 'agent · Phase N' (1-indexed) when the DAG resolves it", async () => {
+    // Wire phase 1 must surface as "Phase 2" in the dropdown — matches
+    // the +1 convention used by the DAG view's phase labels and
+    // WorkflowMetaStats' phase progress.
+    const dag = makeDag([
+      makeNode({
+        id: "n-rev",
+        phase: 1,
+        spec: { kind: "worker", agent: "official/reviewer", brief: "r" },
+      }),
+    ]);
+    const artifacts: WorkflowArtifactWire[] = [
+      {
+        kind: "node",
+        nodeId: "n-rev",
+        taskId: "t-rev",
+        path: "verdict.json",
+        size: 100,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
+
+    render(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={dag}
+        artifacts={artifacts}
+        loaded={true}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("workflow-artifacts-selector")).toBeTruthy();
+    });
+    const select = screen.getByTestId("workflow-artifacts-selector") as HTMLSelectElement;
+    const optgroup = select.querySelector("optgroup[label*='official/reviewer']");
+    expect(optgroup?.getAttribute("label")).toBe("official/reviewer · Phase 2");
+  });
+
+  it("appends '· #N' when multiple nodes share the same (agent, phase) bucket", async () => {
+    // Two reviewer nodes in the same wire phase (e.g. parallel
+    // reviewer + designer spawned by one coord wake-up). The #N
+    // disambiguator orders by createdAt ASC, mirroring
+    // groupByPhase's sibling column convention.
+    const dag = makeDag([
+      makeNode({
+        id: "n-rev-early",
+        phase: 1,
+        createdAt: "2026-05-28T00:01:00.000Z",
+        spec: { kind: "worker", agent: "official/reviewer", brief: "first" },
+      }),
+      makeNode({
+        id: "n-rev-late",
+        phase: 1,
+        createdAt: "2026-05-28T00:02:00.000Z",
+        spec: { kind: "worker", agent: "official/reviewer", brief: "second" },
+      }),
+    ]);
+    const artifacts: WorkflowArtifactWire[] = [
+      {
+        kind: "node",
+        nodeId: "n-rev-early",
+        taskId: "t-1",
+        path: "verdict.json",
+        size: 100,
+        modifiedAt: "2026-05-28T00:01:00.000Z",
+        mimeBucket: "text",
+      },
+      {
+        kind: "node",
+        nodeId: "n-rev-late",
+        taskId: "t-2",
+        path: "verdict.json",
+        size: 100,
+        modifiedAt: "2026-05-28T00:02:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
+
+    render(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={dag}
+        artifacts={artifacts}
+        loaded={true}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("workflow-artifacts-selector")).toBeTruthy();
+    });
+    const select = screen.getByTestId("workflow-artifacts-selector") as HTMLSelectElement;
+    const labels = Array.from(select.querySelectorAll("optgroup")).map((og) =>
+      og.getAttribute("label"),
+    );
+    // createdAt ASC ordering puts -early first (#1), then -late (#2).
+    expect(labels).toEqual([
+      "official/reviewer · Phase 2 · #1",
+      "official/reviewer · Phase 2 · #2",
+    ]);
+  });
+
+  it("does NOT append '· #N' when the bucket has only one node", async () => {
+    // Defensive: single-node buckets stay clean as `agent · Phase N`,
+    // so the dropdown doesn't read `· #1` for the common case.
+    const dag = makeDag([
+      makeNode({
+        id: "n-only",
+        phase: 0,
+        spec: { kind: "worker", agent: "official/engineer", brief: "x" },
+      }),
+    ]);
+    const artifacts: WorkflowArtifactWire[] = [
+      {
+        kind: "node",
+        nodeId: "n-only",
+        taskId: "t-only",
+        path: "report.md",
+        size: 100,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
+
+    render(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={dag}
+        artifacts={artifacts}
+        loaded={true}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("workflow-artifacts-selector")).toBeTruthy();
+    });
+    const select = screen.getByTestId("workflow-artifacts-selector") as HTMLSelectElement;
+    const optgroup = select.querySelector("optgroup[label*='official/engineer']");
+    expect(optgroup?.getAttribute("label")).toBe("official/engineer · Phase 1");
+    expect(optgroup?.getAttribute("label")?.includes("#")).toBe(false);
   });
 });

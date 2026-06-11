@@ -589,6 +589,16 @@ export const handlers = [
         { headers: { "Content-Type": "text/markdown; charset=utf-8" } },
       );
     }
+    if (ext === "html" || ext === "htm") {
+      // Self-contained HTML stub (no external assets) so designer
+      // mode exercises the workflow Artifacts tab's `<iframe srcdoc>`
+      // path end-to-end — surfaces the C4 flex-height chain and
+      // the C5 summary-first auto-select behavior without needing
+      // a live coordinator run.
+      return new HttpResponse(designerModeSummaryHtml(wfid, decoded), {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
     if (ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "webp") {
       // Same 1x1 transparent PNG (RFC-compliant) used for designer-mode previews.
       const pngBytes = Uint8Array.from([
@@ -625,3 +635,70 @@ export const handlers = [
     return undefined;
   }),
 ];
+
+/**
+ * Designer-mode body for `.html` workflow artifacts: a self-
+ * contained mock of the coordinator's summary report shape
+ * (per `first-party/agents/coordinator/AGENTS.md` 0.1.2). No
+ * external CSS / fonts / images / scripts — the body renders
+ * fully inside the dashboard's `<iframe srcdoc>` viewer.
+ */
+function designerModeSummaryHtml(wfid: string, decoded: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workflow ${wfid} — designer-mode summary</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 24px; max-width: 880px; }
+  h1 { font-size: 1.4em; margin-top: 0; }
+  h2 { font-size: 1.1em; margin-top: 1.6em; border-bottom: 1px solid #ccc8; padding-bottom: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #ccc6; font-size: 0.95em; }
+  th { background: #f0f0f01a; font-weight: 600; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.8em; background: #16a34a22; color: #15803d; }
+  .muted { color: #6668; font-size: 0.85em; }
+  code { background: #0001; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+  <h1>Designer-mode summary (<code>${decoded}</code>)</h1>
+  <p class="muted">Workflow id: <code>${wfid}</code> &middot; this stub stands in for the real <code>summary.html</code> a coordinator agent would produce per <code>first-party/agents/coordinator/AGENTS.md</code> 0.1.2.</p>
+  <p><strong>Outcome:</strong> <span class="badge">succeeded</span></p>
+
+  <h2>Brief</h2>
+  <p>Migrate package <code>@glyphs-ai/example</code> to async I/O. Engineer dispatches a single task, reviewer + designer verify, coordinator finishes.</p>
+
+  <h2>Task tree</h2>
+  <table>
+    <thead><tr><th>Agent</th><th>Phase</th><th>Status</th><th>Task</th><th>Duration</th></tr></thead>
+    <tbody>
+      <tr><td>official/engineer</td><td>1</td><td>succeeded</td><td><code>20260608-aaaa1111</code></td><td>4m 32s</td></tr>
+      <tr><td>official/reviewer</td><td>2</td><td>succeeded</td><td><code>20260608-bbbb2222</code></td><td>2m 11s</td></tr>
+      <tr><td>official/designer</td><td>2</td><td>succeeded</td><td><code>20260608-cccc3333</code></td><td>3m 04s</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Reviewer verdict</h2>
+  <blockquote><em>APPROVE</em> &mdash; no blocker or major findings; one minor cleanup noted in <code>review.md</code>.</blockquote>
+
+  <h2>Designer verdict</h2>
+  <blockquote><em>APPROVE</em> &mdash; visual + a11y probes pass at 1440&times;900 and 768&times;1024.</blockquote>
+
+  <h2>Decisions</h2>
+  <ul>
+    <li>Phase 1 wake: engineer dispatched with the full brief.</li>
+    <li>Phase 2 wake: reviewer + designer dispatched in parallel; both APPROVE.</li>
+    <li>Phase 3 wake: <code>workflow finish --outcome succeeded</code>.</li>
+  </ul>
+
+  <h2>Per-node artifacts</h2>
+  <ul>
+    <li>Engineer: <a href="https://github.com/glyphs-ai/glyph/pull/0">PR #0 (placeholder)</a></li>
+    <li>Reviewer: <code>verdict.json</code>, <code>review.md</code>, <code>artifact/reviewer-report.html</code></li>
+    <li>Designer: <code>verdict.json</code>, <code>artifact/designer-report.html</code></li>
+  </ul>
+</body>
+</html>`;
+}

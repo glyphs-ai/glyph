@@ -3,11 +3,23 @@ import type { WorkflowArtifactWire, WorkflowDagWire, WorkflowHeaderWire } from "
 import { workflowArtifactUrl } from "../../api";
 import { FileViewer } from "../../components/viewers/FileViewer";
 import { viewerNeedsBlob } from "../../components/viewers/index";
-import { useWorkflowArtifacts } from "../../hooks/useWorkflowArtifacts";
+import { formatPhaseLabel } from "./dag-edge-geometry";
 
 export interface ArtifactsTabProps {
   workflow: WorkflowHeaderWire;
   dag: WorkflowDagWire | null;
+  /**
+   * Flattened workflow artifact list owned by the parent (the
+   * `useWorkflowArtifacts` hook is lifted into {@link WorkflowView} so
+   * the tab label can render an `Artifacts (N)` count badge without
+   * the tab having to mount first). `null` while the initial fetch is
+   * still in flight; an empty array means "loaded, none surfaced".
+   */
+  artifacts: readonly WorkflowArtifactWire[] | null;
+  /** Mirrors `useWorkflowArtifacts().loaded`. */
+  loaded: boolean;
+  /** Mirrors `useWorkflowArtifacts().error`; non-null swaps to a banner. */
+  error: string | null;
 }
 
 /**
@@ -70,11 +82,8 @@ function artifactSubPath(a: WorkflowArtifactWire): string {
  *   - The viewer is force-remounted on selection change so internal
  *     state (object URLs, JSON memo) cannot leak across artifacts.
  */
-export function ArtifactsTab({ workflow, dag }: ArtifactsTabProps) {
-  const isRunning = workflow.status === "running";
-  const { artifacts, error, loaded } = useWorkflowArtifacts(workflow.id, isRunning);
-
-  const entries = useMemo(() => flattenEntries(artifacts?.artifacts ?? [], dag), [artifacts, dag]);
+export function ArtifactsTab({ workflow, dag, artifacts, loaded, error }: ArtifactsTabProps) {
+  const entries = useMemo(() => flattenEntries(artifacts ?? [], dag), [artifacts, dag]);
 
   const [selected, setSelected] = useState<string | null>(null);
   const [fetchState, setFetchState] = useState<FetchState>({ status: "idle" });
@@ -282,9 +291,13 @@ function ArtifactPreview({ selected, state, downloadUrl }: ArtifactPreviewProps)
  * (phase ascending, createdAt ascending), then unknown nodes
  * appended at the end. Inside each section files are sorted by path.
  *
- * The node label embeds both the agent kind and a short ID prefix so
- * two coordinator nodes from the same agent (rare but legal in
- * cascaded workflows) remain disambiguatable in the dropdown.
+ * Per-node group labels read as `${agent} · ${formatPhaseLabel(phase)}`
+ * (e.g. `official/reviewer · Phase 2`). When multiple nodes share the
+ * same `(agent, phase)` bucket — e.g. two parallel reviewers spawned
+ * by the same coord wake-up — a `· #N` 1-indexed disambiguator is
+ * appended, ordered by `createdAt` ASC (same convention
+ * `dag-edge-geometry.ts:groupByPhase` uses for sibling column order).
+ * Single-node buckets stay clean as `agent · Phase N`.
  */
 function flattenEntries(
   artifacts: readonly WorkflowArtifactWire[],
@@ -305,6 +318,11 @@ function flattenEntries(
     }
   }
 
+  // Pre-compute the `(agent, phase) → ordered nodeIds` bucket map so
+  // each per-entry label resolves in O(1) without re-walking the DAG.
+  // Order within a bucket is `createdAt` ASC to match groupByPhase.
+  const bucketIndex = buildNodeBucketIndex(dag);
+
   const out: Entry[] = [];
   for (const a of sortArtifacts(summary)) {
     out.push({
@@ -322,11 +340,12 @@ function flattenEntries(
     const list = byNode.get(nodeId);
     if (list === undefined) continue;
     seen.add(nodeId);
+    const label = nodeGroupLabel(nodeId, dag, bucketIndex);
     for (const a of sortArtifacts(list)) {
       out.push({
         value: artifactSubPath(a),
         label: filenameOf(a.path),
-        group: nodeGroupLabel(nodeId, dag),
+        group: label,
         subPath: artifactSubPath(a),
         nodeId,
       });
@@ -334,11 +353,12 @@ function flattenEntries(
   }
   for (const [nodeId, list] of byNode.entries()) {
     if (seen.has(nodeId)) continue;
+    const label = nodeGroupLabel(nodeId, dag, bucketIndex);
     for (const a of sortArtifacts(list)) {
       out.push({
         value: artifactSubPath(a),
         label: filenameOf(a.path),
-        group: nodeGroupLabel(nodeId, dag),
+        group: label,
         subPath: artifactSubPath(a),
         nodeId,
       });
@@ -365,10 +385,45 @@ function groupEntries(entries: readonly Entry[]): { group: string; entries: Entr
   return out;
 }
 
-function nodeGroupLabel(nodeId: string, dag: WorkflowDagWire | null): string {
+/**
+ * Per-`(agent, phase)` ordered list of node ids, sorted by
+ * `createdAt` ASC — drives the `· #N` disambiguator appended to
+ * dropdown group labels when multiple nodes share the same bucket.
+ * Returns an empty map when `dag` is null so callers can blindly
+ * `.get()` without a null guard.
+ */
+function buildNodeBucketIndex(dag: WorkflowDagWire | null): ReadonlyMap<string, readonly string[]> {
+  const out = new Map<string, string[]>();
+  if (dag === null) return out;
+  const ordered = [...dag.nodes].sort((a, b) => {
+    if (a.phase !== b.phase) return a.phase - b.phase;
+    return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+  });
+  for (const node of ordered) {
+    const spec = node.spec;
+    if (
+      (spec.kind !== "coordinator" && spec.kind !== "worker") ||
+      !("agent" in spec) ||
+      typeof spec.agent !== "string"
+    ) {
+      continue;
+    }
+    const key = `${spec.agent}|${node.phase}`;
+    const bucket = out.get(key);
+    if (bucket === undefined) out.set(key, [node.id]);
+    else bucket.push(node.id);
+  }
+  return out;
+}
+
+function nodeGroupLabel(
+  nodeId: string,
+  dag: WorkflowDagWire | null,
+  bucketIndex: ReadonlyMap<string, readonly string[]>,
+): string {
   // Trim trailing dashes from the short id so labels read cleanly
   // when the 8-char window happens to land on a separator
-  // (e.g. `wf-1234-` would otherwise render as `agent · wf-1234-`
+  // (e.g. `wf-1234-` would otherwise render as `Node wf-1234-`
   // with a dangling dash).
   const short = nodeId.slice(0, 8).replace(/-+$/, "");
   if (dag === null) return `Node ${short}`;
@@ -380,7 +435,12 @@ function nodeGroupLabel(nodeId: string, dag: WorkflowDagWire | null): string {
     "agent" in spec &&
     typeof spec.agent === "string"
   ) {
-    return `${spec.agent} · ${short}`;
+    const base = `${spec.agent} · ${formatPhaseLabel(node.phase)}`;
+    const bucket = bucketIndex.get(`${spec.agent}|${node.phase}`);
+    if (bucket === undefined || bucket.length <= 1) return base;
+    const position = bucket.indexOf(nodeId);
+    if (position < 0) return base;
+    return `${base} · #${position + 1}`;
   }
   return `Node ${short}`;
 }
