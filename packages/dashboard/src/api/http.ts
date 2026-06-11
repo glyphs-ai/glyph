@@ -35,6 +35,14 @@ export function workspacePrefix(): string {
 
 export const fetchJson = async <T>(path: string, label: string): Promise<T> => {
   const r = await fetch(path);
+  // Treat 202 as a typed "warming" surface: the server has acknowledged
+  // the request but the per-workspace context isn't ready to serve
+  // data yet. Without this branch `r.ok` would be true and the
+  // `{state, workspaceId}` warming envelope would silently parse as
+  // the typed payload — every caller would get a corrupted response.
+  // Surface as `ApiError` so call sites can branch on
+  // `code === "WorkspaceWarming"` instead of guessing from message text.
+  if (r.status === 202) throw await buildApiError(r);
   if (!r.ok) {
     throw new Error(`${label}: ${r.status}`);
   }
@@ -97,6 +105,15 @@ async function extractErrorEnvelope(
     if (body && typeof body.error === "string") message = body.error;
     if (body && typeof body.code === "string") code = body.code;
     if (body && typeof body.field === "string") field = body.field;
+    // Warming-up envelope (202): server returns `{state: "warming",
+    // workspaceId}` instead of the typed `{error, code}` shape. Surface
+    // that as a structured error so UI surfaces can branch on
+    // `code === "WorkspaceWarming"` and the message names the
+    // workspace.
+    if (body && body.state === "warming" && typeof body.workspaceId === "string") {
+      code = "WorkspaceWarming";
+      message = `workspace "${body.workspaceId}" is warming up`;
+    }
   } catch {
     // body not JSON; keep status
   }
@@ -125,12 +142,12 @@ async function buildApiError(r: Response): Promise<ApiError> {
 
 export const mutate = async (path: string, init: RequestInit): Promise<void> => {
   const r = await fetch(path, init);
-  if (!r.ok) throw await buildApiError(r);
+  if (r.status === 202 || !r.ok) throw await buildApiError(r);
 };
 
 export const mutateJson = async <T>(path: string, init: RequestInit): Promise<T> => {
   const r = await fetch(path, init);
-  if (!r.ok) throw await buildApiError(r);
+  if (r.status === 202 || !r.ok) throw await buildApiError(r);
   return (await r.json()) as T;
 };
 
@@ -151,6 +168,6 @@ export const jsonInit = (method: string, body: object): RequestInit => ({
  */
 export async function fetchJsonWithErrorBody<T>(path: string, signal?: AbortSignal): Promise<T> {
   const r = await fetch(path, signal ? { signal } : undefined);
-  if (!r.ok) throw await buildApiError(r);
+  if (r.status === 202 || !r.ok) throw await buildApiError(r);
   return (await r.json()) as T;
 }

@@ -35,4 +35,9 @@ export {
   WorkflowCoordSpecError,
 } from "./wiring/workflow-coord-task-runner.js";
 export { WorkflowWorkerSpecError } from "./wiring/workflow-worker-task-runner.js";
-export { type WorkspaceContext, WorkspaceHasLiveTasksError } from "./workspace-context.js";
+export {
+  type WorkspaceContext,
+  type WorkspaceContextState,
+  WorkspaceHasLiveTasksError,
+  WorkspaceLoadError,
+} from "./workspace-context.js";

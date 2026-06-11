@@ -21,21 +21,28 @@ import {
   WorkflowCoordSpecError,
   WorkflowWorkerSpecError,
   type WorkspaceContext,
+  type WorkspaceContextState,
   WorkspaceHasLiveTasksError,
+  WorkspaceLoadError,
 } from "../src/index.js";
 
 describe("@glyphs-ai/api public API guard", () => {
   it("exposes the application composition surface", () => {
     expectTypeOf(composeApplication).toBeFunction();
     expectTypeOf<Application>().toHaveProperty("getContext");
+    expectTypeOf<Application>().toHaveProperty("peekContextState");
     expectTypeOf<Application>().toHaveProperty("close");
     expectTypeOf<WorkspaceContext>().toHaveProperty("tasks");
     expectTypeOf<WorkspaceContext>().toHaveProperty("workflows");
+    expectTypeOf<WorkspaceContextState>().toEqualTypeOf<
+      "cached" | "loading" | "unloaded" | "not-registered"
+    >();
   });
 
   it("exposes public error classes with canonical .name values", () => {
     const errors = [
       new WorkspaceHasLiveTasksError("ws", 1),
+      new WorkspaceLoadError("ws", new Error("cause")),
       new TaskScheduleTargetError("bad target"),
       new WorkflowCoordAgentNotCapableError("official/coord"),
       new WorkflowCoordSpecError("bad coord"),

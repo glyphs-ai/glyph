@@ -56,6 +56,7 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "WorkflowCoordSpecError",
   "WorkflowWorkerSpecError",
   "WorkspaceHasLiveTasksError",
+  "WorkspaceLoadError",
   // @glyphs-ai/catalog
   "FetchError",
   "AgentFrontmatterError",

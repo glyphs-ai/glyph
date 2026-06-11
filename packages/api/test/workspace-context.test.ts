@@ -159,17 +159,20 @@ vi.mock("../src/wiring/workflow-worker-task-runner.js", () => ({
 
 import { WorkspaceContextRegistry } from "../src/workspace-context.js";
 
-function makeRegistry(): WorkspaceContextRegistry {
+function makeRegistry(opts: { workspaceExists?: boolean } = {}): WorkspaceContextRegistry {
+  const exists = opts.workspaceExists ?? true;
   const workspaceService = {
     get: vi.fn(
       async (id: string): Promise<Workspace | null> =>
-        ({
-          id,
-          name: "test",
-          workspaceDir: "/tmp/registry-test",
-          createdAt: "2026-01-01T00:00:00.000Z",
-          lastOpenedAt: "2026-01-01T00:00:00.000Z",
-        }) as Workspace,
+        exists
+          ? ({
+              id,
+              name: "test",
+              workspaceDir: "/tmp/registry-test",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              lastOpenedAt: "2026-01-01T00:00:00.000Z",
+            } as Workspace)
+          : null,
     ),
   } as unknown as WorkspaceService;
   return new WorkspaceContextRegistry({
@@ -275,6 +278,52 @@ describe("WorkspaceContextRegistry workflow wiring", () => {
     expect(mocks.capturedGetService).not.toBeNull();
     const resolved = mocks.capturedGetService?.();
     expect(resolved).toBe(ctx?.workflows);
+    await registry.closeAll();
+  });
+});
+
+describe("WorkspaceContextRegistry peek", () => {
+  it('returns "not-registered" for an unknown workspace id without triggering a load', async () => {
+    const registry = makeRegistry({ workspaceExists: false });
+    const state = await registry.peek("ws-unknown");
+    expect(state).toBe("not-registered");
+    // Peek MUST NOT have produced a context entry.
+    expect(registry.loaded()).toHaveLength(0);
+  });
+
+  it('returns "unloaded" for a registered-but-uncached workspace without triggering a load', async () => {
+    const registry = makeRegistry();
+    const state = await registry.peek("ws-cold");
+    expect(state).toBe("unloaded");
+    // The whole point of peek: no compose calls, no entries appended.
+    expect(registry.loaded()).toHaveLength(0);
+    expect(mocks.sequence).toEqual([]);
+  });
+
+  it('returns "loading" when a get() is mid-flight', async () => {
+    const registry = makeRegistry();
+    const gate = makeGate();
+    mocks.catalogGate = gate.promise;
+
+    // Start a get whose load is blocked at composeCatalogModule.
+    const getP = registry.get("ws-loading");
+
+    // While the load is in flight, peek MUST report "loading".
+    const state = await registry.peek("ws-loading");
+    expect(state).toBe("loading");
+
+    // Unblock and let the load complete so the test exits cleanly.
+    gate.resolve();
+    await getP;
+    await registry.closeAll();
+  });
+
+  it('returns "cached" after a successful get()', async () => {
+    const registry = makeRegistry();
+    const ctx = await registry.get("ws-warm");
+    expect(ctx).not.toBeNull();
+    const state = await registry.peek("ws-warm");
+    expect(state).toBe("cached");
     await registry.closeAll();
   });
 });

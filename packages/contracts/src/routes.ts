@@ -155,6 +155,31 @@ export interface WorkspaceCreateBody {
   readonly workspaceDir?: string;
 }
 
+/**
+ * Body returned with HTTP 202 by any `/api/workspaces/:id/*` route
+ * when the per-workspace context is still being built. The client
+ * should back off (honour the `Retry-After` response header — default
+ * 2 s) and retry. Mirrors the response body produced by the server's
+ * `workspaceContextMiddleware`; the dashboard reads this shape to
+ * distinguish a transient warming state from a typed payload.
+ */
+export interface WorkspaceWarmingBody {
+  readonly state: "warming";
+  readonly workspaceId: string;
+}
+
+/**
+ * Body returned with HTTP 503 by any `/api/workspaces/:id/*` route
+ * when the per-workspace context fails to load. The client should
+ * back off (honour `Retry-After` — default 5 s) and retry.
+ * `code` is the canonical `WorkspaceLoadError` class name so UI
+ * surfaces can branch without string-matching the message.
+ */
+export interface WorkspaceLoadFailedBody {
+  readonly error: string;
+  readonly code: "WorkspaceLoadError";
+}
+
 /** PUT /api/workspaces/current body. */
 export interface WorkspaceCurrentPutBody {
   readonly id: string;

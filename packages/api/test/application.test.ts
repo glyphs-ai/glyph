@@ -186,6 +186,32 @@ describe("Application.getContext", () => {
   });
 });
 
+describe("Application.peekContextState", () => {
+  it('returns "not-registered" for an unknown workspace id', async () => {
+    const app = await makeApp();
+    const state = await app.peekContextState("00000000-0000-0000-0000-000000000000");
+    expect(state).toBe("not-registered");
+    expect(app.loadedContexts()).toHaveLength(0);
+  });
+
+  it('returns "unloaded" for a registered-but-uncached workspace', async () => {
+    const app = await makeApp();
+    const ws = await app.registerWorkspace({ name: "demo" });
+    const state = await app.peekContextState(ws.id);
+    expect(state).toBe("unloaded");
+    // peek MUST NOT have triggered a load.
+    expect(app.loadedContexts()).toHaveLength(0);
+  });
+
+  it('returns "cached" after a successful getContext()', async () => {
+    const app = await makeApp();
+    const ws = await app.registerWorkspace({ name: "demo" });
+    await app.getContext(ws.id);
+    const state = await app.peekContextState(ws.id);
+    expect(state).toBe("cached");
+  });
+});
+
 describe("Application.reloadWorkspace", () => {
   it("returns null when the workspace is absent", async () => {
     const app = await makeApp();
