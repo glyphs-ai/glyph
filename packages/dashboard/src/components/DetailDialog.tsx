@@ -576,8 +576,8 @@ function schemeOf(origin: string): string {
 }
 
 function hrefForOrigin(origin: string): string {
-  // Only http(s) URLs are click-safe; everything else (file:, future
-  // npm:/oci:) goes through href="#" so the link is informational.
+  // Only http(s) URLs are click-safe; everything else goes through
+  // href="#" so the link is informational.
   if (origin.startsWith("https://") || origin.startsWith("http://")) return origin;
   return "#";
 }

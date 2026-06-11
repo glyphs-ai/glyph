@@ -28,23 +28,16 @@ export const getServerCurrentWorkspace = (): Promise<{ id: string | null }> =>
 export const setServerCurrentWorkspace = (workspaceId: string): Promise<void> =>
   mutate("/api/workspaces/current", jsonInit("PUT", { id: workspaceId }));
 
-/**
- * Created workspace as returned by `POST /api/workspaces`. Identical shape
- * to {@link WorkspaceListItem} — kept as a separate type only for callsite
- * clarity (the server returns 201 + the same body).
- */
-export type CreatedWorkspace = WorkspaceListItem;
-
 export const addWorkspace = async (opts: {
   name: string;
   /** Optional. When omitted, the server creates a fresh
    *  `<GLYPH_HOME>/workspaces/<uuid>/` directory. */
   workspaceDir?: string;
-}): Promise<CreatedWorkspace> => {
+}): Promise<WorkspaceListItem> => {
   const body: Record<string, unknown> = { name: opts.name };
   if (opts.workspaceDir !== undefined && opts.workspaceDir !== "")
     body.workspaceDir = opts.workspaceDir;
-  return mutateJson<CreatedWorkspace>("/api/workspaces", jsonInit("POST", body));
+  return mutateJson<WorkspaceListItem>("/api/workspaces", jsonInit("POST", body));
 };
 
 /**

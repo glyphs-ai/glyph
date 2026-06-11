@@ -239,8 +239,7 @@ export const cancelTask = (taskId: string): Promise<TaskRecord> => {
  * shape; runtime-internal types like `Runtime` are excluded).
  *
  * Returns `null` (404 NoEventsYet) when the runtime doesn't implement
- * structured activity (e.g. a future runtime with no event log) or
- * when the log isn't on disk yet.
+ * structured activity or when the log isn't on disk yet.
  */
 
 export interface TokenUsage {

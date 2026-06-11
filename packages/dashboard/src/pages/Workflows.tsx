@@ -396,8 +396,8 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
             {(() => {
               // `!= null` (loose) rather than `!== null` (strict) so an
-              // out-of-contract `undefined` from a buggy mock — or a
-              // future buggy server — falls through to the
+              // out-of-contract `undefined` from a buggy mock or server
+              // falls through to the
               // `<WorkflowDetailSkeleton />` branch instead of being
               // handed to `<WorkflowView>` (which dereferences
               // `workflow.brief` and crashes the root). The hook's

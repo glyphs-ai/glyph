@@ -278,11 +278,10 @@ interface FireTaskViewProps {
 
 /**
  * Inner remount-keyed view that owns the `useTaskDetail` hook. The
- * hook is now race-safe on its own (monotonic `requestSeqRef` drops
- * stale responses), so the `key={fireTaskId}` remount from the parent
- * is defence-in-depth: it guarantees a clean React tree on every task
- * switch even if some future refactor reintroduces a closure-captured
- * stale state in the hook.
+ * hook is race-safe on its own (monotonic `requestSeqRef` drops stale
+ * responses), so the `key={fireTaskId}` remount from the parent is
+ * defence-in-depth: it guarantees a clean React tree on every task
+ * switch.
  */
 function FireTaskView({ fireTaskId, pollIntervalMs, headerTrailing }: FireTaskViewProps) {
   const { task, activity, activityError, loadOlder } = useTaskDetail(fireTaskId, pollIntervalMs);

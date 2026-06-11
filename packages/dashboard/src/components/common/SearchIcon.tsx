@@ -1,7 +1,6 @@
 /**
  * Single-source-of-truth magnifying-glass SVG for the search-input
- * adornments on both `TaskFilters` and `WorkflowFilters` (and any
- * future filter strip that mirrors the same search-input slot).
+ * adornments on both `TaskFilters` and `WorkflowFilters`.
  *
  * Convention:
  *   - This component owns only the SVG markup + viewBox / stroke

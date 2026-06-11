@@ -1,16 +1,15 @@
 /**
- * MSW request handlers for the dashboard's read surface.
+ * MSW request handlers for the dashboard's API surface.
  *
- * Every URL here mirrors a fetch call site in `packages/dashboard/src/api.ts`.
+ * Every URL here mirrors a fetch call site in `packages/dashboard/src/api/`.
  * When adding a new dashboard route, mirror it here too (or add a fixture
  * entry the catch-all can serve) — otherwise designer mode will pass the
  * request through to the (non-existent) backend and log an
  * `onUnhandledRequest: "warn"` warning in the browser console.
  *
- * The handlers are read-only PLUS a narrow mutation slice for
- * `/schedules*`. Broader mutation support across the rest of the
- * surface is still on the roadmap; the catch-all returns 501 for any
- * non-GET mutation that doesn't match a handler above it.
+ * The handlers are read-only plus the mutation routes needed by designer
+ * mode. The catch-all returns 501 for any non-GET mutation that doesn't
+ * match a handler above it.
  */
 
 import { type DefaultBodyType, HttpResponse, http } from "msw";

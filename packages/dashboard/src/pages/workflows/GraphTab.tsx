@@ -15,7 +15,7 @@ export interface GraphTabProps {
  * parent can flip its URL state to the node-task pane.
  *
  * Nodes without a dispatched task (the narrow window between insert
- * and dispatch, or a future kind that has no task seam) render as
+ * and dispatch, or a kind that has no task seam) render as
  * inert chips: the rendering pass marks them `aria-disabled` and
  * the click handler short-circuits. This is intentional — there's
  * nothing to navigate to until the dispatcher writes `taskId`.

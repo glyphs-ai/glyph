@@ -50,37 +50,8 @@ export async function fetchAll(): Promise<CatalogData> {
 }
 
 /**
- * Install a new agent. Wire body is `{ origin: string }` — the
- * canonical origin URI is the only identity downstream (catalog DB
- * row, AGENTS.md `dependencies:` blocks, fetcher dispatch). The
- * dashboard presents a friendlier `provider + location` form to
- * humans, then assembles the canonical origin URI client-side via
- * {@link buildOriginFromSource} before posting.
- *
- * Client-side assembly keeps the wire shape narrow and matches what
- * the CLI sends and what every YAML/markdown frontmatter dependency
- * declares.
- *
- * The dashboard never asks the user "what kind of URL is this?" —
- * the user picks `url` or `file`. `url` means "the server's
- * `parseOrigin` sniffs the URL grammar and routes to the right
- * fetcher" (today: only `https://github.com/...`; tomorrow: npm /
- * oci / etc., with no UI change required). `file` always means the
- * local-file fetcher; the dashboard appends the `file:` scheme
- * transparently. The server receives only canonical origin URIs.
- *
- * The server then fetches via the registered fetcher (file:,
- * https://github.com/...), recursively resolves dependencies, and
- * returns a manifest. Returns 207 on partial failure — caller
- * surfaces that as an error message via {@link extractError}.
- *
- * No `scopeHints`: scope is determined entirely by each entry's
- * frontmatter (or default `public`). Forking under a different scope =
- * editing upstream's frontmatter, not a per-install flag.
- */
-/**
  * User-facing install source. `"url"` covers every fetcher whose origin is
- * a URL (today: GitHub; future: npm, oci, etc.) — the catalog's `parseOrigin`
+ * a URL — the catalog's `parseOrigin`
  * sniffs the URL grammar to pick the right fetcher. `"file"` always means
  * the local file fetcher (server-side `file:` scheme).
  *
@@ -114,7 +85,7 @@ export interface InstallSource {
  * dashboard assembles it from its UI form via
  * {@link buildOriginFromSource}.
  */
-export interface InstallBody {
+interface InstallBody {
   readonly origin: string;
 }
 
@@ -160,7 +131,7 @@ export function buildOriginFromSource(src: InstallSource): string {
  * row in `installed[]` carries enough info for the dashboard to
  * prompt the user about pending prereqs without a follow-up GET.
  */
-export interface InstalledEntry {
+interface InstalledEntry {
   kind: "skill" | "agent" | "mcp";
   fqn: string;
   /** Frontmatter prereqs text. Absent for mcps and for entries with no prereqs. */
@@ -181,10 +152,27 @@ export interface InstallResult {
 }
 
 /** Wire mirror of `@glyphs-ai/catalog` ``CatalogSyncResult``. */
-export interface SyncResult extends InstallResult {
+interface SyncResult extends InstallResult {
   orphansFlagged: { kind: "skill" | "mcp"; fqn: string; origin: string }[];
 }
 
+/**
+ * Install an agent (and its transitively-required deps) from a user-
+ * supplied source. The dashboard's `provider + location` form is
+ * assembled into a canonical `origin` URI client-side via
+ * {@link buildOriginFromSource}; the wire body is just `{ origin }`,
+ * identical to what the CLI sends.
+ *
+ * On partial failure the server returns 207 with a populated
+ * `failed[]` (and possibly `installed[]`) — both are surfaced to the
+ * caller through {@link InstallResult}; the shared `extractError`
+ * helper formats the error string the user sees.
+ *
+ * Scope is determined entirely by each entry's frontmatter (or the
+ * default `public`). There is intentionally no per-install
+ * `scopeHints` field: forking into a different scope means editing
+ * the upstream's frontmatter, not flipping a UI toggle.
+ */
 export const installAgent = (src: InstallSource): Promise<InstallResult> =>
   mutateJson<InstallResult>(
     `${catalogPrefix()}/agents`,
@@ -219,7 +207,7 @@ export const installMcp = (src: InstallSource): Promise<InstallResult> =>
  * are populated by the sync resolve endpoint; install resolve leaves
  * them at their no-op defaults.
  */
-export interface ResolveNodeBase {
+interface ResolveNodeBase {
   kind: "skill" | "agent" | "mcp";
   origin: string;
   fqn: string;
@@ -237,20 +225,20 @@ export interface ResolveNodeBase {
   error?: { name: string; message: string };
 }
 
-export interface SkillResolveNode extends ResolveNodeBase {
+interface SkillResolveNode extends ResolveNodeBase {
   kind: "skill";
   shortName: string;
   /** Scope as it'll appear in the catalog (frontmatter or `public` default). */
   scope: string;
 }
 
-export interface AgentResolveNode extends ResolveNodeBase {
+interface AgentResolveNode extends ResolveNodeBase {
   kind: "agent";
   shortName: string;
   scope: string;
 }
 
-export interface McpResolveNode extends ResolveNodeBase {
+interface McpResolveNode extends ResolveNodeBase {
   kind: "mcp";
   specName: string;
 }
@@ -398,10 +386,6 @@ export const getMcp = (name: string): Promise<McpDetail> =>
 export const updateMcpContent = (name: string, content: string) =>
   mutate(`${catalogPrefix()}/mcps/${encodeURIComponent(name)}`, jsonInit("PUT", { content }));
 
-export interface MarkdownDetail {
-  content: string;
-}
-
 export interface SkillDetail {
   skill: Skill;
   status: "ready" | "blocked";
@@ -412,9 +396,6 @@ export interface SkillDetail {
 
 export const getSkill = (name: string): Promise<SkillDetail> =>
   fetchJson<SkillDetail>(`${catalogPrefix()}/skills/${encodeURIComponent(name)}`, "skill");
-
-export const getSkillContent = (name: string): Promise<string> =>
-  getSkill(name).then((d) => d.content);
 
 export const updateSkillContent = (name: string, content: string) =>
   mutate(`${catalogPrefix()}/skills/${encodeURIComponent(name)}`, jsonInit("PUT", { content }));
@@ -443,9 +424,6 @@ export interface AgentDetail {
 
 export const getAgent = (name: string): Promise<AgentDetail> =>
   fetchJson<AgentDetail>(`${catalogPrefix()}/agents/${encodeURIComponent(name)}`, "agent");
-
-export const getAgentContent = (name: string): Promise<string> =>
-  getAgent(name).then((d) => d.content);
 
 export const updateAgentContent = (name: string, content: string) =>
   mutate(`${catalogPrefix()}/agents/${encodeURIComponent(name)}`, jsonInit("PUT", { content }));

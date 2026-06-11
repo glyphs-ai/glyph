@@ -61,8 +61,7 @@ type DetailTab = "overview" | "activity" | "artifacts";
  *
  * Used by:
  *   - `tasks/TaskDetail.tsx` (Tasks page master-detail right pane)
- *   - `schedules/FireTaskDetailPane.tsx` (Schedules page Mode B; added
- *     in a follow-up PR)
+ *   - `schedules/FireTaskDetailPane.tsx` (Schedules page Mode B)
  */
 export function TaskView({
   task,

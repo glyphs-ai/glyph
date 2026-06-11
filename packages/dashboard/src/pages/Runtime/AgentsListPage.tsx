@@ -296,9 +296,7 @@ export function AgentsListPage() {
                 />
                 {/*
                   The FilterMenu popover keeps the toolbar to one row
-                  of chrome regardless of how many filter dimensions we
-                  add later (sort, group, etc.). This matches the
-                  Catalog filter rationale.
+                  of chrome and matches the Catalog filter rationale.
 
                   When the active filter is anything other than "All",
                   the button title shows the picked value and a small

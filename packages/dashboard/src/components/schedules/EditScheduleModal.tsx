@@ -30,7 +30,7 @@ export interface EditScheduleModalProps {
 }
 
 /**
- * Edit-schedule modal — follow-up.
+ * Edit-schedule modal.
  *
  * Mirrors `CreateScheduleModal`'s field layout (both render
  * {@link ScheduleFormFields}). Differences from Create:

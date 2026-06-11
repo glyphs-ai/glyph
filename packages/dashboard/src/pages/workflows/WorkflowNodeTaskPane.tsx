@@ -36,8 +36,8 @@ export interface WorkflowNodeTaskPaneProps {
  *     fallback with a back-only row is shown.
  *
  * `useTaskDetail` is mounted via the inner `NodeTaskView` so it can be
- * `key`-remounted on `nodeTaskId` swap — defence-in-depth against any
- * future refactor that breaks the hook's monotonic seq guard.
+ * `key`-remounted on `nodeTaskId` swap — defence-in-depth around the
+ * hook's monotonic seq guard.
  */
 export function WorkflowNodeTaskPane({
   workflow,
@@ -245,8 +245,7 @@ interface NodeTaskViewProps {
 
 /**
  * Inner remount-keyed view that owns the `useTaskDetail` hook. Same
- * pattern as `FireTaskView` so a future refactor only has to look in
- * one place.
+ * pattern as `FireTaskView`.
  */
 function NodeTaskView({ nodeTaskId, pollIntervalMs, headerTrailing }: NodeTaskViewProps) {
   const { task, activity, activityError, loadOlder } = useTaskDetail(nodeTaskId, pollIntervalMs);

@@ -31,7 +31,7 @@ export function sortByCreatedDesc(rows: readonly WorkflowHeaderWire[]): Workflow
 /**
  * Tone bucket for the four terminal+running workflow statuses. Used by
  * both `WorkflowStatusBadge` (label color) and `WorkflowListItem` (row
- * tint). Exhaustive switch with a `never` fall-through so any future
+ * tint). Exhaustive switch with a `never` fall-through so any new
  * status addition becomes a compile error here instead of silently
  * rendering as the default tone.
  *

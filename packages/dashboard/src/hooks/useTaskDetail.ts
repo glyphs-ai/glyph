@@ -34,10 +34,9 @@ export function useTaskDetail(taskId: string | null, pollIntervalMs: number): Ta
   const mounted = useMounted();
   const taskTokenRef = useRef<string | null>(null);
   const inFlightRef = useRef(false);
-  // Monotonic request id — incremented on every refresh() call. The
-  // current value is captured at call time and re-checked before each
-  // setState so a slow response from a previous task swap cannot
-  // overwrite the latest task's state.
+  // Monotonic request id. The current value is captured at call time
+  // and re-checked before each setState so a slow response from a
+  // previous task swap cannot overwrite the latest task's state.
   const requestSeqRef = useRef(0);
   const loadingOlderRef = useRef(false);
   const activityRef = useRef<TaskActivity | null>(null);
@@ -105,17 +104,18 @@ export function useTaskDetail(taskId: string | null, pollIntervalMs: number): Ta
     if (a === null || a.activity.length === 0) return;
     const oldestSeq = a.activity[0]?.seq;
     if (oldestSeq === undefined || oldestSeq <= 0) return;
+    const seq = requestSeqRef.current;
     loadingOlderRef.current = true;
     try {
       const next = await fetchTaskActivity(taskId, { before: oldestSeq, limit: 50 });
-      if (!mounted.current) return;
+      if (!mounted.current || seq !== requestSeqRef.current) return;
       if (next === null) return;
       setActivity((prev) => mergePrev(prev, next));
     } catch (e) {
-      if (!mounted.current) return;
+      if (!mounted.current || seq !== requestSeqRef.current) return;
       setActivityError(e instanceof Error ? e.message : String(e));
     } finally {
-      loadingOlderRef.current = false;
+      if (seq === requestSeqRef.current) loadingOlderRef.current = false;
     }
   }, [taskId]);
 
@@ -123,6 +123,9 @@ export function useTaskDetail(taskId: string | null, pollIntervalMs: number): Ta
   // refs so the next `refresh()` doesn't fire `?after=N` against
   // the new task).
   useEffect(() => {
+    requestSeqRef.current += 1;
+    inFlightRef.current = false;
+    loadingOlderRef.current = false;
     setTask(null);
     setActivity(null);
     activityRef.current = null;

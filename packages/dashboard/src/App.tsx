@@ -91,7 +91,7 @@ const VALID_CATALOG_TABS = new Set<CatalogTab>(["agents", "skills", "mcps"]);
  * different URLs stay independent because there's no shared global state.
  *
  * The workspace identifier in the URL is the registry's UUID `workspaceId`; the
- * user-facing display name lives in `metadata.name` and may change at any
+ * user-facing display name lives in `name` and may change at any
  * time without breaking links.
  */
 export function App() {
@@ -598,7 +598,7 @@ function NotFoundRedirect() {
  * Map a URL pathname back to the sidebar item identifier. The first
  * path segment after `/workspaces/<workspaceId>/` selects the top-level
  * section; for `runtime`, the **second** segment selects which Runtime
- * child is highlighted (Agents / Sessions / Tasks). Unknown segments
+ * child is highlighted (Agents / Sessions / Tasks / Schedules / Workflows). Unknown segments
  * fall back to `overview` so the sidebar always has a highlighted row.
  *
  * The compound `runtime:<child>` return value (a single string) keeps

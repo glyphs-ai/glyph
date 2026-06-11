@@ -16,7 +16,7 @@ export interface TaskDetailProps {
  *
  * All rendering (header, tabs, body) lives in `TaskView`, which is
  * also consumed by the Schedules page's `FireTaskDetailPane` (Mode B
- * of the schedule master-detail; added in a follow-up PR).
+ * of the schedule master-detail).
  */
 export function TaskDetail({ taskId, pollIntervalMs }: TaskDetailProps) {
   const { task, activity, activityError, loadOlder } = useTaskDetail(taskId, pollIntervalMs);

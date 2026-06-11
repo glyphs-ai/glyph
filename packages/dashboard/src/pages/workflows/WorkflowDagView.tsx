@@ -179,10 +179,9 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
                   .join(" ");
                 const title = JSON.stringify(node.spec, null, 2);
                 // Trim trailing dashes from the 8-char short id so the chip
-                // never ends on a separator if a future id format ever
-                // produces one (matches the defense in ArtifactsTab's
-                // node group label). UUIDv4 first-8 is pure hex so this
-                // is a no-op today, kept as belt-and-braces.
+                // never ends on a separator (matches the defense in
+                // ArtifactsTab's node group label). UUIDv4 first-8 is pure
+                // hex, so this is a no-op today, kept as belt-and-braces.
                 const idShort = node.id.slice(0, 8).replace(/-+$/, "");
                 const agent = extractAgent(node);
                 const brief = extractBrief(node);
@@ -229,8 +228,7 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
                       the DAG card omits the row entirely for not-started nodes. The two formatting
                       primitives (`formatRelative`, `formatDuration`) ARE reused — both come from
                       `utils/time.ts`, so the relative-time / duration logic itself lives in exactly
-                      one place. If a third caller needs the "started · {running|ran}" split format,
-                      promote it to a `RelativeTime` variant in a follow-up.
+                      one place.
                     */}
                     {(startedAt || runtime !== null) && (
                       <span className="dag-node__timing">
@@ -346,7 +344,7 @@ function extractBrief(node: WorkflowNodeWire): string | null {
  * Project the node spec's discriminator down to the dashboard's
  * styling vocabulary. The contracts wire shape carries kind ONLY on
  * `spec.kind` (the substrate's opaque envelope is flattened by the
- * server-side projection); unknown / future kinds fall back to
+ * server-side projection); unknown kinds fall back to
  * `"worker"` so the visual still renders a recognisable node.
  */
 function nodeKind(node: WorkflowNodeWire): "coordinator" | "worker" {

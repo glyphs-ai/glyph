@@ -1,13 +1,12 @@
 /**
  * Shared agent avatar primitive — coloured monogram square used by the
- * Agents-list row, the AgentDetailPane header, and any future
- * agent-mention chip.
+ * Agents-list row and the AgentDetailPane header.
  *
  * Design contract (locked by tests):
  *
  *   - **Background colour** is a deterministic hash of the FULL `fqn`
  *     (`scope/short`). Two agents that share a short name but live in
- *     different scopes (e.g. `acme/dev` vs `acme/dev`) MUST resolve
+ *     different scopes (e.g. `widgets/dev` vs `acme/dev`) MUST resolve
  *     to different palette entries — that disambiguation is the avatar's
  *     primary job, alongside the rendered FQN text. Hashing just `label`
  *     would defeat the property, so don't refactor in that direction
@@ -28,7 +27,7 @@
  *
  *   - **Sizes** map to fixed pixel boxes so consumers can rely on a
  *     stable footprint inside flex/grid layouts:
- *       sm = 24 px (chips, mentions),
+ *       sm = 24 px,
  *       md = 40 px (list rows, default),
  *       lg = 56 px (detail pane header).
  */

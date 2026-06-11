@@ -36,7 +36,7 @@ export interface CreateScheduleModalProps {
  *
  * Error-body preservation: `previewCron` and `createSchedule` both
  * surface the server's `error` string verbatim (via the shared
- * `extractError` helper in `api.ts`), so users see "Invalid cron
+ * `extractError` helper in `api/http.ts`), so users see "Invalid cron
  * expression: …" rather than "schedule preview: 400".
  */
 export function CreateScheduleModal({

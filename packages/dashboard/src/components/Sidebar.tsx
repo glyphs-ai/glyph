@@ -29,8 +29,8 @@ export type RuntimeChildId = "agents" | "sessions" | "tasks" | "schedules" | "wo
 
 /**
  * Full identity of a clickable sidebar item. A `SectionId` selects a
- * top-level section; `runtime:<child>` selects one of Runtime's three
- * children. The compound form keeps the section / sub-section invariant
+ * top-level section; `runtime:<child>` selects one of Runtime's children.
+ * The compound form keeps the section / sub-section invariant
  * out of `App.tsx` (the renderer derives both halves from one id).
  */
 export type SidebarItemId = SectionId | `runtime:${RuntimeChildId}`;
@@ -85,7 +85,7 @@ interface SidebarProps {
   onSelect: (id: SectionId) => void;
   /**
    * Called with the Runtime child id when the user clicks one of the
-   * nested Agents / Sessions / Tasks rows. Routed to the matching
+   * nested Runtime rows. Routed to the matching
    * `/workspaces/<workspaceId>/runtime/<child>` URL by the caller.
    */
   onSelectRuntimeChild: (id: RuntimeChildId) => void;

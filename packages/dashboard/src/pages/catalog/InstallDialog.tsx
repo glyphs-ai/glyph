@@ -223,9 +223,7 @@ function inputMetaFor(provider: InstallProvider, kind: CatalogKind): InputMeta {
   const what = WHAT[kind];
 
   if (provider === "url") {
-    // Today the catalog accepts GitHub tree URLs; future fetchers
-    // (npm, oci, etc.) will join without UI changes. We surface a
-    // GitHub example because that's the only scheme that works today.
+    // Surface a GitHub example because that's the supported URL form.
     return {
       label: "URL",
       placeholder: URL_EXAMPLE[kind],

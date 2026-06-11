@@ -20,7 +20,7 @@ export const fixtureActivities: Record<string, TaskActivity> = {
         seq: 2,
         kind: "thinking",
         timestamp: "2026-05-27T22:00:03.000Z",
-        text: "Read api.ts to enumerate every fetch the dashboard makes.",
+        text: "Read src/api/ to enumerate every fetch the dashboard makes.",
       },
       {
         seq: 3,
@@ -28,7 +28,7 @@ export const fixtureActivities: Record<string, TaskActivity> = {
         timestamp: "2026-05-27T22:00:05.000Z",
         callId: "tool-1",
         name: "view",
-        args: { path: "/repo/packages/dashboard/src/api.ts" },
+        args: { path: "/repo/packages/dashboard/src/api/" },
         status: "success",
         durationMs: 42,
       },
