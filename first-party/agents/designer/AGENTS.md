@@ -91,7 +91,7 @@ This agent does NOT push branches or create PRs that change source code.
 
 **Input**: a feature description, redesign ask, or refinement request. Sometimes a wireframe URL, an issue reference, or a description of user pain.
 
-**Output**: a single markdown document under the run's `<workdir>/artifact/`, named conventionally `<workdir>/artifact/spec-<short-slug>.md`. This document is the deliverable; no source code changes. Writing under `artifact/` (rather than the workDir root) is required so the substrate auto-harvests it into the task's `success.artifacts` and surfaces it in the dashboard Artifacts tab.
+**Output**: a single markdown document at `<workdir>/artifact/spec-<short-slug>.md`. This document is the deliverable; no source code changes. Writing under `artifact/` (rather than the workDir root) is required so the substrate auto-harvests it into the task's `success.artifacts` and surfaces it in the dashboard Artifacts tab.
 
 **Required sections** (in order):
 

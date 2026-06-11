@@ -59,14 +59,20 @@ CASE "two parents, both worker, agents in {official/reviewer, official/designer}
               (the engineer's success.output and/or activity log carry the
               `gh pr create` URL; parse the PR number from the URL —
               no new engineer contract required)
-  ci = `gh pr checks <pr_number> --json name,state,conclusion`
-  if every check has conclusion = "success":
+  ci = `gh pr checks <pr_number> --json name,state,bucket,link`
+       # `bucket` is gh's normalised category for each check, one of
+       # `pass | fail | pending | skipping | cancel`. `link` is the
+       # per-check URL (GitHub Actions form:
+       # https://github.com/<owner>/<repo>/actions/runs/<runId>/job/<jobId>).
+  if every check.bucket in ("pass", "skipping"):
+       # `skipping` is terminal-OK (the job was deliberately skipped, e.g.
+       #  conditional `if:` evaluated false); treat as pass for gating.
     finishWorkflow(succeeded, summary={
       "iterations": <count of dev nodes in DAG>,
       "minor_findings_remaining": <count if any>,
       "ci": "all green"
     })
-  elif any check has conclusion in ("failure", "cancelled", "timed_out"):
+  elif any check.bucket in ("fail", "cancel"):
     addSubgraph:
       dev (worker, agent=official/engineer, brief=<template-dev-iter-2-plus>)
          parents = [self]
@@ -75,7 +81,7 @@ CASE "two parents, both worker, agents in {official/reviewer, official/designer}
     # The dev brief instructs the worker to fetch `gh pr checks --json`
     # itself so the failing-job context flows in without coord pre-digestion.
     exit
-  else:  # at least one check still pending — dispatch a ci-waiter
+  else:  # at least one check.bucket == "pending" — dispatch a ci-waiter
     addSubgraph:
       ci-waiter (worker, agent=official/reviewer, brief=<template-review-ci>)
          parents = [self]
@@ -159,8 +165,12 @@ Re-implement the feature for iteration ${ITERATION_NUMBER}.
 - CI state on the PR (in case the prior iteration was waved through by
   reviewers but failed in CI — coord re-dispatches you with the same
   brief so always check):
-    gh pr checks ${PR_NUMBER} --json name,state,conclusion,detailsUrl
-    For any failure: gh run view <runId> --log-failed | tail -c 2000
+    gh pr checks ${PR_NUMBER} --json name,state,bucket,link
+    For any check whose bucket is "fail" or "cancel":
+      Parse runId from the `link` field (regex: actions/runs/(\d+)/)
+      then: gh run view <runId> --log-failed | tail -c 2000
+    If `link` does not match the Actions URL shape (external provider),
+    embed the `link` URL itself in the iteration brief as context.
 
 # What to do
 Address every finding marked severity=blocker or major. Apply your own
@@ -272,12 +282,24 @@ verdicts.
    process-level timeout. On timeout, write a timeout verdict per the
    output protocol below and exit.
 2. On terminal, capture per-job state:
-     gh pr checks ${PR_NUMBER} --json name,state,conclusion,detailsUrl
-3. For any check whose conclusion is in (failure, cancelled, timed_out),
-   fetch the failing job's tail (≤2 KB) from the actually-failing job
-   (not the whole workflow's log):
-     gh run view <runId> --log-failed | tail -c 2000
-   Embed the tail in the corresponding finding's `detail` field.
+     gh pr checks ${PR_NUMBER} --json name,state,bucket,link
+   `bucket` is gh's normalised category for each check, one of
+   `pass | fail | pending | skipping | cancel`. `link` is the per-check
+   URL (GitHub Actions form:
+   `https://github.com/<owner>/<repo>/actions/runs/<runId>/job/<jobId>`).
+3. For each check whose `bucket` is `fail` or `cancel`:
+   a. Parse the GitHub Actions run id from `link` with the regex
+      `actions/runs/(\d+)/`.
+   b. If the regex matches, fetch the failing job's tail (≤2 KB) from the
+      actually-failing job (not the whole workflow's log):
+        gh run view <runId> --log-failed | tail -c 2000
+      Embed the tail in the corresponding finding's `detail` field.
+   c. If the regex does not match (external provider — Vercel,
+      third-party CI — whose `link` URL has a different shape and
+      `gh run view` cannot introspect it), fall back to embedding just
+      the `link` URL and the check `name` in `detail` and note
+      `"non-Actions check — log retrieval not supported"` so coord sees
+      the degradation.
 4. Do NOT read the PR diff. Do NOT post inline review comments. Do NOT
    make merge / deploy decisions. Do NOT auto-retry flaky CI runs.
 
@@ -290,21 +312,23 @@ artifact/ → success.artifacts → coord reads):
     {
       "id":       "ci-<job-name>",
       "severity": "blocker" | "major" | "minor",
-      "summary":  "<job name + conclusion + ≤200 chars>",
-      "detail":   "<failing job log tail (≤2 KB) + detailsUrl>"
+      "summary":  "<job name + bucket + ≤200 chars>",
+      "detail":   "<failing job log tail (≤2 KB) + link URL>"
     }
   ]
 }
 
 Mapping rules:
-- Every check conclusion = "success" ⇒ verdict = "APPROVE",
-  findings = []
-- Any conclusion in ("failure", "cancelled", "timed_out") ⇒
-  verdict = "REQUEST_CHANGES", one finding per failing check,
-  severity = "blocker" (CI failure blocks merge)
+- Every check.bucket in ("pass", "skipping") ⇒ verdict = "APPROVE",
+  findings = []. (`skipping` is terminal-OK — the job was deliberately
+  skipped, e.g. a conditional `if:` evaluated false — and is treated as
+  pass for gating purposes.)
+- Any check.bucket in ("fail", "cancel") ⇒ verdict = "REQUEST_CHANGES",
+  one finding per failing check, severity = "blocker" (CI failure blocks
+  merge).
 - 30-minute timeout fired before terminal ⇒
   verdict = "REQUEST_CHANGES", one finding id = "ci-timeout",
-  severity = "major"
+  severity = "major".
 
 Coord decision rule (so you understand the impact):
 - verdict APPROVE → workflow finishes succeeded
@@ -335,7 +359,7 @@ Plain string replacement; placeholders with no value (e.g. `${WORKFLOW_DETAILS}`
 
 ## Stop condition
 
-Trigger `finishWorkflow(succeeded, ...)` in the "two parents, both reviewers" case when both verdicts parse cleanly per §C, the union of findings filtered to `severity in ('blocker', 'major')` is empty, AND the CI quality gate is green (either inline via `gh pr checks --json` showing every check `conclusion = "success"`, or via a subsequent `ci-waiter` whose `verdict.json` is `APPROVE`). The success `summary` records `iterations` (count of `official/engineer` nodes in the final DAG), `minor_findings_remaining` (visibility — the work ships with them outstanding), and `ci` (`"all green"` or `"all green (waited)"`).
+Trigger `finishWorkflow(succeeded, ...)` in the "two parents, both reviewers" case when both verdicts parse cleanly per §C, the union of findings filtered to `severity in ('blocker', 'major')` is empty, AND the CI quality gate is green (either inline via `gh pr checks --json` showing every check's `bucket` in `("pass", "skipping")`, or via a subsequent `ci-waiter` whose `verdict.json` is `APPROVE`). The success `summary` records `iterations` (count of `official/engineer` nodes in the final DAG), `minor_findings_remaining` (visibility — the work ships with them outstanding), and `ci` (`"all green"` or `"all green (waited)"`).
 
 No hard iteration cap is baked into this strategy; coord uses its judgment to call `finishWorkflow(failed, "convergence stalled — N iterations and still seeing the same finding category")` when iteration is no longer productive (e.g. the same blocker keeps reappearing, CI keeps flaking on the same job).
 
@@ -351,9 +375,9 @@ Every `(parent role, parent terminal status)` cell on every expected parent role
 | 1 parent | `official/engineer` worker | `succeeded` | "one parent, dev, succeeded" | addSubgraph review + designer + next-coord |
 | 1 parent | `official/engineer` worker | `failed` | "one parent, dev, failed/cancelled" | finish(failed, "dev iteration ended in failed") |
 | 1 parent | `official/engineer` worker | `cancelled` | "one parent, dev, failed/cancelled" | finish(failed, "dev iteration ended in cancelled") |
-| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, `gh pr checks` all green | "two parents, both reviewers" → CI sub-case all-green | finish(succeeded, ci="all green") |
-| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, `gh pr checks` any red | "two parents, both reviewers" → CI sub-case any-red | addSubgraph next dev iter (dev brief instructs it to fetch CI failure context) |
-| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, `gh pr checks` any pending | "two parents, both reviewers" → CI sub-case pending | addSubgraph ci-waiter (reviewer MODE: ci) + next-coord |
+| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, every `gh pr checks` bucket in `("pass", "skipping")` | "two parents, both reviewers" → CI sub-case all-green | finish(succeeded, ci="all green") |
+| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, any `gh pr checks` bucket in `("fail", "cancel")` | "two parents, both reviewers" → CI sub-case any-red | addSubgraph next dev iter (dev brief instructs it to fetch CI failure context) |
+| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, any `gh pr checks` bucket == `"pending"` | "two parents, both reviewers" → CI sub-case pending | addSubgraph ci-waiter (reviewer MODE: ci) + next-coord |
 | 2 parents | both reviewers (review + designer) | both `succeeded`, any verdict carries blocker/major | "two parents, both reviewers" → blockers/majors path | addSubgraph next dev iter |
 | 2 parents | reviewer | `failed` | "two parents, any failed/cancelled" | finish(failed, "reviewer iteration ended in failed") |
 | 2 parents | reviewer | `cancelled` | "two parents, any failed/cancelled" | finish(failed, "reviewer iteration ended in cancelled") |

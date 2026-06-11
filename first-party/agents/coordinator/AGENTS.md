@@ -43,7 +43,7 @@ the strategy skill the workflow has selected (for v1: always
 | Read workflow header | `glyph workflow show --wfid $WF --json` |
 | Read full DAG | `glyph workflow dag --wfid $WF --json` |
 | Read a worker's verdict | `glyph task show <tid> --json` |
-| Read worker artifacts | check `<workdir>/artifact/verdict.json` in the worker's workDir |
+| Read worker artifacts | check `<workdir>/artifact/verdict.json` (workDir from `glyph task show --json`'s `workdir` field) |
 | Expand the DAG | `glyph workflow add-subgraph --wfid $WF --input <payload.json>` |
 | Terminate the workflow | `glyph workflow finish --wfid $WF --outcome <succeeded\|failed> --message "..."` |
 | Cleanup (rare) | `glyph workflow remove-node`, `workflow remove-edge`, `workflow cancel-node` |

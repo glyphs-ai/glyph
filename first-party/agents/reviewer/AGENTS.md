@@ -129,8 +129,10 @@ When the brief sets `MODE: ci`, the agent's single responsibility is to observe 
 
 1. Read `${PR_NUMBER}` (and the repo, if the brief sets one) from the brief.
 2. Run `gh pr checks ${PR_NUMBER} --watch` with a 30-minute process-level timeout. If the timeout fires, write a timeout verdict (see step 5) and exit.
-3. On terminal, run `gh pr checks ${PR_NUMBER} --json name,state,conclusion,detailsUrl` to capture final state per job.
-4. For any failure, fetch the failed job's tail with `gh run view <runId> --log-failed | tail -c 2000` and embed it in the corresponding finding's `detail` field. The 2 KB cap must come from the **actually-failing job**, not from the whole workflow's log.
+3. On terminal, run `gh pr checks ${PR_NUMBER} --json name,state,bucket,link` to capture final state per job. `bucket` is `gh`'s normalised category for each check — one of `pass | fail | pending | skipping | cancel`. `link` is the per-check URL (for GitHub Actions checks it has the shape `https://github.com/<owner>/<repo>/actions/runs/<runId>/job/<jobId>`; for non-Actions checks it points at the external provider).
+4. For each check whose `bucket` is `fail` or `cancel`:
+   1. Parse the GitHub Actions run id from `link` with the regex `actions/runs/(\d+)/`. If the regex matches, fetch the failing job's tail with `gh run view <runId> --log-failed | tail -c 2000` (or `Select-Object -Last 40` on PowerShell) and embed the tail in the corresponding finding's `detail` field. The 2 KB cap must come from the **actually-failing job**, not from the whole workflow's log.
+   2. If the regex does not match (the check is an external provider — Vercel, third-party CI — whose `link` URL has a different shape and `gh run view` cannot introspect it), fall back to embedding just the `link` URL and the check `name` in `detail`; note `"non-Actions check — log retrieval not supported"` so coord sees the degradation.
 5. Write the verdict per the universal schema (`workflow-coordination/SKILL.md` §C) to `<workdir>/artifact/verdict.json`. The strategy skill's `template-review-ci` shows the exact mapping (one finding per failing check + per-job log tail).
 6. Exit. The coordinator wakes on this task terminal and unions the verdict with sibling reviewer verdicts.
 
