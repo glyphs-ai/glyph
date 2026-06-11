@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { CopilotClient } from "@github/copilot-sdk";
+import type { CopilotClient, CopilotSession, SessionEvent } from "@github/copilot-sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TrustRegistrationFailed } from "../../src/copilot/errors.js";
 import {
@@ -9,7 +9,7 @@ import {
   RuntimeProvisionFailed,
   RuntimeStateDeletionFailed,
 } from "../../src/index.js";
-import type { AgentContentSource, ResolvedAgent } from "../../src/types.js";
+import type { AgentContentSource, ResolvedAgent, ToolCallItem } from "../../src/types.js";
 import { makeFakeContentSource } from "../fixtures/fake-content-source.js";
 
 let scratch: string;
@@ -41,6 +41,22 @@ async function buildAgent(): Promise<{ agent: ResolvedAgent; source: AgentConten
     agents: { demo: { files: { "AGENTS.md": agentBody } } },
   });
   return { agent: await source.resolveAgent("public/demo"), source };
+}
+
+function fakeCopilotClient(
+  methods: Pick<CopilotClient, "start" | "stop" | "createSession">,
+): CopilotClient {
+  return Object.assign(Object.create(null), methods) as CopilotClient;
+}
+
+function fakeCopilotSession(
+  methods: Pick<CopilotSession, "sessionId" | "send" | "disconnect" | "abort">,
+): CopilotSession {
+  return Object.assign(Object.create(null), methods) as CopilotSession;
+}
+
+function fakeSessionEvent(event: object): SessionEvent {
+  return Object.assign(Object.create(null), event) as SessionEvent;
 }
 
 const FIXED_UUID = "12345678-1234-1234-1234-1234567890ab";
@@ -110,9 +126,9 @@ describe("CopilotRuntime", () => {
       // Workspace bootstrap is intentionally NOT part of the Runtime
       // contract — trust setup is `buildInteractiveLaunch`'s per-launch
       // preflight (see CopilotRuntime jsdoc, per-mode trust matrix).
-      // Pin the absence so any future bootstrap method has to update
+      // Pin the absence so adding a bootstrap method has to update
       // this test and the matching JSDoc paragraph deliberately.
-      expect((rt as unknown as { registerWorkspace?: unknown }).registerWorkspace).toBeUndefined();
+      expect("registerWorkspace" in rt).toBe(false);
     });
   });
 
@@ -179,7 +195,7 @@ describe("CopilotRuntime", () => {
       // (`pwshQuote(undefined)` → "Cannot read properties of undefined
       // reading 'replace'") and have no representation in the inlined
       // `$env:K='v'` display form. This test pins the round-trip so
-      // a future refactor introducing a transform can't silently drop
+      // introducing a transform can't silently drop
       // or mangle keys.
       const rt = new CopilotRuntime({
         copilotConfigPath: path.join(scratch, "copilot-config.json"),
@@ -218,11 +234,11 @@ describe("CopilotRuntime", () => {
         headlessDeps: {
           createClient: (opts) => {
             captured = opts?.env as NodeJS.ProcessEnv | undefined;
-            return {
+            return fakeCopilotClient({
               start: () => Promise.reject(new Error("STUB_NO_START")),
-              stop: () => Promise.resolve(),
+              stop: () => Promise.resolve([]),
               createSession: () => Promise.reject(new Error("unreached")),
-            } as unknown as CopilotClient;
+            });
           },
           registerSession: () => {},
         },
@@ -791,6 +807,95 @@ describe("CopilotRuntime", () => {
       expect(collected[1]?.seq).toBe(3);
       expect(collected[0]?.text).toBe("seed 3");
       expect(collected[1]?.text).toBe("seed 4");
+    });
+
+    it("keeps parser state for buffered tool calls before live completions", async () => {
+      const { agent, source } = await buildAgent();
+      let onEvent: ((event: SessionEvent) => void) | undefined;
+      const session = fakeCopilotSession({
+        sessionId: FIXED_UUID,
+        send: async () => {
+          onEvent?.(
+            fakeSessionEvent({
+              type: "assistant.message",
+              id: "a1",
+              parentId: null,
+              timestamp: "2026-05-12T03:54:11.000Z",
+              data: {
+                content: "",
+                toolRequests: [{ name: "read_file", toolCallId: "c1" }],
+              },
+            }),
+          );
+          return "message-id";
+        },
+        disconnect: () => Promise.resolve(),
+        abort: () => Promise.resolve(),
+      });
+      const rt = new CopilotRuntime({
+        copilotStateDir: stateDir,
+        headlessDeps: {
+          createClient: () =>
+            fakeCopilotClient({
+              start: () => Promise.resolve(),
+              stop: () => Promise.resolve([]),
+              createSession: async (sessionOpts: Parameters<CopilotClient["createSession"]>[0]) => {
+                onEvent = sessionOpts.onEvent;
+                return session;
+              },
+            }),
+        },
+      });
+
+      const handle = await rt.launchHeadless({
+        workdir,
+        workspaceDir: scratch,
+        agent,
+        catalog: source,
+        prompt: "hi",
+      });
+      const ac = new AbortController();
+      const collected: ToolCallItem[] = [];
+      const iterPromise = (async () => {
+        for await (const item of rt.streamActivity(FIXED_UUID, { signal: ac.signal })) {
+          if (item.kind === "tool_call") {
+            collected.push(item);
+            ac.abort();
+          }
+        }
+      })();
+
+      const { setTimeout: delay } = await import("node:timers/promises");
+      await delay(0);
+      onEvent?.(
+        fakeSessionEvent({
+          type: "tool.execution_complete",
+          id: "tc1",
+          parentId: null,
+          timestamp: "2026-05-12T03:54:12.000Z",
+          data: { toolCallId: "c1", success: true, result: "ok" },
+        }),
+      );
+      await iterPromise;
+
+      expect(collected).toHaveLength(1);
+      expect(collected[0]).toMatchObject({
+        seq: 1,
+        parentSeq: 0,
+        name: "read_file",
+        status: "success",
+      });
+
+      onEvent?.(
+        fakeSessionEvent({
+          type: "session.idle",
+          id: "idle",
+          parentId: null,
+          timestamp: "2026-05-12T03:54:13.000Z",
+          data: {},
+        }),
+      );
+      await handle.exit;
     });
   });
 });

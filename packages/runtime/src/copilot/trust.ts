@@ -47,8 +47,6 @@ const MAX_CONFIG_BYTES = 10 * 1024 * 1024;
  * The whole module is intentionally Copilot-specific. Trust is not
  * lifted into the cross-runtime `Runtime` interface; each runtime
  * adapter owns its own preconditions and decides where to enforce them.
- * A future Gemini or Claude-Code adapter would write its own helper, or
- * none at all, depending on what its CLI requires.
  *
  * # IO mechanics
  *
@@ -225,13 +223,17 @@ function readTrustedFolders(value: unknown): string[] {
  * Boundary check uses `path.sep` so `/foo` does NOT cover `/foobar`.
  */
 export function isPathCovered(target: string, trusted: readonly string[]): boolean {
-  const normTarget = path.resolve(target);
+  const normTarget = canonicalPathForCoverage(path.resolve(target));
   for (const entry of trusted) {
     if (typeof entry !== "string" || entry.length === 0) continue;
-    const normEntry = path.resolve(entry);
+    const normEntry = canonicalPathForCoverage(path.resolve(entry));
     if (normEntry === normTarget) return true;
     const prefix = normEntry.endsWith(path.sep) ? normEntry : normEntry + path.sep;
     if (normTarget.startsWith(prefix)) return true;
   }
   return false;
+}
+
+function canonicalPathForCoverage(p: string): string {
+  return process.platform === "win32" ? p.toLowerCase() : p;
 }

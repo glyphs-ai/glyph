@@ -35,11 +35,24 @@ import {
  *   - Step 2 EACCES (and any other code) surfaces — pins the
  *     denylist-of-one filter: only ERR_PACKAGE_PATH_NOT_EXPORTED is
  *     swallowed; every other resolver error code (EACCES, ENOTDIR,
- *     and any future Node resolver code) fails the preflight loudly
+ *     and any new Node resolver code) fails the preflight loudly
  *     at boot rather than slipping past as a no-op.
  */
 
 const FAKE_SDK_URL = "file:///fake/node_modules/@github/copilot-sdk/dist/index.js";
+
+function fakeRequire(resolveImpl: (id: string) => string): NodeRequire {
+  return Object.assign(() => undefined, {
+    resolve: Object.assign(resolveImpl, { paths: () => [] }),
+    cache: {},
+    extensions: {
+      ".js": () => {},
+      ".json": () => {},
+      ".node": () => {},
+    },
+    main: undefined,
+  });
+}
 
 function makeDeps(overrides: Partial<CopilotPreflightDeps>): CopilotPreflightDeps {
   // A deps object that never throws by default — happy path that
@@ -47,10 +60,7 @@ function makeDeps(overrides: Partial<CopilotPreflightDeps>): CopilotPreflightDep
   // failure mode without polluting the other step.
   const base: CopilotPreflightDeps = {
     resolveSpecifier: () => FAKE_SDK_URL,
-    createRequireAt: () =>
-      ({
-        resolve: () => "/fake/node_modules/@github/copilot/sdk/index.js",
-      }) as unknown as NodeRequire,
+    createRequireAt: () => fakeRequire(() => "/fake/node_modules/@github/copilot/sdk/index.js"),
   };
   return { ...base, ...overrides };
 }
@@ -112,11 +122,9 @@ describe("assertCopilotSdkResolvable", () => {
     const cause = errnoError("Cannot find module '@github/copilot/sdk'", "MODULE_NOT_FOUND");
     const deps = makeDeps({
       createRequireAt: () =>
-        ({
-          resolve: () => {
-            throw cause;
-          },
-        }) as unknown as NodeRequire,
+        fakeRequire(() => {
+          throw cause;
+        }),
     });
     expect(() => assertCopilotSdkResolvable(deps)).toThrow(CopilotSdkUnavailableError);
     try {
@@ -138,11 +146,9 @@ describe("assertCopilotSdkResolvable", () => {
     );
     const deps = makeDeps({
       createRequireAt: () =>
-        ({
-          resolve: () => {
-            throw cause;
-          },
-        }) as unknown as NodeRequire,
+        fakeRequire(() => {
+          throw cause;
+        }),
     });
     expect(() => assertCopilotSdkResolvable(deps)).not.toThrow();
   });
@@ -157,11 +163,9 @@ describe("assertCopilotSdkResolvable", () => {
     const cause = errnoError("EACCES: permission denied", "EACCES");
     const deps = makeDeps({
       createRequireAt: () =>
-        ({
-          resolve: () => {
-            throw cause;
-          },
-        }) as unknown as NodeRequire,
+        fakeRequire(() => {
+          throw cause;
+        }),
     });
     expect(() => assertCopilotSdkResolvable(deps)).toThrow(CopilotSdkUnavailableError);
     try {

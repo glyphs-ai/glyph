@@ -171,8 +171,8 @@ export function assertCopilotSdkResolvable(deps: CopilotPreflightDeps = defaultD
   // Every OTHER error code surfaces: missing-module (`MODULE_NOT_FOUND`
   // / `ERR_MODULE_NOT_FOUND` — the packaging-chain bug we are
   // guarding against), permission errors (`EACCES` — bad SDK file
-  // mode), broken junctions (`ENOTDIR`), and any future Node
-  // resolver error code we haven't named. The module-level jsdoc
+  // mode), broken junctions (`ENOTDIR`), and any new Node resolver
+  // error code we haven't named. The module-level jsdoc
   // says "we must fail loud" for Step 2; this denylist-of-one
   // brings the code into line with the doc, so a corrupted install
   // can't slip past the preflight just because Node grew a new

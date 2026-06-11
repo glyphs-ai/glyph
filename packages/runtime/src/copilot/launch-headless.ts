@@ -25,7 +25,9 @@ import {
   approveAll,
   CopilotClient,
   type CopilotSession,
+  type MCPHTTPServerConfig,
   type MCPServerConfig,
+  type MCPStdioServerConfig,
   type SessionEvent,
 } from "@github/copilot-sdk";
 import { RuntimeHeadlessLaunchFailed, RuntimeProvisionFailed } from "../errors.js";
@@ -127,10 +129,10 @@ export interface LaunchCopilotHeadlessDeps {
  *   5. Create the session with `workingDirectory: taskDir`,
  *      `enableConfigDiscovery: true` (skills/instructions auto-load),
  *      the loaded `mcpServers`, and the buffering `onEvent` handler.
- *   6. Register the buffer with the CopilotRuntime so the dashboard
- *      can pull activity through `readActivity(runtimeSessionId)`.
- *   7. Send the prompt via `session.send` (fire-and-forget — exit
+ *   6. Send the prompt via `session.send` (fire-and-forget — exit
  *      watcher tracks `session.idle`).
+ *   7. Register the buffer with the CopilotRuntime so the dashboard
+ *      can pull activity through `readActivity(runtimeSessionId)`.
  *   8. Build the exit promise + cleanup hooks.
  */
 export async function launchCopilotHeadless(
@@ -156,9 +158,9 @@ export async function launchCopilotHeadless(
   // tokens). We do NOT pass `copilotHome` so the SDK defaults to
   // `~/.copilot` and inherits the operator's auth.
   //
-  // `useLoggedInUser: true` is the SDK default, set explicitly so a
-  // future refactor adding per-session `gitHubToken` (BYOK) doesn't
-  // accidentally also switch this default — the SDK documented
+  // `useLoggedInUser: true` is the SDK default, set explicitly so
+  // setting per-session `gitHubToken` (BYOK) does not accidentally
+  // also switch this default — the SDK documented
   // behavior is that providing `gitHubToken` implicitly flips this
   // to false.
   const createClient = deps.createClient ?? ((opts) => new CopilotClient(opts));
@@ -243,13 +245,8 @@ export async function launchCopilotHeadless(
     throw new RuntimeHeadlessLaunchFailed("copilot", opts.taskDir, cause as Error);
   }
 
-  // Step 6: register the buffer so readActivity can find it.
-  deps.registerSession(session.sessionId, buffer);
-
-  // Step 7: send the prompt. `send` returns once the message is
+  // Step 6: send the prompt. `send` returns once the message is
   // queued; the SDK fires events asynchronously as the agent works.
-  // Failures here surface as the exit promise resolving with a
-  // non-zero code.
   try {
     await session.send({ prompt: opts.prompt });
   } catch (cause) {
@@ -257,6 +254,9 @@ export async function launchCopilotHeadless(
     await safeStop(client);
     throw new RuntimeHeadlessLaunchFailed("copilot", opts.taskDir, cause as Error);
   }
+
+  // Step 7: register the buffer only after a successful prompt send.
+  deps.registerSession(session.sessionId, buffer);
 
   // Step 8: build the exit promise. Resolves on session.idle (handled
   // in onEvent above) OR if we detect the client dropping (rare —
@@ -277,8 +277,7 @@ export async function launchCopilotHeadless(
       // — the exit watcher will see the idle event and clean up.
       session.abort().catch(() => {
         // Already aborted or session is in a state that can't be
-        // aborted. The exit watcher will still settle eventually
-        // when the underlying client errors out.
+        // aborted. Cleanup remains owned by the exit watcher.
       });
     },
   };
@@ -379,7 +378,8 @@ async function readMcpServersFromWorkdir(
     typeof parsed !== "object" ||
     !("mcpServers" in parsed) ||
     typeof (parsed as { mcpServers: unknown }).mcpServers !== "object" ||
-    (parsed as { mcpServers: unknown }).mcpServers === null
+    (parsed as { mcpServers: unknown }).mcpServers === null ||
+    Array.isArray((parsed as { mcpServers: unknown }).mcpServers)
   ) {
     throw new InvalidMcpJson(
       COPILOT_MCP_CONFIG,
@@ -392,14 +392,99 @@ async function readMcpServersFromWorkdir(
 
   const out: Record<string, MCPServerConfig> = {};
   for (const [name, body] of Object.entries(sourceMap)) {
-    if (body === null || typeof body !== "object") {
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
       throw new InvalidMcpJson(name, new Error(`server config must be an object`));
     }
-    const merged = { ...(body as Record<string, unknown>) };
-    if (!("tools" in merged)) {
-      merged.tools = ["*"];
+    out[name] = coerceMcpServerConfig(name, body as Record<string, unknown>);
+  }
+  return out;
+}
+
+function coerceMcpServerConfig(name: string, body: Record<string, unknown>): MCPServerConfig {
+  const tools = "tools" in body ? readStringArray(body.tools) : ["*"];
+  if (tools === null) {
+    throw new InvalidMcpJson(name, new Error(`server config tools must be a string array`));
+  }
+
+  const timeout = readOptionalNumber(body.timeout);
+  if (body.timeout !== undefined && timeout === undefined) {
+    throw new InvalidMcpJson(name, new Error(`server config timeout must be a finite number`));
+  }
+
+  if (body.type === "http" || body.type === "sse") {
+    const url = readString(body.url);
+    if (url === undefined) {
+      throw new InvalidMcpJson(name, new Error(`server config url must be a string`));
     }
-    out[name] = merged as unknown as MCPServerConfig;
+    const headers = readOptionalStringRecord(body.headers);
+    if (body.headers !== undefined && headers === undefined) {
+      throw new InvalidMcpJson(name, new Error(`server config headers must be a string map`));
+    }
+    const config: MCPHTTPServerConfig = {
+      type: body.type,
+      url,
+      tools,
+      ...(headers !== undefined ? { headers } : {}),
+      ...(timeout !== undefined ? { timeout } : {}),
+    };
+    return config;
+  }
+
+  if (body.type !== undefined && body.type !== "local" && body.type !== "stdio") {
+    throw new InvalidMcpJson(
+      name,
+      new Error(`server config type must be "stdio", "local", "http", or "sse"`),
+    );
+  }
+
+  const command = readString(body.command);
+  if (command === undefined) {
+    throw new InvalidMcpJson(name, new Error(`server config command must be a string`));
+  }
+  const args = readStringArray(body.args);
+  if (args === null) {
+    throw new InvalidMcpJson(name, new Error(`server config args must be a string array`));
+  }
+  const env = readOptionalStringRecord(body.env);
+  if (body.env !== undefined && env === undefined) {
+    throw new InvalidMcpJson(name, new Error(`server config env must be a string map`));
+  }
+  const cwd = readString(body.cwd);
+  if (body.cwd !== undefined && cwd === undefined) {
+    throw new InvalidMcpJson(name, new Error(`server config cwd must be a string`));
+  }
+  const config: MCPStdioServerConfig = {
+    ...(body.type !== undefined ? { type: body.type } : {}),
+    command,
+    args,
+    tools,
+    ...(env !== undefined ? { env } : {}),
+    ...(cwd !== undefined ? { cwd } : {}),
+    ...(timeout !== undefined ? { timeout } : {}),
+  };
+  return config;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.every((item): item is string => typeof item === "string") ? value : null;
+}
+
+function readOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readOptionalStringRecord(value: unknown): Record<string, string> | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item !== "string") return undefined;
+    out[key] = item;
   }
   return out;
 }

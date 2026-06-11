@@ -297,10 +297,9 @@ export class CopilotRuntime implements Runtime {
     // `CopilotRuntimeConfig` contract.
     //
     // Spread `cmd.env` first so any env contributed by the inner
-    // launch builder (today `buildCopilotLaunchCommand` returns
-    // nothing here, but a future flag might) is preserved. Base
-    // overrides on key collision because the runtime is the
-    // canonical owner of the cross-cutting keys.
+    // launch builder is preserved. Base overrides on key collision
+    // because the runtime is the canonical owner of the cross-cutting
+    // keys.
     return { ...cmd, env: { ...cmd.env, ...this.subprocessEnvBase } };
   }
 
@@ -603,11 +602,14 @@ export class CopilotRuntime implements Runtime {
     buffer: EventBuffer,
     opts: StreamActivityOpts,
   ): AsyncIterable<ActivityItem> {
-    // Start seq matches readActivity's: if caller passed `after`, the
-    // next event we yield is seq `after + 1`. Otherwise, continue
-    // from after the current buffer length (we do NOT replay history).
-    const startSeq = typeof opts.after === "number" ? opts.after + 1 : buffer.events.length;
-    const parser = new CopilotActivityStreamParser(startSeq);
+    // Seed parser state from already-buffered events so live
+    // tool.execution_complete events can update earlier tool_call items
+    // and seqs continue after multi-item source events. We still do NOT
+    // replay history to this subscriber.
+    const parser = new CopilotActivityStreamParser();
+    for (const event of buffer.events) {
+      parser.parseLine(JSON.stringify(event));
+    }
 
     // Queue + notify pattern: pending events are pushed into `queue`
     // by the SDK callback; the generator drains the queue on each
@@ -635,17 +637,22 @@ export class CopilotRuntime implements Runtime {
         }
         // Buffer hit terminal state and there's nothing left to yield.
         if (buffer.finished) return;
+        if (opts.signal?.aborted) return;
         // Wait for either a new event or an abort signal.
         await new Promise<void>((resolve) => {
-          wake = resolve;
-          // Abort listener — same-tick resolve so we exit promptly.
-          if (opts.signal) {
-            const onAbort = () => {
-              opts.signal?.removeEventListener("abort", onAbort);
-              resolve();
-            };
-            opts.signal.addEventListener("abort", onAbort, { once: true });
+          if (opts.signal?.aborted) {
+            resolve();
+            return;
           }
+          let settled = false;
+          const settle = () => {
+            if (settled) return;
+            settled = true;
+            opts.signal?.removeEventListener("abort", settle);
+            resolve();
+          };
+          wake = settle;
+          opts.signal?.addEventListener("abort", settle, { once: true });
         });
         wake = undefined;
       }

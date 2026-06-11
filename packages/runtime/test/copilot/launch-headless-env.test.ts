@@ -23,11 +23,12 @@
  * deliberately throwing from `client.start()` so we don't have to mock
  * the full session lifecycle.
  */
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { CopilotClient } from "@github/copilot-sdk";
+import type { CopilotClient, CopilotSession } from "@github/copilot-sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { InvalidMcpJson } from "../../src/copilot/errors.js";
 import { launchCopilotHeadless } from "../../src/copilot/launch-headless.js";
 import { RuntimeHeadlessLaunchFailed } from "../../src/errors.js";
 import type { AgentContentSource, ResolvedAgent } from "../../src/types.js";
@@ -58,6 +59,18 @@ async function buildAgent(): Promise<{ agent: ResolvedAgent; source: AgentConten
   return { agent: await source.resolveAgent("public/demo"), source };
 }
 
+function fakeCopilotClient(
+  methods: Pick<CopilotClient, "start" | "stop" | "createSession">,
+): CopilotClient {
+  return Object.assign(Object.create(null), methods) as CopilotClient;
+}
+
+function fakeCopilotSession(
+  methods: Pick<CopilotSession, "sessionId" | "send" | "disconnect" | "abort">,
+): CopilotSession {
+  return Object.assign(Object.create(null), methods) as CopilotSession;
+}
+
 /**
  * Build a fake CopilotClient that captures the constructor options
  * (so we can assert on `env`) and then throws from `start()` to abort
@@ -74,11 +87,11 @@ function capturingClientFactory(): {
     // Minimal CopilotClient stub. We only need `start` to throw so the
     // launch flow exits via the documented RuntimeHeadlessLaunchFailed
     // path; nothing else is called after start() rejects.
-    return {
+    return fakeCopilotClient({
       start: () => Promise.reject(new Error("STUB_NO_START")),
-      stop: () => Promise.resolve(),
+      stop: () => Promise.resolve([]),
       createSession: () => Promise.reject(new Error("should not be reached")),
-    } as unknown as CopilotClient;
+    });
   };
   return { capture, factory };
 }
@@ -196,5 +209,89 @@ describe("launchCopilotHeadless env merge", () => {
     // It IS a copy (not the same reference) so the caller can't
     // accidentally mutate process.env via the SDK.
     expect(env).not.toBe(process.env);
+  });
+});
+
+describe("launchCopilotHeadless failure handling", () => {
+  it("does not register a session buffer when prompt send fails", async () => {
+    const { agent, source } = await buildAgent();
+    let registered = 0;
+    const session = fakeCopilotSession({
+      sessionId: "12345678-1234-1234-1234-1234567890ab",
+      send: () => Promise.reject(new Error("STUB_SEND_FAILED")),
+      disconnect: () => Promise.resolve(),
+      abort: () => Promise.resolve(),
+    });
+
+    await expect(
+      launchCopilotHeadless(
+        {
+          taskDir: workdir,
+          agent,
+          catalog: source,
+          prompt: FRAMING,
+          workspaceDir: scratch,
+        },
+        {
+          copilotStateDir: stateDir,
+          sharedDir: path.join(scratch, "shared"),
+          createClient: () =>
+            fakeCopilotClient({
+              start: () => Promise.resolve(),
+              stop: () => Promise.resolve([]),
+              createSession: () => Promise.resolve(session),
+            }),
+          registerSession: () => {
+            registered += 1;
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(RuntimeHeadlessLaunchFailed);
+
+    expect(registered).toBe(0);
+  });
+
+  it("rejects non-object mcpServers entries before creating the SDK session", async () => {
+    const { agent, source } = await buildAgent();
+    let createSessionCalled = false;
+    let caught: unknown;
+
+    try {
+      await launchCopilotHeadless(
+        {
+          taskDir: workdir,
+          agent,
+          catalog: source,
+          prompt: FRAMING,
+          workspaceDir: scratch,
+        },
+        {
+          copilotStateDir: stateDir,
+          sharedDir: path.join(scratch, "shared"),
+          createClient: () =>
+            fakeCopilotClient({
+              start: async () => {
+                await writeFile(
+                  path.join(workdir, ".mcp.json"),
+                  JSON.stringify({ mcpServers: { bad: [] } }),
+                  "utf8",
+                );
+              },
+              stop: () => Promise.resolve([]),
+              createSession: () => {
+                createSessionCalled = true;
+                return Promise.reject(new Error("should not create session"));
+              },
+            }),
+          registerSession: () => {},
+        },
+      );
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(RuntimeHeadlessLaunchFailed);
+    expect((caught as Error).cause).toBeInstanceOf(InvalidMcpJson);
+    expect(createSessionCalled).toBe(false);
   });
 });

@@ -25,7 +25,7 @@
  *      (`package.json`, `tsconfig.json`, every sibling `*.config.{ts,
  *      mts,cts,js,mjs,cjs}`). This covers what the AST scan cannot —
  *      tsconfig path aliases, vitest aliases, package.json dependency
- *      maps. If a future config file ever names `@glyphs-ai/catalog`,
+ *      maps. If a new config file ever names `@glyphs-ai/catalog`,
  *      this assertion catches it.
  *
  * `ALLOWED_VIOLATIONS` is empty by design — this audit is binary, no
@@ -234,7 +234,7 @@ describe("no @glyphs-ai/catalog imports in @glyphs-ai/runtime", () => {
  * tsconfig path aliases, vitest aliases — anything that names
  * `@glyphs-ai/catalog` in a non-`.ts` config file. The list is the union
  * of the two named files plus every sibling matching
- * `*.config.{ts,mts,cts,js,mjs,cjs}` so a future config file (e.g. a
+ * `*.config.{ts,mts,cts,js,mjs,cjs}` so a new config file (e.g. a
  * tsup/biome/build config) is caught automatically.
  */
 function listConfigFiles(): string[] {

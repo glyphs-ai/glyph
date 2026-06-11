@@ -361,7 +361,7 @@ export interface LaunchHeadlessOpts {
  *
  * **Why `sessionDir` is a Promise** rather than a sync `string | null`:
  * a headless subprocess is owned by the runtime *now*, so it can
- * naturally produce a future value for any id/path it learns
+ * naturally produce a deferred value for any id/path it learns
  * post-spawn. Interactive sessions are launched by a human at some
  * unknown later time, so the runtime can't promise anything; the
  * manager discovers the id later via {@link Runtime.readMetadata}.
@@ -534,11 +534,6 @@ export interface ActivityResult {
  * Runtimes that have richer per-message metadata (model, tokens,
  * stopReason, …) report it through {@link ActivityItem} instead — this
  * type is the headline-only view.
- *
- * Open for extension: future runtime-specific metadata may live in a
- * sibling field. No index signature here on purpose — adding one would
- * push the contract from "headline" to "anything", which is what
- * {@link ActivityItem} is for.
  */
 export interface AgentActivity {
   /** Natural-language content produced by the agent. */

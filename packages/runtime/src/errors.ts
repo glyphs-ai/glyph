@@ -110,7 +110,7 @@ export class RuntimeHeadlessLaunchFailed extends Error {
  *
  * The dashboard already gates the "Spawn remote" button by capabilities
  * so this error only fires when something bypasses that gate (a
- * hand-rolled curl, a future CLI / MCP caller, a stale dashboard tab
+ * hand-rolled curl, another CLI / MCP caller, a stale dashboard tab
  * after a runtime swap). Mapping to HTTP 400 lets the caller correct
  * the request without retry.
  *

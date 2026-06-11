@@ -1,9 +1,8 @@
 /**
  * Placeholder substitution for runtime-projected configuration strings.
  *
- * Portable MCP specs (and, in the future, agent / skill
- * frontmatter that reaches a runtime) cannot embed machine-specific
- * absolute paths and cannot rely on shell variable expansion (the MCP
+ * Portable MCP specs cannot embed machine-specific absolute paths and
+ * cannot rely on shell variable expansion (the MCP
  * spec at modelcontextprotocol.io has no `${VAR}` mechanism, and
  * wrapping commands in `bash -c "..."` so the shell does the expansion
  * breaks Windows immediately). This module provides glyph's own
@@ -131,17 +130,17 @@ export function substitutePlaceholdersDeep<T>(
   source: string,
 ): T {
   if (typeof value === "string") {
-    return substitutePlaceholders(value, context, source) as unknown as T;
+    return substitutePlaceholders(value, context, source) as T;
   }
   if (Array.isArray(value)) {
-    return value.map((v) => substitutePlaceholdersDeep(v, context, source)) as unknown as T;
+    return value.map((v) => substitutePlaceholdersDeep(v, context, source)) as T;
   }
   if (value !== null && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       out[k] = substitutePlaceholdersDeep(v, context, source);
     }
-    return out as unknown as T;
+    return out as T;
   }
   return value;
 }

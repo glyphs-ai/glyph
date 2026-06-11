@@ -261,7 +261,7 @@ describe("provisionCopilotWorkdir - path-traversal hardening", () => {
     // Built from `makeFakeContentSource` so the port shape is enforced
     // by TypeScript; the adversarial `relPath` is injected by
     // overriding `agentEntries` on the returned source. An inline
-    // `as any` stub would let port drift live silently - using the
+    // loose stub would let port drift live silently - using the
     // real fake catches that at compile time.
     const t = targetDir();
     const { source: baseSource } = makeFakeContentSource({

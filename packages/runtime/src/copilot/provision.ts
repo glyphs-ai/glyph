@@ -113,8 +113,7 @@ const DEFAULT_SCOPE_PREFIX = "public/";
  * Source data is pulled from the catalog as `AsyncIterable<{relPath, content}>`
  * streams (see {@link AgentContentSource.skillEntries} /
  * {@link AgentContentSource.agentEntries}). The runtime never resolves on-disk
- * catalog paths; a future SQLite-backed catalog implementation works the same
- * way.
+ * catalog paths; alternate catalog storage works the same way.
  *
  * Does NOT touch the Copilot CLI's `config.json` `trustedFolders`.
  * Folder-trust is `CopilotRuntime.buildInteractiveLaunch`'s preflight
@@ -205,7 +204,7 @@ async function materializeAgent(
  *
  * A typo in a placeholder (`${workspceDir}`) surfaces as
  * {@link UnknownPlaceholderError} → wrapped as {@link InvalidMcpJson}
- * here so the caller treats it the same as any other malformed-spec
+ * here so the caller treats it like other malformed-spec
  * failure. The error's `.message` carries the offending MCP name +
  * placeholder so the dashboard can show the user where to fix.
  *
