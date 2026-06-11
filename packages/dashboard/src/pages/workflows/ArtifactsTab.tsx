@@ -115,10 +115,42 @@ export function ArtifactsTab({ workflow, dag, artifacts, loaded, error }: Artifa
     [entries, selected],
   );
 
+  // Stable identity key for the currently-selected artifact's bytes:
+  // sub-path + modifiedAt (looked up against the wire artifact list,
+  // which IS the source of truth for "this artifact changed"). The
+  // bytes-fetch effect below keys on this string, so a poll that
+  // returns the same artifact list (or one where the currently-
+  // selected artifact's modifiedAt is unchanged) is a no-op for the
+  // preview pane — the iframe / HTML viewer does not re-mount, no
+  // visible flash.
+  //
+  // The previous shape keyed on the `selectedEntry` object identity,
+  // which gets a fresh reference on every poll cycle because
+  // `entries` is recomputed by the `useMemo` above and
+  // `entries.find(...)` produces a new entry object each call. That
+  // forced a full byte refetch + viewer remount every
+  // WORKFLOW_POLL_INTERVAL_MS while the workflow was running.
+  const selectedFetchKey = useMemo(() => {
+    if (selectedEntry === undefined) return null;
+    const modifiedAt = lookupModifiedAt(artifacts, selectedEntry);
+    return `${selectedEntry.subPath}|${modifiedAt ?? ""}`;
+  }, [selectedEntry, artifacts]);
+
+  // Read the currently-selected entry through a ref so the bytes-fetch
+  // effect below can resolve `subPath` / `label` without listing
+  // `selectedEntry` in its dep array. `selectedEntry`'s object identity
+  // changes on every artifacts poll; listing it would re-fire the
+  // effect for unchanged bytes — `selectedFetchKey` is the stable key
+  // that captures the only conditions that should trigger a refetch.
+  const selectedEntryRef = useRef<Entry | undefined>(selectedEntry);
+  selectedEntryRef.current = selectedEntry;
+
   // Fetch the selected artifact's bytes, aborting any in-flight
-  // request when the selection (or workflow id) changes.
+  // request when the selection key (sub-path + modifiedAt) or the
+  // workflow id changes.
   useEffect(() => {
-    if (selectedEntry === undefined) {
+    const entry = selectedEntryRef.current;
+    if (entry === undefined || selectedFetchKey === null) {
       setFetchState({ status: "idle" });
       return;
     }
@@ -127,8 +159,8 @@ export function ArtifactsTab({ workflow, dag, artifacts, loaded, error }: Artifa
     abortRef.current = ctrl;
     setFetchState({ status: "loading" });
 
-    const url = workflowArtifactUrl(workflow.id, selectedEntry.subPath);
-    const asBlob = viewerNeedsBlob(selectedEntry.label);
+    const url = workflowArtifactUrl(workflow.id, entry.subPath);
+    const asBlob = viewerNeedsBlob(entry.label);
     (async () => {
       try {
         const res = await fetch(url, { signal: ctrl.signal });
@@ -156,7 +188,7 @@ export function ArtifactsTab({ workflow, dag, artifacts, loaded, error }: Artifa
     })();
 
     return () => ctrl.abort();
-  }, [selectedEntry, workflow.id]);
+  }, [selectedFetchKey, workflow.id]);
 
   const handleSelect = useCallback((value: string) => {
     setSelected(value);
@@ -462,4 +494,32 @@ function sortArtifacts<T extends WorkflowArtifactWire>(list: readonly T[]): T[] 
 function filenameOf(p: string): string {
   const parts = p.split("/");
   return parts[parts.length - 1] || p;
+}
+
+/**
+ * Resolve the `modifiedAt` of the wire artifact behind the given
+ * {@link Entry}. The selection's `subPath` is sentinel-prefixed
+ * (`summary/<path>` or `nodes/<nodeId>/<path>`), so we reverse that
+ * encoding when matching back against the original wire list. Returns
+ * `null` if the artifact has been removed between polls — the caller
+ * uses that as a stable empty token so the fetch effect still
+ * re-fires when the artifact reappears with a new modifiedAt.
+ */
+function lookupModifiedAt(
+  artifacts: readonly WorkflowArtifactWire[] | null,
+  entry: Entry,
+): string | null {
+  if (artifacts === null) return null;
+  for (const a of artifacts) {
+    if (a.kind === "workflow-summary") {
+      if (entry.nodeId === null && `summary/${a.path}` === entry.subPath) {
+        return a.modifiedAt;
+      }
+      continue;
+    }
+    if (entry.nodeId === a.nodeId && `nodes/${a.nodeId}/${a.path}` === entry.subPath) {
+      return a.modifiedAt;
+    }
+  }
+  return null;
 }

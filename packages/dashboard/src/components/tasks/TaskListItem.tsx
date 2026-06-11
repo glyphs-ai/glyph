@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TaskRecord } from "../../api";
 import { useClickOutside } from "../../hooks/useClickOutside";
+import { truncateBrief } from "../../utils/brief";
 import { RelativeTime } from "../common/RelativeTime";
 import { MoreHorizontalIcon } from "../Icons";
 import { StatusBadge } from "./StatusBadge";
 import { readRuntime, STATUS_TONE } from "./shared";
+
+/**
+ * Master-list rows are a narrow column (~360 px) shared with Workflows
+ * / Schedules, so a brief from the long end of the 200-char contract
+ * cap blows out the row height. 70 keeps two visual lines on the
+ * smallest supported viewport. The full text is preserved in the
+ * `title` attribute (which also carries the optional task details) and
+ * read by AT through the headline span.
+ */
+const LIST_BRIEF_CAP = 70;
 
 /**
  * Why `closeMenu` takes a reason: the per-row `⋯` menu can close from
@@ -323,7 +334,7 @@ export function TaskListItem({
           className="task-list__item-headline task-list__item-headline--clamp"
           title={tooltip}
         >
-          {headline}
+          {truncateBrief(headline, LIST_BRIEF_CAP)}
         </span>
         <span id={metaId} className="task-list__item-meta muted">
           <span title={`Agent: ${task.agent}`}>{task.agent}</span>

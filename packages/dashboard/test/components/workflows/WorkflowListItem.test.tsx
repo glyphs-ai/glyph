@@ -122,6 +122,32 @@ describe("WorkflowListItem — meta rendering", () => {
     expect(row.textContent).not.toContain("iteration 7");
     expect(row.textContent).not.toContain("iter ");
   });
+
+  it("truncates a long brief in the headline and preserves the full text in the title attribute", () => {
+    // Row briefs come from the user's `--brief` flag (≤ 200 chars by
+    // contract). A brief from the long end of that cap blows out the
+    // narrow ~360 px row column without truncation. The full string
+    // remains in the `title` attribute so AT + hover discover it.
+    const longBrief =
+      "This workflow drives the SDLC strategy across engineer, reviewer, and designer iterations to land the parser refactor end-to-end";
+    const { wf } = renderRow({ brief: longBrief });
+    const headline = screen
+      .getByTestId(`workflow-row-${wf.id}`)
+      .querySelector(".task-list__item-headline");
+    expect(headline?.textContent?.length ?? 0).toBeLessThan(longBrief.length);
+    expect(headline?.textContent?.endsWith("…")).toBe(true);
+    expect(headline?.getAttribute("title")).toBe(longBrief);
+  });
+
+  it("leaves a short brief unmodified in the headline (no ellipsis)", () => {
+    const shortBrief = "fix the parser";
+    const { wf } = renderRow({ brief: shortBrief });
+    const headline = screen
+      .getByTestId(`workflow-row-${wf.id}`)
+      .querySelector(".task-list__item-headline");
+    expect(headline?.textContent).toBe(shortBrief);
+    expect(headline?.getAttribute("title")).toBe(shortBrief);
+  });
 });
 
 describe("WorkflowListItem — row `⋯` menu", () => {
