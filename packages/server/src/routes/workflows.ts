@@ -1079,13 +1079,6 @@ export function workflowsRoutes(
   //      defense-in-depth against a tight TOCTOU race.
   //   3. Drop the workflow substrate's own rows + (if purging) shared
   //      dir via `WorkflowService.deleteWorkflow`.
-  //
-  // NOTE: the per-node `findTaskByWorkflowNode` returns only the
-  // most recent task per node id (see task-repository docs). If a
-  // future workflow feature re-dispatches the same node multiple
-  // times, older rows would be orphaned by this cascade — that path
-  // does not exist today (no node retry surface), but switch to a
-  // bulk `findAllTasksByWorkflow(workflowId)` lookup when it lands.
   app.delete("/:wfid", async (c) => {
     const wfid = c.req.param("wfid");
     const purge = c.req.query("purge") === "1";
