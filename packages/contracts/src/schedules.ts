@@ -56,10 +56,8 @@ export type TaskScheduleTargetWire = { readonly kind: "task" } & TaskTargetData;
 
 /**
  * Wire-shape target on schedule responses. Flat for the task kind
- * (`TaskScheduleTargetWire`); opaque envelope for any future kind
- * the server projects through unchanged. When a second concrete
- * kind ships, add its flat wire shape here as another union member
- * and extend `projectScheduleToWire` in the server.
+ * (`TaskScheduleTargetWire`); unrecognized kinds stay in the
+ * substrate envelope shape the server projected.
  */
 export type ScheduleWireTarget =
   | TaskScheduleTargetWire

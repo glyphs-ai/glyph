@@ -11,13 +11,6 @@
  * network does not belong here.
  */
 export interface HealthResponse {
-  /**
-   * Always `"ok"` for now. Reserved as an enum for the future case
-   * where the server can self-report `"degraded"` (e.g. a runtime is
-   * missing, fs is read-only). Clients should treat any non-`"ok"`
-   * value as "server is up but something is wrong" rather than
-   * parse-faulting.
-   */
   readonly status: "ok";
   /** Server package name, e.g. `"@glyphs-ai/server"`. */
   readonly name: string;

@@ -6,8 +6,7 @@
  *    and at CLI/MCP-call to construct the URL
  *  - **phantom** request and response types — `RouteSpec<Req, Res>`
  *    parametrises the spec with the wire shapes so consumers (server
- *    handler, CLI client, future MCP wrapper) can type-check against
- *    the same contract
+ *    handler and CLI client) can type-check against the same contract
  *
  * **Drift protection** comes from two complementary mechanisms:
  *  1. The reflection test in `packages/server/test/route-manifest.test.ts`
@@ -21,12 +20,13 @@
  *     exist in the manifest, and a request body that doesn't match the
  *     declared shape fails to compile.
  *
- * Schema-drift protection on the **server** side is currently partial:
- * handlers import their request-body types from this module but still
- * construct response payloads ad hoc. A future `typedHandler` wrapper
- * can lock the response shape to `RouteRes<K>` at compile time; for now
- * the reflection test catches path/method drift and review catches
- * body-shape drift between handlers and the manifest declarations.
+ * Server-side schema-drift protection is currently partial: handlers
+ * import their request-body types from this module but construct
+ * response payloads ad hoc — the response shape on the wire is not
+ * locked to `RouteRes<K>` at compile time. The reflection test
+ * catches path/method drift; response-body drift relies on review
+ * and the dashboard / CLI typecheck against the manifest catching
+ * downstream shape mismatches.
  */
 
 import type {
@@ -49,7 +49,7 @@ import type { Task, TaskStatus } from "@glyphs-ai/task";
 import type { HealthResponse } from "./health.js";
 import type { ResolveManifest } from "./plan-to-manifest.js";
 import type { RuntimeInfo } from "./runtimes.js";
-import type { ScheduleWireTarget } from "./schedules.js";
+import type { ScheduleWireTarget, TaskTargetData, TaskTargetPatch } from "./schedules.js";
 import type { ServerConfig } from "./server-config.js";
 import type {
   AddEdgeBody,
@@ -109,16 +109,16 @@ export interface RouteSpec<Req extends RouteRequest = Record<string, never>, Res
 
 /**
  * Construct a typed {@link RouteSpec}. The `_req` and `_res` slots are
- * filled with a runtime placeholder (`undefined as any`) — the values are
- * never read, but TypeScript needs the property to exist for the generic
- * inference to flow through `typeof ROUTES[K]`.
+ * filled with runtime placeholders. The values are never read, but
+ * TypeScript needs the properties to exist for generic inference to
+ * flow through `typeof ROUTES[K]`.
  */
 export function defineRoute<Req extends RouteRequest = Record<string, never>, Res = unknown>(
   method: HttpMethod,
   path: string,
 ): RouteSpec<Req, Res> {
-  // biome-ignore lint/suspicious/noExplicitAny: phantom slots; never read.
-  return { method, path, _req: undefined as any, _res: undefined as any };
+  const phantom = undefined as never;
+  return { method, path, _req: phantom, _res: phantom };
 }
 
 /** Extract the request shape carried by a {@link RouteSpec}. */
@@ -257,14 +257,7 @@ export interface ScheduleListQuery {
  */
 export interface TaskScheduleCreateBody {
   readonly name: string;
-  readonly target: {
-    readonly agent: string;
-    /** Single line, ≤ 200 chars. Mirrors `@glyphs-ai/task` `DispatchOpts.brief`. */
-    readonly brief: string;
-    /** Optional multi-line body. Mirrors `@glyphs-ai/task` `DispatchOpts.details`. */
-    readonly details?: string;
-    readonly runtime?: string;
-  };
+  readonly target: TaskTargetData;
   readonly trigger: {
     readonly kind: "cron";
     readonly expr: string;
@@ -289,12 +282,7 @@ export interface TaskScheduleCreateBody {
  */
 export interface TaskSchedulePatchBody {
   readonly name?: string;
-  readonly target?: {
-    readonly agent?: string;
-    readonly brief?: string;
-    readonly details?: string | null;
-    readonly runtime?: string | null;
-  };
+  readonly target?: TaskTargetPatch;
   readonly trigger?: TaskScheduleCreateBody["trigger"];
   readonly enabled?: boolean;
 }
@@ -342,8 +330,7 @@ export type ScheduleWire = Omit<Schedule, "target"> & {
  * route boundary and inside `ScheduleService.preview`. The double
  * check keeps each layer self-defending: the route emits a typed 400
  * envelope before reaching the service; the service still rejects an
- * out-of-range value if invoked directly (tests, future programmatic
- * users).
+ * out-of-range value if invoked directly by tests.
  */
 export interface SchedulePreviewQuery {
   readonly n?: string;
@@ -670,8 +657,6 @@ export const ROUTES = {
    * so the body can omit `kind` (the URL declares it) — the server
    * narrows the body to `TaskTargetData` then calls
    * `service.create({ name, trigger, target: { kind: "task", data }, enabled })`.
-   * When a `workflow` target lands later it gets its own
-   * `schedules.workflow.create` route.
    */
   "schedules.task.create": defineRoute<
     { params: WorkspacePathParams; body: TaskScheduleCreateBody },
@@ -821,7 +806,7 @@ export const ROUTES = {
    *   - `nodes/<nodeId>/<rest>` — per-node artifact (`max-age=300`)
    * 400 on unknown prefix or traversal attempt; 404 on missing file.
    */
-  "workflows.artifacts.get": defineRoute<{ params: WorkflowArtifactPathParams }, unknown>(
+  "workflows.artifacts.get": defineRoute<{ params: WorkflowArtifactPathParams }, never>(
     "GET",
     "/api/workspaces/:id/workflows/:wfid/artifacts/:encodedPath",
   ),
@@ -890,10 +875,10 @@ export const ROUTES = {
    * an envelope carrying the offending node ids — the operator should
    * cancel the workflow first or wait briefly and retry.
    */
-  "workflows.delete": defineRoute<
-    { params: WorkflowPathParams; query: WorkflowDeleteQuery },
-    void
-  >("DELETE", "/api/workspaces/:id/workflows/:wfid"),
+  "workflows.delete": defineRoute<{ params: WorkflowPathParams; query: WorkflowDeleteQuery }, void>(
+    "DELETE",
+    "/api/workspaces/:id/workflows/:wfid",
+  ),
   /**
    * Delete a single edge `(from, to)`. Endpoints live in the path,
    * not the body, so the route is RESTful: `DELETE` on the edge's

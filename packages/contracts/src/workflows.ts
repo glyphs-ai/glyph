@@ -73,10 +73,8 @@ export type WorkflowCoordinatorNodeSpecWire = {
 
 /**
  * Wire-shape spec on workflow node responses. Flat for the two
- * shipped kinds (`worker` / `coordinator`); opaque envelope for any
- * future kind the server projects through unchanged. When a third
- * concrete kind ships, add its flat wire shape here as another
- * union member.
+ * shipped kinds (`worker` / `coordinator`); unrecognized kinds stay
+ * in the substrate envelope shape the server projected.
  */
 export type WorkflowNodeWireSpec =
   | WorkflowWorkerNodeSpecWire
@@ -190,9 +188,11 @@ export type WorkflowFailureWire =
 
 /**
  * Wire projection of a cancelled workflow's terminal payload.
- * Single-arm interface — `kind` retained as a discriminator so future
- * cancellation sources (e.g. parent-workflow cascade) can be added
- * without breaking the wire shape.
+ *
+ * Discriminated single-arm interface — `kind` is retained as a
+ * discriminator so additional cancellation sources can be added as
+ * extra union members without breaking the on-disk wire shape that
+ * existing clients consume.
  *
  *   - `user` — operator called `/cancel` from the dashboard / CLI.
  */
@@ -231,8 +231,8 @@ export interface WorkflowNodeWire {
    * `{}` if no entries). The substrate currently writes one
    * key: `retry` with shape `{ of: string; reason: string;
    * attempt: number }` when a node is a retry-coord inserted by
-   * the stuck-workflow detector. Other keys may be added by higher
-   * tiers; consumers should treat unknown keys as opaque.
+   * the stuck-workflow detector. All other keys are opaque to
+   * consumers.
    */
   readonly metadata: Readonly<Record<string, unknown>>;
   readonly createdAt: string;
