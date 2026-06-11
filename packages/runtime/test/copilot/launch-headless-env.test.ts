@@ -104,7 +104,7 @@ describe("launchCopilotHeadless env merge", () => {
     await expect(
       launchCopilotHeadless(
         {
-          taskDir: workdir,
+          workdir,
           agent,
           catalog: source,
           prompt: FRAMING,
@@ -151,7 +151,7 @@ describe("launchCopilotHeadless env merge", () => {
       await expect(
         launchCopilotHeadless(
           {
-            taskDir: workdir,
+            workdir,
             agent,
             catalog: source,
             prompt: FRAMING,
@@ -188,7 +188,7 @@ describe("launchCopilotHeadless env merge", () => {
     await expect(
       launchCopilotHeadless(
         {
-          taskDir: workdir,
+          workdir,
           agent,
           catalog: source,
           prompt: FRAMING,
@@ -226,7 +226,7 @@ describe("launchCopilotHeadless failure handling", () => {
     await expect(
       launchCopilotHeadless(
         {
-          taskDir: workdir,
+          workdir,
           agent,
           catalog: source,
           prompt: FRAMING,
@@ -259,7 +259,7 @@ describe("launchCopilotHeadless failure handling", () => {
     try {
       await launchCopilotHeadless(
         {
-          taskDir: workdir,
+          workdir,
           agent,
           catalog: source,
           prompt: FRAMING,

@@ -1,7 +1,7 @@
 {
   "name": "@glyphs-ai/dashboard",
   "description": "Web UI for glyph (React + Vite, bundled into the CLI as static assets served by @glyphs-ai/server)",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "engines": {

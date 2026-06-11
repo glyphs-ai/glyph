@@ -94,7 +94,7 @@ export class RuntimeProvisionFailed extends Error {
 export class RuntimeHeadlessLaunchFailed extends Error {
   constructor(
     public readonly kind: string,
-    public readonly taskDir: string,
+    public readonly workdir: string,
     cause: Error,
   ) {
     super(`runtime "${kind}" launchHeadless failed`);

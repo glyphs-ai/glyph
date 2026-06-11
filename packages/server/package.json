@@ -1,6 +1,6 @@
 {
   "name": "@glyphs-ai/server",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "description": "HTTP API surface (Hono) for glyph -- workspace-scoped catalog / sessions / tasks / schedules over a per-workspace context registry. Pure transport adapter over @glyphs-ai/api.",

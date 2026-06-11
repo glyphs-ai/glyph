@@ -1,7 +1,7 @@
 {
   "name": "@glyphs-ai/workspace",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "Workspace registry for glyph — manages $GLYPH_HOME/global.db plus allocation/cleanup of per-workspace sessions/ and tasks/ subdirs (workspace.db is owned by sibling packages)",
   "license": "MIT",
   "type": "module",

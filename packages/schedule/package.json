@@ -1,7 +1,7 @@
 {
   "name": "@glyphs-ai/schedule",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "Schedules — cron-triggered dispatch substrate (schedules table + ScheduleService timer chain)",
   "license": "MIT",
   "type": "module",

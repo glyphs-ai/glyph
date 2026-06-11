@@ -64,7 +64,7 @@ export interface EventBuffer {
 }
 
 export interface LaunchCopilotHeadlessOpts {
-  readonly taskDir: string;
+  readonly workdir: string;
   readonly agent: ResolvedAgent;
   readonly catalog: AgentContentSource;
   readonly prompt: string;
@@ -111,7 +111,7 @@ export interface LaunchCopilotHeadlessDeps {
 }
 
 /**
- * Spawn the SDK client, create a session pointed at `taskDir`, send the
+ * Spawn the SDK client, create a session pointed at `workdir`, send the
  * prompt, and return a live {@link RuntimeHandle}. The runtime's own
  * cleanup is on `kill()` (graceful abort) or on the natural exit of the
  * session (`session.idle`).
@@ -126,7 +126,7 @@ export interface LaunchCopilotHeadlessDeps {
  *   4. Read `<workdir>/.mcp.json` (if present) — polyfill for the
  *      SDK's missing MCP discovery; the file is still the source
  *      of truth on disk.
- *   5. Create the session with `workingDirectory: taskDir`,
+ *   5. Create the session with `workingDirectory: workdir`,
  *      `enableConfigDiscovery: true` (skills/instructions auto-load),
  *      the loaded `mcpServers`, and the buffering `onEvent` handler.
  *   6. Send the prompt via `session.send` (fire-and-forget — exit
@@ -145,9 +145,9 @@ export async function launchCopilotHeadless(
     sharedDir: deps.sharedDir,
   };
   try {
-    await provisionCopilotWorkdir(opts.taskDir, opts.agent, opts.catalog, placeholders);
+    await provisionCopilotWorkdir(opts.workdir, opts.agent, opts.catalog, placeholders);
   } catch (cause) {
-    throw new RuntimeProvisionFailed("copilot", opts.taskDir, cause as Error);
+    throw new RuntimeProvisionFailed("copilot", opts.workdir, cause as Error);
   }
 
   // Step 2: start the SDK client.
@@ -172,7 +172,7 @@ export async function launchCopilotHeadless(
   try {
     await client.start();
   } catch (cause) {
-    throw new RuntimeHeadlessLaunchFailed("copilot", opts.taskDir, cause as Error);
+    throw new RuntimeHeadlessLaunchFailed("copilot", opts.workdir, cause as Error);
   }
 
   // Step 3: per-session event buffer + idle latch.
@@ -217,10 +217,10 @@ export async function launchCopilotHeadless(
   // disk for debuggability and inspection.
   let mcpServers: Record<string, MCPServerConfig> | undefined;
   try {
-    mcpServers = await readMcpServersFromWorkdir(opts.taskDir);
+    mcpServers = await readMcpServersFromWorkdir(opts.workdir);
   } catch (cause) {
     await safeStop(client);
-    throw new RuntimeHeadlessLaunchFailed("copilot", opts.taskDir, cause as Error);
+    throw new RuntimeHeadlessLaunchFailed("copilot", opts.workdir, cause as Error);
   }
 
   // Step 5: create the session.
@@ -228,7 +228,7 @@ export async function launchCopilotHeadless(
   try {
     session = await client.createSession({
       onPermissionRequest: approveAll,
-      workingDirectory: opts.taskDir,
+      workingDirectory: opts.workdir,
       // Auto-discovers skill / instruction directories from the
       // workdir. (MCP files are NOT discovered; we pass them
       // explicitly above — see step 4.)
@@ -242,7 +242,7 @@ export async function launchCopilotHeadless(
     // Best-effort: shut the client down so we don't leak a copilot
     // CLI subprocess behind the rejected launch.
     await safeStop(client);
-    throw new RuntimeHeadlessLaunchFailed("copilot", opts.taskDir, cause as Error);
+    throw new RuntimeHeadlessLaunchFailed("copilot", opts.workdir, cause as Error);
   }
 
   // Step 6: send the prompt. `send` returns once the message is
@@ -252,7 +252,7 @@ export async function launchCopilotHeadless(
   } catch (cause) {
     await safeDisconnect(session);
     await safeStop(client);
-    throw new RuntimeHeadlessLaunchFailed("copilot", opts.taskDir, cause as Error);
+    throw new RuntimeHeadlessLaunchFailed("copilot", opts.workdir, cause as Error);
   }
 
   // Step 7: register the buffer only after a successful prompt send.
