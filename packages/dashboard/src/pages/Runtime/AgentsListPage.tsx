@@ -54,9 +54,7 @@ const SEARCH_DEBOUNCE_MS = 200;
  *         workspace-wide poll feeds both panes — no duplicate network
  *         calls. The `/tasks` route is standalone-only; this page
  *         intentionally surfaces only standalone-origin tasks here.
- *         Schedule-launched runs live at `/scheduled-tasks` (a future
- *         agent surface will join them in once we surface the schedule
- *         UI here).
+ *         Schedule-launched runs live at `/scheduled-tasks`.
  *       * `listSessions({ agent: <selectedFqn> })` only when something is
  *         selected; the per-agent session fetch stops when selection
  *         clears.

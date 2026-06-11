@@ -23,9 +23,9 @@ export const ENABLED_FILTERS: { value: EnabledFilter; label: string }[] = [
 
 /**
  * Sort a list of schedules by `nextFireAt` ascending, pushing entries
- * with no `nextFireAt` (e.g. invalid expression, future feature) to
- * the bottom. The server already sorts this way; the dashboard
- * re-applies it after client-side filters so the list stays stable.
+ * with no `nextFireAt` (e.g. invalid expression) to the bottom. The
+ * server already sorts this way; the dashboard re-applies it after
+ * client-side filters so the list stays stable.
  */
 export function sortByNextFire(rows: ScheduleView[]): ScheduleView[] {
   return rows.slice().sort((a, b) => {

@@ -16,8 +16,9 @@
  *
  * What this does NOT catch:
  *  - Request / response **body** shape drift between manifest types and
- *    handler logic. That's the next layer (typedHandler wrapper or a
- *    runtime contract test); tracked as future work in the plan.
+ *    handler logic. Handlers import their request-body types from the
+ *    manifest but still construct response payloads ad hoc; review is
+ *    the line of defence for body-shape drift.
  */
 
 import { CatalogService, type CatalogServiceOpts } from "@glyphs-ai/catalog";
