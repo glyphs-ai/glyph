@@ -64,6 +64,7 @@
  */
 
 import type { CatalogService } from "@glyphs-ai/catalog";
+import type { WorkflowWorkerNodeSpec } from "@glyphs-ai/contracts";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type {
   WorkflowNodeRunner,
@@ -78,18 +79,6 @@ const silentLogger: Logger = pino({ level: "silent" });
 export const DEFAULT_WORKER_POLL_INTERVAL_MS = 2000;
 /** Default runner-local poll-error budget before surfacing as failed. */
 export const DEFAULT_WORKER_MAX_POLL_ERRORS = 3;
-
-/**
- * Validated worker-spec shape. The substrate persists this as
- * `spec_json` and hands it back verbatim on dispatch. Kept narrow
- * (`agent`/`brief`/optional `details`/optional `runtime`).
- */
-export interface WorkerNodeSpec {
-  readonly agent: string;
-  readonly brief: string;
-  readonly details?: string;
-  readonly runtime?: string;
-}
 
 /**
  * Wire-shape error for a malformed worker node spec. Lives next to
@@ -204,7 +193,7 @@ export function makeWorkerNodeRunner(
   };
 
   return {
-    async validate(spec: unknown, ctx: WorkflowNodeValidateCtx): Promise<WorkerNodeSpec> {
+    async validate(spec: unknown, ctx: WorkflowNodeValidateCtx): Promise<WorkflowWorkerNodeSpec> {
       if (spec === null || typeof spec !== "object" || Array.isArray(spec)) {
         throw new WorkflowWorkerSpecError("Worker node spec must be an object");
       }
@@ -273,7 +262,7 @@ export function makeWorkerNodeRunner(
         throw new WorkflowWorkerNotInCoordMenuError(obj.agent, ctx.coordinatorAgent, menu);
       }
 
-      const validated: WorkerNodeSpec = {
+      const validated: WorkflowWorkerNodeSpec = {
         agent: obj.agent,
         brief: obj.brief,
         ...(obj.details !== undefined ? { details: obj.details } : {}),
@@ -283,7 +272,7 @@ export function makeWorkerNodeRunner(
     },
 
     async dispatch(opts): Promise<void> {
-      const spec = opts.spec as WorkerNodeSpec;
+      const spec = opts.spec as WorkflowWorkerNodeSpec;
       const task = await tasks.dispatch({
         agent: spec.agent,
         brief: spec.brief,

@@ -62,6 +62,7 @@
  */
 
 import type { CatalogService } from "@glyphs-ai/catalog";
+import type { WorkflowCoordinatorNodeSpec } from "@glyphs-ai/contracts";
 import {
   AgentNotFoundError,
   AgentResolutionFailedError,
@@ -126,16 +127,6 @@ const COORD_FRAMING_PROMPT_COPILOT =
 // argument — this is the additional build-time guard on the
 // default value we ship here.
 assertFramingPromptIsSafe(COORD_FRAMING_PROMPT_COPILOT);
-
-/**
- * Validated coord-spec shape. The substrate persists this as
- * `spec_json` and hands it back verbatim on dispatch. Matches the
- * bootstrap insert shape (`coordSpec = { agent: args.coordinatorAgent }`).
- * Kept narrow (single `agent` field).
- */
-export interface CoordNodeSpec {
-  readonly agent: string;
-}
 
 /**
  * Wire-shape error for a malformed coord node spec. Lives next to
@@ -275,7 +266,10 @@ export function makeCoordNodeRunner(
   };
 
   return {
-    async validate(spec: unknown, _ctx: WorkflowNodeValidateCtx): Promise<CoordNodeSpec> {
+    async validate(
+      spec: unknown,
+      _ctx: WorkflowNodeValidateCtx,
+    ): Promise<WorkflowCoordinatorNodeSpec> {
       if (spec === null || typeof spec !== "object" || Array.isArray(spec)) {
         throw new WorkflowCoordSpecError("Coord node spec must be an object");
       }
@@ -337,7 +331,7 @@ export function makeCoordNodeRunner(
       }
 
       const wf = await service.getWorkflow(opts.workflowId);
-      const spec = opts.spec as CoordNodeSpec;
+      const spec = opts.spec as WorkflowCoordinatorNodeSpec;
       const task = await tasks.dispatch({
         agent: spec.agent,
         brief: wf.brief,

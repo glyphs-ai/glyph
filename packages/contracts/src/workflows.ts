@@ -50,7 +50,7 @@ export interface WorkflowWorkerNodeSpec {
  * The coordinator-kind handler enforces (at insert time):
  *
  *   1. `agent` non-empty string AND exists in catalog AND its
- *      `dependencies.skills` MUST include `official/coordinator`.
+ *      `dependencies.agents` dispatch menu MUST be non-empty.
  */
 export interface WorkflowCoordinatorNodeSpec {
   /** Coordinator agent FQN. */
