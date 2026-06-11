@@ -19,7 +19,7 @@ describe("validators: workspace id", () => {
   it("isValidWorkspaceId rejects non-UUIDs", () => {
     expect(isValidWorkspaceId("not-a-uuid")).toBe(false);
     expect(isValidWorkspaceId("")).toBe(false);
-    expect(isValidWorkspaceId(123 as unknown as string)).toBe(false);
+    expect(isValidWorkspaceId(123)).toBe(false);
     expect(isValidWorkspaceId(null)).toBe(false);
   });
 
@@ -56,9 +56,7 @@ describe("validators: workspace name", () => {
 
   it("assertValidWorkspaceName throws WorkspaceNameInvalidError on bad input", () => {
     expect(() => assertValidWorkspaceName("")).toThrow(WorkspaceNameInvalidError);
-    expect(() => assertValidWorkspaceName(42 as unknown as string)).toThrow(
-      WorkspaceNameInvalidError,
-    );
+    expect(() => assertValidWorkspaceName(42)).toThrow(WorkspaceNameInvalidError);
   });
 });
 
@@ -76,6 +74,6 @@ describe("validators: workspace dir", () => {
   it("throws on empty / non-string input", () => {
     expect(() => normalizeWorkspaceDir("")).toThrow(TypeError);
     expect(() => normalizeWorkspaceDir("   ")).toThrow(TypeError);
-    expect(() => normalizeWorkspaceDir(null as unknown as string)).toThrow(TypeError);
+    expect(() => normalizeWorkspaceDir(null)).toThrow(TypeError);
   });
 });

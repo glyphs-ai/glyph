@@ -21,9 +21,14 @@ import {
   normalizeWorkspaceDir,
   RegisterWorkspaceOptsSchema,
 } from "./validate.js";
+import type { WorkspaceEntity } from "./workspace-entity.js";
 import type { WorkspaceRepository } from "./workspace-repository.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
+
+function entityToWorkspace(entity: WorkspaceEntity): Workspace {
+  return { ...entity, lastOpenedAt: entity.lastOpenedAt ?? entity.createdAt };
+}
 
 export interface WorkspaceServiceOpts {
   readonly repo: WorkspaceRepository;
@@ -38,11 +43,8 @@ export interface WorkspaceServiceOpts {
  * `list`, `getLastOpened`, `getLastOpenedId`). All read paths go
  * through the repository (which returns the internal `WorkspaceEntity`
  * shape, structurally identical to the Drizzle row today) and are
- * projected inline to the wire `Workspace` DTO by coalescing the
- * nullable `lastOpenedAt` to `createdAt` so consumers never see
- * `null`. The same projection is repeated in each read method; if a
- * future column makes it non-trivial, extract a private `entityToDto`
- * helper at that point.
+ * projected to the wire `Workspace` DTO by coalescing the nullable
+ * `lastOpenedAt` to `createdAt` so consumers never see `null`.
  *
  * Three-layer split:
  *
@@ -107,20 +109,17 @@ export class WorkspaceService {
 
   async get(id: string): Promise<Workspace | null> {
     const entity = await this.repo.findById(id);
-    return entity ? { ...entity, lastOpenedAt: entity.lastOpenedAt ?? entity.createdAt } : null;
+    return entity ? entityToWorkspace(entity) : null;
   }
 
   async list(): Promise<Workspace[]> {
     const entities = await this.repo.findAllByLastOpened();
-    return entities.map((entity) => ({
-      ...entity,
-      lastOpenedAt: entity.lastOpenedAt ?? entity.createdAt,
-    }));
+    return entities.map(entityToWorkspace);
   }
 
   async getLastOpened(): Promise<Workspace | null> {
     const entity = await this.repo.findLastOpened();
-    return entity ? { ...entity, lastOpenedAt: entity.lastOpenedAt ?? entity.createdAt } : null;
+    return entity ? entityToWorkspace(entity) : null;
   }
 
   async getLastOpenedId(): Promise<string | null> {

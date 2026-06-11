@@ -19,11 +19,7 @@ type Db = BetterSQLite3Database<typeof schema>;
  *
  * The naming separation is contractual: `WorkspaceRow` is a Drizzle
  * implementation detail (changes when the ORM does); `WorkspaceEntity`
- * is the pkg-owned domain shape (changes when we want it to). The
- * moment Row gains a column we don't want in Entity (e.g. a
- * `deleted_at` for soft-delete), reintroduce a `rowToEntity`
- * projection here and `WorkspaceEntity` stops being assignable from
- * the row directly. Until then, the type-level alias is enough.
+ * is the pkg-owned domain shape.
  *
  * Service layer maps `WorkspaceEntity` → wire `Workspace` DTO by
  * coalescing the nullable `lastOpenedAt` to `createdAt` (so DTO

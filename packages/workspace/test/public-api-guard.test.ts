@@ -5,7 +5,7 @@
  *   Uses Vitest's `expectTypeOf<T>()` to lock the pkg's public surface
  *   at the TYPE level. Every public method on the service class, every
  *   exported error class, every exported DTO / layout shape, and every
- *   exported layout helper / constant gets a `expectTypeOf(...)`
+ *   exported layout helper gets a `expectTypeOf(...)`
  *   assertion below.
  *
  * WHY it is valuable:
@@ -43,7 +43,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   composeWorkspaceModule,
-  type GLOBAL_DB_FILE,
   globalDbPath,
   InputValidationError,
   type RegisterWorkspaceOpts,
@@ -51,7 +50,6 @@ import {
   RegistryError,
   type RenameWorkspaceOpts,
   type UnregisterWorkspaceOpts,
-  type WORKSPACES_PARENT_SUBDIR,
   type Workspace,
   WorkspaceError,
   WorkspaceIdConflictError,
@@ -143,15 +141,10 @@ describe("@glyphs-ai/workspace public API guard", () => {
     >();
   });
 
-  it("preserves the exported layout helpers + filename constants", () => {
+  it("preserves the exported layout helpers", () => {
     expectTypeOf(workspaceLayout).toBeFunction();
     expectTypeOf(workspacesParentDir).toBeFunction();
     expectTypeOf(globalDbPath).toBeFunction();
-    // String-literal subtypes; assert assignability to `string` rather
-    // than exact equality so renaming the literal value remains an
-    // internal change while the public type stays string-shaped.
-    expectTypeOf<typeof GLOBAL_DB_FILE>().toExtend<string>();
-    expectTypeOf<typeof WORKSPACES_PARENT_SUBDIR>().toExtend<string>();
   });
 
   it("preserves the composition surface (composeWorkspaceModule + WorkspaceModule + WorkspaceModuleOptions)", () => {

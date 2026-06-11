@@ -23,9 +23,7 @@ export {
   WorkspacePathConflictError,
 } from "./errors.js";
 export {
-  GLOBAL_DB_FILE,
   globalDbPath,
-  WORKSPACES_PARENT_SUBDIR,
   type WorkspaceLayout,
   workspaceLayout,
   workspacesParentDir,

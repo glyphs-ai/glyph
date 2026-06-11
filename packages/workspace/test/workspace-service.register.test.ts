@@ -112,11 +112,6 @@ describe("WorkspaceService.register", () => {
   });
 
   it("throws InputValidationError when workspaceDir is relative", async () => {
-    // Exercises RegisterWorkspaceOptsSchema's `.refine(path.isAbsolute)`
-    // branch. The rejection has to surface here, before
-    // normalizeWorkspaceDir's `path.resolve` would silently absolutize
-    // the opts — losing this test would let a future pipeline reorder
-    // accept relative paths without tripping a regression.
     await expect(
       sys.service.register({ id: UUID_A, workspaceDir: "relative/p", name: "Project" }),
     ).rejects.toBeInstanceOf(InputValidationError);
