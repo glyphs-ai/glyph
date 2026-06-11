@@ -26,6 +26,7 @@ describe("WorkflowList — explicit role='list'", () => {
         selectedId={null}
         onSelect={vi.fn()}
         onCancel={vi.fn()}
+        onDelete={vi.fn()}
         openMenuId={null}
         onMenuOpenChange={vi.fn()}
       />,
@@ -49,6 +50,7 @@ describe("WorkflowList — aria-posinset / aria-setsize across rows", () => {
         selectedId={null}
         onSelect={vi.fn()}
         onCancel={vi.fn()}
+        onDelete={vi.fn()}
         openMenuId={null}
         onMenuOpenChange={vi.fn()}
       />,
@@ -77,6 +79,7 @@ describe("WorkflowList — single-open menu coordination", () => {
         selectedId={null}
         onSelect={vi.fn()}
         onCancel={vi.fn()}
+        onDelete={vi.fn()}
         openMenuId="wf-2"
         onMenuOpenChange={vi.fn()}
       />,
@@ -97,6 +100,7 @@ describe("WorkflowList — single-open menu coordination", () => {
         selectedId={null}
         onSelect={vi.fn()}
         onCancel={vi.fn()}
+        onDelete={vi.fn()}
         openMenuId={null}
         onMenuOpenChange={onMenuOpenChange}
       />,

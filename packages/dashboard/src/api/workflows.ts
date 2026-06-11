@@ -10,7 +10,7 @@ import type {
   WorkflowNodeWire,
   WorkflowNodeWireSpec,
 } from "@glyphs-ai/contracts";
-import { fetchJson, jsonInit, mutateJson, workspacePrefix } from "./http.js";
+import { fetchJson, jsonInit, mutate, mutateJson, workspacePrefix } from "./http.js";
 
 export type {
   CancelWorkflowBody,
@@ -70,6 +70,26 @@ export const cancelWorkflow = (
     `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/cancel`,
     jsonInit("POST", body),
   );
+
+/**
+ * Delete a terminal workflow. Default ("archive") drops only the
+ * substrate metadata rows — the on-disk shared workflow dir and
+ * per-node task workdirs stay so the operator can still inspect the
+ * run after the fact. `{ purge: true }` is the hard-delete path:
+ * substrate rows + workflow dir + per-node task workdirs + runtime
+ * state all go.
+ *
+ * Server returns 409 when the workflow is still running (mutate()
+ * throws the typed envelope; callers parse `code` +
+ * `transition` to render a "Cancel first" CTA, mirroring the task
+ * delete pattern).
+ */
+export const deleteWorkflow = (workflowId: string, opts?: { purge?: boolean }) => {
+  const qs = opts?.purge ? "?purge=1" : "";
+  return mutate(`${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}${qs}`, {
+    method: "DELETE",
+  });
+};
 
 /**
  * Workflow artifact list. Returns an aggregated `{ artifacts: [] }`

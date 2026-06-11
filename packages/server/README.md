@@ -57,7 +57,7 @@ not a task sub-layer.
 /api/workspaces/:id/schedules/:sid/preview               GET                      next-N fires for this schedule
 
 /api/workspaces/:id/workflows                            GET POST                 list / create workflow
-/api/workspaces/:id/workflows/:wfid                      GET                      workflow header
+/api/workspaces/:id/workflows/:wfid                      GET DELETE               workflow header / delete workflow (?purge=1)
 /api/workspaces/:id/workflows/:wfid/dag                  GET                      full DAG snapshot with taskId enrichment
 /api/workspaces/:id/workflows/:wfid/nodes/:nid           GET                      single node with taskId enrichment
 /api/workspaces/:id/workflows/:wfid/cancel               POST                     user-initiated workflow cancel

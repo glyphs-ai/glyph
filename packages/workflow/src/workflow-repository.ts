@@ -363,6 +363,41 @@ export class WorkflowRepository {
       .run();
   }
 
+  /**
+   * Delete every edge row whose `workflow_id` matches. Used by
+   * `deleteWorkflow` to cascade-clean adjacency before the node-row
+   * cascade and the workflow-row delete (same tx — the substrate
+   * never persists dangling edges).
+   */
+  deleteEdgesByWorkflowTx(tx: Db, workflowId: string): void {
+    assertValidWorkflowId(workflowId);
+    tx.delete(workflowEdges).where(eq(workflowEdges.workflowId, workflowId)).run();
+  }
+
+  /**
+   * Delete every node row whose `workflow_id` matches. Used by
+   * `deleteWorkflow` after the edge cascade and before the
+   * workflow-row delete (same tx).
+   */
+  deleteNodesByWorkflowTx(tx: Db, workflowId: string): void {
+    assertValidWorkflowId(workflowId);
+    tx.delete(workflowNodes).where(eq(workflowNodes.workflowId, workflowId)).run();
+  }
+
+  /**
+   * Delete the workflow row. Returns true iff a row was actually
+   * deleted (false on an id that didn't exist — the caller decides
+   * whether to surface as `WorkflowNotFoundError` or treat as a
+   * no-op). Must be called AFTER {@link deleteEdgesByWorkflowTx} and
+   * {@link deleteNodesByWorkflowTx} in the same tx so the substrate
+   * never observes a missing parent for dangling children.
+   */
+  deleteWorkflowTx(tx: Db, workflowId: string): boolean {
+    assertValidWorkflowId(workflowId);
+    const result = tx.delete(workflows).where(eq(workflows.id, workflowId)).run();
+    return result.changes > 0;
+  }
+
   // ─── Read-side helpers used by service primitives ────────
 
   /**

@@ -64,6 +64,7 @@ import {
   ParentStateError,
   WorkflowAlreadyTerminalError,
   WorkflowDagInvariantError,
+  WorkflowDeleteRequiresTerminalError,
   WorkflowEdgeCycleError,
   WorkflowEdgeNotFoundError,
   WorkflowEnumValueCorruptionError,
@@ -148,6 +149,12 @@ export const workflowsErrorPolicy: ErrorPolicy = {
     // 409 — FSM / DAG conflict against existing state
     [WorkflowAlreadyTerminalError, 409],
     [WorkflowNodeNotMutableError, 409],
+    // Delete-while-running. The route attaches a customBody to surface
+    // `{ code, status, transition: 'delete' }` so the dashboard
+    // branches on `transition` to render a "Cancel first" CTA — the
+    // same envelope precedent as task's InvalidTransition + delete
+    // verb.
+    [WorkflowDeleteRequiresTerminalError, 409],
     [WorkflowEdgeCycleError, 409],
     [MultipleSuccessorCoordsError, 409],
     [OrphanCoordInsertError, 409],

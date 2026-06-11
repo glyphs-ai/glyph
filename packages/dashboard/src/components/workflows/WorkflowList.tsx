@@ -10,6 +10,9 @@ export interface WorkflowListProps {
   /** Page-supplied action callback. The list forwards it per-row so any
    *  row's `⋯` menu can cancel any workflow without selecting it first. */
   onCancel: (target: WorkflowHeaderWire) => void;
+  /** Page-supplied delete callback. Disabled at row level when the
+   *  workflow is `running`. */
+  onDelete: (target: WorkflowHeaderWire) => void;
   /** Page-supplied single-open coordination. */
   openMenuId: string | null;
   onMenuOpenChange: (id: string | null) => void;
@@ -33,6 +36,7 @@ export function WorkflowList({
   selectedId,
   onSelect,
   onCancel,
+  onDelete,
   openMenuId,
   onMenuOpenChange,
 }: WorkflowListProps) {
@@ -88,6 +92,7 @@ export function WorkflowList({
                     selected={selectedId === w.id}
                     onSelect={() => onSelect(w.id)}
                     onCancel={onCancel}
+                    onDelete={onDelete}
                     menuOpen={openMenuId === w.id}
                     onMenuOpenChange={(open) => onMenuOpenChange(open ? w.id : null)}
                     posinset={idx + 1}

@@ -26,6 +26,7 @@ function renderRow(overrides: Partial<WorkflowHeaderWire> = {}, opts: RenderOpts
   const { selected = false, menuOpen = false } = opts;
   const onSelect = vi.fn();
   const onCancel = vi.fn();
+  const onDelete = vi.fn();
   const onMenuOpenChange = vi.fn();
   const wf = makeWorkflow(overrides);
   render(
@@ -35,6 +36,7 @@ function renderRow(overrides: Partial<WorkflowHeaderWire> = {}, opts: RenderOpts
         selected={selected}
         onSelect={onSelect}
         onCancel={onCancel}
+        onDelete={onDelete}
         menuOpen={menuOpen}
         onMenuOpenChange={onMenuOpenChange}
         posinset={1}
@@ -42,7 +44,7 @@ function renderRow(overrides: Partial<WorkflowHeaderWire> = {}, opts: RenderOpts
       />
     </ul>,
   );
-  return { wf, onSelect, onCancel, onMenuOpenChange };
+  return { wf, onSelect, onCancel, onDelete, onMenuOpenChange };
 }
 
 afterEach(() => cleanup());
@@ -233,6 +235,7 @@ describe("WorkflowListItem — row `⋯` menu", () => {
     const { wf, rerender } = (() => {
       const onSelect = vi.fn();
       const onCancel = vi.fn();
+      const onDelete = vi.fn();
       const onMenuOpenChange = vi.fn();
       const wf = makeWorkflow();
       const result = render(
@@ -242,6 +245,7 @@ describe("WorkflowListItem — row `⋯` menu", () => {
             selected={false}
             onSelect={onSelect}
             onCancel={onCancel}
+            onDelete={onDelete}
             menuOpen={false}
             onMenuOpenChange={onMenuOpenChange}
             posinset={1}
@@ -261,6 +265,7 @@ describe("WorkflowListItem — row `⋯` menu", () => {
           selected={false}
           onSelect={vi.fn()}
           onCancel={vi.fn()}
+          onDelete={vi.fn()}
           menuOpen={true}
           onMenuOpenChange={vi.fn()}
           posinset={1}
@@ -299,6 +304,7 @@ describe("WorkflowListItem — row-menu placement", () => {
             selected={false}
             onSelect={vi.fn()}
             onCancel={vi.fn()}
+            onDelete={vi.fn()}
             menuOpen={true}
             onMenuOpenChange={vi.fn()}
             posinset={1}
@@ -309,6 +315,7 @@ describe("WorkflowListItem — row-menu placement", () => {
             selected={false}
             onSelect={vi.fn()}
             onCancel={vi.fn()}
+            onDelete={vi.fn()}
             menuOpen={false}
             onMenuOpenChange={vi.fn()}
             posinset={2}
@@ -344,6 +351,7 @@ describe("WorkflowListItem — row-menu placement", () => {
             selected={false}
             onSelect={vi.fn()}
             onCancel={vi.fn()}
+            onDelete={vi.fn()}
             menuOpen={true}
             onMenuOpenChange={vi.fn()}
             posinset={1}
@@ -380,6 +388,7 @@ describe("WorkflowListItem — row-menu placement", () => {
             selected={false}
             onSelect={vi.fn()}
             onCancel={vi.fn()}
+            onDelete={vi.fn()}
             menuOpen={true}
             onMenuOpenChange={vi.fn()}
             posinset={1}
@@ -390,6 +399,7 @@ describe("WorkflowListItem — row-menu placement", () => {
             selected={false}
             onSelect={vi.fn()}
             onCancel={vi.fn()}
+            onDelete={vi.fn()}
             menuOpen={false}
             onMenuOpenChange={vi.fn()}
             posinset={2}

@@ -49,6 +49,14 @@ export interface WorkflowListItemProps {
    * canonical information surface).
    */
   onCancel: (target: WorkflowHeaderWire) => void;
+  /**
+   * Page-supplied row action. Disabled while the workflow is still
+   * `running` (the server enforces the same gate via 409 — the UI
+   * disables to make the constraint discoverable without a round
+   * trip). The page opens its delete-confirm modal with the
+   * workflow as the target.
+   */
+  onDelete: (target: WorkflowHeaderWire) => void;
   /** Page-level single-open coordination: true iff this row's menu is the one open. */
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
@@ -74,6 +82,10 @@ export interface WorkflowListItemProps {
  *     row-menu label exactly (see `TaskListItem.tsx`); the noun is
  *     reintroduced in the modal title + primary button where the
  *     popover-from-anywhere context makes the disambiguation useful.
+ *   - "Delete" — `aria-disabled="true"` when status is `running`;
+ *     fires `onDelete(workflow)` otherwise. Server enforces the same
+ *     gate via a 409 `WorkflowDeleteRequiresTerminalError` envelope;
+ *     the UI disables to make the constraint discoverable up-front.
  *   - "Copy ID" — always enabled; clipboard write with silent fallback.
  */
 export function WorkflowListItem({
@@ -81,6 +93,7 @@ export function WorkflowListItem({
   selected,
   onSelect,
   onCancel,
+  onDelete,
   menuOpen,
   onMenuOpenChange,
   posinset,
@@ -263,6 +276,7 @@ export function WorkflowListItem({
   };
 
   const canCancel = workflow.status === "running";
+  const canDelete = workflow.status !== "running";
 
   return (
     <li
@@ -352,6 +366,21 @@ export function WorkflowListItem({
               }}
             >
               {canCancel ? "Cancel" : "Cancel — already terminal"}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="task-list__item-menu-option task-list__item-menu-option--danger"
+              aria-disabled={canDelete ? undefined : true}
+              data-testid={`workflow-row-menu-delete-${workflow.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!canDelete) return;
+                closeMenu("menuitem");
+                onDelete(workflow);
+              }}
+            >
+              {canDelete ? "Delete" : "Delete — cancel first"}
             </button>
             <button
               type="button"

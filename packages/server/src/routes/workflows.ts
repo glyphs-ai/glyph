@@ -22,6 +22,7 @@
  *   - `GET    /`                          — list workflows; `?q=`, `?coordinatorAgent=`, `?createdSince=` narrow
  *   - `POST   /`                          — seed a workflow + its initial coord
  *   - `GET    /:wfid`                     — header only (with `iterationCount`)
+ *   - `DELETE /:wfid`                     — delete a terminal workflow (`?purge=1` for hard delete)
  *   - `GET    /:wfid/dag`                 — full snapshot (header + nodes + edges) with taskId enrichment
  *   - `POST   /:wfid/cancel`              — external cancel; returns updated header
  *   - `GET    /:wfid/artifacts`           — list workflow-summary + per-node artifacts
@@ -93,6 +94,7 @@ import type {
   WorkflowStatusWire,
 } from "@glyphs-ai/api";
 import {
+  InvalidTransition,
   tasksRoot as resolveTasksRoot,
   safeJoinUnderRoot as safeJoinTaskRoot,
   TASK_ARTIFACT_SUBDIR,
@@ -101,6 +103,7 @@ import {
 import {
   type NodeRef,
   workflowDir as resolveWorkflowDir,
+  WorkflowDeleteRequiresTerminalError,
   WorkflowError,
   type WorkflowNodeKind,
   WorkflowNodeNotFoundError,
@@ -1036,6 +1039,127 @@ export function workflowsRoutes(
         route: "workflows.removeEdge",
         policy: workflowsErrorPolicy,
         meta: { workflowId: wfid, fromNodeId: from, toNodeId: to },
+      });
+    }
+  });
+
+  // ── DELETE /:wfid — deleteWorkflow ───────────────────────────────
+  //
+  // Workflow-level delete with two modes (mirrors `tasks.delete`):
+  //   - default (`?purge` absent or not "1") — archive: substrate DB
+  //     rows for the workflow + its nodes + edges go; on-disk shared
+  //     workflow dir and per-node task workdirs / runtime state are
+  //     preserved so the operator can still read the run after the
+  //     fact.
+  //   - `?purge=1` — hard delete: archive + per-node task purge
+  //     (runtime state + task workdirs) + shared workflow dir.
+  //
+  // Lifecycle constraint: the workflow must be terminal. A running
+  // workflow yields 409 `WorkflowDeleteRequiresTerminalError` with
+  // a typed body so the dashboard can render the "Cancel first" CTA
+  // (mirrors task's `transition: 'delete'` envelope).
+  //
+  // Cross-substrate composition order:
+  //   1. Pre-scan every node for in-flight (non-terminal) tasks via
+  //      the `hasInFlightForWorkflowNode` reverse-lookup. If any are
+  //      non-terminal, reject the whole operation with a 409 BEFORE
+  //      any destructive write — the cascade is all-or-nothing.
+  //      Without this gate, a workflow that has just transitioned to
+  //      `succeeded` (via `WorkflowService.finishWorkflow`, which
+  //      intentionally does not await the coordinator task's exit;
+  //      see the `excludeRunningCoords: true` branch) would pass the
+  //      `wf.status === "running"` check, partially delete its other
+  //      node tasks, then fail with `InvalidTransition` when the
+  //      cascade reaches the still-mid-exit coord task — leaving an
+  //      undeletable workflow row with half its tasks already purged.
+  //   2. Iterate every node's owning task via the task reverse-lookup
+  //      and call `tasks.delete(taskId, { purge })`. After the
+  //      pre-scan above this should never see a non-terminal task,
+  //      but the `InvalidTransition` customBody branch is kept as
+  //      defense-in-depth against a tight TOCTOU race.
+  //   3. Drop the workflow substrate's own rows + (if purging) shared
+  //      dir via `WorkflowService.deleteWorkflow`.
+  //
+  // NOTE: the per-node `findTaskByWorkflowNode` returns only the
+  // most recent task per node id (see task-repository docs). If a
+  // future workflow feature re-dispatches the same node multiple
+  // times, older rows would be orphaned by this cascade — that path
+  // does not exist today (no node retry surface), but switch to a
+  // bulk `findAllTasksByWorkflow(workflowId)` lookup when it lands.
+  app.delete("/:wfid", async (c) => {
+    const wfid = c.req.param("wfid");
+    const purge = c.req.query("purge") === "1";
+    try {
+      const wf = resolve(c);
+      const tasks = resolveTasks(c);
+      // Pre-resolve the snapshot BEFORE touching task rows so a
+      // running workflow short-circuits without partial task cleanup.
+      // The substrate's `deleteWorkflow` re-checks status inside its
+      // tx as defense-in-depth against a race with concurrent
+      // cancel-in-flight.
+      const snapshot = await wf.getDag(wfid);
+      if (snapshot.workflow.status === "running") {
+        throw new WorkflowDeleteRequiresTerminalError(wfid, snapshot.workflow.status);
+      }
+      // All-or-nothing pre-scan for in-flight node tasks (see method
+      // doc above for the post-finishWorkflow coord-task race this
+      // closes). `hasInFlightForWorkflowNode` is a cheap index-eligible
+      // probe; doing N of them is acceptable for typical workflow
+      // sizes (< 20 nodes).
+      const holdoutNodeIds: string[] = [];
+      for (const node of snapshot.nodes) {
+        if (await tasks.hasInFlightForWorkflowNode(node.id)) {
+          holdoutNodeIds.push(node.id);
+        }
+      }
+      if (holdoutNodeIds.length > 0) {
+        const plural = holdoutNodeIds.length === 1 ? "" : "s";
+        return c.json(
+          {
+            error:
+              `workflow ${wfid} has ${holdoutNodeIds.length} in-flight ` +
+              `node task${plural}; cancel the workflow first or wait for ` +
+              `task${plural} to finish (holdout node id${plural}: ` +
+              `${holdoutNodeIds.join(", ")})`,
+            code: "WorkflowDeleteHasInFlightTasks",
+            transition: "delete",
+            holdoutNodeIds,
+          },
+          409,
+        );
+      }
+      for (const node of snapshot.nodes) {
+        const linked = await tasks.findTaskByWorkflowNode(node.id);
+        if (linked === null) continue;
+        await tasks.delete(linked.id, { purge });
+      }
+      await wf.deleteWorkflow(wfid, { purgeDir: purge });
+      logEvent(c, "workflow deleted", { workflowId: wfid, purge });
+      return c.body(null, 204);
+    } catch (err) {
+      return respondError(c, err, {
+        route: "workflows.delete",
+        policy: workflowsErrorPolicy,
+        meta: { workflowId: wfid, purge },
+        customBody: (e) => {
+          if (e instanceof WorkflowDeleteRequiresTerminalError) {
+            return {
+              error: e.message,
+              code: e.name,
+              status: e.status,
+              transition: "delete",
+            };
+          }
+          if (e instanceof InvalidTransition) {
+            return {
+              error: e.message,
+              code: "InvalidTransition",
+              status: e.from,
+              transition: "delete",
+            };
+          }
+          return null;
+        },
       });
     }
   });

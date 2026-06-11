@@ -35,6 +35,7 @@ export {
   ParentStateError,
   WorkflowAlreadyTerminalError,
   WorkflowDagInvariantError,
+  WorkflowDeleteRequiresTerminalError,
   WorkflowEdgeCycleError,
   WorkflowEdgeNotFoundError,
   WorkflowEnumValueCorruptionError,

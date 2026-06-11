@@ -389,6 +389,11 @@ export interface TaskDeleteQuery {
   readonly purge?: "1";
 }
 
+/** DELETE /api/workspaces/:id/workflows/:wfid query params. */
+export interface WorkflowDeleteQuery {
+  readonly purge?: "1";
+}
+
 /**
  * GET /api/workspaces/:id/tasks/:tid/activity query params.
  * Pagination is server-controlled — the manifest declares the
@@ -860,6 +865,35 @@ export const ROUTES = {
     { params: WorkflowPathParams; body: FinishWorkflowBody },
     WorkflowHeaderWire
   >("POST", "/api/workspaces/:id/workflows/:wfid/finish"),
+  /**
+   * Delete a workflow. Two modes via the `?purge=1` query flag, mirroring
+   * `tasks.delete`:
+   *
+   *   - default (no `?purge`): **archive** — drops the workflow row +
+   *     every owned node + every owned edge from the substrate DB and
+   *     cascades `tasks.delete(taskId)` (archive mode) for each node's
+   *     owning task. The on-disk shared workflow dir and per-node task
+   *     workdirs are preserved so the operator can still inspect the
+   *     run after the fact.
+   *
+   *   - `?purge=1` — **hard delete** — archive + remove the shared
+   *     workflow dir + cascade `tasks.delete(taskId, { purge: 1 })` for
+   *     each node's owning task (per-task workdir + runtime state).
+   *
+   * Lifecycle gate: the workflow must be terminal. A running workflow
+   * yields 409 `WorkflowDeleteRequiresTerminalError` with envelope
+   * `{ code, status, transition: 'delete' }` (parallel to
+   * `tasks.delete`'s `InvalidTransition` envelope). A workflow whose
+   * own row is terminal but which still has an in-flight node task
+   * (e.g. the coordinator task draining its final tick after
+   * `finishWorkflow`) yields 409 `WorkflowDeleteHasInFlightTasks` with
+   * an envelope carrying the offending node ids — the operator should
+   * cancel the workflow first or wait briefly and retry.
+   */
+  "workflows.delete": defineRoute<
+    { params: WorkflowPathParams; query: WorkflowDeleteQuery },
+    void
+  >("DELETE", "/api/workspaces/:id/workflows/:wfid"),
   /**
    * Delete a single edge `(from, to)`. Endpoints live in the path,
    * not the body, so the route is RESTful: `DELETE` on the edge's

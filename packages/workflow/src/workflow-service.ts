@@ -29,6 +29,7 @@ import {
   ParentStateError,
   WorkflowAlreadyTerminalError,
   WorkflowDagInvariantError,
+  WorkflowDeleteRequiresTerminalError,
   WorkflowEdgeCycleError,
   WorkflowEdgeNotFoundError,
   WorkflowError,
@@ -591,6 +592,71 @@ export class WorkflowService {
     assertValidWorkflowId(workflowId);
     const wfDir = workflowDir(this.workspaceDir, workflowId);
     await safeRmDir(wfDir, this.logger);
+  }
+
+  // ─── deleteWorkflow ──────────────────────────────────────
+
+  /**
+   * Delete a workflow's substrate state. Two modes:
+   *
+   *   - **archive** (`opts.purgeDir !== true`, default): atomically
+   *     deletes the workflow row + every owned node row + every
+   *     owned edge row from the substrate DB. The on-disk shared
+   *     workflow dir (`<workspaceDir>/workflows/<workflowId>/`) and
+   *     any per-node task workdirs are preserved so the operator can
+   *     still inspect the run. The task substrate's per-node rows
+   *     are NOT touched by this method — the route layer composes
+   *     `tasks.delete(taskId, { purge: false })` for each node BEFORE
+   *     calling this so the cross-substrate metadata cleanup is
+   *     consistent.
+   *
+   *   - **purge** (`opts.purgeDir === true`): archive + remove the
+   *     shared workflow dir via {@link purge}. Per-node task workdirs
+   *     and runtime state are likewise the route layer's
+   *     responsibility (`tasks.delete(taskId, { purge: true })` per
+   *     node), so the same caller ordering applies.
+   *
+   * Lifecycle gate: the workflow MUST be in a terminal status
+   * (`succeeded` / `failed` / `cancelled`). A `running` workflow
+   * raises {@link WorkflowDeleteRequiresTerminalError} → 409 at the
+   * HTTP layer (the dashboard branches on the `transition: 'delete'`
+   * field to render a "Cancel first" CTA). The check is performed
+   * INSIDE the write tx so a concurrent transition to terminal
+   * (cancel-in-flight) doesn't race past the read.
+   *
+   * Missing workflow → {@link WorkflowNotFoundError}.
+   *
+   * The post-commit engine nudge that other mutation methods fire is
+   * intentionally omitted — the workflow no longer exists, so there
+   * is nothing for the engine to tick.
+   */
+  async deleteWorkflow(workflowId: string, opts?: { readonly purgeDir?: boolean }): Promise<void> {
+    assertValidWorkflowId(workflowId);
+    const purgeDir = opts?.purgeDir === true;
+
+    this.db.transaction((tx) => {
+      const wf = this.repo.readWorkflowTx(tx, workflowId);
+      if (wf === null) {
+        throw new WorkflowNotFoundError(workflowId);
+      }
+      if (wf.status === "running") {
+        throw new WorkflowDeleteRequiresTerminalError(workflowId, wf.status);
+      }
+      // Cascade order: edges → nodes → workflow. Cross-row FK is
+      // (workflow_id) so the row delete is the last step; edges
+      // before nodes guarantees the substrate never observes a
+      // dangling edge mid-tx.
+      this.repo.deleteEdgesByWorkflowTx(tx, workflowId);
+      this.repo.deleteNodesByWorkflowTx(tx, workflowId);
+      const removed = this.repo.deleteWorkflowTx(tx, workflowId);
+      if (!removed) {
+        throw new WorkflowNotFoundError(workflowId);
+      }
+    });
+
+    if (purgeDir) {
+      await this.purge(workflowId);
+    }
   }
 
   // ─── addNode ─────────────────────────────────────────────

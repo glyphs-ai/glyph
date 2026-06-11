@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   cancelWorkflow,
+  deleteWorkflow,
   type ServerConfig,
   type WorkflowHeaderWire,
   type WorkflowNodeWire,
@@ -16,7 +17,10 @@ import {
   type TimePreset,
 } from "../components/tasks/shared";
 import { CreateWorkflowModal } from "../components/workflows/CreateWorkflowModal";
-import { CancelWorkflowModal } from "../components/workflows/WorkflowConfirmModals";
+import {
+  CancelWorkflowModal,
+  DeleteWorkflowModal,
+} from "../components/workflows/WorkflowConfirmModals";
 import { WorkflowDetailSkeleton } from "../components/workflows/WorkflowDetailSkeleton";
 import { WorkflowFilters } from "../components/workflows/WorkflowFilters";
 import { WorkflowList } from "../components/workflows/WorkflowList";
@@ -201,6 +205,10 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   const [cancelTarget, setCancelTarget] = useState<WorkflowHeaderWire | null>(null);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkflowHeaderWire | null>(null);
+  const [deletePurge, setDeletePurge] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   // Single-open coordination for the per-row `⋯` action menus
   // (mirrors `Schedules.tsx`). At most one row's menu may be open at
   // a time so the panels don't visually overlap or fight for focus.
@@ -213,6 +221,16 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     setOpenMenuWorkflowId(null);
     setCancelError(null);
     setCancelTarget(target);
+  }, []);
+
+  const handleRowDelete = useCallback((target: WorkflowHeaderWire) => {
+    // Row menu invokes Delete: drop the menu, open the modal targeted
+    // at the row's workflow. Independent of master selection so any
+    // terminal workflow can be deleted in-place.
+    setOpenMenuWorkflowId(null);
+    setDeleteError(null);
+    setDeletePurge(false);
+    setDeleteTarget(target);
   }, []);
 
   const handleCreated = useCallback(
@@ -252,6 +270,32 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     },
     [cancelTarget, detail, refresh],
   );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await deleteWorkflow(deleteTarget.id, { purge: deletePurge });
+      if (!mounted.current) return;
+      // If the deleted workflow was the master selection, clear the
+      // URL slot so the detail pane doesn't try to fetch a now-404
+      // workflow header. The reconcile useEffect would also catch
+      // this on the next refresh tick, but clearing inline avoids
+      // the transient "workflow not found" alert.
+      if (effectiveSelectedId === deleteTarget.id) {
+        setMasterDetailUrl({ workflowId: null, nodeTaskId: null });
+      }
+      setDeleteTarget(null);
+      setDeletePurge(false);
+      await refresh();
+    } catch (e) {
+      if (!mounted.current) return;
+      setDeleteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (mounted.current) setDeleteBusy(false);
+    }
+  }, [deleteTarget, deletePurge, effectiveSelectedId, refresh, setMasterDetailUrl]);
 
   // When the selected workflow ends, surface the freshly-terminal row
   // by pulling the server state once more so the row's row-tint stops
@@ -342,6 +386,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
                     selectedId={effectiveSelectedId}
                     onSelect={onSelectWorkflow}
                     onCancel={handleRowCancel}
+                    onDelete={handleRowDelete}
                     openMenuId={openMenuWorkflowId}
                     onMenuOpenChange={setOpenMenuWorkflowId}
                   />
@@ -428,6 +473,23 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             setCancelError(null);
           }}
           onConfirm={handleConfirmCancel}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteWorkflowModal
+          target={deleteTarget}
+          purge={deletePurge}
+          onPurgeChange={setDeletePurge}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => {
+            if (deleteBusy) return;
+            setDeleteTarget(null);
+            setDeleteError(null);
+            setDeletePurge(false);
+          }}
+          onConfirm={handleConfirmDelete}
         />
       )}
     </>

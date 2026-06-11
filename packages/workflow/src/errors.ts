@@ -71,6 +71,26 @@ export class WorkflowAlreadyTerminalError extends WorkflowError {
 }
 
 /**
+ * Thrown by `deleteWorkflow` when invoked against a workflow whose
+ * status is still `running`. Deletion is a destructive lifecycle
+ * verb: the caller must cancel the workflow first (which the
+ * dashboard renders as a "Cancel first" CTA branched off
+ * `transition: 'delete'` in the 409 body). Maps to a 409 at the HTTP
+ * layer.
+ */
+export class WorkflowDeleteRequiresTerminalError extends WorkflowError {
+  override readonly name = "WorkflowDeleteRequiresTerminalError";
+  constructor(
+    public readonly workflowId: string,
+    public readonly status: string,
+  ) {
+    super(
+      `Workflow "${workflowId}" (status="${status}") cannot be deleted while non-terminal; cancel it first`,
+    );
+  }
+}
+
+/**
  * Thrown when a mutation targets a node whose status disallows the
  * change. The "structural sealing" rule: `replaceSpec` /
  * `removeNode` reject anything not `not_started`; `addEdge` /
