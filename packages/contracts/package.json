@@ -1,5 +1,6 @@
 {
   "name": "@glyphs-ai/contracts",
+  "private": true,
   "version": "0.0.1",
   "description": "Wire contracts for glyph. The strict-isolation entrypoint for dashboard + CLI: pure types only, with no orchestration code in the runtime graph.",
   "license": "MIT",

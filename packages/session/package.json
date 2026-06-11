@@ -1,5 +1,6 @@
 {
   "name": "@glyphs-ai/session",
+  "private": true,
   "version": "0.0.1",
   "description": "Per-session workdir registry for glyph (manages CLI sessions baked from a catalog, parameterised over a Runtime)",
   "license": "MIT",
