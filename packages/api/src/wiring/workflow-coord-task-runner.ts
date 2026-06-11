@@ -366,7 +366,7 @@ export function makeCoordNodeRunner(
         // (the per-workflow shared dir is coord-only by design;
         // workers stay workflow-unaware). The convention is doc-
         // only, not OS-enforced. Key names are stable identifiers
-        // referenced by `skills/coordinator/SKILL.md`.
+        // referenced by `skills/workflow-coordination/SKILL.md`.
         subprocessEnv: {
           GLYPH_WORKFLOW_ID: opts.workflowId,
           GLYPH_NODE_ID: opts.nodeId,

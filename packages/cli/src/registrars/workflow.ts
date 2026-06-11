@@ -84,7 +84,7 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
     .requiredOption("--brief <text>", "Workflow brief (non-empty)")
     .requiredOption(
       "--coord-agent <fqn>",
-      "Coordinator agent FQN (e.g. official/coordinator); must declare the official/coordinator skill",
+      "Coordinator agent FQN (e.g. official/coordinator); must declare the official/workflow-coordination skill",
     )
     .option("--details <text>", "Optional multi-line workflow context")
     .option(

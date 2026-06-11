@@ -1,11 +1,11 @@
 ---
-name: coordinator
+name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.1.0
+version: 0.2.0
 ---
 
-# Glyph Coordinator Skill
+# Glyph Workflow Coordination Skill
 
 The framework every workflow coordinator wake-up loads: how to read the DAG, what schema reviewer workers emit in `verdict.json`, how to plumb context into worker briefs, and how to author a sibling strategy skill. The case bank, brief templates, and stop condition for any given workflow live in a sibling **strategy skill** (for v1: `official/software-development-lifecycle`); the scaffolding here is strategy-agnostic.
 
@@ -106,21 +106,21 @@ Use `glyph workflow add-subgraph` with `tempId` references so every node + edge 
 ```jsonc
 {
   "nodes": [
-    { "tempId": "<role-a>", "kind": "worker", "parents": ["<self-node-id>"],
+    { "tempId": "<role-a>", "kind": "worker", "existingParents": ["<self-node-id>"],
       "spec": { "agent": "<agent-fqn>", "brief": "<substituted template>", "details": null } },
-    { "tempId": "<role-b>", "kind": "worker", "parents": ["<self-node-id>"],
+    { "tempId": "<role-b>", "kind": "worker", "existingParents": ["<self-node-id>"],
       "spec": { "agent": "<agent-fqn>", "brief": "<substituted template>", "details": null } },
-    { "tempId": "coord",    "kind": "coordinator", "parents": [],
+    { "tempId": "coord",    "kind": "coordinator",
       "spec": { "agent": "official/coordinator" } }
   ],
   "edges": [
-    { "from": "<role-a>", "to": "coord" },
-    { "from": "<role-b>", "to": "coord" }
+    { "from": { "tempId": "<role-a>" }, "to": { "tempId": "coord" } },
+    { "from": { "tempId": "<role-b>" }, "to": { "tempId": "coord" } }
   ]
 }
 ```
 
-The substrate resolves the `tempId`s within the transaction and returns the assigned node ids in `inserted[].nodeId`. Two universal rules: every fan-out MUST end in a `next-coord` whose parents are the newly-inserted workers (otherwise the branch dead-ends), and exactly one `add-subgraph` per wake-up (splitting a fan-out across two CLI calls leaves a half-formed DAG and may re-wake the wrong coord).
+The substrate resolves the `tempId`s within the transaction and returns the assigned node ids in `insertedNodes[].nodeId`. Two universal rules: every fan-out MUST end in a `next-coord` whose parents are the newly-inserted workers (otherwise the branch dead-ends), and exactly one `add-subgraph` per wake-up (splitting a fan-out across two CLI calls leaves a half-formed DAG and may re-wake the wrong coord).
 
 ---
 
@@ -181,7 +181,7 @@ version: 0.1.0                       # 3-segment semver
 ---
 ```
 
-Content-only: **no `dependencies:`** (the coord agent already declares the generic `official/coordinator` skill as a peer dep; adding deps here would shadow that scope), **no `prereqs:`** (the skill body is the entire contract — nothing to install).
+Content-only: **no `dependencies:`** (the coord agent already declares the generic `official/workflow-coordination` skill as a peer dep; adding deps here would shadow that scope), **no `prereqs:`** (the skill body is the entire contract — nothing to install).
 
 ### Required body sections (use these exact headings — the coord LLM and lint tooling key on them)
 

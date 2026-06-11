@@ -189,19 +189,19 @@ atomic.
   ```jsonc
   {
     "nodes": [
-      { "tempId": "n1", "kind": "worker", "parents": ["<existing-node-id>"],
+      { "tempId": "n1", "kind": "worker", "existingParents": ["<existing-node-id>"],
         "spec": { "agent": "official/engineer", "brief": "…", "details": "…" } },
-      { "tempId": "n2", "kind": "coordinator", "parents": [],
+      { "tempId": "n2", "kind": "coordinator",
         "spec": { "agent": "official/coordinator" } }
     ],
     "edges": [
-      { "from": "n1", "to": "n2" }   // tempIds resolve within the batch
+      { "from": { "tempId": "n1" }, "to": { "tempId": "n2" } }   // {tempId} resolves within the batch; use {nodeId} for an existing node
     ]
   }
   ```
 - Output (table): `tempId | nodeId | phase` per row
 - Output (json): `AddSubgraphResultWire` —
-  `{ inserted: [{ tempId, nodeId, phase }] }`
+  `{ insertedNodes: [{ tempId, nodeId, phase }] }`
 
 Substrate rules enforced atomically:
 - Every node's `parents` may reference existing-node ids OR tempIds from
@@ -211,7 +211,7 @@ Substrate rules enforced atomically:
   have exactly one successor coord per parent group), at-most-one-live-
   coord-per-parent invariant preserved post-insert.
 
-The coord strategies (see `official/coordinator` skill §B) build their
+The coord strategies (see `official/workflow-coordination` skill §B) build their
 "dev + next-coord" or "review + designer + next-coord" expansions with
 this command so the engine sees a self-consistent DAG slice.
 
@@ -363,15 +363,15 @@ jq . "$WD/verdict.json"
 cat > /tmp/expand.json <<EOF
 {
   "nodes": [
-    { "tempId": "dev",   "kind": "worker", "parents": ["$ME"],
+    { "tempId": "dev",   "kind": "worker", "existingParents": ["$ME"],
       "spec": { "agent": "official/engineer",
                 "brief":   $(printf '%s' "$WORKER_BRIEF" | jq -Rs .),
                 "details": $(printf '%s' "$WORKER_DETAILS" | jq -Rs .) } },
-    { "tempId": "coord", "kind": "coordinator", "parents": [],
+    { "tempId": "coord", "kind": "coordinator",
       "spec": { "agent": "official/coordinator" } }
   ],
   "edges": [
-    { "from": "dev", "to": "coord" }
+    { "from": { "tempId": "dev" }, "to": { "tempId": "coord" } }
   ]
 }
 EOF
@@ -395,7 +395,7 @@ glyph workflow finish --wfid "$WFID" --outcome failed \
 
 ## See also
 
-- `official/coordinator` skill — coord's operating model, strategies, brief
+- `official/workflow-coordination` skill — coord's operating model, strategies, brief
   templates, and verdict.json schema. The skill is the contract for what
   *should* be dispatched; this reference documents *how* to dispatch it.
 - `SKILL.md` (this skill) — output / exit-code discipline and workspace

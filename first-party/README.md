@@ -32,7 +32,7 @@ The glyph dashboard's "Install from URL" field also accepts these.
 ### Skills
 
 - `official/cli` — glyph CLI command reference (workspace, agent, task, session, catalog subcommands)
-- `official/coordinator` — generic coordinator framework (DAG reading, verdict schema, worker brief plumbing)
+- `official/workflow-coordination` — generic coordinator framework (DAG reading, verdict schema, worker brief plumbing); loaded by the `official/coordinator` agent
 - `official/software-development-lifecycle` — engineer → review+designer iterate-to-clean strategy (loaded by `official/coordinator`)
 - `official/dispatch-watchdog` — script + pattern for blocking on a long-running task
 - `official/dispatch-with-details` — pattern for dispatching tasks with structured detail bodies

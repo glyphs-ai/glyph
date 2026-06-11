@@ -325,7 +325,7 @@ describe("workflowCreate — server error envelope", () => {
       {
         status: 400,
         body: JSON.stringify({
-          error: "coordinatorAgent must declare official/coordinator",
+          error: "coordinatorAgent must declare official/workflow-coordination",
           code: "CoordinatorAgentInvalidError",
         }),
       },

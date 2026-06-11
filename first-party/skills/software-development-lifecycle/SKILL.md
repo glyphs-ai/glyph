@@ -1,13 +1,13 @@
 ---
 name: software-development-lifecycle
 scope: official
-description: "Strategy skill for official/coordinator — the engineer → review+designer iterate-to-clean orchestration: case bank, brief templates, placeholder resolution, stop condition, failure-mode coverage"
-version: 0.1.0
+description: "Strategy skill for the official/coordinator agent — the engineer → review+designer iterate-to-clean orchestration: case bank, brief templates, placeholder resolution, stop condition, failure-mode coverage"
+version: 0.1.1
 ---
 
 # Glyph Software-Development-Lifecycle Strategy Skill
 
-Strategy: dispatch a single `official/engineer` worker; on success, fan out to parallel `official/reviewer` + `official/designer` reviewers; finish succeeded if both verdicts come back clean (APPROVE with at most minor findings), else dispatch the next `official/engineer` iteration with prior verdicts available, and loop. Loaded by the `official/coordinator` agent alongside the generic `official/coordinator` skill at every coord wake-up.
+Strategy: dispatch a single `official/engineer` worker; on success, fan out to parallel `official/reviewer` + `official/designer` reviewers; finish succeeded if both verdicts come back clean (APPROVE with at most minor findings), else dispatch the next `official/engineer` iteration with prior verdicts available, and loop. Loaded by the `official/coordinator` agent alongside the generic `official/workflow-coordination` skill at every coord wake-up.
 
 ---
 
