@@ -160,7 +160,6 @@ function relPosix(absFile: string): string {
  * its own name in its own source is at worst a circular-import bug, but
  * it cannot be a fence break — see `collectSourceViolations`); other
  * cross-pkg specifier-shaped mentions are surfaced for review.
- * Over-cautious for now is better than missing real fence breaks.
  */
 function extractGlyphSpecifiers(source: string): string[] {
   const re = /(?:from|import)\s*\(?\s*["'](@glyphs-ai\/[A-Za-z0-9_-]+)["']/g;

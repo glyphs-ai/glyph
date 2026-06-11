@@ -12,20 +12,6 @@
  * This file stays limited to HTTP round-trips so it pays one cold
  * server boot instead of one boot per command case.
  *
- * Skipped (with reason):
- *
- *   - `glyph task dispatch` happy path: requires a registered agent
- *     in the workspace's catalog, which in turn requires either
- *     pre-seeded fixture content or running the catalog install path
- *     against a real upstream. Out of scope for a smoke test — the
- *     argv layer and the API-error contract are both covered already
- *     (see argv-validation `--brief` rejection cases and
- *     api-contract.test.ts `unknown agent` mapping).
- *   - `glyph task activity --limit 5`: needs an existing task id,
- *     which depends on the dispatch happy path above. Same reasoning.
- *
- * These are stretch goals for deeper task-flow coverage, not smoke
- * checks for this file.
  */
 
 import { existsSync } from "node:fs";
@@ -33,31 +19,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CLI_BIN, pickPort, runBin as run } from "../_helpers/cli-bundle.js";
+import { CLI_BIN, pickPort, runBin as run, SCRUBBED_ENV } from "../_helpers/cli-bundle.js";
 
 // Module-scoped because every test shares the boot. Set in
 // `beforeAll`, read by every `it(...)`.
 let home: string;
 let port: number;
 let sharedEnv: NodeJS.ProcessEnv;
-
-/**
- * `runBin` does `env: { ...process.env, ...env }`. Without explicit
- * clears, env vars left in the developer's shell (`GLYPH_SERVER`,
- * `PORT`, `GLYPH_WORKSPACE`, `GLYPH_HOME`) leak into every spawn
- * and break tests in surprising ways — e.g. `GLYPH_SERVER` set
- * from a previous `pnpm dev` makes `glyph health` connect to the
- * dev port (41817) instead of the test's freshly-spawned port. Pass
- * `undefined` for each to delete the inherited entry before the
- * test's own `GLYPH_HOME` is merged on top.
- */
-const SCRUBBED_ENV: NodeJS.ProcessEnv = {
-  GLYPH_SERVER: undefined,
-  GLYPH_WORKSPACE: undefined,
-  GLYPH_HOME: undefined,
-  PORT: undefined,
-  GLYPH_HOST: undefined,
-};
 
 describe.sequential("integration smoke", () => {
   beforeAll(async () => {

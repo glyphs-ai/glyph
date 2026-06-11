@@ -24,8 +24,8 @@ test/
 ```
 
 Tests are grouped by the **subject** of the test (`test/architecture/`
-for repo-wide source-tree audits, `test/cli/` for CLI lifecycle,
-future `test/runtime/`, ...) — not by their origin package.
+for repo-wide source-tree audits, `test/cli/` for CLI lifecycle) —
+not by their origin package.
 
 Architecture audits follow the canonical tier model: T0 foundations are
 workspace, runtime, schedule, terminal, and catalog; T1 modes are
@@ -67,9 +67,3 @@ files each pay one real server boot. On Linux/macOS it's typically
 faster because the spawn + SQLite startup paths are cheaper there.
 The `test/architecture/` audits add < 1 s each (pure file-tree
 walks).
-
-## Future work
-
-Real-spawn runtime layer coverage is the next planned addition; one
-test file per `packages/runtime/dispatch-*` entry point will land here
-when scheduled.

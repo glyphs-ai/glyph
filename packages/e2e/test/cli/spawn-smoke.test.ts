@@ -37,7 +37,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BIN_AVAILABLE, CLI_BIN, pickPort, runBin } from "../_helpers/cli-bundle.js";
+import { BIN_AVAILABLE, CLI_BIN, pickPort, runBin, SCRUBBED_ENV } from "../_helpers/cli-bundle.js";
 
 // ─── lifecycle (shared boot) ──────────────────────────────────────────
 
@@ -55,7 +55,7 @@ describe.sequential("spawn smoke (lifecycle)", () => {
     }
     home = await mkdtemp(path.join(tmpdir(), "glyph-cli-spawn-"));
     port = pickPort();
-    env = { GLYPH_HOME: home };
+    env = { ...SCRUBBED_ENV, GLYPH_HOME: home };
     const r = await runBin(["start", "--port", String(port), "--no-serve-static"], env);
     if (r.exitCode !== 0) {
       throw new Error(`server failed to start (exit ${r.exitCode}): ${r.stderr}`);
@@ -150,7 +150,7 @@ describe("spawn smoke (status cleans up stale runtime.json)", () => {
       }),
       "utf8",
     );
-    const r = await runBin(["status"], { GLYPH_HOME: home });
+    const r = await runBin(["status"], { ...SCRUBBED_ENV, GLYPH_HOME: home });
     expect(r.exitCode).toBe(3);
     expect(r.stdout).toMatch(/not running/);
     expect(existsSync(rfPath)).toBe(false);

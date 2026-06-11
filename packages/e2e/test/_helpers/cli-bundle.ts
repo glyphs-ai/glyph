@@ -30,6 +30,20 @@ export interface Run {
 }
 
 /**
+ * `runBin` does `env: { ...process.env, ...env }`. Without explicit
+ * clears, env vars left in the developer's shell (`GLYPH_SERVER`,
+ * `PORT`, `GLYPH_WORKSPACE`, `GLYPH_HOME`) leak into spawns and can
+ * make tests connect to an unrelated server or home directory.
+ */
+export const SCRUBBED_ENV: NodeJS.ProcessEnv = {
+  GLYPH_SERVER: undefined,
+  GLYPH_WORKSPACE: undefined,
+  GLYPH_HOME: undefined,
+  PORT: undefined,
+  GLYPH_HOST: undefined,
+};
+
+/**
  * Spawn the bundled CLI in a child process and capture stdout/stderr.
  *
  * Env merge: starts from `process.env`, then applies `env` on top.
