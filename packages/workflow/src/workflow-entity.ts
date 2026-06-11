@@ -224,8 +224,8 @@ export class WorkflowNodeEntity {
    *     ids fail grammar.
    *   - `WorkflowEnumValueCorruptionError` if `status` is not in the
    *     known node-status vocabulary.
-   *   - `WorkflowNodeKindShapeError` if `kind` is not a known
-   *     `WorkflowNodeKind` (defensive guard against schema corruption).
+   *   - `WorkflowNodeKindShapeError` / `WorkflowNodeKindCorruptionError`
+   *     if `kind` is malformed or outside the closed enum.
    *   - `WorkflowError` if `spec_json` is not valid JSON.
    *   - `WorkflowError` if `metadata` is not a valid JSON object
    *     (the column was added with the stuck-coord-recovery work; the

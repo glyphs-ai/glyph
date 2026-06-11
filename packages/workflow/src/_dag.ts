@@ -101,9 +101,8 @@ export function parentsOf(
  *   - `coordinator`: every parent must be in any terminal status
  *     (coord wakes on failures specifically to drive recovery).
  *
- * Exhaustive over `WorkflowNodeKind`; the `never` branch is a
- * compile-time guarantee that any future enum extension surfaces
- * here.
+ * Exhaustive over `WorkflowNodeKind`; the `never` branch makes enum
+ * extensions surface here at compile time.
  */
 export function parentsReadyForKind(
   kind: WorkflowNodeKind,
@@ -146,16 +145,6 @@ export function wouldCreateCycle(
     for (const n of adj.get(cur) ?? []) stack.push(n);
   }
   return false;
-}
-
-export function parseSpecJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    throw new WorkflowError(
-      `Failed to parse coord spec_json: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
 }
 
 // ─── addSubgraph batch helpers (pure) ───────────────────────────────

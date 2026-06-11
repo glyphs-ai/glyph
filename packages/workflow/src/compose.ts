@@ -96,13 +96,11 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
   });
   service.setEngine(engine);
 
-  engine.start();
-
   return {
     service,
     engine,
     async close() {
-      await engine.stop();
+      await engine.drain();
       sqlite?.close();
     },
   };

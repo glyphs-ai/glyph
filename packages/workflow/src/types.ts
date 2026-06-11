@@ -101,9 +101,7 @@ export type WorkflowFailure =
  * Payload attached when a workflow transitions to `cancelled`. Set
  * by the cancelWorkflow route.
  *
- * Single-arm interface — `kind` is retained as a discriminator so
- * future cancellation sources (e.g. parent-workflow cascade) can be
- * added without breaking the wire shape.
+ * Single-arm interface — `kind` is retained as a discriminator.
  *
  *   - `user` — operator called cancelWorkflow via dashboard / CLI.
  */

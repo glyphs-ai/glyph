@@ -23,7 +23,7 @@ import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlit
  * `ended_at` is non-null iff `status` is terminal, but this and the
  * `coordinator_agent` denorm rule are engine-enforced inside the
  * mutation primitives, NOT DDL constraints, so the DDL stays
- * permissive across future tweaks.
+ * permissive.
  *
  * The workflow's on-disk directory is NOT stored — it's derived via
  * `workflowDir(workspaceDir, id)` so a workspace move only requires
@@ -59,8 +59,7 @@ export const workflows = sqliteTable(
  * Persisted row for one workflow node.
  *
  * Polymorphic on `kind`. Two kinds ship: `'worker'` and `'coordinator'`.
- * (`'human'` is reserved for a future iteration.) The substrate is
- * kind-agnostic — each row is routed through a compose-time
+ * The substrate is kind-agnostic — each row is routed through a compose-time
  * `WorkflowNodeRunner` for kind-specific concerns (spec
  * validation, dispatch, cancel).
  *

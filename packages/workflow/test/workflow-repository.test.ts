@@ -176,30 +176,6 @@ describe("WorkflowRepository — CRUD round-trips", () => {
     expect(edges[0]?.from).toBe(COORD_ID);
     expect(edges[0]?.to).toBe(WORKER_ID);
   });
-
-  it("listNonTerminalNodes filters to {not_started, ready, running}", () => {
-    db.db.transaction((tx) => {
-      repo.insertWorkflow(tx, makeWf());
-      repo.insertNode(tx, makeNode({ id: COORD_ID, status: "running" }));
-      repo.insertNode(
-        tx,
-        makeNode({ id: WORKER_ID, kind: "worker", phase: 1, status: "succeeded" }),
-      );
-      repo.insertNode(
-        tx,
-        makeNode({
-          id: "550e8400-e29b-41d4-a716-446655440003",
-          kind: "worker",
-          phase: 1,
-          status: "not_started",
-        }),
-      );
-    });
-    const live = db.db.transaction((tx) => repo.listNonTerminalNodes(tx, WF_ID));
-    expect(live.map((n) => n.id).sort()).toEqual(
-      [COORD_ID, "550e8400-e29b-41d4-a716-446655440003"].sort(),
-    );
-  });
 });
 
 describe("WorkflowRepository — defense-in-depth id validation", () => {

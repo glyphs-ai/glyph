@@ -1,4 +1,5 @@
 import path from "node:path";
+import { WorkflowError } from "./errors.js";
 import { assertValidWorkflowId, assertValidWorkflowNodeId } from "./validate.js";
 
 /** Subdirectory under `<workspaceDir>/` where per-workflow workdirs live. */
@@ -31,7 +32,7 @@ export function safeJoinUnderRoot(root: string, id: string): string {
     id.includes("\\") ||
     id.includes("\0")
   ) {
-    throw new Error(`invalid workflow path component: ${JSON.stringify(id)}`);
+    throw new WorkflowError(`invalid workflow path component: ${JSON.stringify(id)}`);
   }
   const normalizedRoot = path.resolve(root);
   const candidate = path.resolve(normalizedRoot, id);
@@ -39,10 +40,12 @@ export function safeJoinUnderRoot(root: string, id: string): string {
     ? normalizedRoot
     : normalizedRoot + path.sep;
   if (!candidate.startsWith(rootWithSep) && candidate !== normalizedRoot) {
-    throw new Error(`refused: candidate path escapes root (${candidate} not under ${rootWithSep})`);
+    throw new WorkflowError(
+      `refused: candidate path escapes root (${candidate} not under ${rootWithSep})`,
+    );
   }
   if (candidate === normalizedRoot) {
-    throw new Error("refused: candidate path equals root");
+    throw new WorkflowError("refused: candidate path equals root");
   }
   return candidate;
 }

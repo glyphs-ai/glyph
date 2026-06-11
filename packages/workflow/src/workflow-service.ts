@@ -435,9 +435,8 @@ export class WorkflowService {
    *     workflow id; the repository escapes `LIKE` metacharacters so
    *     a `%` typed into the search box doesn't widen the match.
    *
-   * Per-workspace volume is small enough that pagination is not yet
-   * needed — same shape as `ScheduleService.list` /
-   * `TaskService.list`.
+   * Per-workspace volume is small enough to use the same unbounded
+   * shape as `ScheduleService.list` / `TaskService.list`.
    */
   async list(opts: ListWorkflowOpts = {}): Promise<readonly WorkflowEntity[]> {
     return this.repo.listWorkflows(opts);
@@ -512,9 +511,6 @@ export class WorkflowService {
     const validateCtx: WorkflowNodeValidateCtx = {
       workflowId,
       workflowStatus: "running",
-      // Bootstrap validate context: the coord about to be installed is
-      // the one whose dispatch menu future worker validates must
-      // resolve against. See WorkflowNodeValidateCtx.coordinatorAgent.
       coordinatorAgent: opts.coordinatorAgent,
     };
     const validatedSpec = await runner.validate(coordSpec, validateCtx);
@@ -783,7 +779,7 @@ export class WorkflowService {
 
     // Post-commit eager-dispatch reaction. Without this, a coord that
     // adds a node whose parents are all already terminal would
-    // deadlock — no future parent-termination event would ever fire
+    // deadlock — no later parent-termination event would ever fire
     // to wake the new node. `dispatchAtomic` re-checks readiness
     // atomically so a concurrent parent cancel is handled safely.
     const parentEntitiesForReadiness = await Promise.all(
@@ -806,8 +802,6 @@ export class WorkflowService {
 
   async addEdge(workflowId: string, opts: AddEdgeOpts): Promise<AddEdgeResult> {
     let resultToPhase = 0;
-    let toKind = "";
-    let toNodeStatusAfter: WorkflowNodeStatus = "not_started";
     let dispatchCandidates: string[] = [];
     let retryResult: StuckRecoveryOutcome = { inserted: false };
 
@@ -868,9 +862,6 @@ export class WorkflowService {
       const phaseDiff = this.recomputePhasesInTx(tx, workflowId, [opts.toNodeId]);
       this.repo.updateNodePhases(tx, phaseDiff);
       resultToPhase = phaseDiff.get(opts.toNodeId) ?? toNode.phase;
-      toKind = toNode.kind;
-      toNodeStatusAfter = toNode.status;
-
       // Candidates for the post-commit dispatch reaction: the to-node
       // plus any not_started descendant whose phase was recomputed.
       // (The recompute set IS the set of not_started descendants.)
@@ -883,8 +874,6 @@ export class WorkflowService {
     // Post-commit eager-dispatch reaction. dispatchAtomic re-checks
     // readiness inside its own tx, so a concurrent parent cancel
     // between this read and the dispatch tx is a no-op.
-    void toKind;
-    void toNodeStatusAfter;
     for (const candidateId of dispatchCandidates) {
       const node = await this.repo.readNode(candidateId);
       if (node === null) continue;
@@ -1125,9 +1114,7 @@ export class WorkflowService {
       // Orphan-child check uses the PRE-delete edge set. Performed
       // BEFORE the row + edge deletes so a rejected call leaves no
       // state behind (the tx would still roll back on throw, but
-      // surfacing the rejection earlier keeps the code self-evident
-      // and avoids the rare case of a write-then-throw partial
-      // application in a future refactor).
+      // surfacing the rejection earlier keeps the code self-evident).
       const liveEdges = this.repo.listEdgesByWorkflowTx(tx, workflowId);
       const childIds = liveEdges.filter((e) => e.from === nodeId).map((e) => e.to);
       const parentsByChild = new Map<string, string[]>();
@@ -1221,15 +1208,11 @@ export class WorkflowService {
         throw new WorkflowRemoveEdgeOrphansChildError(workflowId, opts.fromNodeId, opts.toNodeId);
       }
 
-      const deleted = this.repo.deleteEdgeTx(tx, {
+      this.repo.deleteEdgeTx(tx, {
         workflowId,
         from: opts.fromNodeId,
         to: opts.toNodeId,
       });
-      // Defensive: the row was present per the `exists` check above;
-      // a 0-rows delete here would indicate a concurrent mutation,
-      // which the auth gate + tx isolation already preclude.
-      void deleted;
 
       const phaseDiff = this.recomputePhasesInTx(tx, workflowId, [opts.toNodeId]);
       this.repo.updateNodePhases(tx, phaseDiff);
@@ -1326,11 +1309,9 @@ export class WorkflowService {
         throw new WorkflowNodeNotMutableError(workflowId, nodeId, node.status, "replaceSpec");
       }
       // The substrate's view of `kind` comes from the `kind` column,
-      // not from spec_json. Even if a future runner returned a spec
-      // with a `kind` field, the substrate ignores it on read — the
-      // immutable-kind contract is enforced by the absence of a
-      // `newKind` arg AND by `kind` being persisted in its own
-      // column.
+      // not from spec_json. The immutable-kind contract is enforced by
+      // the absence of a `newKind` arg AND by `kind` being persisted
+      // in its own column.
       if (node.kind !== nodeKind) {
         throw new WorkflowError(
           `replaceSpec: kind changed between Phase A read and tx (${nodeKind} → ${node.kind}); concurrent schema mutation?`,
@@ -1713,8 +1694,7 @@ export class WorkflowService {
       // has a single source of truth for the (created_at DESC, id
       // DESC) ordering. The equality holds in normal operation
       // (freshly-inserted coord wins on createdAt), but the explicit
-      // check defends against any future schema-corruption case the
-      // helper is hardened against.
+      // check keeps this path aligned with the helper's ordering.
       if (latestCoordTempId !== null) {
         const validatedSpec = validatedSpecByTempId.get(latestCoordTempId) as { agent: string };
         const newCoordNodeId = tempIdToNodeId.get(latestCoordTempId) as string;
@@ -2049,8 +2029,7 @@ export class WorkflowService {
     // caller's tx so the coord-node INSERT and the
     // `workflows.coordinator_agent` cache can never get out of
     // sync. The substrate exposes no public repo method for this
-    // because `insertCoordNodeInTx` is the sole call site (used by
-    // both `createWorkflow` and `addNode(kind='coordinator')`).
+    // because coordinator inserts are centralized in this helper.
     tx.update(workflows)
       .set({ coordinatorAgent: args.validatedSpec.agent })
       .where(eq(workflows.id, args.workflowId))

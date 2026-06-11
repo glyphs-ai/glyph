@@ -20,7 +20,7 @@
  *      (asserted via interleaving-free dispatch ordering)
  *   7. cross-workflow parallelism → two workflows progress
  *      independently
- *   8. engine.stop() drains in-flight ticks
+ *   8. engine.drain() awaits in-flight ticks
  *   9. structural rules still fire (worker requires ≥1 parent)
  */
 
@@ -533,21 +533,21 @@ describe("WorkflowEngine integration", () => {
     );
   });
 
-  it("engine.stop() drains in-flight ticks (no dispatch lands after stop)", async () => {
+  it("engine.drain() awaits in-flight ticks (no dispatch lands after drain)", async () => {
     const { initialCoordNodeId } = await h.module.service.createWorkflow({
-      brief: "stop-test",
+      brief: "drain-test",
       coordinatorAgent: "coord-agent",
     });
-    // Wait for the coord to advance, then stop. After stop further
+    // Wait for the coord to advance, then drain. After drain further
     // ticks should be no-ops.
     await waitUntil(
       async () => (await h.module.service.getNode(initialCoordNodeId)).status === "succeeded",
       2000,
       "coord succeeded",
     );
-    await h.module.engine.stop();
+    await h.module.engine.drain();
     const dispatchesBefore = h.coord.dispatchCalls.length;
-    // Trigger after stop — should be a no-op.
+    // Trigger after drain — should be a no-op.
     h.module.engine.triggerWorkflowTick("any-id-does-not-matter");
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(h.coord.dispatchCalls.length).toBe(dispatchesBefore);

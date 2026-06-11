@@ -23,6 +23,7 @@ import {
   InvalidWorkflowNodeIdError,
   WorkflowEnumValueCorruptionError,
   WorkflowError,
+  WorkflowNodeKindCorruptionError,
   WorkflowNodeKindShapeError,
 } from "./errors.js";
 import type {
@@ -147,16 +148,17 @@ export function assertValidWorkflowNodeStatusEnum(
 }
 
 /**
- * Closed-set check for `workflow_nodes.kind`. The substrate ships
- * the two `WorkflowNodeKind` values `'coordinator'` and `'worker'`; any
- * other value is rejected as a schema-shape violation (signals a
- * corrupted row). Used by
- * `WorkflowNodeEntity.fromRow` so the typed entity field can carry
- * the closed-enum type directly.
+ * Closed-set check for `workflow_nodes.kind`. Non-string / empty
+ * values are shape errors; unknown string values are row corruption.
+ * Used by `WorkflowNodeEntity.fromRow` so the typed entity field can
+ * carry the closed-enum type directly.
  */
 export function assertValidWorkflowNodeKind(kind: unknown): asserts kind is WorkflowNodeKind {
-  if (kind !== "coordinator" && kind !== "worker") {
+  if (typeof kind !== "string" || kind.length === 0) {
     throw new WorkflowNodeKindShapeError(String(kind));
+  }
+  if (kind !== "coordinator" && kind !== "worker") {
+    throw new WorkflowNodeKindCorruptionError(kind);
   }
 }
 

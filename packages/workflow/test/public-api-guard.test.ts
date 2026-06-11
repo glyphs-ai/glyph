@@ -280,8 +280,8 @@ describe("@glyphs-ai/workflow public API guard", () => {
 
   it("WorkflowModule exposes the engine alongside service + close", () => {
     // The engine field is the structural seam composition callers
-    // use to drive `start()` (currently a no-op) and `stop()`
-    // (drains in-flight per-workflow tick chains). The type is left
+    // use to drive `drain()` (awaits in-flight per-workflow tick
+    // chains and gates further triggers). The type is left
     // opaque-ish (no static reference to the class) — downstream
     // consumers should not import the engine directly; they
     // interact through the module.

@@ -23,7 +23,7 @@ type Db = BetterSQLite3Database<typeof schema>;
  * any spec payload beyond passing it through as opaque JSON.
  *
  * Defense-in-depth id validation lives here so the table grammar is
- * enforced even if a future caller forgets to validate at the boundary.
+ * enforced at the repository boundary.
  *
  * Reads accept the package's `Db`; writes inside a transaction accept
  * the transactional `Db` handed back from `db.transaction((tx) => …)`
@@ -62,9 +62,9 @@ export class WorkflowRepository {
    *     escapes the `LIKE` metacharacters `%` / `_` so a literal id
    *     fragment from a search box doesn't accidentally widen.
    *
-   * Per-workspace volume is small enough that pagination is not yet
-   * needed — mirrors `ScheduleService.list` / `TaskService.list`
-   * which are also unbounded on the same per-workspace scope.
+   * Per-workspace volume is small enough to mirror
+   * `ScheduleService.list` / `TaskService.list`, which are also
+   * unbounded on the same per-workspace scope.
    */
   async listWorkflows(opts?: {
     readonly coordinatorAgent?: string;
@@ -412,27 +412,6 @@ export class WorkflowRepository {
       .select()
       .from(workflowNodes)
       .where(inArray(workflowNodes.id, ids as string[]))
-      .all();
-    return rows.map((row) => WorkflowNodeEntity.fromRow(row));
-  }
-
-  /**
-   * Fetch all non-terminal nodes for a workflow inside the caller's
-   * tx. Used by the cancel reconciliation paths in `finishWorkflow` /
-   * `cancelWorkflow`.
-   */
-  listNonTerminalNodes(tx: Db, workflowId: string): readonly WorkflowNodeEntity[] {
-    assertValidWorkflowId(workflowId);
-    const nonTerminal: WorkflowNodeStatus[] = ["not_started", "ready", "running"];
-    const rows = tx
-      .select()
-      .from(workflowNodes)
-      .where(
-        and(
-          eq(workflowNodes.workflowId, workflowId),
-          inArray(workflowNodes.status, nonTerminal as string[]),
-        ),
-      )
       .all();
     return rows.map((row) => WorkflowNodeEntity.fromRow(row));
   }

@@ -269,11 +269,8 @@ export class WorkflowEnumValueCorruptionError extends WorkflowError {
 
 /**
  * Thrown by `assertValidWorkflowNodeKind` when the value is not a
- * non-empty string. Distinct from {@link WorkflowEnumValueCorruptionError}:
- * the entity-layer kind guard checks shape only (`assertValidXxx`
- * pattern); membership against the closed `WorkflowNodeKind` enum is
- * enforced separately by {@link WorkflowNodeKindCorruptionError} when
- * the substrate routes per-kind logic against a persisted row.
+ * non-empty string. Unknown string values use
+ * {@link WorkflowNodeKindCorruptionError}.
  */
 export class WorkflowNodeKindShapeError extends WorkflowError {
   override readonly name = "WorkflowNodeKindShapeError";

@@ -7,7 +7,7 @@
  *
  * This module contains no `setInterval` or `setTimeout`. Polling
  * cadence is per-host and lives inside the concrete runner
- * implementations (e.g. `workflow-task-runner.ts` polls
+ * implementations (e.g. `workflow-worker-task-runner.ts` polls
  * `tasks.get(...)` to discover terminal status). The engine reacts
  * to two events only:
  *
@@ -56,7 +56,7 @@
  * # State
  *
  * Pure in-memory: a `Map<workflowId, Promise>` chain + a
- * `shuttingDown` flag + the injected deps. No tables, no module-
+ * `draining` flag + the injected deps. No tables, no module-
  * level mutables, no persistence — engine restart = in-flight nodes
  * stuck `running` until a recovery hook lands.
  */
@@ -77,7 +77,7 @@ export class WorkflowEngine {
   private readonly service: WorkflowService;
   private readonly logger: Logger;
   private readonly perWorkflowChain = new Map<string, Promise<void>>();
-  private shuttingDown = false;
+  private draining = false;
 
   constructor(opts: WorkflowEngineOpts) {
     this.service = opts.service;
@@ -85,26 +85,18 @@ export class WorkflowEngine {
   }
 
   /**
-   * Lifecycle hook called by `compose.ts` after construction.
-   *
-   * Currently a no-op: there are no timers to launch and no
-   * recovery scan to run. Engine-restart recovery is not yet
-   * implemented — in-flight nodes from a previous process stay
-   * `running` until a recovery hook lands. Present as a named
-   * method so compose stays symmetrical with `stop()` and gives a
-   * stable place to plug recovery in without changing the boot
-   * contract.
-   */
-  start(): void {
-    this.logger.debug("WorkflowEngine.start: currently a no-op");
-  }
-
-  /**
-   * Graceful shutdown. Flips `shuttingDown` (so further
-   * `triggerWorkflowTick` calls are no-ops) then awaits every
+   * Drain the engine: flip `draining` (so further
+   * `triggerWorkflowTick` calls are no-ops) then await every
    * in-flight per-workflow tick chain. Idempotent — repeated calls
    * after the first await the same set of (already-settled)
    * promises and return immediately.
+   *
+   * There is no paired `start()` because the engine has no setup
+   * gate — it is operational from construction (Map empty,
+   * `draining` false, no timers, no recovery scan). Drain is the
+   * only lifecycle hook the engine needs because it is the only
+   * point where state has to be flipped (the gate) and external
+   * work has to be awaited (the in-flight chains).
    *
    * Note: this does NOT cancel in-flight runner dispatches. A
    * `runner.dispatch` that's mid-poll continues to its natural
@@ -113,8 +105,8 @@ export class WorkflowEngine {
    * responsibility and is invoked by the test composition's
    * shutdown step.
    */
-  async stop(): Promise<void> {
-    this.shuttingDown = true;
+  async drain(): Promise<void> {
+    this.draining = true;
     const inflight = Array.from(this.perWorkflowChain.values());
     if (inflight.length === 0) return;
     await Promise.allSettled(inflight);
@@ -138,7 +130,7 @@ export class WorkflowEngine {
    * cumulative count of ever-touched workflows.
    */
   triggerWorkflowTick(workflowId: string): void {
-    if (this.shuttingDown) return;
+    if (this.draining) return;
     const prev = this.perWorkflowChain.get(workflowId) ?? Promise.resolve();
     const next: Promise<void> = prev
       .then(() => this.tickOnce(workflowId))
@@ -169,11 +161,11 @@ export class WorkflowEngine {
    * (which is idempotent) and then re-enters
    * `triggerWorkflowTick(workflowId)` so the workflow advances.
    *
-   * Skips the entire tick (no-op return) when `shuttingDown` has
-   * been flipped between the trigger and this body running.
+   * Skips the entire tick (no-op return) when `draining` has been
+   * flipped between the trigger and this body running.
    */
   private async tickOnce(workflowId: string): Promise<void> {
-    if (this.shuttingDown) return;
+    if (this.draining) return;
     let eligible: readonly string[];
     try {
       eligible = await this.service.listEligibleNodeIdsForDispatch(workflowId);

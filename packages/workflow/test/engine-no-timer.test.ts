@@ -3,7 +3,7 @@
  *
  * The engine module MUST NOT contain `setInterval` or `setTimeout`.
  * All polling cadence lives inside concrete runner implementations
- * (e.g. `packages/api/src/wiring/workflow-task-runner.ts`).
+ * (e.g. `packages/api/src/wiring/workflow-worker-task-runner.ts`).
  *
  * This is a SOURCE-level grep — strings appearing inside JSDoc
  * comments (e.g. "MUST NOT contain `setInterval`") are intentionally

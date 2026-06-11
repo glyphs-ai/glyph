@@ -12,6 +12,7 @@ import {
   InvalidWorkflowIdError,
   InvalidWorkflowNodeIdError,
   WorkflowEnumValueCorruptionError,
+  WorkflowNodeKindCorruptionError,
   WorkflowNodeKindShapeError,
 } from "../src/errors.js";
 import {
@@ -185,12 +186,10 @@ describe("assertValidWorkflowNodeKind (closed enum: 'coordinator' | 'worker')", 
 
   it("rejects values outside the closed WorkflowNodeKind enum", () => {
     // The substrate's `WorkflowNodeKind` is `'coordinator' | 'worker'`. Any
-    // other persisted value signals schema corruption; the validator
-    // surfaces it as a shape error so entity round-trips fail loudly at
-    // `fromRow()` rather than smuggling junk into the typed runtime.
-    for (const bad of ["task", "evaluator", "future-kind-99", "Worker", "WORKER", "human"]) {
+    // other persisted string value signals schema corruption.
+    for (const bad of ["task", "evaluator", "unknown-kind-99", "Worker", "WORKER", "human"]) {
       expect(() => assertValidWorkflowNodeKind(bad), `expected reject: ${bad}`).toThrowError(
-        WorkflowNodeKindShapeError,
+        WorkflowNodeKindCorruptionError,
       );
     }
   });
