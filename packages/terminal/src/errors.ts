@@ -7,6 +7,13 @@ export class NoTerminalFoundError extends Error {
   }
 }
 
+export class InvalidLaunchCommandError extends Error {
+  override readonly name = "InvalidLaunchCommandError";
+  constructor(reason: string) {
+    super(`Invalid launch command: ${reason}`);
+  }
+}
+
 export class TerminalSpawnFailedError extends Error {
   override readonly name = "TerminalSpawnFailedError";
   constructor(

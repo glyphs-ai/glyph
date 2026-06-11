@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  type LaunchCommand,
-  spawnTerminalWith,
-  TerminalSpawnFailedError,
-} from "../../src/index.js";
+import { spawnTerminalWith } from "../../src/dispatch.js";
+import { type LaunchCommand, TerminalSpawnFailedError } from "../../src/index.js";
 import { makeDeps, sample } from "../_helpers.js";
 
 describe("spawnTerminalWith > windows", () => {
@@ -292,9 +289,8 @@ describe("spawnTerminalWith > windows", () => {
   });
 
   it("escapes EVERY `;` in the payload, not just the env-prefix separators", async () => {
-    // Defense-in-depth: even if a future caller puts a `;` in cmd.cmd
-    // or cmd.args (e.g. a flag value), it must still be escaped or
-    // wt will fan out into multiple tabs.
+    // Semicolons in cmd.cmd or cmd.args (e.g. a flag value) must still
+    // be escaped or wt will fan out into multiple tabs.
     const wt = "C:\\Users\\me\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe";
     const { deps, calls } = makeDeps({
       platform: "win32",

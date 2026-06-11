@@ -4,13 +4,12 @@
  * WHAT this file does:
  *   Uses Vitest's `expectTypeOf<T>()` to lock the package's public surface
  *   at the TYPE level. `@glyphs-ai/terminal` has no central Service
- *   class — its public surface is a set of free functions
- *   (`spawnTerminal`, `spawnTerminalWith`, `whichSyncDefault`), error
- *   classes (`NoTerminalFoundError`, `TerminalSpawnFailedError`,
- *   `UnsupportedPlatformError`), and DTOs / option shapes
- *   (`LaunchCommand`, `Launcher`, `SpawnHandle`, `SpawnTerminalDeps`,
- *   `SpawnTerminalResult`). Each gets a `expectTypeOf(...)` assertion
- *   below.
+ *   class — its public surface is a small set of free functions
+ *   (`spawnTerminal`), error classes (`InvalidLaunchCommandError`,
+ *   `NoTerminalFoundError`, `TerminalSpawnFailedError`,
+ *   `UnsupportedPlatformError`), and DTOs
+ *   (`LaunchCommand`, `Launcher`, `SpawnTerminalResult`). Each gets a
+ *   `expectTypeOf(...)` assertion below.
  *
  * WHY it is valuable:
  *   Silent renames (`spawnTerminal` → `launchTerminal`), accidental
@@ -48,22 +47,20 @@
 
 import { describe, expectTypeOf, it } from "vitest";
 import {
+  InvalidLaunchCommandError,
   type LaunchCommand,
   type Launcher,
   NoTerminalFoundError,
-  type SpawnHandle,
-  type SpawnTerminalDeps,
   type SpawnTerminalResult,
   spawnTerminal,
-  spawnTerminalWith,
   TerminalSpawnFailedError,
   UnsupportedPlatformError,
-  whichSyncDefault,
 } from "../src/index.js";
 
 describe("@glyphs-ai/terminal public API guard", () => {
   it("exports the concrete error classes with their canonical constructor signatures", () => {
     const errs: Error[] = [
+      new InvalidLaunchCommandError("test reason"),
       new NoTerminalFoundError(),
       new TerminalSpawnFailedError("wt", "ENOENT"),
       new UnsupportedPlatformError("aix"),
@@ -83,20 +80,7 @@ describe("@glyphs-ai/terminal public API guard", () => {
     expectTypeOf<LaunchCommand>().toHaveProperty("display");
     expectTypeOf<LaunchCommand>().toHaveProperty("env");
 
-    // Spawner ports / handles.
-    expectTypeOf<SpawnHandle>().toHaveProperty("earlyFailure");
     expectTypeOf<SpawnTerminalResult>().toHaveProperty("launcher");
-
-    // Dependency injection seam for spawnTerminalWith. Every field
-    // must remain because test fixtures across the monorepo construct
-    // a real `SpawnTerminalDeps` literal — a missing key would break
-    // every consumer's test.
-    expectTypeOf<SpawnTerminalDeps>().toHaveProperty("spawn");
-    expectTypeOf<SpawnTerminalDeps>().toHaveProperty("exists");
-    expectTypeOf<SpawnTerminalDeps>().toHaveProperty("whichSync");
-    expectTypeOf<SpawnTerminalDeps>().toHaveProperty("platform");
-    expectTypeOf<SpawnTerminalDeps>().toHaveProperty("env");
-    expectTypeOf<SpawnTerminalDeps>().toHaveProperty("observationMs");
 
     // Launcher is a closed string union — dashboard renders it
     // verbatim, so any drift surfaces here first.
@@ -122,15 +106,7 @@ describe("@glyphs-ai/terminal public API guard", () => {
   it("preserves the exported function signatures", () => {
     // spawnTerminal: zero-config wrapper used by api/server / session's spawnFn.
     expectTypeOf(spawnTerminal).toBeFunction();
-    expectTypeOf(spawnTerminal).parameters.toEqualTypeOf<
-      [LaunchCommand, Partial<SpawnTerminalDeps>?]
-    >();
+    expectTypeOf(spawnTerminal).parameters.toEqualTypeOf<[LaunchCommand]>();
     expectTypeOf(spawnTerminal).returns.resolves.toEqualTypeOf<SpawnTerminalResult>();
-
-    // spawnTerminalWith: testable variant exposing the dependency-injection seam.
-    expectTypeOf(spawnTerminalWith).toBeFunction();
-
-    // whichSyncDefault: PATH lookup helper consumed by test fixtures.
-    expectTypeOf(whichSyncDefault).toBeFunction();
   });
 });

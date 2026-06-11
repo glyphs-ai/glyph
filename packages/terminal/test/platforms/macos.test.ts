@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  type LaunchCommand,
-  spawnTerminalWith,
-  TerminalSpawnFailedError,
-} from "../../src/index.js";
+import { spawnTerminalWith } from "../../src/dispatch.js";
+import { type LaunchCommand, TerminalSpawnFailedError } from "../../src/index.js";
 import { makeDeps, sample, sampleResume } from "../_helpers.js";
 
 describe("spawnTerminalWith > macOS", () => {

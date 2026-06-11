@@ -5,8 +5,8 @@ import type { LaunchCommand, Launcher, SpawnTerminalDeps, SpawnTerminalResult } 
 /**
  * The subset of `Launcher` that names a Linux terminal emulator. Used to
  * make `LINUX_CANDIDATES` and `buildLinuxArgs` precise enough that
- * TypeScript can verify the per-terminal switches are exhaustive — any
- * future entry added to `LINUX_CANDIDATES` must also gain a switch arm
+ * TypeScript can verify the per-terminal switches are exhaustive — each
+ * new entry added to `LINUX_CANDIDATES` must also gain a switch arm
  * or the build will fail rather than silently fall through to a
  * cwd-dropping fallback.
  */

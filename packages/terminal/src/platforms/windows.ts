@@ -128,9 +128,8 @@ export async function spawnWindows(
  * The escape only needs to happen on the path where we PUT a semicolon
  * into the payload — i.e. when `cmd.env` was non-empty. We still apply
  * the replace unconditionally because it's a cheap no-op when the
- * payload contains no `;` and gives us defense-in-depth if a future
- * caller adds `;`-bearing args, such as a target CLI flag value with a
- * semicolon.
+ * payload contains no `;` and keeps semicolon-bearing command names,
+ * args, and env values data-only.
  */
 function buildWtArgs(cmd: LaunchCommand, deps: SpawnTerminalDeps): string[] {
   // Prefer PowerShell 7+ for modern terminal behaviour on Windows.

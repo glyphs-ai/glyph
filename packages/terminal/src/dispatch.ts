@@ -38,10 +38,6 @@ const DEFAULT_DEPS: SpawnTerminalDeps = {
 };
 
 /** Production entry point — spawns a terminal for the given launch command. */
-export function spawnTerminal(
-  cmd: LaunchCommand,
-  opts?: Partial<SpawnTerminalDeps>,
-): Promise<SpawnTerminalResult> {
-  const deps: SpawnTerminalDeps = { ...DEFAULT_DEPS, ...opts };
-  return spawnTerminalWith(cmd, deps);
+export function spawnTerminal(cmd: LaunchCommand): Promise<SpawnTerminalResult> {
+  return spawnTerminalWith(cmd, DEFAULT_DEPS);
 }

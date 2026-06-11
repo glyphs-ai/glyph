@@ -1,4 +1,4 @@
-import type { LaunchCommand, SpawnHandle, SpawnTerminalDeps } from "../src/index.js";
+import type { LaunchCommand, SpawnHandle, SpawnTerminalDeps } from "../src/types.js";
 
 export const sample: LaunchCommand = {
   cmd: "copilot",

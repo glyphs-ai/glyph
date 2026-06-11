@@ -66,7 +66,8 @@ ignore env handed to their launcher process:
   `env` option. `cmd /k` reliably inherits env from its parent, so no
   inline `set` prefix is needed.
 
-Env filtering is value-based, not name-based: keys are preserved in
+Environment names must be portable shell identifiers
+(`[A-Za-z_][A-Za-z0-9_]*`). Among valid names, keys are preserved in
 insertion order, and only string-valued entries survive. `undefined`,
 `null`, and other non-string values are dropped defensively before
 quoting.
@@ -90,9 +91,6 @@ const cmd: LaunchCommand = {
 const result = await spawnTerminal(cmd); // { launcher: "wt" | "cmd" | ... }
 ```
 
-`spawnTerminalWith(cmd, deps)` is the dependency-injected variant used
-by tests. `spawnTerminal` fills in real `node:child_process` /
-`node:fs` dependencies and forwards.
-
-Errors: `NoTerminalFoundError`, `TerminalSpawnFailedError`,
-`UnsupportedPlatformError` — all named subclasses of `Error`.
+Errors: `InvalidLaunchCommandError`, `NoTerminalFoundError`,
+`TerminalSpawnFailedError`, `UnsupportedPlatformError` — all named
+subclasses of `Error`.

@@ -1,23 +1,28 @@
 import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
 import { existsSync, lstatSync } from "node:fs";
 import path from "node:path";
+import { InvalidLaunchCommandError } from "./errors.js";
 import type { LaunchCommand, SpawnHandle, SpawnOpts } from "./types.js";
 
-/** Reject paths with control characters that could break shell/AppleScript quoting. */
+/** Reject command fields with control characters that could break shell/AppleScript quoting. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: detecting control chars is the explicit purpose.
 const CONTROL_CHARS_RE = /[\x00-\x1f]/;
+const PORTABLE_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export function validateLaunchCommand(cmd: LaunchCommand): void {
   if (CONTROL_CHARS_RE.test(cmd.cwd)) {
-    throw new Error("workdir contains a control character");
+    throw new InvalidLaunchCommandError("workdir contains a control character");
   }
   if (CONTROL_CHARS_RE.test(cmd.cmd)) {
-    throw new Error("command contains a control character");
+    throw new InvalidLaunchCommandError("command contains a control character");
   }
   for (const a of cmd.args) {
     if (CONTROL_CHARS_RE.test(a)) {
-      throw new Error("argument contains a control character");
+      throw new InvalidLaunchCommandError("argument contains a control character");
     }
+  }
+  for (const name of Object.keys(cmd.env ?? {})) {
+    assertPortableEnvName(name);
   }
 }
 
@@ -90,13 +95,12 @@ export function pwshQuote(s: string): string {
 }
 
 /**
- * Filter an env bag down to `[key, string-value]` tuples, defensively
- * dropping non-string values that may have leaked past the typed
- * contract (`Readonly<Record<string, string>>`) via an upstream
- * `as`-cast over `NodeJS.ProcessEnv`. Without this filter, a leaked
- * `undefined` would crash `shQuote(v)` / `pwshQuote(v)` at
- * `undefined.replace`; dropping the bad entry keeps the launch path
- * resilient.
+ * Filter an env bag down to `[key, string-value]` tuples after checking
+ * that names are portable shell identifiers. Non-string values may have
+ * leaked past the typed contract (`Readonly<Record<string, string>>`)
+ * via an upstream `as`-cast over `NodeJS.ProcessEnv`; without this
+ * filter, a leaked `undefined` would crash `shQuote(v)` /
+ * `pwshQuote(v)` at `undefined.replace`.
  *
  * Returns an empty array when `env` is `undefined`, so callers can
  * unconditionally call `filterStringEntries(env)` and then branch on
@@ -106,7 +110,18 @@ function filterStringEntries(
   env: Readonly<Record<string, string>> | undefined,
 ): [string, string][] {
   if (env === undefined) return [];
-  return Object.entries(env).filter((e): e is [string, string] => typeof e[1] === "string");
+  return Object.entries(env).filter((e): e is [string, string] => {
+    assertPortableEnvName(e[0]);
+    return typeof e[1] === "string";
+  });
+}
+
+function assertPortableEnvName(name: string): void {
+  if (!PORTABLE_ENV_NAME_RE.test(name)) {
+    throw new InvalidLaunchCommandError(
+      `environment variable name ${JSON.stringify(name)} is not portable`,
+    );
+  }
 }
 
 /**

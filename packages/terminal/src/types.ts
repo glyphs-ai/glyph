@@ -56,12 +56,12 @@ export interface LaunchCommand {
    * This package does that work; see the per-platform implementations
    * in `src/platforms/`.
    *
-   * The terminal filter is value-based, not name-based: keys are
-   * preserved in insertion order, and only string-valued entries survive.
-   * Producers should filter `undefined` / `null` before assembling this
-   * map; terminal also drops non-string entries defensively before
-   * quoting so a bad cast over `NodeJS.ProcessEnv` cannot crash the
-   * launch path.
+   * Environment names must be portable shell identifiers
+   * (`[A-Za-z_][A-Za-z0-9_]*`). Among valid names, keys are preserved in
+   * insertion order and only string-valued entries survive. Producers
+   * should filter `undefined` / `null` before assembling this map;
+   * terminal also drops non-string entries defensively before quoting so
+   * a bad cast over `NodeJS.ProcessEnv` cannot crash the launch path.
    */
   readonly env?: Readonly<Record<string, string>>;
 }
@@ -116,11 +116,11 @@ export interface SpawnOpts {
    * caller is responsible for merging with `process.env` if they
    * want partial-override semantics.
    *
-   * Used as a belt-and-suspenders for the Windows `cmd /k` fallback,
-   * where the new console naturally inherits parent env. The wt+pwsh
-   * and macOS/Linux paths inline env into the shell command instead
-   * (because their target apps run as daemons and ignore spawn env);
-   * see the per-platform implementations.
+   * Used by the Windows `cmd /k` fallback, where the new console
+   * naturally inherits parent env. The wt+pwsh and macOS/Linux paths
+   * inline env into the shell command instead (because their target
+   * apps run as daemons and ignore spawn env); see the per-platform
+   * implementations.
    */
   env?: NodeJS.ProcessEnv;
 }
