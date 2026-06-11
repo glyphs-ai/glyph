@@ -6,7 +6,7 @@
  * the node — only the per-kind `WorkflowNodeRunner` knows the typed
  * shape. The wire DTOs in `@glyphs-ai/contracts` project that envelope
  * flat for the two shipped kinds (`task` / `coordinator`) and pass
- * any future kind through verbatim.
+ * unrecognised kinds through verbatim.
  *
  * Lives in the server pkg (not the substrate) because the projection
  * is wire-layer-specific — the substrate stays kind-agnostic and
@@ -36,7 +36,7 @@ import {
  * (`{ id: string } | null`) so the projector doesn't depend on the
  * internal `TaskEntity` class.
  */
-export interface ProjectionTasksDep {
+interface ProjectionTasksDep {
   findTaskByWorkflowNode(nodeId: string): Promise<{ readonly id: string } | null>;
 }
 
@@ -69,8 +69,8 @@ export function projectWorkflowHeader(
 }
 
 /**
- * Flatten the node-spec envelope for the two shipped kinds; pass any
- * future kind through as `{ kind, spec }` so dashboard / CLI code can
+ * Flatten the node-spec envelope for the two shipped kinds; pass an
+ * unrecognised kind through as `{ kind, spec }` so dashboard / CLI code can
  * branch on the discriminator without unwrapping.
  *
  * The cast to the per-kind wire shape is safe because the substrate's
@@ -99,7 +99,7 @@ function projectNodeSpec(node: WorkflowNodeEntity): WorkflowNodeWireSpec {
  * For routes that DO need `taskId` (the `/dag` route), use
  * {@link projectWorkflowNodeWithTaskId}.
  */
-export function projectWorkflowNodeSync(node: WorkflowNodeEntity): WorkflowNodeWire {
+function projectWorkflowNodeSync(node: WorkflowNodeEntity): WorkflowNodeWire {
   return {
     id: node.id,
     workflowId: node.workflowId,
@@ -141,7 +141,7 @@ export async function projectWorkflowNodeWithTaskId(
 }
 
 /** Project a `WorkflowEdgeEntity` to its wire-shape `(from, to)` pair. */
-export function projectWorkflowEdge(edge: WorkflowEdgeEntity): WorkflowEdgeWire {
+function projectWorkflowEdge(edge: WorkflowEdgeEntity): WorkflowEdgeWire {
   return { from: edge.from, to: edge.to };
 }
 

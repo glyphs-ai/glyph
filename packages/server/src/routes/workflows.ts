@@ -110,7 +110,7 @@ import {
   type WorkflowService,
 } from "@glyphs-ai/workflow";
 import { Hono } from "hono";
-import { mimeBucketFor } from "../util/mime-bucket.js";
+import { contentTypeFor, mimeBucketFor } from "../util/mime-bucket.js";
 import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
 import { respondError } from "./_respond-error.js";
 import { errorBody, logEvent, parseJsonBody } from "./_shared.js";
@@ -121,9 +121,9 @@ import {
   projectWorkflowNodeWithTaskId,
 } from "./_workflow-projection.js";
 
-export type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
-export type WorkflowTasksResolver = (c: import("hono").Context) => TaskService;
-export type WorkflowWorkspaceDirResolver = (c: import("hono").Context) => string;
+type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
+type WorkflowTasksResolver = (c: import("hono").Context) => TaskService;
+type WorkflowWorkspaceDirResolver = (c: import("hono").Context) => string;
 
 const ALLOWED_CREATE_KEYS = new Set(["brief", "details", "coordinatorAgent", "metadata"]);
 const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker"];
@@ -1274,43 +1274,4 @@ function safeJoinNested(root: string, rel: string): string {
     throw new Error("artifact path escapes root");
   }
   return candidate;
-}
-
-/**
- * Ext-to-MIME table for the artifact static-bytes route. Lifted
- * verbatim from `routes/tasks.ts` so the two artifact-serving
- * routes stay consistent. Unknown extensions fall through to
- * `application/octet-stream` (browser treats as download).
- */
-function contentTypeFor(name: string): string {
-  const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
-  switch (ext) {
-    case "txt":
-    case "log":
-      return "text/plain; charset=utf-8";
-    case "md":
-      return "text/markdown; charset=utf-8";
-    case "html":
-    case "htm":
-      return "text/html; charset=utf-8";
-    case "json":
-      return "application/json; charset=utf-8";
-    case "csv":
-      return "text/csv; charset=utf-8";
-    case "svg":
-      return "image/svg+xml";
-    case "png":
-      return "image/png";
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg";
-    case "gif":
-      return "image/gif";
-    case "webp":
-      return "image/webp";
-    case "pdf":
-      return "application/pdf";
-    default:
-      return "application/octet-stream";
-  }
 }

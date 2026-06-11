@@ -13,7 +13,7 @@ import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared
  * `.sessions.spawnInteractive()` for the "start an interactive
  * session" call site.
  */
-export type WorkspaceContextResolver = (c: import("hono").Context) => WorkspaceContext;
+type WorkspaceContextResolver = (c: import("hono").Context) => WorkspaceContext;
 
 type SessionCreateBodyRaw = { [K in keyof SessionCreateBody]?: unknown };
 const SESSION_CREATE_KEYS = new Set(["agent", "runtime"]);

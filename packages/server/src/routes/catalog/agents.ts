@@ -92,8 +92,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): Hono {
         skipped: result.skipped.length,
         failed: result.failed.length,
       });
-      // biome-ignore lint/suspicious/noExplicitAny: Hono's status type is a finite union.
-      return c.json(result, status as any);
+      return c.json(result, status);
     } catch (err) {
       return respondError(c, err, {
         route: "catalog.agents.install",
@@ -144,8 +143,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): Hono {
         skipped: result.skipped.length,
         failed: result.failed.length,
       });
-      // biome-ignore lint/suspicious/noExplicitAny: Hono's status type is a finite union.
-      return c.json(result, status as any);
+      return c.json(result, status);
     } catch (err) {
       return respondError(c, err, {
         route: "catalog.agents.sync",

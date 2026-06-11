@@ -9,6 +9,7 @@ import {
   type TaskStatus,
 } from "@glyphs-ai/task";
 import { Hono } from "hono";
+import { contentTypeFor } from "../util/mime-bucket.js";
 import { tasksErrorPolicy } from "./_error-policies/tasks.js";
 import { respondError } from "./_respond-error.js";
 import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared.js";
@@ -26,7 +27,7 @@ const TASK_DISPATCH_KEYS = new Set(["agent", "brief", "details", "runtime"]);
  * workspace-scoped TaskService out of Hono's per-request context. Mirrors
  * the SessionService pattern exactly.
  */
-export type TaskServiceResolver = (c: import("hono").Context) => TaskService;
+type TaskServiceResolver = (c: import("hono").Context) => TaskService;
 
 /**
  * Build the structured 409 body that pairs with an InvalidTransition
@@ -158,8 +159,7 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
       // Brief is the displayed label everywhere — task list rows,
       // detail panel header, CLI table. Multi-line input would
       // break the layout and tooltips. Keep the single-line
-      // contract enforced at the wire boundary so downstream
-      // consumers (dashboard, CLI, future MCP) never have to defend.
+      // contract enforced at the wire boundary.
       return c.json({ error: "brief must be a single line (no newline characters)" }, 400);
     }
     if (briefTrimmed.length > BRIEF_MAX_LENGTH) {
@@ -558,47 +558,6 @@ const TASK_ACTIVITY_MAX_LIMIT = 500;
  * dispatch route as a 400 when exceeded. Sized to fit a single line in
  * the dashboard list (~2 lines wrapped on a 360px column at the
  * default font size); also bounds the SQLite column width and the
- * displayed task title across CLI / dashboard / future MCP tools.
+ * displayed task title across CLI / dashboard tools.
  */
 const BRIEF_MAX_LENGTH = 200;
-
-/**
- * Best-effort Content-Type for an artifact filename. Whitelisted text
- * formats get their canonical mime type (so the browser renders them
- * inline); everything else falls back to `application/octet-stream`,
- * which the browser will treat as a download. Charset is included on
- * the text variants because the agent's output is always UTF-8 (it's
- * what node writes by default and what `framing.ts` expects).
- */
-function contentTypeFor(name: string): string {
-  const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
-  switch (ext) {
-    case "txt":
-    case "log":
-      return "text/plain; charset=utf-8";
-    case "md":
-      return "text/markdown; charset=utf-8";
-    case "html":
-    case "htm":
-      return "text/html; charset=utf-8";
-    case "json":
-      return "application/json; charset=utf-8";
-    case "csv":
-      return "text/csv; charset=utf-8";
-    case "svg":
-      return "image/svg+xml";
-    case "png":
-      return "image/png";
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg";
-    case "gif":
-      return "image/gif";
-    case "webp":
-      return "image/webp";
-    case "pdf":
-      return "application/pdf";
-    default:
-      return "application/octet-stream";
-  }
-}

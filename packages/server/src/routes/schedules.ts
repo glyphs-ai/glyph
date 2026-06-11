@@ -71,7 +71,7 @@ import { schedulesErrorPolicy } from "./_error-policies/schedules.js";
 import { respondError } from "./_respond-error.js";
 import { errorBody, logEvent, parseJsonBody } from "./_shared.js";
 
-export type ScheduleServiceResolver = (c: import("hono").Context) => ScheduleService;
+type ScheduleServiceResolver = (c: import("hono").Context) => ScheduleService;
 
 const ALLOWED_TASK_CREATE_KEYS = new Set(["name", "target", "trigger", "enabled"]);
 const ALLOWED_TASK_PATCH_KEYS = new Set(["name", "target", "trigger", "enabled"]);
@@ -250,11 +250,6 @@ function validateTrigger(raw: unknown): ValidationResult<ScheduleTrigger> {
  * kind-agnostic and stores `{ kind: "task", data: { agent, ... } }`;
  * the wire shape stays flat (`{ kind: "task", agent, ... }`) so the
  * dashboard / CLI's `schedule.target.agent` reads keep working.
- *
- * When future kinds land, extend this switch with each kind's flat
- * wire shape; the default branch passes the envelope through so a
- * brand-new kind still appears on the wire (just without the flat
- * projection) until the route gets explicit support.
  */
 function projectScheduleToWire(s: Schedule): ScheduleWire {
   if (s.target.kind === "task") {

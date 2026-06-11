@@ -11,7 +11,7 @@ import { respondError } from "./_respond-error.js";
  * cancel paths all observe a single in-memory state. See the mount in
  * `index.ts` — both routes pass `c.get("workspaceContext").tasks`.
  */
-export type TaskServiceResolver = (c: import("hono").Context) => TaskService;
+type TaskServiceResolver = (c: import("hono").Context) => TaskService;
 
 // Task-error → HTTP status mapping lives in the task error policy; both
 // routes consume the canonical implementation.
@@ -24,7 +24,7 @@ export type TaskServiceResolver = (c: import("hono").Context) => TaskService;
  * `origin` filter is hardcoded to `["schedule"]` and the route does not
  * expose an `?origin=` query param. Splitting at the URL layer (instead
  * of via a `?origin=` discriminator on `/tasks`) means each origin's
- * caller surface — dashboard, CLI, future MCP — gets a route whose URL
+ * caller surface gets a route whose URL
  * IS the contract; callers cannot accidentally widen the result set by
  * forgetting an opt-in filter.
  *

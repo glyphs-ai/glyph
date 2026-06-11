@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { errorBody, logFault, unmappedFaultMeta } from "./_shared.js";
 
 /**
@@ -15,9 +16,9 @@ import { errorBody, logFault, unmappedFaultMeta } from "./_shared.js";
  * on `tasks.cancel` and `"delete"` on `tasks.delete`. That body is
  * route-dependent — pass it via `RespondErrorOpts.customBody`, not here.
  */
-export type StatusEntry = readonly [
+type StatusEntry = readonly [
   klass: new (...args: never[]) => Error,
-  status: number,
+  status: ContentfulStatusCode,
   classStableBody?: (err: Error) => Record<string, unknown>,
 ];
 
@@ -36,7 +37,7 @@ export interface ErrorPolicy {
    * Defaults to 400. Some routes (read-only / server-failure paths)
    * override per-call via `RespondErrorOpts.defaultStatus`.
    */
-  readonly defaultStatus?: number;
+  readonly defaultStatus?: ContentfulStatusCode;
 }
 
 export interface RespondErrorOpts {
@@ -61,13 +62,16 @@ export interface RespondErrorOpts {
    * route-dependent envelopes (e.g. `InvalidTransition` with verb).
    * Return `null` to fall back to the class-stable / default body.
    */
-  readonly customBody?: (err: unknown, status: number) => Record<string, unknown> | null;
+  readonly customBody?: (
+    err: unknown,
+    status: ContentfulStatusCode,
+  ) => Record<string, unknown> | null;
   /**
    * Per-call override of `policy.defaultStatus`. Mapped-class status
    * (from `policy.statuses`) always wins; this only changes the
    * fallthrough for unmapped errors.
    */
-  readonly defaultStatus?: number;
+  readonly defaultStatus?: ContentfulStatusCode;
 }
 
 /**
@@ -75,7 +79,7 @@ export interface RespondErrorOpts {
  * `packages/server/src/routes/**`. Resolves status via the per-domain
  * `ErrorPolicy`, emits the structured "5xx fault" or "unmapped error
  * fell through" log line via {@link logFault}, and returns the JSON
- * response with the consolidated `as any` cast on the status.
+ * response.
  *
  * Status resolution:
  *   - First `instanceof` match in `policy.statuses` wins (order is
@@ -91,7 +95,7 @@ export interface RespondErrorOpts {
  *      `{ error: "internal error" }` per `SAFE_ERROR_NAMES`)
  */
 export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): Response {
-  let status: number | undefined;
+  let status: ContentfulStatusCode | undefined;
   let classStableBody: ((err: Error) => Record<string, unknown>) | undefined;
 
   if (err instanceof Error) {
@@ -106,7 +110,8 @@ export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): 
   }
 
   const isUnmapped = status === undefined;
-  const finalStatus = status ?? opts.defaultStatus ?? opts.policy.defaultStatus ?? 400;
+  const finalStatus: ContentfulStatusCode =
+    status ?? opts.defaultStatus ?? opts.policy.defaultStatus ?? 400;
 
   if (finalStatus >= 500) {
     logFault(c, err, `${opts.route}: 5xx fault`, opts.meta);
@@ -129,6 +134,5 @@ export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): 
     body = errorBody(err);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: Hono's c.json status type is a finite union.
-  return c.json(body, finalStatus as any);
+  return c.json(body, finalStatus);
 }

@@ -191,9 +191,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // the server only passes the DB file path. On first launch the
   // composer creates the schema from its own entity list; on
   // subsequent launches `orm.schema.updateSchema()` is a no-op for
-  // matching schemas. (Production hardening: switch to
-  // `orm.migrator.up()` once a release branch has cut a migrations
-  // baseline beyond `Migration00000000000000_initial`.)
+  // matching schemas.
   //
   // We do NOT auto-create a default workspace — the dashboard's
   // landing page prompts the user to create one explicitly.
@@ -225,12 +223,9 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.use("*", requestLogger(logger));
   app.use("*", accessLog());
 
-  // /api/health stays before any future auth middleware so the
-  // dashboard's backoff probe and external liveness checks can poll
-  // without authenticating. Today there is no auth middleware; glyph
-  // delegates auth to the operator's reverse proxy / SSH tunnel /
-  // mesh VPN — see auth.ts;
-  // the route order convention is kept for the day a layer returns.
+  // /api/health stays unauthenticated so the dashboard's backoff probe
+  // and external liveness checks can poll it. glyph delegates auth to
+  // the operator's reverse proxy / SSH tunnel / mesh VPN — see auth.ts.
   // The endpoint exposes only liveness and clock fields: `status`,
   // `name`, `version`, `startedAt`, `uptimeSec`, and `serverNow` —
   // nothing a network observer couldn't already derive from the
@@ -403,7 +398,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
         // @hono/node-server's `serve` returns a node http.Server, which
         // has a standard `close(cb)`. Stop accepting new connections,
         // then wait for in-flight ones to drain.
-        (server as unknown as { close: (cb?: (err?: Error) => void) => void }).close((err) => {
+        server.close((err) => {
           if (err) reject(err);
           else resolve();
         });

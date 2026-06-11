@@ -4,8 +4,8 @@ import { Hono } from "hono";
 
 /**
  * Routes for /api/runtimes — exposes the registered runtime kinds AND
- * each runtime's advertised capability flags so the dashboard / future
- * CLI can conditionally enable UI affordances (e.g. a "Spawn remote"
+ * each runtime's advertised capability flags so clients can
+ * conditionally enable UI affordances (e.g. a "Spawn remote"
  * button only renders enabled when the active runtime sets
  * `capabilities.remoteSession === true`).
  *

@@ -6,8 +6,7 @@ import pino, { type DestinationStream, type LoggerOptions } from "pino";
  * `Logger` is pino's `Logger` type, re-exported. glyph commits to
  * pino at the type level — the previous 4-method facade was hiding
  * pino features (child loggers, redact, serializers) that the codebase
- * actually wants to use, in exchange for an abstraction whose payoff
- * (swapping logger backends) is hypothetical work that won't happen.
+ * actually wants to use.
  * See `docs/architecture.md` → "Tech stack" for the concise rationale.
  *
  * Call sites use pino's API directly:
@@ -25,7 +24,7 @@ export type Logger = pino.Logger;
 export type LogLevel = pino.Level;
 
 /** Configuration for `buildLogger`. All fields are optional. */
-export interface BuildLoggerOpts {
+interface BuildLoggerOpts {
   /**
    * Minimum level emitted. Default `"info"`. Set via env (server passes
    * `GLYPH_LOG_LEVEL`) or pinned in tests.
@@ -47,8 +46,7 @@ export interface BuildLoggerOpts {
 
   /**
    * Filename prefix under `dir`. Default `"server"`. Operators usually
-   * leave this alone; tests or sidecar processes (future runtime
-   * probes, etc) can scope their files with a different prefix.
+   * leave this alone; tests can scope their files with a different prefix.
    */
   readonly basename?: string;
 

@@ -4,11 +4,7 @@ import { Hono } from "hono";
 /**
  * GET /api/health — unauthenticated liveness + version surface.
  *
- * If a future auth middleware lands (today none exists; the server
- * binds loopback-only and delegates auth to operator-managed
- * transports — see `auth.ts`), mount it AFTER this route so the
- * dashboard's backoff probe can detect server-up without
- * authenticating. The endpoint exposes only liveness and clock fields:
+ * The endpoint exposes only liveness and clock fields:
  * `status`, `name`, `version`, `startedAt`, `uptimeSec`, and
  * `serverNow` — nothing a network observer couldn't already derive
  * from the running socket.

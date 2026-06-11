@@ -18,7 +18,7 @@ import { parseJsonBody } from "../_shared.js";
  *    into the route's `{ error }` shape (callers map to 400)
  *
  * All semantic validation (required fields, scope grammar, MCP name shape)
- * lives in the catalog so HTTP / future CLI / SDK share one source of truth.
+ * lives in the catalog so callers share one source of truth.
  */
 
 /** POST /catalog/skills body: `{ origin: string }`. Scope is frontmatter-driven. */

@@ -201,6 +201,8 @@ export const INTERNAL_ERROR_NAMES = new Set<string>([
   "WorkflowEnumValueCorruptionError",
 ]);
 
+type LoggerContext = Context<{ Variables: { logger?: Logger } }>;
+
 /**
  * Log a server-side fault via the request-scoped logger. The line lands
  * in the rotated JSON file (`<glyphHome>/logs/server-*.log`) via pino,
@@ -219,11 +221,7 @@ export function logFault(
   msg: string,
   extra?: Record<string, unknown>,
 ): void {
-  // Cast widens the no-Variables `Context` type so we can probe for
-  // the request-scoped logger without forcing every route factory to
-  // declare a `Variables: { logger: Logger }` env up-front. The check
-  // below returns silently when the logger isn't present.
-  const logger = (c.get as unknown as (k: string) => unknown)("logger") as Logger | undefined;
+  const logger = (c as LoggerContext).get("logger");
   if (logger === undefined) return;
   logger.error({ err, ...(extra ?? {}) }, msg);
 }
@@ -247,7 +245,7 @@ export function logFault(
  * structured fields the entity already exposes).
  */
 export function logEvent(c: Context, msg: string, meta?: Record<string, unknown>): void {
-  const logger = (c.get as unknown as (k: string) => unknown)("logger") as Logger | undefined;
+  const logger = (c as LoggerContext).get("logger");
   if (logger === undefined) return;
   logger.info(meta ?? {}, msg);
 }

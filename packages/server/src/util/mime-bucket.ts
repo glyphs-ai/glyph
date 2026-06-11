@@ -26,6 +26,39 @@ export function mimeBucketFor(filename: string): WorkflowArtifactMimeBucket {
   return "generic";
 }
 
+export function contentTypeFor(filename: string): string {
+  const ext = path.extname(filename).slice(1).toLowerCase();
+  switch (ext) {
+    case "txt":
+    case "log":
+      return "text/plain; charset=utf-8";
+    case "md":
+      return "text/markdown; charset=utf-8";
+    case "html":
+    case "htm":
+      return "text/html; charset=utf-8";
+    case "json":
+      return "application/json; charset=utf-8";
+    case "csv":
+      return "text/csv; charset=utf-8";
+    case "svg":
+      return "image/svg+xml";
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    case "pdf":
+      return "application/pdf";
+    default:
+      return "application/octet-stream";
+  }
+}
+
 const TEXT_EXTS = new Set([
   "md",
   "txt",
