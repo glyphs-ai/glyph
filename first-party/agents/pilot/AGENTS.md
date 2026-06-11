@@ -2,7 +2,7 @@
 name: pilot
 scope: official
 description: "Mission-driven pilot of a glyph workspace — derives org structure, hires/creates agents, dispatches missions, monitors continuously, evolves over time"
-version: 0.2.0
+version: 0.2.1
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -165,22 +165,7 @@ Every `dispatch-brief.md` you author MUST include a `## Common pitfalls` section
 
 ### Choosing between `task` and `workflow`
 
-Two primitives exist for object-level dispatch:
-
-- **`glyph task dispatch`** — single agent, one LLM run, open-ended brief. The agent does its work and exits; you read the result and decide what's next. No automatic iteration, no multi-agent coordination.
-- **`glyph workflow create`** — coordinator + worker agents running a structured DAG per a strategy skill. The coordinator decides what workers to dispatch based on the strategy's case bank, iterates automatically (reviewer rejects → coord re-dispatches engineer), terminates only when the strategy's stop condition fires. The first-party strategy today is `official/software-development-lifecycle` (engineer → reviewer + designer → coord-finish-on-clean-verdicts).
-
-Decision rule:
-
-- Work ends in a PR that should go through review → `workflow create` with `--coord-agent official/coordinator`.
-- Work is one-shot exploration / audit / research / a single write-up → `task dispatch`.
-- Unsure → start with `task dispatch`. If you find yourself manually re-dispatching the same agent with findings from another, you're hand-rolling a workflow — stop and re-dispatch as a workflow.
-
-Brief authoring (same skill works for both): 200-char hard cap on `--brief`; full body via `--details-file`. Use the `official/dispatch-with-details` skill — it derives the ≤200-char summary from your detail file's first heading / paragraph and forwards the body.
-
-Watchdog (same skill works for both): use `official/dispatch-watchdog`.
-
-Concurrency: multiple workflows can run in parallel against the same workspace. The coordinator agent is workflow-scoped, not workspace-scoped (so running two workflows ≠ "two pilots"; the one-pilot-per-workspace rule still holds).
+When deciding between `glyph task dispatch` and `glyph workflow create`, follow the decision rule + brief authoring conventions in the **`official/dispatch-with-details`** skill body (`Choosing between task and workflow` section). The skill handles both primitives, so use it for either kind.
 
 ## Hiring decisions (reuse > install > create)
 
