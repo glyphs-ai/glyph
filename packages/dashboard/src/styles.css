@@ -5019,6 +5019,42 @@ button {
   display: block;
   padding: var(--space-3) var(--space-2);
   overflow: auto;
+  /* Reserve the scrollbar gutter at all times so the dag's right edge
+     doesn't reflow by ~14 px the first time the content overflows.
+     Also keeps a visual track present for browsers that hide
+     overlay scrollbars (macOS WebKit with "Show scroll bars: When
+     scrolling"); operators need to discover that the dag is
+     scrollable without having to scroll first to find out. */
+  scrollbar-gutter: stable;
+  /* Firefox / standard: thin track tinted with the dashboard's
+     border tokens so the scrollbar visually matches the chrome
+     instead of falling back to the white-on-white OS default that
+     disappears on light surfaces. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+/* WebKit (Chrome / Safari / Edge): a visible, persistent scrollbar.
+   `overflow: auto` plus no explicit ::-webkit-scrollbar styling lets
+   the OS hide overlay scrollbars until the user scrolls — that's the
+   exact symptom this rule addresses. Tinted with the same border
+   token as the Firefox `scrollbar-color` above for parity. */
+.workflow-dag::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.workflow-dag::-webkit-scrollbar-track {
+  background: transparent;
+}
+.workflow-dag::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.workflow-dag::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-subtle);
+  background-clip: padding-box;
+  border: 2px solid transparent;
 }
 
 .workflow-dag--empty {
@@ -5259,6 +5295,20 @@ button {
    * to a bounded box and the dag scrolls instead of pushing the page. */
   flex: 1 1 auto;
   min-height: 0;
+}
+/* Mirror the task variant's `.tasks-pane__detail > .overview-tab`
+ * rule for the workflow chain: `overflow: auto` lets the short-
+ * viewport fallback (Summary + Details cards together below their
+ * 200px min-height each) spill into the panel's own scroll rather
+ * than getting clipped by `.workflow-tabpanel { overflow: hidden }`.
+ * The flex grow + min-height-0 are already set by `.workflow-tabpanel
+ * > *` above and the `.overview-tab` base rule. Specificity-doubled
+ * (two class selectors) so this wins over the `> *` catch-all
+ * regardless of source order. */
+.workflow-tabpanel > .overview-tab {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 .workflow-tabpanel:focus-visible {
   outline: 2px solid var(--color-accent);

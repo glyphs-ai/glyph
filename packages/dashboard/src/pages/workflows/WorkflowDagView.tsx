@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { WorkflowDagWire, WorkflowNodeWire } from "../../api";
 import { WORKFLOW_NODE_STATUS_LABEL } from "../../components/workflows/shared";
+import { truncateBrief } from "../../utils/brief";
 import { formatAbsolute, formatDuration, formatRelative } from "../../utils/time";
 import {
   buildSlotMap,
@@ -11,6 +12,17 @@ import {
   type Rect,
   resolveEdges,
 } from "./dag-edge-geometry";
+
+/**
+ * Per-node card title cap. Wider than the master-list cap (60 isn't
+ * enough for a phase + agent + role + iteration prefix) but narrower
+ * than the 200-char contract cap so a single SDLC worker brief —
+ * composed as `"Iteration N: <role> ... — <workflow.brief verbatim>"`
+ * by workflow-coordination §D — can't blow out the phase-column
+ * layout. The full brief stays in the chip's `title` attribute and in
+ * the Mode B detail pane.
+ */
+const DAG_BRIEF_CAP = 100;
 
 export interface WorkflowDagViewProps {
   dag: WorkflowDagWire;
@@ -218,7 +230,7 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
                         title={brief}
                         data-testid={`dag-brief-${node.id}`}
                       >
-                        {brief}
+                        {truncateBrief(brief, DAG_BRIEF_CAP)}
                       </span>
                     ) : null}
                     {/*

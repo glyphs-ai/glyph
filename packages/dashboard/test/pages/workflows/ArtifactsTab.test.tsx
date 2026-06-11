@@ -394,3 +394,99 @@ describe("ArtifactsTab — node group label (agent · Phase + disambiguator)", (
     expect(optgroup?.getAttribute("label")?.includes("#")).toBe(false);
   });
 });
+
+describe("ArtifactsTab — bytes-fetch is keyed on (subPath + modifiedAt), not entry identity", () => {
+  it("does NOT re-fetch the selected artifact's bytes when the artifact list re-polls with unchanged modifiedAt", async () => {
+    // Repro of the over-aggressive refetch bug: the parent re-polls
+    // the artifact list every WORKFLOW_POLL_INTERVAL_MS and hands us a
+    // NEW array reference with structurally identical items. Before
+    // the fix the bytes-fetch effect keyed on the derived
+    // `selectedEntry` object (new reference each poll), so the iframe
+    // / HTML viewer flashed every cycle. After the fix the effect
+    // keys on `subPath + "|" + modifiedAt` (a string), so an
+    // unchanged artifact is a no-op.
+    const artifacts1: WorkflowArtifactWire[] = [
+      {
+        kind: "workflow-summary",
+        path: "report.md",
+        size: 100,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
+
+    // Stub fetch with an OK response so the effect runs to completion
+    // (covers the `if (!res.ok)` early-return branch from beforeEach).
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("hello", { status: 200 }) as unknown as Response);
+
+    const { rerender } = render(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={null}
+        artifacts={artifacts1}
+        loaded={true}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe("/api/wf/wf-1/summary%2Freport.md");
+
+    // Simulate a poll cycle: build a structurally-identical NEW array
+    // (different reference) with the SAME modifiedAt for the selected
+    // artifact. The effect must not re-fire.
+    const artifacts2: WorkflowArtifactWire[] = [
+      {
+        kind: "workflow-summary",
+        path: "report.md",
+        size: 100,
+        modifiedAt: "2026-05-28T00:00:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
+    rerender(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={null}
+        artifacts={artifacts2}
+        loaded={true}
+        error={null}
+      />,
+    );
+
+    // Give the microtask queue a beat to flush; fetch count MUST stay
+    // at 1. (Asserting via a short poll loop rather than a fixed
+    // timeout keeps the test resilient on slow CI.)
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // Now bump the selected artifact's modifiedAt: the effect SHOULD
+    // re-fire because the underlying bytes legitimately changed.
+    const artifacts3: WorkflowArtifactWire[] = [
+      {
+        kind: "workflow-summary",
+        path: "report.md",
+        size: 100,
+        modifiedAt: "2026-05-28T00:01:00.000Z",
+        mimeBucket: "text",
+      },
+    ];
+    rerender(
+      <ArtifactsTab
+        workflow={makeWf()}
+        dag={null}
+        artifacts={artifacts3}
+        loaded={true}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+});

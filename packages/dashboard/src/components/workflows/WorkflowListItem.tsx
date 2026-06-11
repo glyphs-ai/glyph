@@ -10,9 +10,19 @@ import {
 } from "react";
 import type { WorkflowHeaderWire } from "../../api";
 import { useClickOutside } from "../../hooks/useClickOutside";
+import { truncateBrief } from "../../utils/brief";
 import { RelativeTime } from "../common/RelativeTime";
 import { MoreHorizontalIcon } from "../Icons";
 import { WorkflowStatusBadge } from "./WorkflowStatusBadge";
+
+/**
+ * Master-list rows are a narrow column (~360 px) shared with Tasks /
+ * Schedules, so a brief from the long end of the 200-char contract cap
+ * blows out the row height. 70 keeps two visual lines on the smallest
+ * supported viewport. The full text is preserved in the `title`
+ * attribute and read by AT through the headline span.
+ */
+const LIST_BRIEF_CAP = 70;
 
 /**
  * Why `closeMenu` takes a reason: the per-row `⋯` menu can close from
@@ -303,7 +313,7 @@ export function WorkflowListItem({
           className="task-list__item-headline task-list__item-headline--clamp"
           title={workflow.brief}
         >
-          {workflow.brief}
+          {truncateBrief(workflow.brief, LIST_BRIEF_CAP)}
         </span>
         <span id={metaId} className="task-list__item-meta muted">
           <span title={`Coordinator: ${workflow.coordinatorAgent}`}>

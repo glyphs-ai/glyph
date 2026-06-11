@@ -409,3 +409,52 @@ describe("WorkflowDagView  node activation", () => {
     expect(svg?.querySelector("marker")).toBeTruthy();
   });
 });
+
+describe("WorkflowDagView — long brief truncation", () => {
+  it("truncates the visible brief on a node card and preserves the full text in the title attribute", () => {
+    // SDLC strategy worker briefs are composed as
+    // `"Iteration N: <role> ... — <workflow.brief verbatim>"`, so a
+    // 140-char workflow brief lands in every worker node's card
+    // title. Without truncation the card stretches to the full page
+    // width and breaks the phase-column layout.
+    const longBrief =
+      "Iteration 3: engineer attempts to land the fix for issue #42 — refactor the substrate's atomic-write helper to support the new compaction policy across all repository modules";
+    render(
+      <WorkflowDagView
+        dag={makeDag([
+          makeNode({
+            id: "n-long",
+            phase: 0,
+            spec: { kind: "worker", agent: "official/engineer", brief: longBrief },
+          }),
+        ])}
+      />,
+    );
+    const brief = screen.getByTestId("dag-brief-n-long");
+    // Visible text MUST be shorter than the original and end with an
+    // ellipsis (the helper's terminator).
+    expect(brief.textContent?.length ?? 0).toBeLessThan(longBrief.length);
+    expect(brief.textContent?.endsWith("…")).toBe(true);
+    // The full brief MUST remain on the `title` attribute so screen
+    // readers and hover tooltips still surface the complete text.
+    expect(brief.getAttribute("title")).toBe(longBrief);
+  });
+
+  it("leaves a short brief unmodified (no ellipsis, title equals visible)", () => {
+    const shortBrief = "fix the parser";
+    render(
+      <WorkflowDagView
+        dag={makeDag([
+          makeNode({
+            id: "n-short",
+            phase: 0,
+            spec: { kind: "worker", agent: "official/engineer", brief: shortBrief },
+          }),
+        ])}
+      />,
+    );
+    const brief = screen.getByTestId("dag-brief-n-short");
+    expect(brief.textContent).toBe(shortBrief);
+    expect(brief.getAttribute("title")).toBe(shortBrief);
+  });
+});

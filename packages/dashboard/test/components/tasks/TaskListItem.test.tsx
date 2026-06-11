@@ -335,6 +335,37 @@ describe("TaskListItem — aria-posinset / aria-setsize", () => {
   });
 });
 
+describe("TaskListItem — brief truncation in the headline", () => {
+  it("truncates a long brief in the headline and preserves the full text in the title attribute", () => {
+    // Task briefs can be up to 200 chars (contract cap). The row's
+    // ~360 px headline column can't accommodate that without
+    // truncation; the full text falls through to the `title`
+    // attribute for AT + hover surfaces.
+    const longBrief =
+      "Refactor the substrate's atomic-write helper to support the new compaction policy across all repository modules under the dashboard service tier";
+    renderRow({ task: makeTask({ id: "task-long", brief: longBrief }) });
+    const headline = screen
+      .getByTestId("task-row-task-long")
+      .querySelector(".task-list__item-headline");
+    expect(headline?.textContent?.length ?? 0).toBeLessThan(longBrief.length);
+    expect(headline?.textContent?.endsWith("…")).toBe(true);
+    // `title` carries the full brief (no ellipsis) — task tooltips also
+    // concatenate details when present, but with no details we expect
+    // the bare brief.
+    expect(headline?.getAttribute("title")).toBe(longBrief);
+  });
+
+  it("leaves a short brief unmodified in the headline (no ellipsis)", () => {
+    const shortBrief = "Build a thing";
+    renderRow({ task: makeTask({ id: "task-short", brief: shortBrief }) });
+    const headline = screen
+      .getByTestId("task-row-task-short")
+      .querySelector(".task-list__item-headline");
+    expect(headline?.textContent).toBe(shortBrief);
+    expect(headline?.getAttribute("title")).toBe(shortBrief);
+  });
+});
+
 describe("TaskListItem — symmetric task-row-* testids (mirrors schedule-row-*)", () => {
   it("renders task-row-{id} on the <li>, task-row-menu-trigger-{id} on the trigger, and task-row-menu-{id} on the open panel", () => {
     renderRow({ task: makeTask({ id: "task-zebra" }), menuOpen: true });
