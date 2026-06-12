@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-06-12)
+
+- Realign the **Commands quick reference** table to the new CLI id-flag convention (`packages/cli/README.md` → "Naming conventions"): `glyph task show <tid>` / `task activity <tid>` → `<task-id>` (positional); `glyph workflow cancel <wfid>` → `glyph workflow cancel <workflow-id>` (positional). Documentation-only change.
+
 ## 0.2.1 (2026-06-12)
 
 - Drop the inline **Choosing between `task` and `workflow`** subsection under **Dispatching tasks**; replace with a one-line pointer to the `official/dispatch-with-details` skill body. The decision rule + brief authoring + watchdog notes are dispatch-time concerns shared by every dispatcher (not pilot-specific), so they now live next to the primitive that handles them. Single source of truth.

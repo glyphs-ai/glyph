@@ -2,7 +2,7 @@
  * Unit tests for `resolveWorkspace` — the CLI's workspace-id resolver.
  *
  * The contract:
- *  - Only PROCESS-LOCAL sources count: the `--workspace` flag and
+ *  - Only PROCESS-LOCAL sources count: the `--workspace-id` flag and
  *    the `GLYPH_WORKSPACE` env. Both are race-free because no
  *    other client of the glyph server can mutate them.
  *  - There is no server-side workspace lookup: shared server state is
@@ -29,8 +29,8 @@ describe("resolveWorkspace", () => {
     else process.env.GLYPH_WORKSPACE = savedEnv;
   });
 
-  it("returns the --workspace flag when present", async () => {
-    const workspaceId = await resolveWorkspace({ workspace: "ws-flag-1" });
+  it("returns the --workspace-id flag when present", async () => {
+    const workspaceId = await resolveWorkspace({ workspaceId: "ws-flag-1" });
     expect(workspaceId).toBe("ws-flag-1");
   });
 
@@ -42,19 +42,19 @@ describe("resolveWorkspace", () => {
 
   it("flag wins over env", async () => {
     process.env.GLYPH_WORKSPACE = "ws-env-loses";
-    const workspaceId = await resolveWorkspace({ workspace: "ws-flag-wins" });
+    const workspaceId = await resolveWorkspace({ workspaceId: "ws-flag-wins" });
     expect(workspaceId).toBe("ws-flag-wins");
   });
 
   it("trims whitespace from both sources", async () => {
-    expect(await resolveWorkspace({ workspace: "  ws-trim-1  " })).toBe("ws-trim-1");
+    expect(await resolveWorkspace({ workspaceId: "  ws-trim-1  " })).toBe("ws-trim-1");
     process.env.GLYPH_WORKSPACE = "  ws-trim-2  ";
     expect(await resolveWorkspace({})).toBe("ws-trim-2");
   });
 
   it("treats empty string as absent (flag)", async () => {
     process.env.GLYPH_WORKSPACE = "ws-from-env";
-    const workspaceId = await resolveWorkspace({ workspace: "" });
+    const workspaceId = await resolveWorkspace({ workspaceId: "" });
     expect(workspaceId).toBe("ws-from-env");
   });
 
@@ -67,13 +67,13 @@ describe("resolveWorkspace", () => {
     await expect(resolveWorkspace({})).rejects.toThrow(/no workspace selected/);
   });
 
-  it("error message references both --workspace and GLYPH_WORKSPACE", async () => {
+  it("error message references both --workspace-id and GLYPH_WORKSPACE", async () => {
     try {
       await resolveWorkspace({});
       expect.fail("expected throw");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      expect(msg).toContain("--workspace");
+      expect(msg).toContain("--workspace-id");
       expect(msg).toContain("GLYPH_WORKSPACE");
       expect(msg).toContain("workspace list");
     }

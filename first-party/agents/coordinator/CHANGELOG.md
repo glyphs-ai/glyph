@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 (2026-06-12)
+
+- Realign the **Commands** table and **Wake-up loop** snippet to the new CLI id-flag convention (`packages/cli/README.md` → "Naming conventions"): `glyph workflow show --wfid $WF` → `glyph workflow show $WF` (positional `<workflow-id>`); `glyph task show --tid <id>` → `glyph task show <task-id>` (positional). Fix the **Expand the DAG** row's stale `--input <payload.json>` to the correct `--spec-file <payload.json>`. Update the **Verdict parsing** snippet to use the positional `<task-id>` form. No behavior change — the substrate-side mutation routes are unchanged.
+
 ## 0.1.2 (2026-06-12)
 
 - Add **Pre-flight validate** rule to the **✅ Always** list: before dispatching, validate every brief template against the dispatched agent's current `AGENTS.md` per `official/workflow-coordination` §D; log drift to `coord-decisions/` and escalate per the severity matrix; never patch templates inline.

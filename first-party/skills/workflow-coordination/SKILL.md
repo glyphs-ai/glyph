@@ -2,7 +2,7 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.3.0
+version: 0.3.1
 ---
 
 # Glyph Workflow Coordination Skill
@@ -17,8 +17,8 @@ CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`
 
 ```
 1. Read own node id from the task spec / env
-2. Read workflow header:           glyph workflow show     --wfid $WF --json
-3. Read full DAG:                  glyph workflow dag      --wfid $WF --json
+2. Read workflow header:           glyph workflow show     $WF --json
+3. Read full DAG:                  glyph workflow dag      $WF --json
 4. Identify own parents:           edges where to == own node id
 5. Identify selected strategy:
    - read workflow.metadata.strategy if set
@@ -159,7 +159,7 @@ Strategy skills SHOULD re-quote this schema (verbatim, or as a worked example wi
 
 Treat workers as pure specialists: they MUST NOT depend on any workflow-specific skill or know they are inside a workflow. All workflow context reaches them via the task brief coord writes when dispatching them. Every worker brief a strategy template emits MUST follow this pattern:
 
-- **Always include**: workflow id (so the worker can call `glyph workflow show --wfid $WF --json` itself), `workflow.brief` verbatim (no trim, no summary, no paraphrase), `workflow.details` verbatim (empty string if `null`), and concrete fetch instructions for any prior-iter outputs the worker needs (e.g. `glyph task show --tid ${PRIOR_<role>_TASK_ID}` then `<task-workdir>/artifact/verdict.json`). Workers do their own fetching; coord does not pre-digest.
+- **Always include**: workflow id (so the worker can call `glyph workflow show $WF --json` itself), `workflow.brief` verbatim (no trim, no summary, no paraphrase), `workflow.details` verbatim (empty string if `null`), and concrete fetch instructions for any prior-iter outputs the worker needs (e.g. `glyph task show ${PRIOR_<role>_TASK_ID}` then `<task-workdir>/artifact/verdict.json`). Workers do their own fetching; coord does not pre-digest.
 - **Never include**: technical content (quality bars, fix suggestions, design opinions — workers own those domains), coord's interpretation of prior-iter findings (the worker reads the raw `verdict.json` itself), or hints about future coord wake-ups (workers are workflow-unaware).
 - **Always inline the output protocol**: for reviewer workers, the §C `verdict.json` schema (verbatim, or as a worked example) plus validation rules and the optional narrative-file convention (also under `<workdir>/artifact/`). For implementer workers, the expected branch / PR convention the next coord wake-up relies on.
 - **Use `${PLACEHOLDER}` substitution** for every per-dispatch slot. Coord fills slots via plain string replacement before writing the brief into `add-subgraph`. Substitution is total — a literal `${...}` in the dispatched brief is a bug. Unresolved placeholders (e.g. `${WORKFLOW_DETAILS}` when the creator passed nothing) substitute the empty string.

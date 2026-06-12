@@ -29,7 +29,7 @@ export interface ConnectFlagOpts {
 }
 
 export interface WorkspaceFlagOpts extends ConnectFlagOpts {
-  workspace?: string;
+  workspaceId?: string;
 }
 
 export function parseConnectFlags(opts: Record<string, unknown>): ConnectFlagOpts {
@@ -44,8 +44,8 @@ export function parseConnectFlags(opts: Record<string, unknown>): ConnectFlagOpt
 
 export function parseWorkspaceFlags(opts: Record<string, unknown>): WorkspaceFlagOpts {
   const out: WorkspaceFlagOpts = parseConnectFlags(opts);
-  const workspace = pickString(opts, "workspace");
-  if (workspace !== undefined) out.workspace = workspace;
+  const workspaceId = pickString(opts, "workspaceId");
+  if (workspaceId !== undefined) out.workspaceId = workspaceId;
   return out;
 }
 
@@ -96,10 +96,10 @@ export function withConnectFlags(c: Command): Command {
     .option("--json", "Shorthand for --output json");
 }
 
-/** Workspace-scoped commands additionally take `--workspace`. */
+/** Workspace-scoped commands additionally take `-w, --workspace-id`. */
 export function withWorkspaceFlags(c: Command): Command {
   return withConnectFlags(c).option(
-    "-w, --workspace <id>",
+    "-w, --workspace-id <id>",
     "Workspace id (or set GLYPH_WORKSPACE; one is required)",
   );
 }

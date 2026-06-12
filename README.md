@@ -149,10 +149,10 @@ glyph runtime list
 glyph workspace list
 glyph workspace add --name "Sandbox" --workdir ~/code/sandbox
 export GLYPH_WORKSPACE=<id>          # required for workspace-scoped commands
-glyph workspace show <id>
-glyph workspace rm <id> --purge
+glyph workspace show <workspace-id>
+glyph workspace rm <workspace-id> --purge
 
-# sessions and tasks (workspace-scoped; pass --workspace <id> to override the env above)
+# sessions and tasks (workspace-scoped; pass --workspace-id <id> to override the env above)
 glyph session new --agent writer
 glyph session list --agent writer --json
 glyph task dispatch --agent triage --brief "Scan recent issues"
@@ -171,7 +171,7 @@ glyph catalog mcp install --url https://github.com/glyphs-ai/glyph/tree/main/fir
 Common flags on every API command:
 
 - `--server <url>` — overrides `GLYPH_SERVER` and `runtime.json`. Defaults to `http://127.0.0.1:8787`.
-- `--workspace <id>` — workspace-scoped commands. Overrides `GLYPH_WORKSPACE` and the server's `currentWorkspace`.
+- `--workspace-id <id>` — workspace-scoped commands. Overrides `GLYPH_WORKSPACE` and the server's `currentWorkspace`.
 - `--output <fmt>` / `--json` — `table` (human-friendly default) or `json` (for scripting).
 
 Exit codes: `0` success, `1` generic error, `2` usage error, `3` server unreachable, `4` server returned a 4xx/5xx.

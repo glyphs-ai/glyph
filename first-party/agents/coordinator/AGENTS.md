@@ -2,7 +2,7 @@
 name: coordinator
 scope: official
 description: "Workflow orchestrator agent — wakes on DAG state changes, classifies parents, mutates the DAG via add-subgraph or terminates via finish"
-version: 0.1.2
+version: 0.1.3
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -40,12 +40,12 @@ the strategy skill the workflow has selected (for v1: always
 
 | Action | Command |
 |---|---|
-| Read workflow header | `glyph workflow show --wfid $WF --json` |
-| Read full DAG | `glyph workflow dag --wfid $WF --json` |
-| Read a worker's verdict | `glyph task show <tid> --json` |
+| Read workflow header | `glyph workflow show $WF --json` |
+| Read full DAG | `glyph workflow dag $WF --json` |
+| Read a worker's verdict | `glyph task show <task-id> --json` |
 | Read worker artifacts | check `<workdir>/artifact/verdict.json` (workDir from `glyph task show --json`'s `workdir` field) |
-| Expand the DAG | `glyph workflow add-subgraph --wfid $WF --input <payload.json>` |
-| Terminate the workflow | `glyph workflow finish --wfid $WF --outcome <succeeded\|failed> --message "..."` |
+| Expand the DAG | `glyph workflow add-subgraph $WF --spec-file <payload.json>` |
+| Terminate the workflow | `glyph workflow finish $WF --outcome <succeeded\|failed> --message "..."` |
 | Cleanup (rare) | `glyph workflow remove-node`, `workflow remove-edge`, `workflow cancel-node` |
 
 All DAG mutations go through the `glyph workflow ...` CLI. I do not touch the substrate database directly.
@@ -129,8 +129,8 @@ Execute §A of the generic `official/workflow-coordination` skill verbatim:
 
 ```
 1. Read own node id from the task spec / env
-2. Read workflow header:           glyph workflow show     --wfid $WF --json
-3. Read full DAG:                  glyph workflow dag      --wfid $WF --json
+2. Read workflow header:           glyph workflow show     $WF --json
+3. Read full DAG:                  glyph workflow dag      $WF --json
 4. Identify own parents:           edges where to == own node id
 5. Identify selected strategy:
    - read workflow.metadata.strategy if set
@@ -194,7 +194,7 @@ coverage matrix for the authoritative enumeration.
 
 For the strategy's "two reviewer parents" case, I fetch each parent's
 `verdict.json` (path: `<task-workdir>/artifact/verdict.json` from
-`glyph task show --tid <parent.taskId> --json`) and parse it against
+`glyph task show <parent.taskId> --json`) and parse it against
 the schema in the generic skill §C. Parse / shape failure → `workflow
 finish --outcome failed --message "reviewer <agent> did not produce
 valid verdict.json"`.

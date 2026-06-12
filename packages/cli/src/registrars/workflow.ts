@@ -152,42 +152,38 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
 
   withWorkspaceFlags(workflowCmd.command("show"))
     .description("Print one workflow's header (status, iterationCount, timestamps)")
-    .requiredOption("--wfid <id>", "Workflow id")
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowShow(pickString(opts, "wfid") ?? "", parseWorkspaceFlags(opts));
+    .argument("<workflow-id>", "Workflow id")
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowShow(workflowId, parseWorkspaceFlags(opts));
     });
 
   withWorkspaceFlags(workflowCmd.command("node-show"))
     .description("Print one workflow node's projected wire shape (with taskId enrichment)")
-    .requiredOption("--wfid <id>", "Workflow id")
-    .requiredOption("--nid <id>", "Node id within the workflow")
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowNodeShow(
-        pickString(opts, "wfid") ?? "",
-        pickString(opts, "nid") ?? "",
-        parseWorkspaceFlags(opts),
-      );
+    .argument("<workflow-id>", "Workflow id")
+    .argument("<node-id>", "Node id within the workflow")
+    .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowNodeShow(workflowId, nodeId, parseWorkspaceFlags(opts));
     });
 
   withWorkspaceFlags(workflowCmd.command("dag"))
     .description("Print the full DAG snapshot (header + nodes + edges)")
-    .requiredOption("--wfid <id>", "Workflow id")
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowDag(pickString(opts, "wfid") ?? "", parseWorkspaceFlags(opts));
+    .argument("<workflow-id>", "Workflow id")
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowDag(workflowId, parseWorkspaceFlags(opts));
     });
 
   withWorkspaceFlags(workflowCmd.command("cancel"))
     .description(
       "Cancel a running workflow (flips status → cancelled, reconciles non-terminal nodes)",
     )
-    .requiredOption("--wfid <id>", "Workflow id")
+    .argument("<workflow-id>", "Workflow id")
     .option(
       "--message <text>",
       "Free-text operator message persisted into cancellation.message (v2.2; defaults to empty)",
     )
     .option("--kind <kind>", 'Cancellation kind (v2.2 only emits "user"; defaults to "user")')
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowCancel(pickString(opts, "wfid") ?? "", {
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowCancel(workflowId, {
         ...parseWorkspaceFlags(opts),
         ...optionalString(opts, "message"),
         ...optionalString(opts, "kind"),
@@ -196,10 +192,10 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
 
   withWorkspaceFlags(workflowCmd.command("rm"))
     .description("Remove a terminal workflow")
-    .requiredOption("--wfid <id>", "Workflow id")
+    .argument("<workflow-id>", "Workflow id")
     .option("--purge", "Hard delete: also remove workflow/task workdirs and runtime state")
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowRm(pickString(opts, "wfid") ?? "", {
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowRm(workflowId, {
         ...parseWorkspaceFlags(opts),
         purge: opts.purge === true,
       });
@@ -209,31 +205,31 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
 
   withWorkspaceFlags(workflowCmd.command("add-node"))
     .description("Coord-only: insert one node attached to one or more existing parents")
-    .requiredOption("--wfid <id>", "Workflow id")
+    .argument("<workflow-id>", "Workflow id")
     .requiredOption("--kind <kind>", "Node kind (coordinator | worker)")
     .requiredOption("--spec-file <path>", "Path to JSON file holding the opaque per-kind spec")
     .option(
-      "--parents <ids>",
+      "--parent-node-ids <ids>",
       "Comma-separated parent node ids (≥1 required; substrate rejects empty)",
     )
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowAddNode(pickString(opts, "wfid") ?? "", {
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowAddNode(workflowId, {
         ...parseWorkspaceFlags(opts),
         kind: pickString(opts, "kind") ?? "",
         specFile: pickString(opts, "specFile") ?? "",
-        ...optionalString(opts, "parents"),
+        ...optionalString(opts, "parentNodeIds"),
       });
     });
 
   withWorkspaceFlags(workflowCmd.command("add-subgraph"))
     .description("Coord-only: insert N nodes + intra-batch edges atomically")
-    .requiredOption("--wfid <id>", "Workflow id")
+    .argument("<workflow-id>", "Workflow id")
     .requiredOption(
       "--spec-file <path>",
       "Path to JSON file matching { nodes:[{tempId,kind,spec,existingParents?}], edges:[{from,to}] }",
     )
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowAddSubgraph(pickString(opts, "wfid") ?? "", {
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowAddSubgraph(workflowId, {
         ...parseWorkspaceFlags(opts),
         specFile: pickString(opts, "specFile") ?? "",
       });
@@ -241,79 +237,67 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
 
   withWorkspaceFlags(workflowCmd.command("add-edge"))
     .description("Coord-only: add a single edge between two existing nodes")
-    .requiredOption("--wfid <id>", "Workflow id")
-    .requiredOption("--from <id>", "Source node id")
-    .requiredOption("--to <id>", "Destination node id (must be not_started)")
-    .action(async (opts: Record<string, unknown>) => {
+    .argument("<workflow-id>", "Workflow id")
+    .requiredOption("--from-node-id <id>", "Source node id")
+    .requiredOption("--to-node-id <id>", "Destination node id (must be not_started)")
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
       slot.result = await workflowAddEdge(
-        pickString(opts, "wfid") ?? "",
-        pickString(opts, "from") ?? "",
-        pickString(opts, "to") ?? "",
+        workflowId,
+        pickString(opts, "fromNodeId") ?? "",
+        pickString(opts, "toNodeId") ?? "",
         parseWorkspaceFlags(opts),
       );
     });
 
   withWorkspaceFlags(workflowCmd.command("remove-node"))
     .description("Coord-only: delete a not_started node (and its adjacent edges)")
-    .requiredOption("--wfid <id>", "Workflow id")
-    .requiredOption("--nid <id>", "Node id")
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowRemoveNode(
-        pickString(opts, "wfid") ?? "",
-        pickString(opts, "nid") ?? "",
-        parseWorkspaceFlags(opts),
-      );
+    .argument("<workflow-id>", "Workflow id")
+    .argument("<node-id>", "Node id")
+    .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowRemoveNode(workflowId, nodeId, parseWorkspaceFlags(opts));
     });
 
   withWorkspaceFlags(workflowCmd.command("remove-edge"))
     .description(
       "Coord-only: delete a single edge (to-node must be not_started, ≥1 parent retained)",
     )
-    .requiredOption("--wfid <id>", "Workflow id")
-    .requiredOption("--from <id>", "Source node id")
-    .requiredOption("--to <id>", "Destination node id")
-    .action(async (opts: Record<string, unknown>) => {
+    .argument("<workflow-id>", "Workflow id")
+    .requiredOption("--from-node-id <id>", "Source node id")
+    .requiredOption("--to-node-id <id>", "Destination node id")
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
       slot.result = await workflowRemoveEdge(
-        pickString(opts, "wfid") ?? "",
-        pickString(opts, "from") ?? "",
-        pickString(opts, "to") ?? "",
+        workflowId,
+        pickString(opts, "fromNodeId") ?? "",
+        pickString(opts, "toNodeId") ?? "",
         parseWorkspaceFlags(opts),
       );
     });
 
   withWorkspaceFlags(workflowCmd.command("replace-spec"))
     .description("Coord-only: re-validate + replace a node's opaque spec (kind cannot change)")
-    .requiredOption("--wfid <id>", "Workflow id")
-    .requiredOption("--nid <id>", "Node id")
+    .argument("<workflow-id>", "Workflow id")
+    .argument("<node-id>", "Node id")
     .requiredOption("--spec-file <path>", "Path to JSON file holding the new spec")
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowReplaceSpec(
-        pickString(opts, "wfid") ?? "",
-        pickString(opts, "nid") ?? "",
-        {
-          ...parseWorkspaceFlags(opts),
-          specFile: pickString(opts, "specFile") ?? "",
-        },
-      );
+    .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowReplaceSpec(workflowId, nodeId, {
+        ...parseWorkspaceFlags(opts),
+        specFile: pickString(opts, "specFile") ?? "",
+      });
     });
 
   withWorkspaceFlags(workflowCmd.command("cancel-node"))
     .description(
       "Coord-only: cancel a single worker node (coord-kind targets are rejected with 409)",
     )
-    .requiredOption("--wfid <id>", "Workflow id")
-    .requiredOption("--nid <id>", "Node id")
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowCancelNode(
-        pickString(opts, "wfid") ?? "",
-        pickString(opts, "nid") ?? "",
-        parseWorkspaceFlags(opts),
-      );
+    .argument("<workflow-id>", "Workflow id")
+    .argument("<node-id>", "Node id")
+    .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowCancelNode(workflowId, nodeId, parseWorkspaceFlags(opts));
     });
 
   withWorkspaceFlags(workflowCmd.command("finish"))
     .description("Coord-only: flip the workflow terminal (outcome: succeeded | failed)")
-    .requiredOption("--wfid <id>", "Workflow id")
+    .argument("<workflow-id>", "Workflow id")
     .requiredOption("--outcome <outcome>", "Terminal outcome (succeeded | failed)")
     .option(
       "--summary <text>",
@@ -323,15 +307,11 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
       "--message <text>",
       "Failure message persisted into failure.message (required with --outcome failed)",
     )
-    .action(async (opts: Record<string, unknown>) => {
-      slot.result = await workflowFinish(
-        pickString(opts, "wfid") ?? "",
-        pickString(opts, "outcome") ?? "",
-        {
-          ...parseWorkspaceFlags(opts),
-          ...optionalString(opts, "summary"),
-          ...optionalString(opts, "message"),
-        },
-      );
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowFinish(workflowId, pickString(opts, "outcome") ?? "", {
+        ...parseWorkspaceFlags(opts),
+        ...optionalString(opts, "summary"),
+        ...optionalString(opts, "message"),
+      });
     });
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-06-12)
+
+- Realign brief templates and the `${PR_NUMBER}` / `${BRANCH_NAME}` placeholder-derivation prose to the new CLI id-flag convention (`packages/cli/README.md` → "Naming conventions"): `glyph task show --tid <id>` → `glyph task show <id>` (positional); `glyph workflow dag --wfid ${WORKFLOW_ID}` → `glyph workflow dag ${WORKFLOW_ID}` (positional). Documentation-only change.
+
 ## 0.2.0 (2026-06-12)
 
 - **CI quality gate**: extend the "two parents, both reviewers" case with an APPROVE sub-case that runs `gh pr checks <pr_number> --json` synchronously. All-green → finish succeeded; any red → next engineer iteration (the dev brief instructs the worker to fetch the failing-job log itself); pending → dispatch a `ci-waiter` (reviewer in MODE: ci, brief=`template-review-ci`) that blocks on `gh pr checks --watch`.

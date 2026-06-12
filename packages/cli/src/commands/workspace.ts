@@ -3,8 +3,8 @@
  * surface (list / add / current / show / update / rm / reload).
  *
  * Every command takes `--server` / `--output` (some also `--json`
- * shorthand). Workspace-scoped flags (`--workspace`) live in the family
- * commands (`session`, `schedule`, `task`, `workflow`, `catalog`).
+ * shorthand). Workspace-scoped flags (`--workspace-id`) live in the
+ * family commands (`session`, `schedule`, `task`, `workflow`, `catalog`).
  */
 
 import { makeClient } from "../connect.js";

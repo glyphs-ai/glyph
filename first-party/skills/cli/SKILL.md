@@ -2,7 +2,7 @@
 name: cli
 scope: official
 description: "Control a glyph server from the CLI — workspaces, agents, tasks, sessions, catalog, workflows"
-version: 0.1.1
+version: 0.2.0
 ---
 
 # official/cli skill
@@ -39,10 +39,10 @@ Every workspace-scoped command requires an explicit selector. The CLI reads `GLY
 glyph task dispatch --agent writer --brief "..."
 ```
 
-To act on a different workspace, pass `--workspace <id>` per command:
+To act on a different workspace, pass `--workspace-id <id>` per command:
 
 ```sh
-glyph task list --workspace ws-Y
+glyph task list --workspace-id ws-Y
 ```
 
 The CLI does not consult any server-side shared "current workspace" state — selectors are process-local, immune to interference from other clients (other CLI sessions, dashboard tabs, AI agents on the same server).
@@ -82,7 +82,7 @@ The full per-subcommand reference (flags, HTTP route, body schema, response shap
 | --- | --- | --- |
 | `list`, `show`, `dag`, `node-show` | `add-node`, `add-subgraph`, `add-edge`, `remove-node`, `remove-edge`, `replace-spec`, `cancel-node` | `create`, `cancel`, `finish` |
 
-All workflow subcommands accept the same `--server / --home / --workspace / --output / --json` flags and follow the exit-code table below. The reference doc only calls out per-command additions.
+All workflow subcommands accept the same `--server / --home / --workspace-id / --output / --json` flags and follow the exit-code table below. The reference doc only calls out per-command additions.
 
 ## Exit codes
 

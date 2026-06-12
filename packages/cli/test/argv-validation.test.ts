@@ -152,12 +152,12 @@ describe("argv validation (workspace selection)", () => {
   it("workspace-scoped command fails clearly when no workspace is set", async () => {
     // `resolveWorkspace` throws before any HTTP call — see
     // `connect.ts`. The error surfaces through `formatError` as exit
-    // 1 with a message that names both `--workspace` and
+    // 1 with a message that names both `--workspace-id` and
     // `GLYPH_WORKSPACE` so users can pick a fix.
     const r = await runCli(["session", "list"], env());
     expect(r.exitCode).not.toBe(0);
     expect(r.stderr).toContain("workspace");
-    expect(r.stderr).toContain("--workspace");
+    expect(r.stderr).toContain("--workspace-id");
     expect(r.stderr).toContain("GLYPH_WORKSPACE");
   });
 });
