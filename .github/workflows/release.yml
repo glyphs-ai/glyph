@@ -104,12 +104,27 @@ jobs:
           echo "publishing with --tag $tag"
           npm publish --provenance --access public --tag "$tag"
 
+      - name: Pack npm tarball
+        # `prepublishOnly: pnpm bundle` already ran for `npm publish`
+        # above. `--ignore-scripts` skips the redundant rebuild and
+        # guarantees byte-for-byte parity with what was just published —
+        # a second bundle invocation could in principle drift the output
+        # hash if the build environment shifted under it.
+        run: npm pack --ignore-scripts
+
       - name: Create GitHub Release
         # Runs after npm publish so a missing GitHub Release can never be
         # mistaken for "the npm publish failed". Auto-generates release
         # notes from PRs merged since the previous tag (resolved by gh).
         # Prereleases (`X.Y.Z-foo`) get marked as such so the GitHub UI
-        # doesn't promote them as the latest stable release.
+        # doesn't promote them as the latest stable release. The npm
+        # tarball is attached as an asset so internal users who cannot
+        # reach the public npm registry can install via
+        # `gh release download` + `npm i -g ./*.tgz`. The asset is
+        # passed as a positional argument to `gh release create`, so
+        # the release is created with the tarball attached in a single
+        # call — no separate `gh release upload` step that could leave
+        # an empty release behind on failure.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -121,4 +136,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
-            $prerelease_flag
+            $prerelease_flag \
+            "./glyphs-ai-glyph-${version}.tgz"
