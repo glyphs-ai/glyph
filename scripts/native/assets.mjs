@@ -161,22 +161,29 @@ function walkForNodeModules(startDir, name) {
 async function buildClosure(repoRoot) {
   const rootRequire = createRequire(pathToFileURL(resolve(repoRoot, "package.json")));
   const closure = new Map(); // name → { name, root, bundleOnlyPackageJson }
+  const excludedNames = new Set();
 
-  async function add(name, parentRequire, parentName, parentRoot, bundleOnlyPackageJson) {
+  async function add(name, parentRequire, parentName, parentRoot, opts) {
+    if (excludedNames.has(name)) return;
+    const { bundleOnlyPackageJson = false, excludeTransitive = [] } = opts;
     if (closure.has(name)) return;
     const root = resolveInstallRoot(name, parentRequire, parentName, parentRoot, repoRoot);
     closure.set(name, { name, root, bundleOnlyPackageJson });
+    for (const n of excludeTransitive) excludedNames.add(n);
     if (bundleOnlyPackageJson) return;
     const pkg = await readJson(join(root, "package.json"));
     const deps = pkg.dependencies && typeof pkg.dependencies === "object" ? pkg.dependencies : {};
     const requireFromHere = createRequire(pathToFileURL(join(root, "package.json")));
     for (const depName of Object.keys(deps)) {
-      await add(depName, requireFromHere, name, root, false);
+      await add(depName, requireFromHere, name, root, {});
     }
   }
 
   for (const r of NATIVE_ROOTS) {
-    await add(r.name, rootRequire, null, repoRoot, r.bundleOnlyPackageJson === true);
+    await add(r.name, rootRequire, null, repoRoot, {
+      bundleOnlyPackageJson: r.bundleOnlyPackageJson === true,
+      excludeTransitive: r.excludeTransitive ?? [],
+    });
   }
   return [...closure.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -196,14 +203,22 @@ async function selectPackageFiles(pkgRoot, bundleOnlyPackageJson) {
   return all.filter((f) => {
     const rel = relative(pkgRoot, f);
     const parts = rel.split(sep);
-    // Drop test / example fixtures, source maps, TypeScript sources.
+    // Drop test / example fixtures, source maps, TypeScript sources,
+    // documentation, and type-declaration artefacts. None are needed
+    // at runtime; every byte we keep here is a byte postject has to
+    // shuffle through its WASM heap during the inject step, and the
+    // heap is the binding limit on the SEA blob size.
     if (parts.includes("test") || parts.includes("tests") || parts.includes("__tests__")) {
       return false;
     }
     if (parts.includes("example") || parts.includes("examples")) return false;
+    if (parts.includes("docs") || parts.includes("doc")) return false;
     if (parts.includes(".github")) return false;
     if (rel.endsWith(".map")) return false;
+    if (rel.endsWith(".d.ts") || rel.endsWith(".d.cts") || rel.endsWith(".d.mts")) return false;
     if (rel.endsWith(".ts") && !rel.endsWith(".d.ts")) return false;
+    if (rel.endsWith(".md") || rel.endsWith(".markdown")) return false;
+    if (/(^|[\\/])(README|CHANGELOG|LICENSE|HISTORY|NOTICE)(\.[a-z0-9]+)?$/i.test(rel)) return false;
     return true;
   });
 }

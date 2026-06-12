@@ -61,6 +61,16 @@ export const NATIVE_ROOTS = Object.freeze([
   { name: "pino" },
   { name: "pino-pretty" },
   { name: "pino-roll" },
-  { name: "@github/copilot-sdk" },
+  // The SDK's published CJS + ESM dists are pre-bundled by its own
+  // esbuild step. They inline `zod` (saving ~430 files / several MB
+  // off the SEA blob, which keeps postject's WASM-heap inject step
+  // viable on the GitHub Actions runner) but externalise
+  // `vscode-jsonrpc/node.js`, so we vendor the SDK and let the
+  // collector walk transitive deps but drop `zod` from that walk.
+  // The exclude is targeted, not a wholesale `skipDependencies`,
+  // because dropping the dependency walk entirely would also drop
+  // `vscode-jsonrpc` (it would not be reachable from any other
+  // root).
+  { name: "@github/copilot-sdk", excludeTransitive: ["zod"] },
   { name: "@github/copilot", bundleOnlyPackageJson: true },
 ]);
