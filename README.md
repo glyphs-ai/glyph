@@ -66,19 +66,15 @@ network policy, no mirror, etc.). Requires Node 22+ and npm. Every
 tagged release on this repo attaches the same `.tgz` that gets pushed
 to npm as a downloadable asset.
 
-With the [GitHub CLI](https://cli.github.com/):
+`npm install` accepts an HTTPS URL directly — no local download step:
 
 ```sh
-gh release download vX.Y.Z -R glyphs-ai/glyph -p "*.tgz"
-npm i -g ./glyphs-ai-glyph-X.Y.Z.tgz
+npm install -g https://github.com/glyphs-ai/glyph/releases/download/vX.Y.Z/glyphs-ai-glyph-X.Y.Z.tgz
 ```
 
-Without `gh` (plain `curl`; the public repo needs no auth):
-
-```sh
-curl -L -o glyph.tgz https://github.com/glyphs-ai/glyph/releases/download/vX.Y.Z/glyphs-ai-glyph-X.Y.Z.tgz
-npm i -g ./glyph.tgz
-```
+Substitute `X.Y.Z` (twice — in the tag and in the filename) for the
+target release version. npm fetches over HTTPS and installs in one
+step; nothing is written to the current working directory.
 
 The tarball filename follows npm's scoped-package slugification —
 `@glyphs-ai/glyph` becomes `glyphs-ai-glyph-X.Y.Z.tgz` (the leading
