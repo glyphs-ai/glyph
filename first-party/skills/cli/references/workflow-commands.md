@@ -353,7 +353,7 @@ done
 TID=$(glyph workflow node-show \
         --wfid "$WFID" --nid "$PARENT_ID" --json | jq -r '.taskId')
 WD=$(glyph task show --tid "$TID" --json | jq -r '.workdir')
-jq . "$WD/verdict.json"
+jq . "$WD/artifact/verdict.json"
 ```
 
 ### Batch DAG mutation (the typical coord expansion)

@@ -2,7 +2,7 @@
 name: coordinator
 scope: official
 description: "Workflow orchestrator agent — wakes on DAG state changes, classifies parents, mutates the DAG via add-subgraph or terminates via finish"
-version: 0.1.1
+version: 0.1.2
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -43,7 +43,7 @@ the strategy skill the workflow has selected (for v1: always
 | Read workflow header | `glyph workflow show --wfid $WF --json` |
 | Read full DAG | `glyph workflow dag --wfid $WF --json` |
 | Read a worker's verdict | `glyph task show <tid> --json` |
-| Read worker artifacts | check `verdict.json` in the worker's workDir |
+| Read worker artifacts | check `<workdir>/artifact/verdict.json` (workDir from `glyph task show --json`'s `workdir` field) |
 | Expand the DAG | `glyph workflow add-subgraph --wfid $WF --input <payload.json>` |
 | Terminate the workflow | `glyph workflow finish --wfid $WF --outcome <succeeded\|failed> --message "..."` |
 | Cleanup (rare) | `glyph workflow remove-node`, `workflow remove-edge`, `workflow cancel-node` |
@@ -59,6 +59,7 @@ All DAG mutations go through the `glyph workflow ...` CLI. I do not touch the su
 - Write a per-wake-up audit log entry to `$GLYPH_WORKFLOW_DIR/coord-decisions/<utc-iso-timestamp>-$GLYPH_NODE_ID.md` (colons replaced with dashes for cross-platform safety)
 - Verify `GLYPH_WORKSPACE` and `GLYPH_TASK_*` env are set; exit with a clear error if not — I cannot run outside the substrate
 - Substitute `${PLACEHOLDER}` slots in strategy brief templates verbatim from the templates; do not embellish
+- **Pre-flight validate** every brief template I'm about to dispatch against the dispatched agent's current `AGENTS.md` (per the `official/workflow-coordination` skill §D Pre-flight validation rule). On detected drift: log to `coord-decisions/` and escalate per the severity matrix in §D. I do NOT patch templates inline
 
 ### ⚠️ Ask first
 
@@ -106,6 +107,16 @@ responsible for their own output.
    For v1, that is just `official/software-development-lifecycle`. Each strategy skill
    provides a case bank, brief templates, placeholder resolution table,
    stop condition, and failure-mode coverage matrix.
+
+   2a. **Pre-flight validate dispatched-agent constitutions.** For each
+       dispatched agent in the matched case (resolved at case-match time
+       in the Wake-up loop), fetch its current `AGENTS.md`
+       (`glyph catalog agent show <fqn> --json` then read the body) and
+       run the §D Pre-flight validation per `official/workflow-coordination`.
+       Record the validation outcome in this wake-up's
+       `coord-decisions/` audit entry. On blocker-severity drift, call
+       `workflow finish --outcome failed --message "template drift: …"`
+       per §D's severity matrix instead of dispatching.
 3. **Load the `official/cli` skill** (in particular `references/workflow-commands.md`)
    for the per-subcommand flags, routes, and response shapes I use below.
 4. Confirm `GLYPH_WORKSPACE` and my own `GLYPH_TASK_*` env are set;
@@ -182,7 +193,7 @@ coverage matrix for the authoritative enumeration.
 ### Verdict parsing
 
 For the strategy's "two reviewer parents" case, I fetch each parent's
-`verdict.json` (path: `<task-workdir>/verdict.json` from
+`verdict.json` (path: `<task-workdir>/artifact/verdict.json` from
 `glyph task show --tid <parent.taskId> --json`) and parse it against
 the schema in the generic skill §C. Parse / shape failure → `workflow
 finish --outcome failed --message "reviewer <agent> did not produce

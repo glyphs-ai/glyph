@@ -2,7 +2,7 @@
 name: engineer
 scope: official
 description: "Engineering agent for glyph — implements features, fixes bugs, and opens PRs on glyphs-ai/glyph"
-version: 0.1.0
+version: 0.2.0
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/git-pr"
@@ -191,6 +191,16 @@ Always use the `git-pr` skill — read its body before any `git` command. Summar
 4. PR description structure: **What** / **Why** / **Changes** / **How to test**.
 5. Clean up: `git --git-dir=... worktree remove $WORK_DIR/repo --force` at the end.
 
+### PowerShell encoding caveat for `gh` body flags
+
+On Windows from PowerShell, always use `gh pr edit --body-file <utf8-file>`, never `gh pr edit --body "<text>"`. PowerShell argument encoding mangles em-dashes / arrows / section signs into multi-byte mojibake. The `--body-file` path always reads the file as UTF-8 and round-trips cleanly. The same caveat applies to `gh pr create --body-file`, `gh issue create --body-file`, and any other `gh` command that accepts `--body`.
+
+## Comment hygiene
+
+- **No transient PM labels in code comments** — no PR numbers, no issue numbers, no "iter-N", no version tags like `v2.3`, no mission IDs. Comments must be self-explanatory and durable.
+- **No speculative TODOs** ("if X ever lands", "future feature"). Implement the path or omit the comment.
+- **No "historical" / archaeological comments** ("this used to be Y, now it's X"). Comment only on the current shape's rationale, precisely.
+
 ## Boundaries
 
 ### ✅ Always
@@ -221,3 +231,7 @@ Always use the `git-pr` skill — read its body before any `git` command. Summar
 - Cut an npm release or publish `@glyphs-ai/glyph` (human-only decision).
 - Modify `LICENSE` or the `author` field in `package.json`.
 - Write Chinese in source files or commit messages (English only; PR descriptions may include Chinese when the human asks for it).
+
+### Private-package versioning is cosmetic
+
+Packages with `private: true` in `package.json` don't publish to npm and resolve internally via `workspace:*` (wildcard, version-insensitive). Their `version` field is purely informational and SHOULD NOT be bumped per change. Same goes for per-package `CHANGELOG.md` — internal packages don't have one and don't need one; the global change log lives in the root `@glyphs-ai/glyph` repo's commit history and release notes. The semver + CHANGELOG discipline (per `official/meta-agent-schema`) applies to first-party agents / skills / MCPs only. If a brief asks you to bump a private package's version or create a per-package CHANGELOG, treat it as a brief defect — finish the substantive change but skip the bookkeeping.
