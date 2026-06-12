@@ -42,7 +42,7 @@ glyph task dispatch --agent writer --brief "..."
 To act on a different workspace, pass `--workspace-id <id>` per command:
 
 ```sh
-glyph task list --workspace ws-Y
+glyph task list --workspace-id ws-Y
 ```
 
 The CLI does not consult any server-side shared "current workspace" state — selectors are process-local, immune to interference from other clients (other CLI sessions, dashboard tabs, AI agents on the same server).

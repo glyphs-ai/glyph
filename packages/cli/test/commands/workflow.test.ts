@@ -956,7 +956,7 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
     };
   }
 
-  it("`workflow list --workspace …` routes through commander to a GET", async () => {
+  it("`workflow list --workspace-id …` routes through commander to a GET", async () => {
     const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify([sampleHeader]) }]);
     const r = await runCli(["workflow", "list", "--workspace-id", WSID], env());
     expect(r.exitCode, r.stderr).toBe(0);

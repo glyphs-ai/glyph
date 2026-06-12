@@ -135,6 +135,8 @@ check three things:
 If the answer is "none of the above", you're outside the convention —
 discuss with maintainers before adding the flag.
 
+## Public API
+
 ```ts
 import { run } from "@glyphs-ai/cli";
 
