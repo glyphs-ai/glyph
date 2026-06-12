@@ -116,7 +116,19 @@ export async function runBundleStep() {
   // materialised `node_modules/` into. So `require.resolve(spec)`
   // sees every vendored package the same way an ESM `import.meta.
   // resolve(spec)` would.
+  //
+  // The `require = ...` line shadows the outer `require` parameter
+  // that SEA's `embedderRunCjs` passes in. That argument is
+  // `embedderRequire`, which only knows built-in modules and throws
+  // `ERR_UNKNOWN_BUILTIN_MODULE` for everything else (better-sqlite3,
+  // pino, the copilot-sdk, …). The sea-bootstrap stashes a real
+  // `Module.createRequire(process.execPath)` in
+  // `globalThis.__glyphSeaRequire`; we promote it here so every
+  // subsequent `require(...)` in the bundle resolves against the
+  // materialised tree. Outside SEA (local debug) the global is
+  // undefined and `require` keeps its original value.
   const cjsImportMetaShim =
+    "if (typeof globalThis.__glyphSeaRequire === 'function') { require = globalThis.__glyphSeaRequire; }\n" +
     "const __glyph_url_mod = require('node:url');\n" +
     "const __glyph_meta_url = __glyph_url_mod.pathToFileURL(__filename).href;\n" +
     "const __glyph_meta_filename = __filename;\n" +

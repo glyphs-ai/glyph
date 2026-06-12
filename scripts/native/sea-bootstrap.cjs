@@ -123,4 +123,15 @@
     }
     return origReadFile(p, ...rest);
   };
+
+  // Expose the materialised node_modules directory and a real
+  // module-resolver-backed `require` to the surrounding bundle.
+  // SEA's default `require` is `embedderRequire`, which only resolves
+  // built-in modules and throws ERR_UNKNOWN_BUILTIN_MODULE for
+  // everything else. The banner that follows this IIFE reads
+  // globalThis.__glyphSeaRequire and shadows the bundle's outer
+  // `require` with it, so calls like `require("better-sqlite3")`
+  // resolve through `Module._load` against the materialised tree.
+  globalThis.__glyphSeaRequire = Module.createRequire(process.execPath);
+  globalThis.__glyphSeaNodeModulesDir = nodeModulesDir;
 })();
