@@ -162,28 +162,41 @@ async function buildClosure(repoRoot) {
   const rootRequire = createRequire(pathToFileURL(resolve(repoRoot, "package.json")));
   const closure = new Map(); // name → { name, root, bundleOnlyPackageJson }
   const excludedNames = new Set();
+  const explicitRoots = new Map(); // name → { bundleOnlyPackageJson }
 
-  async function add(name, parentRequire, parentName, parentRoot, opts) {
+  // Capture explicit per-root flags up front so the walk can honour
+  // them when it first encounters a package — regardless of whether
+  // that's through the declared root or a sibling root's transitive
+  // dependency. Without this, `@github/copilot` (declared
+  // `bundleOnlyPackageJson: true`) would be pulled in full by
+  // `@github/copilot-sdk`'s transitive walk because the SDK depends on
+  // `@github/copilot`. The first `add()` for the name wins; declaring
+  // the flag here means the win lands on the right shape.
+  for (const r of NATIVE_ROOTS) {
+    explicitRoots.set(r.name, {
+      bundleOnlyPackageJson: r.bundleOnlyPackageJson === true,
+    });
+    for (const n of r.excludeTransitive ?? []) excludedNames.add(n);
+  }
+
+  async function add(name, parentRequire, parentName, parentRoot) {
     if (excludedNames.has(name)) return;
-    const { bundleOnlyPackageJson = false, excludeTransitive = [] } = opts;
     if (closure.has(name)) return;
     const root = resolveInstallRoot(name, parentRequire, parentName, parentRoot, repoRoot);
+    const explicit = explicitRoots.get(name);
+    const bundleOnlyPackageJson = explicit?.bundleOnlyPackageJson === true;
     closure.set(name, { name, root, bundleOnlyPackageJson });
-    for (const n of excludeTransitive) excludedNames.add(n);
     if (bundleOnlyPackageJson) return;
     const pkg = await readJson(join(root, "package.json"));
     const deps = pkg.dependencies && typeof pkg.dependencies === "object" ? pkg.dependencies : {};
     const requireFromHere = createRequire(pathToFileURL(join(root, "package.json")));
     for (const depName of Object.keys(deps)) {
-      await add(depName, requireFromHere, name, root, {});
+      await add(depName, requireFromHere, name, root);
     }
   }
 
   for (const r of NATIVE_ROOTS) {
-    await add(r.name, rootRequire, null, repoRoot, {
-      bundleOnlyPackageJson: r.bundleOnlyPackageJson === true,
-      excludeTransitive: r.excludeTransitive ?? [],
-    });
+    await add(r.name, rootRequire, null, repoRoot);
   }
   return [...closure.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
