@@ -3,7 +3,7 @@
  * scope workspace-aware commands to (`workspaceId`).
  *
  * Precedence (top wins):
- *  - explicit CLI flags (`--server`, `--workspace`)
+ *  - explicit CLI flags (`--server`, `--workspace-id`)
  *  - environment (`GLYPH_SERVER`, `GLYPH_WORKSPACE`)
  *  - `<GLYPH_HOME>/runtime.json` (host/port from a recent
  *    `glyph start`) — for **connection** only
@@ -11,7 +11,7 @@
  *
  * The runtime-file fallback covers connection (host/port) so a freshly-
  * started local server is usable without env wiring. Workspace-scoped
- * commands require `--workspace` or `GLYPH_WORKSPACE` explicitly.
+ * commands require `--workspace-id` or `GLYPH_WORKSPACE` explicitly.
  */
 
 import { resolveGlyphHome } from "@glyphs-ai/server";
@@ -75,28 +75,28 @@ export async function makeClient(flags: ConnectFlags = {}): Promise<ApiClient> {
 
 export interface WorkspaceFlags extends ConnectFlags {
   /** Workspace id; defaults to `GLYPH_WORKSPACE`. */
-  readonly workspace?: string;
+  readonly workspaceId?: string;
 }
 
 /**
  * Resolve the workspace id for a workspace-scoped command.
  *
  * Order:
- *   1. `--workspace <id>` flag
+ *   1. `--workspace-id <id>` flag
  *   2. `GLYPH_WORKSPACE` env
  *   3. Throws — caller's `formatError` surfaces it.
  *
  * Both sources are PROCESS-LOCAL and therefore race-free:
- * `--workspace` is in the call's argv, `GLYPH_WORKSPACE` is in the
+ * `--workspace-id` is in the call's argv, `GLYPH_WORKSPACE` is in the
  * caller's own environment. No cross-client mutation can change the
  * answer between this resolve and the next request.
  */
 export async function resolveWorkspace(flags: WorkspaceFlags): Promise<string> {
-  const explicit = nonEmpty(flags.workspace) ?? nonEmpty(process.env.GLYPH_WORKSPACE);
+  const explicit = nonEmpty(flags.workspaceId) ?? nonEmpty(process.env.GLYPH_WORKSPACE);
   if (explicit) return explicit;
   throw new Error(
     "no workspace selected.\n" +
-      "  Pass --workspace <id> or set GLYPH_WORKSPACE.\n" +
+      "  Pass --workspace-id <id> or set GLYPH_WORKSPACE.\n" +
       "  Run `glyph workspace list` to see available ids.",
   );
 }

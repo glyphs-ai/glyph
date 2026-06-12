@@ -157,7 +157,7 @@ describe("API contract — `glyph task dispatch` server-side error mapping", () 
       }),
     });
     const r = await runCli(
-      ["task", "dispatch", "--workspace", "ws-1", "--agent", "ghost", "--brief", "noop"],
+      ["task", "dispatch", "--workspace-id", "ws-1", "--agent", "ghost", "--brief", "noop"],
       env(),
     );
     expect(r.exitCode).not.toBe(0);

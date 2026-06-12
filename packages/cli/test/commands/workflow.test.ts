@@ -99,7 +99,7 @@ function stubFetchMulti(responses: readonly MockResponse[]): { calls: Call[] } {
 }
 
 function commonOpts() {
-  return { workspace: WSID, server: SERVER_URL, home };
+  return { workspaceId: WSID, server: SERVER_URL, home };
 }
 
 const sampleHeader = {
@@ -389,7 +389,7 @@ describe("workflow create --metadata-file (commander wiring) — file IO + objec
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "x",
@@ -413,7 +413,7 @@ describe("workflow create --metadata-file (commander wiring) — file IO + objec
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "x",
@@ -437,7 +437,7 @@ describe("workflow create --metadata-file (commander wiring) — file IO + objec
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "x",
@@ -461,7 +461,7 @@ describe("workflow create --metadata-file (commander wiring) — file IO + objec
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "x",
@@ -485,7 +485,7 @@ describe("workflow create --metadata-file (commander wiring) — file IO + objec
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "x",
@@ -536,7 +536,7 @@ describe("workflow create --details-file / --details (commander wiring) — file
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "x",
@@ -560,7 +560,7 @@ describe("workflow create --details-file / --details (commander wiring) — file
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "x",
@@ -602,11 +602,11 @@ describe("workflowShow — happy path", () => {
 });
 
 describe("workflowShow — validation (no fetch)", () => {
-  it("empty --wfid → exit 2", async () => {
+  it("empty <workflow-id> → exit 2", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowShow("", { ...commonOpts() });
     expect(r.exitCode).toBe(2);
-    expect(r.stderr).toMatch(/--wfid/);
+    expect(r.stderr).toMatch(/<workflow-id>/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
@@ -669,19 +669,19 @@ describe("workflowNodeShow — happy path", () => {
 });
 
 describe("workflowNodeShow — validation (no fetch)", () => {
-  it("empty --wfid → exit 2", async () => {
+  it("empty <workflow-id> → exit 2", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowNodeShow("", NODE_SHOW_NID, { ...commonOpts() });
     expect(r.exitCode).toBe(2);
-    expect(r.stderr).toMatch(/--wfid/);
+    expect(r.stderr).toMatch(/<workflow-id>/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("empty --nid → exit 2", async () => {
+  it("empty <node-id> → exit 2", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowNodeShow(WFID, "", { ...commonOpts() });
     expect(r.exitCode).toBe(2);
-    expect(r.stderr).toMatch(/--nid/);
+    expect(r.stderr).toMatch(/<node-id>/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
@@ -779,11 +779,11 @@ describe("workflowDag — happy path", () => {
 });
 
 describe("workflowDag — validation (no fetch)", () => {
-  it("empty --wfid → exit 2", async () => {
+  it("empty <workflow-id> → exit 2", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowDag("", { ...commonOpts() });
     expect(r.exitCode).toBe(2);
-    expect(r.stderr).toMatch(/--wfid/);
+    expect(r.stderr).toMatch(/<workflow-id>/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
@@ -857,11 +857,11 @@ describe("workflowCancel — happy path", () => {
 });
 
 describe("workflowCancel — validation (no fetch)", () => {
-  it("empty --wfid → exit 2", async () => {
+  it("empty <workflow-id> → exit 2", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowCancel("", { ...commonOpts() });
     expect(r.exitCode).toBe(2);
-    expect(r.stderr).toMatch(/--wfid/);
+    expect(r.stderr).toMatch(/<workflow-id>/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -917,11 +917,11 @@ describe("workflowRm — happy path", () => {
 });
 
 describe("workflowRm — validation (no fetch)", () => {
-  it("empty --wfid → exit 2", async () => {
+  it("empty <workflow-id> → exit 2", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowRm("", { ...commonOpts() });
     expect(r.exitCode).toBe(2);
-    expect(r.stderr).toMatch(/--wfid/);
+    expect(r.stderr).toMatch(/<workflow-id>/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
@@ -958,16 +958,16 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
 
   it("`workflow list --workspace …` routes through commander to a GET", async () => {
     const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify([sampleHeader]) }]);
-    const r = await runCli(["workflow", "list", "--workspace", WSID], env());
+    const r = await runCli(["workflow", "list", "--workspace-id", WSID], env());
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe("GET");
     expect(calls[0]?.url).toBe(LIST_URL);
   });
 
-  it("`workflow rm --wfid` routes through commander to DELETE", async () => {
+  it("`workflow rm <workflow-id>` routes through commander to DELETE", async () => {
     const { calls } = stubFetchMulti([{ status: 204, body: "" }]);
-    const r = await runCli(["workflow", "rm", "--workspace", WSID, "--wfid", WFID], env());
+    const r = await runCli(["workflow", "rm", "--workspace-id", WSID, WFID], env());
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe("DELETE");
@@ -980,7 +980,7 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "design the parser",
@@ -998,10 +998,10 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
     });
   });
 
-  it("`workflow cancel --wfid --message` routes through commander; --message is sent on the wire", async () => {
+  it("`workflow cancel <workflow-id> --message` routes through commander; --message is sent on the wire", async () => {
     const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify(cancelledHeader) }]);
     const r = await runCli(
-      ["workflow", "cancel", "--workspace", WSID, "--wfid", WFID, "--message", "user pressed stop"],
+      ["workflow", "cancel", "--workspace-id", WSID, WFID, "--message", "user pressed stop"],
       env(),
     );
     expect(r.exitCode, r.stderr).toBe(0);
@@ -1019,7 +1019,7 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
       [
         "workflow",
         "list",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--q",
         "20260601",
@@ -1050,7 +1050,7 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "design the parser",
@@ -1080,7 +1080,7 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
       [
         "workflow",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--brief",
         "design the parser",
@@ -1132,7 +1132,7 @@ async function writeSpec(payload: unknown): Promise<string> {
 // ─── add-node ─────────────────────────────────────────────────────────
 
 describe("workflowAddNode", () => {
-  it("POSTs /nodes with kind + spec + parents from --spec-file and --parents", async () => {
+  it("POSTs /nodes with kind + spec + parents from --spec-file and --parent-node-ids", async () => {
     const specFile = await writeSpec({ agent: "writer", brief: "draft" });
     const { calls } = stubFetchMulti([
       { status: 200, body: JSON.stringify({ nodeId: NID, phase: 2 }) },
@@ -1141,7 +1141,7 @@ describe("workflowAddNode", () => {
       ...commonOpts(),
       kind: "worker",
       specFile,
-      parents: "p1,p2",
+      parentNodeIds: "p1,p2",
     });
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls).toHaveLength(1);
@@ -1199,7 +1199,7 @@ describe("workflowAddNode", () => {
       ...commonOpts(),
       kind: "worker",
       specFile,
-      parents: "p1",
+      parentNodeIds: "p1",
     });
     expect(r.exitCode).toBe(4);
     expect(r.stderr).toContain("WorkflowAlreadyTerminalError");
@@ -1209,7 +1209,7 @@ describe("workflowAddNode", () => {
 // ─── add-edge ─────────────────────────────────────────────────────────
 
 describe("workflowAddEdge", () => {
-  it("POSTs /edges with {fromNodeId, toNodeId} from --from / --to", async () => {
+  it("POSTs /edges with {fromNodeId, toNodeId} from --from-node-id / --to-node-id", async () => {
     const { calls } = stubFetchMulti([
       { status: 200, body: JSON.stringify({ fromNodeId: NID, toNodeId: NID2, toPhase: 2 }) },
     ]);
@@ -1221,7 +1221,7 @@ describe("workflowAddEdge", () => {
     expect(calls[0]?.body).toEqual({ fromNodeId: NID, toNodeId: NID2 });
   });
 
-  it("rejects missing --to with exit 2, no fetch", async () => {
+  it("rejects missing --to-node-id with exit 2, no fetch", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowAddEdge(WFID, NID, "", { ...commonOpts() });
     expect(r.exitCode).toBe(2);
@@ -1302,7 +1302,7 @@ describe("workflowRemoveEdge", () => {
     expect(calls[0]?.url).toBe(REMOVE_EDGE_URL);
   });
 
-  it("rejects missing --from with exit 2, no fetch", async () => {
+  it("rejects missing --from-node-id with exit 2, no fetch", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowRemoveEdge(WFID, "", NID2, { ...commonOpts() });
     expect(r.exitCode).toBe(2);
@@ -1437,6 +1437,75 @@ describe("workflowFinish", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowFinish(WFID, "cancelled", { ...commonOpts() });
     expect(r.exitCode).toBe(2);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ───break-clean: legacy id-flags are rejected by commander ────────
+
+describe("legacy id-flags are rejected (no backward-compat)", () => {
+  function env(): Record<string, string | undefined> {
+    return {
+      GLYPH_HOME: home,
+      GLYPH_SERVER: SERVER_URL,
+      GLYPH_WORKSPACE: undefined,
+    };
+  }
+
+  it("`workflow show --wfid <id>` exits non-zero (commander unknown-option)", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await runCli(["workflow", "show", "--workspace-id", WSID, "--wfid", WFID], env());
+    expect(r.exitCode).not.toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("`workflow node-show --nid <id>` exits non-zero (commander unknown-option)", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await runCli(
+      ["workflow", "node-show", "--workspace-id", WSID, WFID, "--nid", NID],
+      env(),
+    );
+    expect(r.exitCode).not.toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("`workflow add-edge --from <id> --to <id>` exits non-zero (commander unknown-option)", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await runCli(
+      ["workflow", "add-edge", "--workspace-id", WSID, WFID, "--from", NID, "--to", NID2],
+      env(),
+    );
+    expect(r.exitCode).not.toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("`workflow add-node --parents <ids>` exits non-zero (commander unknown-option)", async () => {
+    const specFile = await writeSpec({ agent: "writer", brief: "draft" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await runCli(
+      [
+        "workflow",
+        "add-node",
+        "--workspace-id",
+        WSID,
+        WFID,
+        "--kind",
+        "worker",
+        "--spec-file",
+        specFile,
+        "--parents",
+        "p1,p2",
+      ],
+      env(),
+    );
+    expect(r.exitCode).not.toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("`workflow show --workspace <id>` exits non-zero (--workspace renamed to --workspace-id)", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await runCli(["workflow", "show", "--workspace", WSID, WFID], env());
+    expect(r.exitCode).not.toBe(0);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

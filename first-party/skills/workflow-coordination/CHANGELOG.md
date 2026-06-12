@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 (2026-06-12)
+
+- Realign §A wake-up loop snippet and §D brief-plumbing example to the new CLI id-flag convention (`packages/cli/README.md` → "Naming conventions"): `glyph workflow show --wfid $WF` / `dag --wfid $WF` → positional `$WF`; `glyph task show --tid ${PRIOR_…_TASK_ID}` → positional. Documentation-only change.
+
 ## 0.3.0 (2026-06-12)
 
 - **Breaking (artifact path)**: §C verdict.json location moves from `<task-workdir>/verdict.json` to `<workdir>/artifact/verdict.json` so the substrate auto-harvests it into `success.artifacts` and the dashboard Artifacts tab surfaces it. §D meta-pattern's example fetch path updated to match (`<task-workdir>/artifact/verdict.json`).

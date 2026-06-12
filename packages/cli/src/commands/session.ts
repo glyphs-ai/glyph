@@ -2,7 +2,7 @@
  * `glyph session …` — 5 subcommands wrapping the workspace-scoped
  * sessions HTTP surface (list / new / show / rm / spawn).
  *
- * All commands take `--workspace <id>` or read `GLYPH_WORKSPACE`
+ * All commands take `--workspace-id <id>` or read `GLYPH_WORKSPACE`
  * (no server-side fallback — see `connect.ts:resolveWorkspace`).
  * Identifier flags are positional where unambiguous.
  */
@@ -14,7 +14,7 @@ import type { CommandResult } from "../result.js";
 interface CommonFlags {
   readonly server?: string;
   readonly home?: string;
-  readonly workspace?: string;
+  readonly workspaceId?: string;
   readonly output?: string;
   readonly json?: boolean;
 }

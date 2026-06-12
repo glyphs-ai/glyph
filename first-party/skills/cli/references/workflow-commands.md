@@ -8,10 +8,10 @@ just do their job and exit; the substrate joins their result back to the
 DAG node via `task.metadata.workflowNodeId`.
 
 > All examples assume `GLYPH_WORKSPACE=<id>` is set; add
-> `--workspace <id>` to act on a different workspace.
+> `--workspace-id <id>` to act on a different workspace.
 
 > **Output / exit-code discipline applies uniformly.** Every subcommand
-> below accepts the common `--server / --home / --workspace / --output /
+> below accepts the common `--server / --home / --workspace-id / --output /
 > --json` flags, returns table by default and machine-parseable JSON when
 > `--json` is passed, and shares the exit-code table documented in
 > `SKILL.md` (0 success, 2 usage error, 3 unreachable, 4 server 4xx/5xx).
@@ -96,7 +96,7 @@ node and runs the strategy's "no parents" case.
 
 ## `glyph workflow show`
 
-- Required flags: `--wfid <id>`
+- Positional: `<workflow-id>`
 - Route: `GET /workspaces/:id/workflows/:wfid`
 - Output: `WorkflowHeaderWire` with accurate `iterationCount` (count of
   worker dev nodes in the DAG, irrespective of status)
@@ -108,7 +108,7 @@ fetch by id.
 
 ## `glyph workflow dag`
 
-- Required flags: `--wfid <id>`
+- Positional: `<workflow-id>`
 - Route: `GET /workspaces/:id/workflows/:wfid/dag`
 - Output (table): node table (`phase | nodeId | kind | status | agent`)
   followed by edge lines (`from → to`)
@@ -122,7 +122,7 @@ nodes carry their own `taskId` once dispatched too.
 
 ```sh
 # Coord's bread-and-butter: read the full DAG, find own parents.
-DAG=$(glyph workflow dag --wfid "$WFID" --json)
+DAG=$(glyph workflow dag "$WFID" --json)
 echo "$DAG" | jq --arg me "$NODE_ID" \
   '.edges[] | select(.to == $me) | .from'
 ```
@@ -131,7 +131,7 @@ echo "$DAG" | jq --arg me "$NODE_ID" \
 
 ## `glyph workflow node-show`
 
-- Required flags: `--wfid <id>`, `--nid <id>`
+- Positionals: `<workflow-id> <node-id>`
 - Route: `GET /workspaces/:id/workflows/:wfid/nodes/:nid`
 - Output: `WorkflowNodeWire` (table mirrors the `dag` node row, plus
   `taskId`)
@@ -144,17 +144,17 @@ need to read a parent's `taskId` to look up its task and verdict.
 ```sh
 # Read a single parent node — get its taskId, then read the verdict.
 PARENT_TID=$(glyph workflow node-show \
-               --wfid "$WFID" --nid "$PARENT_ID" --json | jq -r '.taskId')
-glyph task show --tid "$PARENT_TID" --json | jq '.workdir'
+               "$WFID" "$PARENT_ID" --json | jq -r '.taskId')
+glyph task show "$PARENT_TID" --json | jq '.workdir'
 ```
 
 ---
 
 ## `glyph workflow add-node`
 
-- Required flags: `--wfid <id>`, `--kind <coordinator|worker>`,
-  `--spec-file <path>`
-- Optional flags: `--parents <id1,id2,...>` (comma-separated; an empty
+- Positional: `<workflow-id>`
+- Required flags: `--kind <coordinator|worker>`, `--spec-file <path>`
+- Optional flags: `--parent-node-ids <id1,id2,...>` (comma-separated; an empty
   list is rejected by the substrate — every non-initial node needs ≥1
   parent)
 - Route: `POST /workspaces/:id/workflows/:wfid/nodes`
@@ -183,7 +183,8 @@ atomic.
 
 ## `glyph workflow add-subgraph`
 
-- Required flags: `--wfid <id>`, `--spec-file <path>`
+- Positional: `<workflow-id>`
+- Required flags: `--spec-file <path>`
 - Route: `POST /workspaces/:id/workflows/:wfid/subgraph`
 - Body: `AddSubgraphBody` — entire payload from `--spec-file`:
   ```jsonc
@@ -219,7 +220,8 @@ this command so the engine sees a self-consistent DAG slice.
 
 ## `glyph workflow add-edge`
 
-- Required flags: `--wfid <id>`, `--from <id>`, `--to <id>`
+- Positional: `<workflow-id>`
+- Required flags: `--from-node-id <id>`, `--to-node-id <id>`
 - Route: `POST /workspaces/:id/workflows/:wfid/edges`
 - Body: `AddEdgeBody` — `{ fromNodeId, toNodeId }`
 - Output (table): `edge <from> → <to> inserted (toPhase=<n>)`
@@ -234,9 +236,9 @@ logic depends on phase.
 
 ## `glyph workflow remove-node`
 
-- Required flags: `--wfid <id>`, `--nid <id>`
+- Positionals: `<workflow-id> <node-id>`
 - Route: `DELETE /workspaces/:id/workflows/:wfid/nodes/:nid`
-- Output: `node <nid> removed from workflow <wfid>`
+- Output: `node <node-id> removed from workflow <workflow-id>`
 
 The node must be in `not_started`. Adjacent edges (in & out) are deleted
 in the same transaction. Removing a running / terminal node is rejected
@@ -246,9 +248,10 @@ with `WorkflowNodeNotMutableError` (400).
 
 ## `glyph workflow remove-edge`
 
-- Required flags: `--wfid <id>`, `--from <id>`, `--to <id>`
+- Positional: `<workflow-id>`
+- Required flags: `--from-node-id <id>`, `--to-node-id <id>`
 - Route: `DELETE /workspaces/:id/workflows/:wfid/edges/:from/:to`
-- Output: `edge <from> → <to> removed from workflow <wfid>`
+- Output: `edge <from> → <to> removed from workflow <workflow-id>`
 
 The destination node must still be `not_started`; removing an edge
 feeding a running or terminal node is rejected.
@@ -257,7 +260,8 @@ feeding a running or terminal node is rejected.
 
 ## `glyph workflow replace-spec`
 
-- Required flags: `--wfid <id>`, `--nid <id>`, `--spec-file <path>`
+- Positionals: `<workflow-id> <node-id>`
+- Required flags: `--spec-file <path>`
 - Route: `PATCH /workspaces/:id/workflows/:wfid/nodes/:nid/spec`
 - Body: `ReplaceNodeSpecBody` — `{ newSpec }` from `--spec-file`
 - Output: `WorkflowNodeWire` (table mirrors `dag`'s node row)
@@ -271,7 +275,7 @@ node it has already created but not yet dispatched (node must be
 
 ## `glyph workflow cancel`
 
-- Required flags: `--wfid <id>`
+- Positional: `<workflow-id>`
 - Optional flags: `--message <text>` (defaults to empty),
   `--kind <user>` (only `"user"` accepted)
 - Route: `POST /workspaces/:id/workflows/:wfid/cancel`
@@ -286,21 +290,22 @@ finishes itself via `finish` instead of being externally cancelled.
 
 ## `glyph workflow cancel-node`
 
-- Required flags: `--wfid <id>`, `--nid <id>`
+- Positionals: `<workflow-id> <node-id>`
 - Route: `POST /workspaces/:id/workflows/:wfid/nodes/:nid/cancel`
-- Output: `node <nid> cancelled` + `WorkflowNodeWire`
+- Output: `node <node-id> cancelled` + `WorkflowNodeWire`
 
 Body is empty (mirrors `task cancel`). Runner-level defaults supply the
 reason: a worker node gets `"cancelled by coordinator"`; a coord node
 gets `"cancelled by operator (workflow cancel)"`. The reason is stored
 on the underlying task entity (`tasks.cancellation.message`); read it via
-`glyph task show --tid <taskId>` for worker nodes.
+`glyph task show <taskId>` for worker nodes.
 
 ---
 
 ## `glyph workflow finish`
 
-- Required flags: `--wfid <id>`, `--outcome <succeeded|failed>`
+- Positional: `<workflow-id>`
+- Required flags: `--outcome <succeeded|failed>`
 - Mutually exclusive:
   - `--summary <text>` — only with `--outcome succeeded` (sets `success.output`)
   - `--message <text>` — **required** with `--outcome failed` (sets `failure.message`)
@@ -316,7 +321,7 @@ on the underlying task entity (`tasks.cancellation.message`); read it via
   `failure.kind` is always `"coordinator"` (the only currently-valid
   arm; future arms are reserved). Don't try to send `"coord"` (the old
   3-letter value) — it is rejected.
-- Output: `workflow <wfid> finished as <outcome>` + `WorkflowHeaderWire`
+- Output: `workflow <workflow-id> finished as <outcome>` + `WorkflowHeaderWire`
 
 Idempotent on re-call with the same outcome (substrate compares and
 no-ops); calling with a conflicting outcome returns
@@ -330,10 +335,10 @@ no-ops); calling with a conflicting outcome returns
 
 ```sh
 # 1. Workflow header — brief, status, coord agent fqn.
-WF_HDR=$(glyph workflow show --wfid "$WFID" --json)
+WF_HDR=$(glyph workflow show "$WFID" --json)
 
 # 2. Full DAG snapshot — nodes + edges.
-DAG=$(glyph workflow dag --wfid "$WFID" --json)
+DAG=$(glyph workflow dag "$WFID" --json)
 
 # 3. Direct parents of own node id.
 PARENT_IDS=$(echo "$DAG" | jq -r --arg me "$NODE_ID" \
@@ -351,8 +356,8 @@ done
 ```sh
 # Given a parent worker node id, fetch the task workdir then read verdict.json.
 TID=$(glyph workflow node-show \
-        --wfid "$WFID" --nid "$PARENT_ID" --json | jq -r '.taskId')
-WD=$(glyph task show --tid "$TID" --json | jq -r '.workdir')
+        "$WFID" "$PARENT_ID" --json | jq -r '.taskId')
+WD=$(glyph task show "$TID" --json | jq -r '.workdir')
 jq . "$WD/artifact/verdict.json"
 ```
 
@@ -376,18 +381,18 @@ cat > /tmp/expand.json <<EOF
 }
 EOF
 
-glyph workflow add-subgraph --wfid "$WFID" --spec-file /tmp/expand.json --json
+glyph workflow add-subgraph "$WFID" --spec-file /tmp/expand.json --json
 ```
 
 ### Finishing the workflow
 
 ```sh
 # Success.
-glyph workflow finish --wfid "$WFID" --outcome succeeded \
+glyph workflow finish "$WFID" --outcome succeeded \
   --summary "All reviewers approved with only minor findings remaining."
 
 # Failure (reason required).
-glyph workflow finish --wfid "$WFID" --outcome failed \
+glyph workflow finish "$WFID" --outcome failed \
   --message "dev iteration ended in failed; cannot make progress."
 ```
 

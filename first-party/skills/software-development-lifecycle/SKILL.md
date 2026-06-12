@@ -2,7 +2,7 @@
 name: software-development-lifecycle
 scope: official
 description: "Strategy skill for the official/coordinator agent — the engineer → review+designer iterate-to-clean orchestration: case bank, brief templates, placeholder resolution, stop condition, failure-mode coverage"
-version: 0.2.0
+version: 0.2.1
 ---
 
 # Glyph Software-Development-Lifecycle Strategy Skill
@@ -40,7 +40,7 @@ CASE "one parent, worker, agent=official/engineer, status in (failed, cancelled)
 
 CASE "two parents, both worker, agents in {official/reviewer, official/designer}":
   for each parent:
-    fetch task:    glyph task show --tid <parent.taskId> --json
+    fetch task:    glyph task show <parent.taskId> --json
     fetch verdict: read <workdir>/artifact/verdict.json (parse per §C of generic skill)
   blockers_and_majors = [
     f for v in verdicts for f in v.findings if f.severity in ('blocker', 'major')
@@ -55,7 +55,7 @@ CASE "two parents, both worker, agents in {official/reviewer, official/designer}
 
   # Both reviewers APPROVE — run CI quality gate before declaring success.
   prior_dev = most recent (highest-phase) agent=official/engineer worker node in the DAG
-  pr_number = derive from glyph task show --tid <prior_dev.taskId> --json
+  pr_number = derive from glyph task show <prior_dev.taskId> --json
               (the engineer's success.output and/or activity log carry the
               `gh pr create` URL; parse the PR number from the URL —
               no new engineer contract required)
@@ -157,10 +157,10 @@ Re-implement the feature for iteration ${ITERATION_NUMBER}.
 
 # Prior iteration outputs (you must fetch these yourself)
 - Prior review verdict + narrative:
-    glyph task show --tid ${PRIOR_REVIEW_TASK_ID} --json
+    glyph task show ${PRIOR_REVIEW_TASK_ID} --json
     then read <workdir>/artifact/verdict.json and <workdir>/artifact/review.md
 - Prior designer verdict + narrative:
-    glyph task show --tid ${PRIOR_DESIGNER_TASK_ID} --json
+    glyph task show ${PRIOR_DESIGNER_TASK_ID} --json
     then read <workdir>/artifact/verdict.json and <workdir>/artifact/review.md
 - CI state on the PR (in case the prior iteration was waved through by
   reviewers but failed in CI — coord re-dispatches you with the same
@@ -196,7 +196,7 @@ Review the latest dev iteration in this workflow.
 
 # What to review
 The dev node immediately preceding you in the workflow DAG. Find it via:
-  glyph workflow dag --wfid ${WORKFLOW_ID} --json
+  glyph workflow dag ${WORKFLOW_ID} --json
 The dev node is your direct parent. Read dev's task via its taskId, see
 what changed, apply your normal review standards.
 
@@ -248,7 +248,7 @@ Review the latest dev iteration's UI / UX in this workflow.
 
 # What to review
 The dev node immediately preceding you in the workflow DAG. Find it via:
-  glyph workflow dag --wfid ${WORKFLOW_ID} --json
+  glyph workflow dag ${WORKFLOW_ID} --json
 Apply your normal frontend / design review standards.
 
 If this is designer iteration 2 or later, fetch the prior designer node
@@ -350,8 +350,8 @@ Plain string replacement; placeholders with no value (e.g. `${WORKFLOW_DETAILS}`
 | `${ITERATION_NUMBER}` | count of `official/engineer` worker nodes already in the DAG, +1 | integer; `template-dev-iter-2-plus` only |
 | `${PRIOR_REVIEW_TASK_ID}` | `taskId` of the most recent `agent=official/reviewer` worker parent of the prior coord (the reviewer-in-pair from the previous round, NOT a ci-waiter) | string; `template-dev-iter-2-plus` only |
 | `${PRIOR_DESIGNER_TASK_ID}` | `taskId` of the most recent `agent=official/designer` worker parent of the prior coord | string; `template-dev-iter-2-plus` only |
-| `${BRANCH_NAME}` | derived from the prior dev task: parse `pr_number` from `glyph task show --tid <prior_dev.taskId> --json` (its `success.output` and/or activity log carry the `gh pr create` URL), then `gh pr view <pr_number> --json headRefName -q '.headRefName'` | string; `template-dev-iter-2-plus` only — replaces the legacy `<task-workdir>/branch.txt` convention, which is dropped |
-| `${PR_NUMBER}` | derived from the prior dev task: parse PR number from `glyph task show --tid <prior_dev.taskId> --json` (its `success.output` and/or activity log carry the `gh pr create` URL) | integer; `template-dev-iter-2-plus` and `template-review-ci` |
+| `${BRANCH_NAME}` | derived from the prior dev task: parse `pr_number` from `glyph task show <prior_dev.taskId> --json` (its `success.output` and/or activity log carry the `gh pr create` URL), then `gh pr view <pr_number> --json headRefName -q '.headRefName'` | string; `template-dev-iter-2-plus` only — replaces the legacy `<task-workdir>/branch.txt` convention, which is dropped |
+| `${PR_NUMBER}` | derived from the prior dev task: parse PR number from `glyph task show <prior_dev.taskId> --json` (its `success.output` and/or activity log carry the `gh pr create` URL) | integer; `template-dev-iter-2-plus` and `template-review-ci` |
 
 `${PRIOR_*_TASK_ID}` lookups use the "Find prior-iter siblings" snippet from the generic skill §B (same agent FQN, lower phase). For `${PRIOR_REVIEW_TASK_ID}` specifically, restrict the lookup to reviewer nodes that paired with a designer sibling — i.e. ignore `ci-waiter` reviewer nodes (single-parent shape per the case bank) so the dev brief points at the latest *code* review verdict, not the latest CI watcher.
 

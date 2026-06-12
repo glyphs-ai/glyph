@@ -105,7 +105,7 @@ describe("CLI empty-string normalisation (pickString contract)", () => {
       [
         "task",
         "dispatch",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--agent",
         "official/engineer",
@@ -128,7 +128,7 @@ describe("CLI empty-string normalisation (pickString contract)", () => {
       [
         "task",
         "dispatch",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--agent",
         "official/engineer",
@@ -169,7 +169,7 @@ describe("CLI empty-string normalisation (pickString contract)", () => {
       [
         "schedule",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--name",
         "s1",
@@ -198,7 +198,7 @@ describe("CLI empty-string normalisation (pickString contract)", () => {
       [
         "schedule",
         "create",
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--name",
         "s1",

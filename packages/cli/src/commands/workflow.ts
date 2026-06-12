@@ -17,24 +17,25 @@
  * pure business logic so tests can call the functions directly without
  * going through argv parsing.
  *
+ * Identifier convention (see `packages/cli/README.md` →
+ * "Naming conventions"): the workflow id is a positional `<workflow-id>`
+ * on every subcommand (matching `task <task-id>` / `schedule <schedule-id>`);
+ * the node id is `<node-id>` positional on node-scoped subcommands;
+ * `add-edge` / `remove-edge` take `--from-node-id` / `--to-node-id`;
+ * `add-node` takes `--parent-node-ids` (csv plural).
+ *
  * Flag-name choices for create / show / dag / cancel / rm:
  *  - `--brief` (not `--name`) for create — matches
  *    `CreateWorkflowBody.brief` on the wire and the
  *    `schedule create --brief` / `task dispatch --brief` precedent.
  *  - `--coord-agent` for the coordinator agent FQN, mapping to
  *    `CreateWorkflowBody.coordinatorAgent`.
- *  - `--wfid` (not a positional `<wfid>`) for show/dag/cancel/rm — keeps
- *    the surface uniform with the rest of the workflow tree (no
- *    workflow command takes a positional id; an explicit flag pairs
- *    naturally with `--workspace` / `GLYPH_WORKSPACE`).
  *  - `--message` / `--kind` on cancel send the terminal payload
  *    (`cancellation: { kind, message }`).
  *  - `--summary` on finish (succeeded path) → `success.output`.
  *    `--message` on finish (failed path) → `failure.message`.
  *
  * Flag-name choices for the mutation commands:
- *  - `--wfid <id>` is universal across every mutation command — the
- *    workflow id is the URL path arg, identical surface to show/dag.
  *  - `--kind <coordinator|worker>` for `add-node` / `add-subgraph`,
  *    matching the substrate's `NodeKind` (the wire alias is
  *    `WorkflowNodeKindWire`). Note: the existing dag-projection wire
@@ -48,12 +49,10 @@
  *    rationale as `catalog skill upsert --content-file`. No inline
  *    `--spec` overload is provided — agents always write a temp file
  *    via the host filesystem.
- *  - `--parents <ids>` on add-node is comma-separated; empty is
+ *  - `--parent-node-ids <ids>` on add-node is comma-separated; empty is
  *    rejected (substrate emits `EmptyParentsError` → 400). On
  *    add-subgraph, intra-batch parents go in the spec file via the
  *    nodes[].existingParents array.
- *  - `--from <id>` / `--to <id>` on add-edge / remove-edge — symmetric
- *    pair, names match the substrate args.
  *  - `--outcome <succeeded|failed>` on finish — the only enum-typed
  *    flag; both values are accepted (cancellation is the separate
  *    `workflow cancel` route).
@@ -88,7 +87,7 @@ import type { CommandResult } from "../result.js";
 interface CommonFlags {
   readonly server?: string;
   readonly home?: string;
-  readonly workspace?: string;
+  readonly workspaceId?: string;
   readonly output?: string;
   readonly json?: boolean;
 }
@@ -196,7 +195,7 @@ export async function workflowShow(
   opts: WorkflowShowOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   const client = await makeClient(opts);
   try {
@@ -219,10 +218,10 @@ export async function workflowNodeShow(
   opts: WorkflowNodeShowOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
-    return { exitCode: 2, stderr: "node id is required (--nid <id>)\n" };
+    return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
   const client = await makeClient(opts);
   try {
@@ -265,7 +264,7 @@ export async function workflowDag(
   opts: WorkflowDagOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   const client = await makeClient(opts);
   try {
@@ -312,7 +311,7 @@ export async function workflowCancel(
   opts: WorkflowCancelOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (opts.kind !== undefined && opts.kind !== "user") {
     return { exitCode: 2, stderr: '--kind must be "user" when supplied\n' };
@@ -348,7 +347,7 @@ export async function workflowRm(
   opts: WorkflowRmOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   const client = await makeClient(opts);
   try {
@@ -398,8 +397,8 @@ function isFinishOutcome(s: string): s is "succeeded" | "failed" {
 }
 
 /**
- * Parse `--parents <id1,id2,...>`. Empty / unset returns `[]`; the
- * substrate rejects an empty list with `EmptyParentsError` → 400 for
+ * Parse `--parent-node-ids <id1,id2,...>`. Empty / unset returns `[]`;
+ * the substrate rejects an empty list with `EmptyParentsError` → 400 for
  * every non-bootstrap insertion. The CLI does NOT pre-reject — the
  * server's rejection carries the canonical error name + status.
  *
@@ -568,7 +567,7 @@ export function readJsonFileArg(
 export interface WorkflowAddNodeOpts extends CommonFlags {
   readonly kind: string;
   readonly specFile: string;
-  readonly parents?: string;
+  readonly parentNodeIds?: string;
 }
 
 export async function workflowAddNode(
@@ -576,7 +575,7 @@ export async function workflowAddNode(
   opts: WorkflowAddNodeOpts,
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof opts.kind !== "string" || !isNodeKind(opts.kind)) {
     return {
@@ -598,7 +597,7 @@ export async function workflowAddNode(
     const body: AddNodeBody = {
       kind: opts.kind,
       spec,
-      parents: parseParents(opts.parents),
+      parents: parseParents(opts.parentNodeIds),
     };
     const result = await client.call("workflows.nodes.add", {
       params: { id: workspaceId, wfid: workflowId },
@@ -627,7 +626,7 @@ export async function workflowAddSubgraph(
   opts: WorkflowAddSubgraphOpts,
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof opts.specFile !== "string" || opts.specFile.trim() === "") {
     return { exitCode: 2, stderr: "missing required --spec-file <path>\n" };
@@ -672,13 +671,13 @@ export async function workflowAddEdge(
   opts: WorkflowAddEdgeOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof fromNodeId !== "string" || fromNodeId.trim() === "") {
-    return { exitCode: 2, stderr: "missing required --from <node-id>\n" };
+    return { exitCode: 2, stderr: "missing required <from-node-id>\n" };
   }
   if (typeof toNodeId !== "string" || toNodeId.trim() === "") {
-    return { exitCode: 2, stderr: "missing required --to <node-id>\n" };
+    return { exitCode: 2, stderr: "missing required <to-node-id>\n" };
   }
   const client = await makeClient(opts);
   try {
@@ -708,10 +707,10 @@ export async function workflowRemoveNode(
   opts: WorkflowRemoveNodeOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
-    return { exitCode: 2, stderr: "node id is required (--nid <id>)\n" };
+    return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
   const client = await makeClient(opts);
   try {
@@ -735,13 +734,13 @@ export async function workflowRemoveEdge(
   opts: WorkflowRemoveEdgeOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof fromNodeId !== "string" || fromNodeId.trim() === "") {
-    return { exitCode: 2, stderr: "missing required --from <node-id>\n" };
+    return { exitCode: 2, stderr: "missing required <from-node-id>\n" };
   }
   if (typeof toNodeId !== "string" || toNodeId.trim() === "") {
-    return { exitCode: 2, stderr: "missing required --to <node-id>\n" };
+    return { exitCode: 2, stderr: "missing required <to-node-id>\n" };
   }
   const client = await makeClient(opts);
   try {
@@ -769,10 +768,10 @@ export async function workflowReplaceSpec(
   opts: WorkflowReplaceSpecOpts,
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
-    return { exitCode: 2, stderr: "node id is required (--nid <id>)\n" };
+    return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
   if (typeof opts.specFile !== "string" || opts.specFile.trim() === "") {
     return { exitCode: 2, stderr: "missing required --spec-file <path>\n" };
@@ -805,10 +804,10 @@ export async function workflowCancelNode(
   opts: WorkflowCancelNodeOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
-    return { exitCode: 2, stderr: "node id is required (--nid <id>)\n" };
+    return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
   const client = await makeClient(opts);
   try {
@@ -846,7 +845,7 @@ export async function workflowFinish(
   opts: WorkflowFinishOpts = {},
 ): Promise<CommandResult> {
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
-    return { exitCode: 2, stderr: "workflow id is required (--wfid <id>)\n" };
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
   if (typeof outcome !== "string" || !isFinishOutcome(outcome)) {
     return {

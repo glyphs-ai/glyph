@@ -47,14 +47,14 @@ export function registerWorkspaceCommands(program: Command, slot: Slot): void {
     });
 
   withConnectFlags(workspaceCmd.command("show"))
-    .argument("<id>", "Workspace id")
+    .argument("<workspace-id>", "Workspace id")
     .description("Print one workspace's metadata")
     .action(async (workspaceId: string, opts: Record<string, unknown>) => {
       slot.result = await workspaceShow(workspaceId, parseConnectFlags(opts));
     });
 
   withConnectFlags(workspaceCmd.command("update"))
-    .argument("<id>", "Workspace id")
+    .argument("<workspace-id>", "Workspace id")
     .description("Update name")
     .option("--name <name>", "New display name")
     .action(async (workspaceId: string, opts: Record<string, unknown>) => {
@@ -65,7 +65,7 @@ export function registerWorkspaceCommands(program: Command, slot: Slot): void {
     });
 
   withConnectFlags(workspaceCmd.command("rm"))
-    .argument("<id>", "Workspace id")
+    .argument("<workspace-id>", "Workspace id")
     .description("Remove a workspace")
     .option("--purge", "Also remove the workspace's glyph-managed subdirs")
     .action(async (workspaceId: string, opts: Record<string, unknown>) => {
@@ -76,7 +76,7 @@ export function registerWorkspaceCommands(program: Command, slot: Slot): void {
     });
 
   withConnectFlags(workspaceCmd.command("reload"))
-    .argument("<id>", "Workspace id")
+    .argument("<workspace-id>", "Workspace id")
     .description("Force the server to rebuild the workspace context")
     .action(async (workspaceId: string, opts: Record<string, unknown>) => {
       slot.result = await workspaceReload(workspaceId, parseConnectFlags(opts));

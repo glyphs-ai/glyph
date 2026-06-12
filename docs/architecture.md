@@ -552,7 +552,7 @@ rely on; everything else in the env is "best effort, host-dependent".
 | -------- | ---- | -------- | ------- |
 | `GLYPH_SERVER`        | URL string | always | `http://<host>:<port>` the server is listening on. `0.0.0.0` / `::` are rewritten to `127.0.0.1` so the child can dial loopback. glyph binds loopback-only (no auth layer); see "Deliberately not exposed". |
 | `GLYPH_SHARED_DIR`    | abs path   | always | `<GLYPH_HOME>/shared` — the canonical machine-shared writable directory. Same path the runtime exposes to MCP specs as `${sharedDir}`. Pick this for state shared across workspaces (a single playwright login, a model cache). |
-| `GLYPH_WORKSPACE`     | UUID       | always (per run) | Workspace id (routing key for the HTTP API; `glyph ... --workspace <id>` accepts it). |
+| `GLYPH_WORKSPACE`     | UUID       | always (per run) | Workspace id (routing key for the HTTP API; `glyph ... --workspace-id <id>` accepts it). |
 | `GLYPH_WORKSPACE_DIR` | abs path   | always (per run) | Workspace root on disk. Same path the runtime exposes to MCP specs as `${workspaceDir}`. Pick this for state private to one workspace. |
 | `GLYPH_WORK_KIND`     | `task` \| `session` | always (per run) | Discriminator for the run that's about to start. |
 | `GLYPH_WORK_ID`       | string     | always (per run) | This run's id (e.g. `20260514-abc12345`). Same value the dashboard / CLI uses as the URL key. |
@@ -599,7 +599,7 @@ surfaces when AI-agent harnesses (Copilot CLI, Claude, …) run each
 tool call in a brand-new shell. Per-shell `export
 GLYPH_WORKSPACE=...` doesn't survive between calls; the agent
 either has to re-export every call (forgettable, error-prone) or
-pass `--workspace <id>` on every command (verbose, easy to typo
+pass `--workspace-id <id>` on every command (verbose, easy to typo
 across two workspaces). Plumbing the identity through the very
 binary the agent shells out to (`glyph task dispatch`) means
 subsequent `glyph ...` calls inside the resulting subprocess

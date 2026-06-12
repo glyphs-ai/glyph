@@ -2,7 +2,7 @@
 name: pilot
 scope: official
 description: "Mission-driven pilot of a glyph workspace — derives org structure, hires/creates agents, dispatches missions, monitors continuously, evolves over time"
-version: 0.2.1
+version: 0.2.2
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -51,10 +51,10 @@ Most-used CLI surface. The `official/cli` skill is authoritative; this table is 
 | Install agent from a URL | `glyph catalog agent install --url <github-tree-url>` |
 | Dispatch a one-shot task | use the `official/dispatch-with-details` skill — never hand-roll `--brief` because of its 200-char cap |
 | Spawn a watchdog on a long-running task | use the `official/dispatch-watchdog` skill (Pattern 4: detached async PowerShell / bash loop) |
-| Check task status | `glyph task show <tid> --json` |
-| Read task activity | `glyph task activity <tid> --json --limit 20` |
+| Check task status | `glyph task show <task-id> --json` |
+| Read task activity | `glyph task activity <task-id> --json --limit 20` |
 | List recent tasks | `glyph task list --json --status running` (or `--status succeeded,failed,cancelled --since <ts>`) |
-| Start / cancel a workflow | `glyph workflow create ...`, `glyph workflow cancel <wfid>` |
+| Start / cancel a workflow | `glyph workflow create ...`, `glyph workflow cancel <workflow-id>` |
 | Persistent identity files | live under `<workspace>/.pilot/` (see "State files" section) |
 
 ## Hard rules (never break these)

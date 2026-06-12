@@ -111,7 +111,7 @@ const sampleSchedule = {
 const sampleScheduleGet = { ...sampleSchedule, describe: "every day at 9" };
 
 function commonOpts() {
-  return { workspace: WSID, server: SERVER_URL, home };
+  return { workspaceId: WSID, server: SERVER_URL, home };
 }
 
 // PATCH is on the kind-discriminated URL; GET stays polymorphic.
@@ -482,7 +482,10 @@ describe("`glyph schedule patch` commander wiring (argv → action)", () => {
     const { calls } = stubFetchMulti([
       { status: 200, body: JSON.stringify({ ...sampleSchedule, enabled: false }) },
     ]);
-    const r = await runCli(["schedule", "patch", SID, "--workspace", WSID, "--no-enabled"], env());
+    const r = await runCli(
+      ["schedule", "patch", SID, "--workspace-id", WSID, "--no-enabled"],
+      env(),
+    );
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe("PATCH");
@@ -491,7 +494,7 @@ describe("`glyph schedule patch` commander wiring (argv → action)", () => {
 
   it("`--enabled` parses to enabled:true (parity with `schedule enable`)", async () => {
     const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify(sampleSchedule) }]);
-    const r = await runCli(["schedule", "patch", SID, "--workspace", WSID, "--enabled"], env());
+    const r = await runCli(["schedule", "patch", SID, "--workspace-id", WSID, "--enabled"], env());
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe("PATCH");
@@ -500,7 +503,7 @@ describe("`glyph schedule patch` commander wiring (argv → action)", () => {
 
   it("no flags via argv → action prelude returns exit 2, no fetch", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const r = await runCli(["schedule", "patch", SID, "--workspace", WSID], env());
+    const r = await runCli(["schedule", "patch", SID, "--workspace-id", WSID], env());
     expect(r.exitCode).toBe(2);
     expect(r.stderr).toContain("at least one of --name");
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -513,7 +516,7 @@ describe("`glyph schedule patch` commander wiring (argv → action)", () => {
         "schedule",
         "patch",
         SID,
-        "--workspace",
+        "--workspace-id",
         WSID,
         "--name",
         "Renamed",
@@ -536,7 +539,7 @@ describe("`glyph schedule patch` commander wiring (argv → action)", () => {
   it("--clear-details routes through commander to a PATCH with target.details: null", async () => {
     const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify(sampleSchedule) }]);
     const r = await runCli(
-      ["schedule", "patch", SID, "--workspace", WSID, "--clear-details"],
+      ["schedule", "patch", SID, "--workspace-id", WSID, "--clear-details"],
       env(),
     );
     expect(r.exitCode, r.stderr).toBe(0);
@@ -548,7 +551,7 @@ describe("`glyph schedule patch` commander wiring (argv → action)", () => {
   it("--clear-runtime routes through commander to a PATCH with target.runtime: null", async () => {
     const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify(sampleSchedule) }]);
     const r = await runCli(
-      ["schedule", "patch", SID, "--workspace", WSID, "--clear-runtime"],
+      ["schedule", "patch", SID, "--workspace-id", WSID, "--clear-runtime"],
       env(),
     );
     expect(r.exitCode, r.stderr).toBe(0);
