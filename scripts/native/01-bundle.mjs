@@ -23,7 +23,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import esbuild from "esbuild";
 
 import { fail, isEntry } from "./exec.mjs";
@@ -87,25 +87,63 @@ export async function runBundleStep() {
   const out = nativeJsBundlePath();
   await mkdir(dirname(out), { recursive: true });
 
+  // The real CLI entry (`packages/cli/src/bin.ts`) uses top-level
+  // await, which is not legal in CJS — and SEA requires CJS. We
+  // can't modify packages/, so we write a thin synthetic entry next
+  // to `main.cjs` that wraps the call in a `.then(...).catch(...)`.
+  // The wrapper has zero behaviour beyond what bin.ts does (await
+  // run(argv) then exit with its code); it only changes the JS
+  // surface so esbuild can emit CJS.
+  const entrySrcPath = resolve(nativeIntermediatesDir(), "entry.cjs.ts");
+  const cliIndexPath = resolve(repoRoot, "packages/cli/src/index.ts");
+  const cliIndexRel = relative(nativeIntermediatesDir(), cliIndexPath).replaceAll("\\", "/");
+  await writeFile(
+    entrySrcPath,
+    `import { run } from "${cliIndexRel}";\n` +
+      "run(process.argv)\n" +
+      "  .then((code) => { process.exit(code); })\n" +
+      "  .catch((err) => { console.error(err); process.exit(1); });\n",
+  );
+
+  // CJS `import.meta` polyfills. esbuild emits warnings for every
+  // `import.meta.{url,dirname,filename,resolve}` site when targeting
+  // CJS because the spec leaves them undefined; we replace each one
+  // with a reference to a banner-defined constant or helper so
+  // runtime semantics match the ESM build.
+  //
+  // `import.meta.resolve(spec)`: at runtime the bundle's CJS `require`
+  // walks `Module.globalPaths`, which the SEA bootstrap unshifts the
+  // materialised `node_modules/` into. So `require.resolve(spec)`
+  // sees every vendored package the same way an ESM `import.meta.
+  // resolve(spec)` would.
+  const cjsImportMetaShim =
+    "const __glyph_url_mod = require('node:url');\n" +
+    "const __glyph_meta_url = __glyph_url_mod.pathToFileURL(__filename).href;\n" +
+    "const __glyph_meta_filename = __filename;\n" +
+    "const __glyph_meta_dirname = __dirname;\n" +
+    "const __glyph_meta_resolve = (spec) => __glyph_url_mod.pathToFileURL(require.resolve(spec)).href;\n";
+
   console.log(`==> esbuild → ${out}`);
   const result = await esbuild.build({
-    entryPoints: { main: resolve(repoRoot, "packages/cli/src/bin.ts") },
-    outdir: nativeIntermediatesDir(),
-    outExtension: { ".js": ".cjs" },
+    entryPoints: [entrySrcPath],
+    outfile: out,
     bundle: true,
     platform: "node",
     format: "cjs",
     target: "node22",
     external: EXTERNAL,
     banner: {
-      // Run the SEA bootstrap BEFORE esbuild's CJS prelude touches
-      // any user code. Bootstrap is a no-op outside SEA so the
-      // bundle stays runnable as a plain Node script (handy for
-      // local debugging the build output).
-      js: bootstrapSrc,
+      // Bootstrap MUST run before any user code; the import-meta
+      // shim consts come second so user code that references them
+      // (post-esbuild rewrite) finds them in scope.
+      js: bootstrapSrc + "\n" + cjsImportMetaShim,
     },
     define: {
       "process.env.NODE_ENV": JSON.stringify("production"),
+      "import.meta.url": "__glyph_meta_url",
+      "import.meta.filename": "__glyph_meta_filename",
+      "import.meta.dirname": "__glyph_meta_dirname",
+      "import.meta.resolve": "__glyph_meta_resolve",
     },
     logLevel: "info",
   });
