@@ -42,7 +42,7 @@ across both kinds.
 - Waiting for the dispatch to complete — use
   `official/dispatch-watchdog` for the `task` kind. Workflow-kind
   watchdog support is a follow-up; callers polling a workflow today
-  should invoke `glyph workflow show <id> --json` themselves
+  should invoke `glyph workflow show <workflow-id> --json` themselves
   until a kind-aware watchdog primitive lands.
 - Mutating the brief file. It is read-only input.
 
@@ -104,7 +104,7 @@ end-to-end today — it polls a returned task id and fires a
 notification on terminal state. Workflow-kind watchdog support is
 not yet shipped (the watchdog primitive hardcodes `glyph task show`
 and does not accept a verb parameter); for now, callers polling a
-workflow should invoke `glyph workflow show <id> --json`
+workflow should invoke `glyph workflow show <workflow-id> --json`
 directly until a kind-aware watchdog primitive lands.
 
 Concurrency: multiple workflows can run in parallel against the same
@@ -325,7 +325,7 @@ The caller MUST:
    For `Kind = task`, pair with `official/dispatch-watchdog` to get a
    completion notification on terminal state. Workflow-kind watchdog
    support is a follow-up; callers polling a workflow should invoke
-   `glyph workflow show <id> --json` directly until a
+   `glyph workflow show <workflow-id> --json` directly until a
    kind-aware watchdog primitive lands.
 
 The skill does not log; logging the dispatch event is the caller's

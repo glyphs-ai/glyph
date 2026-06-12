@@ -2,7 +2,7 @@
 
 ## 0.3.1 (2026-06-12)
 
-- Sweep stale `glyph workflow show --wfid <id> --json` references in the body text to the new positional shape `glyph workflow show <id> --json` (three sites: **Boundary**, **Why this skill exists**, and the Anti-patterns / dispatch-watchdog paragraph). The CLI's primary resource id is now a positional argument on every `workflow` subcommand and the short-flag spelling no longer exists.
+- Sweep stale `glyph workflow show --wfid <id> --json` references in the body text to the new positional shape `glyph workflow show <workflow-id> --json` (three sites: **Boundary**, **Why this skill exists**, and the Anti-patterns / dispatch-watchdog paragraph). The CLI's primary resource id is now a positional argument on every `workflow` subcommand and the short-flag spelling no longer exists.
 
 ## 0.3.0 (2026-06-12)
 
