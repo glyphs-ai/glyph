@@ -43,9 +43,16 @@ jobs:
 
       - uses: pnpm/action-setup@v5
 
+      # Node 24.x is required for the postject inject step: postject 1.0.0-alpha.6
+      # bundles an Emscripten/LIEF WASM that aborts when parsing the ELF binary
+      # shipped by setup-node@v5 for Node 22.x on ubuntu-latest (reproduced on
+      # 22.22.3). The kimi-code reference build (MoonshotAI/kimi-code) pins
+      # Node 24.15.0 in .nvmrc for the same reason. The embedded SEA Node
+      # therefore runs Node 24; that is compatible with the workspace's
+      # `engines.node: ">=22"` constraint.
       - uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: '24.15.0'
           cache: 'pnpm'
 
       - name: Install
