@@ -59,6 +59,31 @@ Walk through:
    bakes the agent into it and gives you the exact `copilot` invocation to
    run yourself.
 
+## Install from GitHub Release tarball
+
+Use this when you can't install from the public npm registry (private
+network policy, no mirror, etc.). Requires Node 22+ and npm. Every
+tagged release on this repo attaches the same `.tgz` that gets pushed
+to npm as a downloadable asset.
+
+With the [GitHub CLI](https://cli.github.com/):
+
+```sh
+gh release download vX.Y.Z -R glyphs-ai/glyph -p "*.tgz"
+npm i -g ./glyphs-ai-glyph-X.Y.Z.tgz
+```
+
+Without `gh` (plain `curl`; the public repo needs no auth):
+
+```sh
+curl -L -o glyph.tgz https://github.com/glyphs-ai/glyph/releases/download/vX.Y.Z/glyphs-ai-glyph-X.Y.Z.tgz
+npm i -g ./glyph.tgz
+```
+
+The tarball filename follows npm's scoped-package slugification —
+`@glyphs-ai/glyph` becomes `glyphs-ai-glyph-X.Y.Z.tgz` (the leading
+`@` and the `/` collapse to `-`).
+
 ## Configuration
 
 All configuration is via environment variables; no config file. Defaults
