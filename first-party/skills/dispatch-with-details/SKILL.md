@@ -40,7 +40,10 @@ across both kinds.
   between task and workflow" section below; the skill does not infer
   the kind.
 - Waiting for the dispatch to complete — use
-  `official/dispatch-watchdog` for that (it works for either kind).
+  `official/dispatch-watchdog` for the `task` kind. Workflow-kind
+  watchdog support is a follow-up; callers polling a workflow today
+  should invoke `glyph workflow show --wfid <id> --json` themselves
+  until a kind-aware watchdog primitive lands.
 - Mutating the brief file. It is read-only input.
 
 ## Why this skill exists
@@ -91,18 +94,18 @@ Decision rule:
   re-dispatching the same agent with findings from another, you're
   hand-rolling a workflow — stop and re-dispatch as a workflow.
 
-Brief authoring (same skill works for both): the 200-char hard cap on
-`--brief` and the `--details-file` body convention are identical
-across the two verbs. The primitive below handles both — pick the
-kind via its `-Kind` / `--kind` argument; the rest of the call shape
-stays the same.
+Brief authoring: the 200-char hard cap on `--brief` and the
+`--details-file` body convention are identical across the two verbs.
+The primitive below handles both — pick the kind via its `-Kind` /
+`--kind` argument; the rest of the call shape stays the same.
 
-Watchdog (same skill works for both): use `official/dispatch-watchdog`
-regardless of dispatch kind. The watchdog polls a returned id and
-fires a notification on terminal state — its polling loop is
-agnostic to whether the id refers to a task or a workflow as long as
-the caller hands it the matching `glyph task show` /
-`glyph workflow show` invocation.
+Watchdog: `official/dispatch-watchdog` covers the `task` path
+end-to-end today — it polls a returned task id and fires a
+notification on terminal state. Workflow-kind watchdog support is
+not yet shipped (the watchdog primitive hardcodes `glyph task show`
+and does not accept a verb parameter); for now, callers polling a
+workflow should invoke `glyph workflow show --wfid <id> --json`
+directly until a kind-aware watchdog primitive lands.
 
 Concurrency: multiple workflows can run in parallel against the same
 workspace. The coordinator agent is workflow-scoped, not
@@ -238,7 +241,7 @@ glyph_dispatch() {
     local -a extras=()
     while (( $# )); do
         case "$1" in
-            --kind=task|--kind=workflow) kind="${1#--kind=}" ;;
+            --kind=*)                     kind="${1#--kind=}" ;;
             --kind)                       kind="$2"; shift ;;
             *)                            extras+=("$1") ;;
         esac
@@ -317,14 +320,13 @@ The caller MUST:
    `<workspace>/<orchestrator-state-dir>/active-missions/<mission-id>/dispatch-brief.md`).
 3. Ensure the file's first heading or first paragraph reads as a
    useful one-line summary for `--brief`.
-4. Persist the returned id (convention: write to
-   `<mission-folder>/dispatch-id.txt` for the kind-agnostic case, or
-   split into `task-id.txt` / `workflow-id.txt` if the mission's
-   local layout distinguishes them) and pair with
-   `official/dispatch-watchdog`. The watchdog skill is itself
-   kind-agnostic — it polls whichever `glyph <verb> show` the caller
-   points it at, so the same watchdog invocation pattern works for
-   both kinds.
+4. Persist the returned id (convention: `task-id.txt` in the mission
+   folder for `Kind = task`, `workflow-id.txt` for `Kind = workflow`).
+   For `Kind = task`, pair with `official/dispatch-watchdog` to get a
+   completion notification on terminal state. Workflow-kind watchdog
+   support is a follow-up; callers polling a workflow should invoke
+   `glyph workflow show --wfid <id> --json` directly until a
+   kind-aware watchdog primitive lands.
 
 The skill does not log; logging the dispatch event is the caller's
 responsibility (e.g. orchestrator writes to its own decisions log).
