@@ -40,6 +40,10 @@
     "format": "biome format --write .",
     "dev": "pnpm -r --parallel --filter \"./packages/**\" run dev",
     "bundle": "pnpm build && pnpm --filter @glyphs-ai/dashboard build && node scripts/inline-migrations.mjs && node esbuild.config.js && node scripts/copy-dashboard.mjs",
+    "build:native:js": "node scripts/native/01-bundle.mjs",
+    "build:native:sea": "node scripts/native/02-sea-blob.mjs && node scripts/native/03-inject.mjs",
+    "build:native:local": "node scripts/native/build.mjs --profile=local",
+    "test:native:smoke": "node scripts/native/smoke.mjs",
     "prepublishOnly": "pnpm bundle",
     "new-pkg": "node scripts/new-pkg.mjs",
     "knip": "knip"
@@ -56,6 +60,7 @@
     "@biomejs/biome": "^2.3.0",
     "esbuild": "^0.25.0",
     "knip": "^6.14.1",
+    "postject": "1.0.0-alpha.6",
     "typescript": "^5.7.0"
   },
   "pnpm": {

@@ -1,0 +1,77 @@
+name: Native build (SEA)
+
+# PR1 verification path for the Single Executable Application channel.
+# Cross-platform matrix lands in PR2; right now we prove the externals
+# story works on linux-x64 only (better-sqlite3 prebuild + pino's
+# worker_threads loader + the @github/copilot-sdk runtime resolver).
+#
+# Trigger surface is narrow on purpose — we DO NOT want this workflow
+# to gate every commit on `main` until the matrix lands. PRs that
+# touch the native pipeline trigger it; pushes to main run it as a
+# trailing check so the artifact channel stays warm.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/native/**'
+      - '.github/workflows/native-build.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/native/**'
+      - '.github/workflows/native-build.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: native-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux-x64:
+    name: SEA (linux-x64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # `build:native:local` runs the full pipeline: dashboard build,
+      # workspace tsc -b, inline migrations, esbuild CJS bundle,
+      # node --experimental-sea-config, postject inject. The
+      # orchestrator hard-gates non-linux-x64 hosts so this job will
+      # not silently produce an unusable artefact if the runner image
+      # changes architecture.
+      - name: Build native SEA artefact
+        run: pnpm build:native:local
+
+      - name: Smoke
+        run: pnpm test:native:smoke
+
+      - name: Binary size
+        run: |
+          ls -lh dist-native/bin/linux-x64/glyph
+          stat -c '%s bytes' dist-native/bin/linux-x64/glyph
+
+      - name: Upload SEA artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glyph-linux-x64
+          path: dist-native/bin/linux-x64/glyph
+          if-no-files-found: error
+          retention-days: 7
