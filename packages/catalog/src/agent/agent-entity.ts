@@ -6,6 +6,7 @@ import {
   normaliseFqnDeps,
   type OriginDeps,
 } from "../_shared/dep-keys.js";
+import { safeNormalize } from "../fetcher/index.js";
 import type { Agent } from "../types.js";
 import {
   AGENT_DEP_SPECS,
@@ -82,7 +83,7 @@ function buildInitialAgentState(
   const now = new Date().toISOString();
   return {
     fqn,
-    origin,
+    origin: safeNormalize(origin),
     description: meta.description,
     version: meta.version,
     prereqs: meta.prereqs,

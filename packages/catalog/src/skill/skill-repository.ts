@@ -3,6 +3,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
 import { emptyDeps } from "../_shared/dep-keys.js";
 import { HasDependentsError } from "../_shared/dependents-error.js";
+import { safeNormalize } from "../fetcher/index.js";
 import type * as schema from "../schema.js";
 import { agentSkillDeps, skillFiles, skillMcpDeps, skillSkillDeps, skills } from "../schema.js";
 import { SkillNotFoundError } from "./errors.js";
@@ -113,7 +114,8 @@ export class SkillRepository {
   }
 
   async findByOrigin(origin: string): Promise<SkillEntity | undefined> {
-    const row = this.db.select().from(skills).where(eq(skills.origin, origin)).get();
+    const key = safeNormalize(origin);
+    const row = this.db.select().from(skills).where(eq(skills.origin, key)).get();
     if (row === undefined) return undefined;
     const deps = await this.listDependencies(row.fqn);
     return rowToSkill(row, deps);

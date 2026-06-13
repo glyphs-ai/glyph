@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
 import { HasDependentsError } from "../_shared/dependents-error.js";
+import { safeNormalize } from "../fetcher/index.js";
 import type * as schema from "../schema.js";
 import { agentMcpDeps, mcps, skillMcpDeps } from "../schema.js";
 import { McpEntity } from "./mcp-entity.js";
@@ -53,7 +54,8 @@ export class McpRepository {
   }
 
   async findByOrigin(origin: string): Promise<McpEntity | undefined> {
-    const row = this.db.select().from(mcps).where(eq(mcps.origin, origin)).get();
+    const key = safeNormalize(origin);
+    const row = this.db.select().from(mcps).where(eq(mcps.origin, key)).get();
     if (row === undefined) return undefined;
     return McpEntity.fromStored(row.fqn, row.origin, row.spec, row.installedAt, row.updatedAt);
   }

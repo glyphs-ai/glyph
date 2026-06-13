@@ -61,7 +61,7 @@ for (const backend of BACKENDS) {
         const m = await svc.install("azure/mcp", "file:/abs/azure", '{"command":"node"}');
         expect(m).toBeInstanceOf(McpEntity);
         expect(m.fqn).toBe("azure/mcp");
-        expect(m.origin).toBe("file:/abs/azure");
+        expect(m.origin).toBe("file:///abs/azure");
         expect(await svc.has("azure/mcp")).toBe(true);
         expect(await svc.list()).toHaveLength(1);
       });
@@ -135,7 +135,7 @@ for (const backend of BACKENDS) {
       it("dispatches to the fetcher and installs the returned content", async () => {
         fetchStub.mockResolvedValueOnce('{"command":"node"}');
         const m = await svc.installFromOrigin("azure/mcp", "file:/abs/azure");
-        expect(m.origin).toBe("file:/abs/azure");
+        expect(m.origin).toBe("file:///abs/azure");
         expect(await svc.has("azure/mcp")).toBe(true);
         expect(fetchStub).toHaveBeenCalledWith("file:/abs/azure");
       });
@@ -150,7 +150,7 @@ for (const backend of BACKENDS) {
       it("replaces content while preserving the stored origin", async () => {
         await svc.install("x/y", "file:/abs/x", '{"v":1}');
         const updated = await svc.updateContent("x/y", '{"v":2,"updated":true}');
-        expect(updated.origin).toBe("file:/abs/x");
+        expect(updated.origin).toBe("file:///abs/x");
         const { meta, body } = McpFormat.parse(updated.spec, "test");
         expect(meta.name).toBe("x/y");
         expect(body.v).toBe(2);
@@ -166,7 +166,7 @@ for (const backend of BACKENDS) {
         const { meta } = McpFormat.parse(updated.spec, "test");
         expect(meta.name).toBe("x/y");
         // Origin lives on the entity / SQLite row, never the file.
-        expect(updated.origin).toBe("file:/abs/x");
+        expect(updated.origin).toBe("file:///abs/x");
       });
 
       it("throws NotFound when updating a missing entry", async () => {
@@ -206,7 +206,7 @@ for (const backend of BACKENDS) {
         await svc.delete("x/y");
         await svc.install("x/y", "file:/abs/second", '{"v":2}');
         const m = await svc.get("x/y");
-        expect(m!.origin).toBe("file:/abs/second");
+        expect(m!.origin).toBe("file:///abs/second");
         expect(JSON.parse(m!.spec).v).toBe(2);
       });
     });
@@ -221,6 +221,18 @@ for (const backend of BACKENDS) {
         const m = await svc.get("x/y");
         expect(m).toBeInstanceOf(McpEntity);
         expect(m!.fqn).toBe("x/y");
+      });
+
+      it("getByOrigin normalizes the input so cross-separator file: lookups match", async () => {
+        await svc.install("x/y", "file:/abs/x", "{}");
+        expect((await svc.getByOrigin("file:///abs/x"))?.fqn).toBe("x/y");
+        expect((await svc.getByOrigin("file:/abs/x/"))?.fqn).toBe("x/y");
+      });
+
+      it("getByOrigin returns null without throwing on garbage input", async () => {
+        await svc.install("x/y", "file:/abs/x", "{}");
+        expect(await svc.getByOrigin("not-a-valid-origin")).toBeNull();
+        expect(await svc.getByOrigin("")).toBeNull();
       });
 
       it("list reflects install / delete in real time", async () => {

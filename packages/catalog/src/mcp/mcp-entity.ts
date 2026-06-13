@@ -1,3 +1,4 @@
+import { safeNormalize } from "../fetcher/index.js";
 import type { Mcp } from "../types.js";
 import * as McpFormat from "./mcp-format.js";
 import { validateMcpName } from "./validate.js";
@@ -33,7 +34,7 @@ export class McpEntity {
     const merged = McpFormat.writeMeta(rawContent, { name }, sourceLabel);
     McpFormat.parse(merged, sourceLabel);
     const now = new Date().toISOString();
-    return new McpEntity(name, origin, merged, now, now);
+    return new McpEntity(name, safeNormalize(origin), merged, now, now);
   }
 
   static fromStored(

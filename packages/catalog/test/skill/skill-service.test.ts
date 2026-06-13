@@ -11,6 +11,20 @@ import { SkillRepository } from "../../src/skill/skill-repository.js";
 import { type SkillFetcher, SkillService } from "../../src/skill/skill-service.js";
 import { bootstrapCatalogDb } from "../helpers/bootstrap.js";
 
+// Local fixture-key canon: mirrors src/fetcher `safeNormalize` for the
+// file: forms this test file exercises, without taking a cross-subdir
+// value import that would trip the test-layout-convention rule.
+function canonKey(origin: string): string {
+  if (!origin.startsWith("file:")) return origin;
+  let rest = origin.slice(5);
+  if (rest.startsWith("//")) rest = rest.slice(2);
+  if (/^\/[a-zA-Z]:[\\/]/.test(rest)) rest = rest.slice(1);
+  const stripped = rest.replace(/^\/+/, "");
+  const fwd = stripped.replace(/\\/g, "/");
+  const trimmed = fwd.length > 1 && fwd.endsWith("/") ? fwd.slice(0, -1) : fwd;
+  return `file:///${trimmed}`;
+}
+
 function makeFetcher(): {
   fetcher: SkillFetcher;
   set: (origin: string, files: Record<string, string>) => void;
@@ -18,14 +32,14 @@ function makeFetcher(): {
   const trees = new Map<string, Map<string, Buffer>>();
   const fetcher: SkillFetcher = {
     async fetchAnchor(origin) {
-      const tree = trees.get(origin);
+      const tree = trees.get(canonKey(origin));
       if (tree === undefined) throw new Error(`fake fetcher: no fixture for ${origin}`);
       const anchor = tree.get("SKILL.md");
       if (anchor === undefined) throw new Error(`fake fetcher: no SKILL.md for ${origin}`);
       return anchor.toString("utf8");
     },
     async *fetchTree(origin) {
-      const tree = trees.get(origin);
+      const tree = trees.get(canonKey(origin));
       if (tree === undefined) throw new Error(`fake fetcher: no fixture for ${origin}`);
       for (const [relPath, content] of tree) {
         yield { relPath, content } satisfies EntryFile;
@@ -37,7 +51,7 @@ function makeFetcher(): {
     set(origin, files) {
       const map = new Map<string, Buffer>();
       for (const [k, v] of Object.entries(files)) map.set(k, Buffer.from(v, "utf8"));
-      trees.set(origin, map);
+      trees.set(canonKey(origin), map);
     },
   };
 }
@@ -247,6 +261,19 @@ describe("SkillService — single-entity API", () => {
   it("getByOrigin returns the entity matching origin", async () => {
     const s = await svc.getByOrigin("file:/abs/tool");
     expect(s!.fqn).toBe("public/tool");
+  });
+
+  it("getByOrigin normalizes the input so cross-separator file: lookups match", async () => {
+    // Stored under canonical `file:///abs/tool` (normalized at
+    // install time). A raw `file:/abs/tool` or backslash form must
+    // still resolve to the same row.
+    expect((await svc.getByOrigin("file:///abs/tool"))?.fqn).toBe("public/tool");
+    expect((await svc.getByOrigin("file:/abs/tool/"))?.fqn).toBe("public/tool");
+  });
+
+  it("getByOrigin returns null without throwing on garbage input", async () => {
+    expect(await svc.getByOrigin("not-a-valid-origin")).toBeNull();
+    expect(await svc.getByOrigin("")).toBeNull();
   });
 
   it("has returns true / false", async () => {

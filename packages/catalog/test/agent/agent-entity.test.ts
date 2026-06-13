@@ -16,12 +16,19 @@ describe("AgentEntity.create", () => {
     expect(a.fqn).toBe("public/researcher");
     expect(a.scope).toBe("public");
     expect(a.shortName).toBe("researcher");
-    expect(a.origin).toBe("file:/abs/agents/researcher");
+    expect(a.origin).toBe("file:///abs/agents/researcher");
     expect(a.description).toBe("Helpful researcher");
     expect(a.version).toBe("1.0.0");
     expect(a.dependencies).toEqual({ skills: [], mcps: [], agents: [] });
     expect(a.depsRefs).toEqual({ skills: [], mcps: [], agents: [] });
     expect(a.installedAt).toBeTypeOf("string");
+  });
+
+  it("normalizes the origin to canonical form", () => {
+    const a = AgentEntity.create(MIN_VALID, "file:F:\\path\\researcher", "test");
+    expect(a.origin).toBe("file:///F:/path/researcher");
+    const b = AgentEntity.create(MIN_VALID, "file:F:/path/researcher", "test");
+    expect(b.origin).toBe(a.origin);
   });
 
   it("rejects empty origin", () => {

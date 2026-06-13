@@ -5,6 +5,8 @@ import {
   normalizeOrigin,
   OriginParseError,
   parseOrigin,
+  safeNormalize,
+  sameOrigin,
 } from "../../src/fetcher/index.js";
 
 describe("parseOrigin", () => {
@@ -86,6 +88,67 @@ describe("normalizeOrigin", () => {
     const a = normalizeOrigin(parseOrigin("https://github.com/me/repo/tree/main/path/"));
     const b = normalizeOrigin(parseOrigin("https://github.com/me/repo/tree/main/path"));
     expect(a).toBe(b);
+  });
+
+  it("file: collapses Windows backslash and forward-slash forms to one canonical key", () => {
+    const a = normalizeOrigin(parseOrigin("file:F:\\path\\x"));
+    const b = normalizeOrigin(parseOrigin("file:F:/path/x"));
+    expect(a).toBe("file:///F:/path/x");
+    expect(b).toBe(a);
+  });
+
+  it("file: trims a single trailing slash but preserves POSIX root", () => {
+    expect(normalizeOrigin(parseOrigin("file:///F:/path/x/"))).toBe("file:///F:/path/x");
+    // POSIX root must survive intact — `file:/` would parse as the root
+    // directory; the trailing-slash trim must not strip it down to `file:///`.
+    expect(normalizeOrigin(parseOrigin("file:/"))).toBe("file:///");
+  });
+
+  it("file: leaves a POSIX absolute path unchanged apart from the canonical `///` prefix", () => {
+    // Separator translation is a no-op when the input is already
+    // canonical POSIX; the only transform is re-asserting `file:///`.
+    expect(normalizeOrigin(parseOrigin("file:/abs/path"))).toBe("file:///abs/path");
+    expect(normalizeOrigin(parseOrigin("file:///abs/path"))).toBe("file:///abs/path");
+  });
+
+  it("file: translation runs after the leading-slash strip so backslashes after `/` collapse too", () => {
+    // `file:/F:\\path\\x` first gets its leading `/` stripped (Windows
+    // drive-letter shape per parseOrigin), then backslashes translate.
+    expect(normalizeOrigin(parseOrigin("file:/F:\\path\\x"))).toBe("file:///F:/path/x");
+  });
+});
+
+describe("sameOrigin (file: cross-separator)", () => {
+  it("treats backslash and forward-slash forms as the same origin", () => {
+    expect(sameOrigin("file:F:\\x", "file:F:/x")).toBe(true);
+  });
+
+  it("ignores a single trailing slash on the file: path", () => {
+    expect(sameOrigin("file:F:/x/", "file:F:/x")).toBe(true);
+  });
+
+  it("does not collapse genuinely different file: paths", () => {
+    expect(sameOrigin("file:F:/x", "file:F:/y")).toBe(false);
+  });
+});
+
+describe("safeNormalize", () => {
+  it("returns the canonical form for parseable origins", () => {
+    expect(safeNormalize("file:F:\\path\\x")).toBe("file:///F:/path/x");
+    expect(safeNormalize("file:F:/path/x/")).toBe("file:///F:/path/x");
+  });
+
+  it("returns the input verbatim when the origin cannot be parsed", () => {
+    expect(safeNormalize("not-a-uri")).toBe("not-a-uri");
+    expect(safeNormalize("")).toBe("");
+    expect(safeNormalize("file:./relative")).toBe("file:./relative");
+  });
+
+  it("does not throw on garbage input", () => {
+    // Lookup callers must never have to wrap this in try/catch — a
+    // malformed origin lookup must produce a non-match, not a throw.
+    expect(() => safeNormalize("file:")).not.toThrow();
+    expect(() => safeNormalize("ftp://nope")).not.toThrow();
   });
 });
 

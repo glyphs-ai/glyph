@@ -7,6 +7,7 @@ import type {
   McpResolveAdapter,
   McpResolvedNode,
 } from "../../src/facade/plan-types.js";
+import { safeNormalize } from "../../src/fetcher/index.js";
 import * as McpFormat from "../../src/mcp/mcp-format.js";
 import { McpRepository } from "../../src/mcp/mcp-repository.js";
 import { McpService } from "../../src/mcp/mcp-service.js";
@@ -40,7 +41,7 @@ function makeFakes(): Fakes {
   const mcpStore = new Map<string, { origin: string; content: string }>();
 
   const tree = (o: string): Map<string, Buffer> => {
-    const t = trees.get(o);
+    const t = trees.get(safeNormalize(o));
     if (t === undefined) throw new Error(`no fixture for ${o}`);
     return t;
   };
@@ -65,12 +66,12 @@ function makeFakes(): Fakes {
     },
   };
   const mcpFetchFile = async (o: string): Promise<string> => {
-    const s = mcpStore.get(o);
+    const s = mcpStore.get(safeNormalize(o));
     if (s === undefined) throw new Error(`no MCP at ${o}`);
     return s.content;
   };
   const mcpResolveAdapter: McpResolveAdapter = async (origin) => {
-    const s = mcpStore.get(origin);
+    const s = mcpStore.get(safeNormalize(origin));
     if (s === undefined) {
       const conflict: CatalogConflict = {
         kind: "mcp",
@@ -93,19 +94,20 @@ function makeFakes(): Fakes {
     setSkill(o, files) {
       const m = new Map<string, Buffer>();
       for (const [k, v] of Object.entries(files)) m.set(k, Buffer.from(v, "utf8"));
-      trees.set(o, m);
+      trees.set(safeNormalize(o), m);
     },
     setAgent(o, files) {
       const m = new Map<string, Buffer>();
       for (const [k, v] of Object.entries(files)) m.set(k, Buffer.from(v, "utf8"));
-      trees.set(o, m);
+      trees.set(safeNormalize(o), m);
     },
     setMcp(o, name, content) {
       const merged = McpFormat.writeMeta(content, { name }, `seed:${o}`);
-      mcpStore.set(o, { origin: o, content: merged });
+      const key = safeNormalize(o);
+      mcpStore.set(key, { origin: key, content: merged });
       const m = new Map<string, Buffer>();
       m.set("mcp.json", Buffer.from(merged, "utf8"));
-      trees.set(o, m);
+      trees.set(key, m);
     },
   };
 }
@@ -219,7 +221,7 @@ describe("sync resolve — identity check", () => {
     expect(await mgr.getSkill("public/tool")).toBeNull();
     const renamed = await mgr.getSkill("public/toolbox");
     expect(renamed).not.toBeNull();
-    expect(renamed?.origin).toBe("file:/abs/tool");
+    expect(renamed?.origin).toBe("file:///abs/tool");
   });
 });
 
