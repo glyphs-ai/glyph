@@ -1224,6 +1224,14 @@ button {
   color: var(--color-accent);
 }
 
+.detail-dialog__dep:focus-visible {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .detail-dialog__prereqs {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -1911,6 +1919,10 @@ button {
 }
 
 .chips__suggest-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.chips__suggest-item--active {
   background: var(--color-surface-hover);
 }
 

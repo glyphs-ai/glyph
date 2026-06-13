@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setActiveWorkspace } from "../src/api";
 import { DetailDialog } from "../src/components/DetailDialog";
@@ -75,12 +76,14 @@ describe("DetailDialog — agent→agent deps row", () => {
     );
 
     render(
-      <DetailDialog
-        target={{ kind: "agent", name: "official/engineer" }}
-        workspaceId="ws-1"
-        onClose={() => {}}
-        onSynced={() => {}}
-      />,
+      <MemoryRouter>
+        <DetailDialog
+          target={{ kind: "agent", name: "official/engineer" }}
+          workspaceId="ws-1"
+          onClose={() => {}}
+          onSynced={() => {}}
+        />
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -115,12 +118,14 @@ describe("DetailDialog — agent→agent deps row", () => {
     );
 
     render(
-      <DetailDialog
-        target={{ kind: "agent", name: "official/engineer" }}
-        workspaceId="ws-1"
-        onClose={() => {}}
-        onSynced={() => {}}
-      />,
+      <MemoryRouter>
+        <DetailDialog
+          target={{ kind: "agent", name: "official/engineer" }}
+          workspaceId="ws-1"
+          onClose={() => {}}
+          onSynced={() => {}}
+        />
+      </MemoryRouter>,
     );
 
     // Each dep chip should be an <a> with a Catalog-page deep-link
@@ -173,12 +178,14 @@ describe("DetailDialog — agent→agent deps row", () => {
     );
 
     render(
-      <DetailDialog
-        target={{ kind: "agent", name: "acme/lonely" }}
-        workspaceId="ws-1"
-        onClose={() => {}}
-        onSynced={() => {}}
-      />,
+      <MemoryRouter>
+        <DetailDialog
+          target={{ kind: "agent", name: "acme/lonely" }}
+          workspaceId="ws-1"
+          onClose={() => {}}
+          onSynced={() => {}}
+        />
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -210,12 +217,14 @@ describe("DetailDialog — agent→agent deps row", () => {
     );
 
     render(
-      <DetailDialog
-        target={{ kind: "skill", name: "acme/some-skill" }}
-        workspaceId="ws-1"
-        onClose={() => {}}
-        onSynced={() => {}}
-      />,
+      <MemoryRouter>
+        <DetailDialog
+          target={{ kind: "skill", name: "acme/some-skill" }}
+          workspaceId="ws-1"
+          onClose={() => {}}
+          onSynced={() => {}}
+        />
+      </MemoryRouter>,
     );
 
     await waitFor(() => {

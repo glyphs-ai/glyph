@@ -1,5 +1,6 @@
 import type { BlockedReason } from "@glyphs-ai/contracts";
 import { type ReactNode, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   type AgentDetail,
   acknowledgeAgentPrereqs,
@@ -43,11 +44,12 @@ import { ResolveTree } from "./ResolveTree";
  *    (description, origin, version, status, deps, prereqs).
  *  - Source tab: full anchor file contents (SKILL.md / AGENTS.md /
  *    mcp.json), no collapse.
- *  - Footer: Sync from upstream (left, ghost) — primary CTA slot on
- *    the right is reserved for the most-actionable lifecycle button:
- *    Acknowledge prereqs (skills + agents) or
- *    the user is in the sync resolve flow, the footer switches to the
- *    standard Back / Apply triad.
+ *  - Footer: Sync from upstream (left, ghost); the primary CTA slot
+ *    on the right carries the most-actionable lifecycle button when
+ *    one applies — Acknowledge prereqs (on blocked-by-prereqs skills
+ *    and agents) or Disable/Enable (on agents). When the user is in
+ *    the sync resolve flow, the footer switches to the standard
+ *    Back / Apply triad.
  *
  * Pure read view: NO disabled inputs, NO toggle between form/source
  * modes, NO Save button. Ergonomics for "I want to inspect what's
@@ -322,11 +324,11 @@ export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailD
              *    upstream". Always anchored here so its position never
              *    shifts as the entry's status changes — a stable button
              *    location matters more than a one-off primary-CTA promotion.
-             *  - RIGHT (primary): the lifecycle CTA when one applies
-             *    Acknowledge prereqs (skills + agents) or
-             *    Disable/Enable (agents). When no lifecycle CTA is
-             *    relevant the right slot is intentionally empty;
-             *    Sync stays on the left.
+             *  - RIGHT (primary): the lifecycle CTA when one applies —
+             *    Acknowledge prereqs (on blocked-by-prereqs skills and
+             *    agents) or Disable/Enable (on agents). When no
+             *    lifecycle CTA is relevant the right slot is
+             *    intentionally empty; Sync stays on the left.
              *
              * Dismiss is handled by the modal header (×); a footer
              * Close would just compete with whichever CTA is anchored
@@ -374,7 +376,7 @@ export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailD
                 disabled={actionBusy}
                 title="Mark prereqs as acknowledged so this entry can be used."
               >
-                * Acknowledge prereqs (skills + agents) or
+                Acknowledge prereqs
               </button>
             )}
           </>
@@ -654,11 +656,12 @@ function projectMcp(d: McpDetail): LoadedDetail {
 }
 
 /**
- * Renders an entry's dep list as Catalog-page deep-links. Each chip
- * is a plain `<a href>` so the browser's universal context-preserving
- * gestures (cmd/ctrl/middle-click → new tab) work without special
- * handling; same-tab click drives the user to the dep's own dialog
- * via the Catalog page's `?entry=<fqn>` URL state.
+ * Renders an entry's dep list as Catalog-page deep-links. Each chip is
+ * a `react-router-dom` `<Link>` — same-tab SPA navigation on a plain
+ * click; the browser handles cmd / ctrl / shift / alt / middle-click
+ * out of the box (Link's onClick defers when any modifier is set or
+ * the button is non-primary), so a "preserve original context" gesture
+ * still opens a new tab without us intercepting anything.
  *
  * `target="_blank"` is intentionally NOT set: multi-tab accumulation
  * while exploring a chain of deps is friction, and the close-button →
@@ -691,12 +694,12 @@ function DepList({
             </li>
           );
         }
-        const href = `/workspaces/${encodeURIComponent(workspaceId)}/catalog/${KIND_TAB[kind]}?entry=${encodeURIComponent(fqn)}`;
+        const to = `/workspaces/${encodeURIComponent(workspaceId)}/catalog/${KIND_TAB[kind]}?entry=${encodeURIComponent(fqn)}`;
         return (
           <li key={fqn}>
-            <a href={href} className="detail-dialog__dep" title={fqn}>
+            <Link to={to} className="detail-dialog__dep" title={fqn}>
               {fqn}
-            </a>
+            </Link>
           </li>
         );
       })}

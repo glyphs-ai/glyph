@@ -37,15 +37,33 @@ interface SuggestRect {
 }
 
 /**
- * Multi-select with autocomplete and free-text fallback.
+ * Multi-select with autocomplete and free-text fallback, implemented
+ * to the WAI-ARIA 1.2 combobox-with-listbox-popup pattern.
  *
  * The suggestion dropdown shows label-only entries from `options`
  * (filtered to ones whose `value` is not already in `values`). On
  * select, the option's `value` is appended to `values` — the label
- * is only ever a display concern. Free-text Enter is the escape
- * hatch for power users adding a value not represented in `options`
- * (e.g. a remote origin URI not in the local catalog); the typed
- * string is stored verbatim as the value.
+ * is only ever a display concern.
+ *
+ * Keyboard model:
+ *   - ArrowDown / ArrowUp: move the active suggestion (opens the
+ *     dropdown if it was closed, wraps at both ends).
+ *   - Home / End: jump to the first / last suggestion.
+ *   - Enter with an active suggestion: commit that suggestion's
+ *     `value`. Enter with no active suggestion but with text that
+ *     exactly matches an option's label: commit that option's `value`
+ *     (so typing the FQN and pressing Enter behaves the same as
+ *     picking the row). Enter with text that doesn't match any
+ *     option: free-text-commit the typed string verbatim — the
+ *     escape hatch for power users adding a value the local catalog
+ *     doesn't know about (e.g. a remote origin URI).
+ *   - Backspace on empty input: remove the trailing chip.
+ *   - Comma: same as Enter (matches the legacy comma-to-commit
+ *     ergonomic for free-text lists).
+ *   - Escape: close the dropdown without committing.
+ *   - Tab: focus leaves the input → the dropdown closes (mouse-down
+ *     commits already register before the blur, so this only matters
+ *     when the user genuinely Tab-traverses away).
  *
  * The suggestion dropdown is rendered via a portal so it can escape ancestor
  * `overflow: hidden` containers (e.g. a modal body that scrolls). It uses
@@ -66,10 +84,12 @@ export function ChipsInput({
 }: ChipsInputProps) {
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [rect, setRect] = useState<SuggestRect | null>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const generatedInputId = useId();
   const inputId = inputIdProp ?? generatedInputId;
+  const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Display lookup: stored value → user-facing label. Values added via
@@ -100,6 +120,19 @@ export function ChipsInput({
     .filter((o) => !values.includes(o.value))
     .filter((o) => o.label.toLowerCase().includes(lowered))
     .slice(0, 8);
+
+  // Keep the active index in-bounds as the filtered list changes
+  // beneath it (typing narrows the suggestions; selecting one shifts
+  // them up by one).
+  useEffect(() => {
+    if (suggestions.length === 0) {
+      if (activeIndex !== -1) setActiveIndex(-1);
+      return;
+    }
+    if (activeIndex >= suggestions.length) {
+      setActiveIndex(suggestions.length - 1);
+    }
+  }, [suggestions.length, activeIndex]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: rect updates whenever focus / values change
   useLayoutEffect(() => {
@@ -134,6 +167,74 @@ export function ChipsInput({
   }, [focused]);
 
   const showDropdown = focused && suggestions.length > 0 && rect && portalTarget;
+  const optionId = (idx: number) => `${listboxId}-opt-${idx}`;
+  const activeOptionId = showDropdown && activeIndex >= 0 ? optionId(activeIndex) : undefined;
+
+  // Enter / comma: if an option row is highlighted, commit it; else
+  // if the typed text exactly matches an option's label, commit that
+  // option's value (the "typed the FQN, pressed Enter" path that
+  // would otherwise re-introduce the FQN-vs-origin-URI wire-shape
+  // bug). Else fall back to the raw text as the free-text escape
+  // hatch.
+  const commitFromInput = () => {
+    if (activeIndex >= 0 && activeIndex < suggestions.length) {
+      addValue(suggestions[activeIndex]!.value);
+      setActiveIndex(-1);
+      return;
+    }
+    const trimmed = text.trim();
+    if (trimmed === "") return;
+    const lower = trimmed.toLowerCase();
+    const exact = options.find((o) => o.label.toLowerCase() === lower && !values.includes(o.value));
+    if (exact) {
+      addValue(exact.value);
+      return;
+    }
+    addValue(trimmed);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      if (suggestions.length === 0) return;
+      e.preventDefault();
+      if (!focused) setFocused(true);
+      setActiveIndex((i) => (i + 1 >= suggestions.length ? 0 : i + 1));
+    } else if (e.key === "ArrowUp") {
+      if (suggestions.length === 0) return;
+      e.preventDefault();
+      if (!focused) setFocused(true);
+      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === "Home" && suggestions.length > 0 && activeIndex !== -1) {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === "End" && suggestions.length > 0 && activeIndex !== -1) {
+      e.preventDefault();
+      setActiveIndex(suggestions.length - 1);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      commitFromInput();
+    } else if (e.key === "Backspace" && text === "" && values.length > 0) {
+      remove(values[values.length - 1]!);
+    } else if (e.key === "," && text.trim()) {
+      e.preventDefault();
+      commitFromInput();
+    } else if (e.key === "Escape") {
+      setFocused(false);
+      setActiveIndex(-1);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Tab-out / clicking somewhere outside the chips control closes
+    // the dropdown. We check `relatedTarget` so a click on a
+    // suggestion row (which fires mousedown → addValue *before* blur
+    // is dispatched) doesn't double-fire by also closing the panel
+    // before the value commits.
+    const next = e.relatedTarget as Node | null;
+    if (next && containerRef.current?.contains(next)) return;
+    setFocused(false);
+    setActiveIndex(-1);
+  };
 
   return (
     <div className="chips" ref={containerRef}>
@@ -169,24 +270,26 @@ export function ChipsInput({
           type="text"
           className="chips__input"
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addValue(text);
-            } else if (e.key === "Backspace" && text === "" && values.length > 0) {
-              remove(values[values.length - 1]!);
-            } else if (e.key === "," && text.trim()) {
-              e.preventDefault();
-              addValue(text);
-            } else if (e.key === "Escape") {
-              setFocused(false);
-            }
+          onChange={(e) => {
+            setText(e.target.value);
+            // Typing reshapes the suggestion list; reset the active
+            // index so the user's next ArrowDown starts at the top of
+            // the freshly-filtered set instead of preserving stale
+            // highlight state.
+            setActiveIndex(-1);
           }}
+          onFocus={() => setFocused(true)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
           placeholder={values.length === 0 ? placeholder : ""}
           disabled={disabled}
           autoComplete="off"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-controls={listboxId}
+          aria-expanded={showDropdown ? true : false}
+          {...(activeOptionId !== undefined ? { "aria-activedescendant": activeOptionId } : {})}
         />
       </div>
       {showDropdown &&
@@ -194,21 +297,34 @@ export function ChipsInput({
           <div
             className="chips__suggest"
             style={{ left: rect.left, top: rect.top, width: rect.width }}
+            role="listbox"
+            id={listboxId}
           >
-            {suggestions.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                className="chips__suggest-item"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  addValue(o.value);
-                }}
-              >
-                <PlusIcon />
-                <span>{o.label}</span>
-              </button>
-            ))}
+            {suggestions.map((o, idx) => {
+              const isActive = idx === activeIndex;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  id={optionId(idx)}
+                  role="option"
+                  aria-selected={isActive}
+                  className={`chips__suggest-item${isActive ? " chips__suggest-item--active" : ""}`}
+                  onMouseDown={(e) => {
+                    // Use mousedown so the value commits before the
+                    // input's blur fires (blur would otherwise close
+                    // the dropdown and swallow the click).
+                    e.preventDefault();
+                    addValue(o.value);
+                    setActiveIndex(-1);
+                  }}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                >
+                  <PlusIcon />
+                  <span>{o.label}</span>
+                </button>
+              );
+            })}
           </div>,
           portalTarget,
         )}

@@ -359,4 +359,221 @@ describe("PatchDialog — agent→agent deps round-trip", () => {
       agents: ["file:/tmp/reviewer"],
     });
   });
+
+  it("commits the highlighted dropdown row's origin URI on ArrowDown then Enter", async () => {
+    // Designer F1 regression: keyboard users must be able to add an
+    // installed entry without touching the mouse. ArrowDown moves the
+    // active suggestion; Enter commits it via origin URI (not FQN).
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "GET" && url.endsWith(`/catalog/agents/${encodeURIComponent(AGENT_FQN)}`)) {
+        return jsonResponse({
+          agent: {
+            fqn: AGENT_FQN,
+            origin: "file:/tmp/dev",
+            description: "dev agent",
+            version: "1.0.0",
+            mutable: true,
+            prereqsAck: true,
+            disabledByUser: false,
+            installedAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+          status: "ready",
+          content: "# dev agent",
+        });
+      }
+      if (method === "PATCH") return emptyOk();
+      throw new Error(`unexpected fetch: ${method} ${url}`);
+    });
+
+    const onSaved = vi.fn();
+    render(
+      <PatchDialog
+        kind="agent"
+        name={AGENT_FQN}
+        availableSkills={[]}
+        availableMcps={[]}
+        availableAgents={[{ fqn: "official/reviewer", origin: "file:/tmp/reviewer" }]}
+        onClose={() => {}}
+        onSaved={onSaved}
+      />,
+    );
+
+    const agentInput = await waitFor(() => {
+      const el = document.getElementById("md-agents") as HTMLInputElement | null;
+      expect(el).toBeTruthy();
+      return el!;
+    });
+
+    // Open dropdown, then walk down with the keyboard.
+    fireEvent.focus(agentInput);
+    fireEvent.keyDown(agentInput, { key: "ArrowDown" });
+    // The active row is the only suggestion; aria-activedescendant
+    // points at it and aria-selected=true is set on the row.
+    await waitFor(() => {
+      const active = document.querySelector('[role="option"][aria-selected="true"]');
+      expect(active?.textContent).toContain("official/reviewer");
+    });
+    // Commit with Enter.
+    fireEvent.keyDown(agentInput, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByText("official/reviewer")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalled();
+    });
+
+    const patchCall = fetchMock.mock.calls.find(([, init]) => {
+      const m = (init as RequestInit | undefined)?.method;
+      return typeof m === "string" && m.toUpperCase() === "PATCH";
+    });
+    expect(patchCall).toBeTruthy();
+    const body = JSON.parse(String((patchCall![1] as RequestInit).body));
+    expect(body.dependencies).toEqual({
+      skills: [],
+      mcps: [],
+      agents: ["file:/tmp/reviewer"],
+    });
+  });
+
+  it("commits the matching option's origin URI when the user types an FQN and presses Enter", async () => {
+    // Designer F2 regression: typing an FQN exactly matching a
+    // dropdown row and pressing Enter must commit the option's
+    // origin URI — NOT the raw FQN. Otherwise the wire-shape bug the
+    // PR is supposed to fix re-surfaces via the only keyboard add
+    // path and the chip renders red ("missing").
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "GET" && url.endsWith(`/catalog/agents/${encodeURIComponent(AGENT_FQN)}`)) {
+        return jsonResponse({
+          agent: {
+            fqn: AGENT_FQN,
+            origin: "file:/tmp/dev",
+            description: "dev agent",
+            version: "1.0.0",
+            mutable: true,
+            prereqsAck: true,
+            disabledByUser: false,
+            installedAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+          status: "ready",
+          content: "# dev agent",
+        });
+      }
+      if (method === "PATCH") return emptyOk();
+      throw new Error(`unexpected fetch: ${method} ${url}`);
+    });
+
+    const onSaved = vi.fn();
+    render(
+      <PatchDialog
+        kind="agent"
+        name={AGENT_FQN}
+        availableSkills={[]}
+        availableMcps={[]}
+        availableAgents={[{ fqn: "official/reviewer", origin: "file:/tmp/reviewer" }]}
+        onClose={() => {}}
+        onSaved={onSaved}
+      />,
+    );
+
+    const agentInput = await waitFor(() => {
+      const el = document.getElementById("md-agents") as HTMLInputElement | null;
+      expect(el).toBeTruthy();
+      return el!;
+    });
+
+    // Focus, type the full FQN, then press Enter without ever using
+    // ArrowDown (the activeIndex stays at -1; the label-match branch
+    // must rescue the wire-shape).
+    fireEvent.focus(agentInput);
+    fireEvent.change(agentInput, { target: { value: "official/reviewer" } });
+    fireEvent.keyDown(agentInput, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByText("official/reviewer")).toBeTruthy();
+    });
+    // No red "missing" chip — the form considered the typed value a
+    // catalog hit and stored the origin URI.
+    expect(document.querySelector(".chips__chip--invalid")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalled();
+    });
+
+    const patchCall = fetchMock.mock.calls.find(([, init]) => {
+      const m = (init as RequestInit | undefined)?.method;
+      return typeof m === "string" && m.toUpperCase() === "PATCH";
+    });
+    expect(patchCall).toBeTruthy();
+    const body = JSON.parse(String((patchCall![1] as RequestInit).body));
+    expect(body.dependencies.agents).toEqual(["file:/tmp/reviewer"]);
+  });
+
+  it("closes the suggestion dropdown when focus leaves the input via Tab", async () => {
+    // Designer F4 regression: a true Tab-out blur must hide the
+    // dropdown so suggestions don't visually persist over content
+    // that no longer has focus.
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith(`/catalog/agents/${encodeURIComponent(AGENT_FQN)}`)) {
+        return jsonResponse({
+          agent: {
+            fqn: AGENT_FQN,
+            origin: "file:/tmp/dev",
+            description: "dev agent",
+            version: "1.0.0",
+            mutable: true,
+            prereqsAck: true,
+            disabledByUser: false,
+            installedAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+          status: "ready",
+          content: "# dev agent",
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    render(
+      <PatchDialog
+        kind="agent"
+        name={AGENT_FQN}
+        availableSkills={[]}
+        availableMcps={[]}
+        availableAgents={[{ fqn: "official/reviewer", origin: "file:/tmp/reviewer" }]}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+
+    const agentInput = await waitFor(() => {
+      const el = document.getElementById("md-agents") as HTMLInputElement | null;
+      expect(el).toBeTruthy();
+      return el!;
+    });
+
+    fireEvent.focus(agentInput);
+    await waitFor(() => {
+      expect(document.querySelector('[role="listbox"]')).toBeTruthy();
+    });
+
+    // Blur with a relatedTarget outside the chips container (the Save
+    // button — wherever the user would Tab to next).
+    const saveBtn = screen.getByRole("button", { name: "Save" });
+    fireEvent.blur(agentInput, { relatedTarget: saveBtn });
+
+    await waitFor(() => {
+      expect(document.querySelector('[role="listbox"]')).toBeNull();
+    });
+  });
 });
