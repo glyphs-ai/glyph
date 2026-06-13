@@ -1,5 +1,6 @@
 import type { AgentEntity } from "../agent/agent-entity.js";
 import type { AgentResolvedNode, AgentService } from "../agent/agent-service.js";
+import { safeNormalize } from "../fetcher/index.js";
 import type { McpEntity } from "../mcp/mcp-entity.js";
 import * as McpFormat from "../mcp/mcp-format.js";
 import type { McpService } from "../mcp/mcp-service.js";
@@ -157,7 +158,13 @@ export async function buildUpstreamClosure(
     return cachedMaps;
   }
 
-  async function walkSkill(origin: string, isRoot: boolean): Promise<void> {
+  async function walkSkill(rawOrigin: string, isRoot: boolean): Promise<void> {
+    // Canonicalise here, not at the call site, so every visited /
+    // inStack / closure-key is the same canonical form a DB row
+    // would carry. Mixed-separator dep refs (`file:F:\...` vs
+    // `file:F:/...`) then collapse to a single graph node, and
+    // cycle reports list each origin once in canonical form.
+    const origin = safeNormalize(rawOrigin);
     if (inStack.has(origin)) {
       throw new CyclicDependencyError([...inStack, origin]);
     }
@@ -209,7 +216,8 @@ export async function buildUpstreamClosure(
     }
   }
 
-  async function walkAgent(origin: string, isRoot: boolean): Promise<void> {
+  async function walkAgent(rawOrigin: string, isRoot: boolean): Promise<void> {
+    const origin = safeNormalize(rawOrigin);
     if (inStack.has(origin)) {
       throw new CyclicDependencyError([...inStack, origin]);
     }
@@ -265,7 +273,8 @@ export async function buildUpstreamClosure(
     }
   }
 
-  async function walkMcp(origin: string): Promise<void> {
+  async function walkMcp(rawOrigin: string): Promise<void> {
+    const origin = safeNormalize(rawOrigin);
     if (visited.has(origin)) return;
     if (opts.mode === "install") {
       const local = await services.mcp.getByOrigin(origin);
@@ -340,7 +349,11 @@ export async function buildLocalClosure(
   const mcpOriginByFqn = new Map(mcps.map((m) => [m.fqn, m.origin] as const));
   const agentOriginByFqn = new Map(agents.map((a) => [a.fqn, a.origin] as const));
 
-  async function visit(origin: string): Promise<void> {
+  async function visit(rawOrigin: string): Promise<void> {
+    // Canonicalise so a seed origin (e.g. raw user input or a dep
+    // ref carried verbatim from frontmatter) collides on the same
+    // key as the canonical form the DB row was stored under.
+    const origin = safeNormalize(rawOrigin);
     if (visited.has(origin)) return;
     visited.add(origin);
 

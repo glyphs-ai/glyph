@@ -6,7 +6,7 @@ import type { AgentEntity } from "../agent/agent-entity.js";
 import { AgentRepository } from "../agent/agent-repository.js";
 import { AgentService } from "../agent/agent-service.js";
 import { AgentNotFoundError } from "../agent/errors.js";
-import { defaultFetcherRegistry } from "../fetcher/index.js";
+import { defaultFetcherRegistry, safeNormalize } from "../fetcher/index.js";
 import { McpNotFoundError } from "../mcp/errors.js";
 import type { McpEntity } from "../mcp/mcp-entity.js";
 import * as McpFormat from "../mcp/mcp-format.js";
@@ -203,7 +203,13 @@ export class CatalogService {
     const poisoned = new Set<string>();
     const depsByOrigin = new Map<string, string[]>();
     for (const planNode of plan.toInstall) {
-      depsByOrigin.set(planNode.node.origin, planRefs(planNode));
+      // Canonicalise dep refs so they collide with `planNode.node.origin`
+      // (which is already canonical because every entity factory and
+      // every walker normalises). Without this, a raw frontmatter
+      // dep ref (`file:/abs/x`) misses a `poisoned` entry holding the
+      // canonical form (`file:///abs/x`) and a failed dep would not
+      // poison its dependent.
+      depsByOrigin.set(planNode.node.origin, planRefs(planNode).map(safeNormalize));
     }
 
     for (const planNode of plan.toInstall) {
@@ -617,22 +623,32 @@ export class CatalogService {
     root: { kind: "skill" | "agent" | "mcp"; origin: string },
     isSync: boolean,
   ): Promise<CatalogPlan> {
+    // Canonicalise the root origin once before any DB read or string
+    // comparison. Stored origins are canonical (the entity factories
+    // normalise on insert), so a raw user-typed `file:F:\path\x` would
+    // miss the `buildLocalClosure` Map keyed by canonical form, get
+    // diffed as `new`, and re-install instead of being recognised as
+    // already-installed. Normalising at the pipeline entry keeps every
+    // downstream comparison — `buildLocalClosure` map lookup,
+    // `diffClosures` rootOrigin equality, `computeReverseDepIndex`
+    // self-skip — on the same canonical key as the DB rows.
+    const canonRoot = { ...root, origin: safeNormalize(root.origin) };
     const services: PipelineServices = {
       skill: this.rt.skill,
       agent: this.rt.agent,
       mcp: this.rt.mcp,
       resolveMcpAdapter: this.rt.resolveMcpAdapter,
     };
-    const upstream = await buildUpstreamClosure(root, services, {
+    const upstream = await buildUpstreamClosure(canonRoot, services, {
       mode: isSync ? "sync" : "install",
     });
-    const local = await buildLocalClosure([root.origin], services);
+    const local = await buildLocalClosure([canonRoot.origin], services);
     const globalReverseDepIndex = isSync
-      ? await this.computeReverseDepIndex(root.origin)
+      ? await this.computeReverseDepIndex(canonRoot.origin)
       : undefined;
     const diff = diffClosures(upstream.closure, local, {
-      rootOrigin: root.origin,
-      rootKind: root.kind,
+      rootOrigin: canonRoot.origin,
+      rootKind: canonRoot.kind,
       isSync,
       ...(globalReverseDepIndex !== undefined ? { globalReverseDepIndex } : {}),
     });
@@ -645,7 +661,7 @@ export class CatalogService {
       toInstall: diff.toInstall as CatalogPlanNode[],
       alreadyInstalled: diff.alreadyInstalled as CatalogPlanNode[],
       conflicts: upstream.conflicts,
-      rootOrigin: root.origin,
+      rootOrigin: canonRoot.origin,
       isSync,
       ...(diff.identityChange !== undefined ? { identityChange: diff.identityChange } : {}),
       orphans: diff.orphans,
