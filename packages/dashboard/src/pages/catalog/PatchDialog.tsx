@@ -1,21 +1,30 @@
 import type { CatalogKind } from "@glyphs-ai/contracts";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CodeEditor } from "../../components/CodeEditor";
-import { MetadataForm, type MetadataFormValues } from "../../components/MetadataForm";
+import {
+  MetadataForm,
+  type MetadataFormDepOption,
+  type MetadataFormValues,
+} from "../../components/MetadataForm";
 import { Modal } from "../../components/Modal";
 import { CATALOG_VERBS, type CatalogMetadataPatch } from "./catalog-verbs";
 
 interface PatchDialogProps {
   kind: CatalogKind;
   name: string;
-  // Available names for chip autocomplete in the metadata form.
-  availableSkills: string[];
-  availableMcps: string[];
   /**
-   * Installed agent FQNs (excluding the entry being edited) for the
+   * Installed entries available for the metadata form's chip
+   * autocomplete dropdown. Each entry's `fqn` is the dropdown label
+   * (what the user recognises); `origin` is the value stored in the
+   * form (matches the wire shape — see {@link MetadataFormValues}).
+   */
+  availableSkills: readonly MetadataFormDepOption[];
+  availableMcps: readonly MetadataFormDepOption[];
+  /**
+   * Installed agents (excluding the entry being edited) for the
    * agent-deps chip autocomplete. Only used when `kind === "agent"`.
    */
-  availableAgents: string[];
+  availableAgents: readonly MetadataFormDepOption[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -75,9 +84,40 @@ export function PatchDialog({
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // FQN → origin lookups, rebuilt whenever the parent's available
+  // lists change. The form stores origin URIs (wire shape); the
+  // installed-list contains both fqn and origin so we can map between
+  // them at the boundary without touching the deeper API.
+  const skillOriginByFqn = useMemo(
+    () => new Map(availableSkills.map((e) => [e.fqn, e.origin])),
+    [availableSkills],
+  );
+  const mcpOriginByFqn = useMemo(
+    () => new Map(availableMcps.map((e) => [e.fqn, e.origin])),
+    [availableMcps],
+  );
+  const agentOriginByFqn = useMemo(
+    () => new Map(availableAgents.map((e) => [e.fqn, e.origin])),
+    [availableAgents],
+  );
+  const skillOriginSet = useMemo(
+    () => new Set(availableSkills.map((e) => e.origin)),
+    [availableSkills],
+  );
+  const mcpOriginSet = useMemo(() => new Set(availableMcps.map((e) => e.origin)), [availableMcps]);
+  const agentOriginSet = useMemo(
+    () => new Set(availableAgents.map((e) => e.origin)),
+    [availableAgents],
+  );
+
   // Load on mount / target change. The detail loader (per kind) returns
   // a normalised `CatalogEntryDetail` shape so this effect never
-  // re-discriminates on the kind itself.
+  // re-discriminates on the kind itself. The origin maps are derived
+  // from the parent-supplied available lists; re-resolve only on
+  // target change (or the first time the maps materialise alongside
+  // the initial load) so the user's mid-edit form state isn't
+  // clobbered by a parent re-render.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate name/verbs-only reseed
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -87,13 +127,20 @@ export function PatchDialog({
       if (cancelled) return;
       setText(detail.content);
       if (detail.meta !== null) {
+        // The API surfaces dep refs as fqn strings; the form holds
+        // origin URI strings (wire shape for PATCH bodies). Resolve
+        // via the parent-supplied available lists. A dep that's no
+        // longer installed (no map hit) keeps its fqn string as the
+        // stored value so the chip still renders — it surfaces as
+        // "missing" via the missingX comparison below.
+        const resolve = (fqn: string, map: Map<string, string>): string => map.get(fqn) ?? fqn;
         setForm({
           description: detail.meta.description,
           version: detail.meta.version,
           prereqs: detail.meta.prereqs,
-          skills: detail.meta.skills,
-          mcps: detail.meta.mcps,
-          agents: detail.meta.agents,
+          skills: detail.meta.skills.map((f) => resolve(f, skillOriginByFqn)),
+          mcps: detail.meta.mcps.map((f) => resolve(f, mcpOriginByFqn)),
+          agents: detail.meta.agents.map((f) => resolve(f, agentOriginByFqn)),
         });
       }
       setAgentDisabledByUser(detail.agentDisabledByUser);
@@ -201,21 +248,21 @@ export function PatchDialog({
             kind={kind as "skill" | "agent"}
             values={form}
             onChange={setForm}
-            availableSkills={availableSkills.filter((n) => n !== name)}
+            availableSkills={availableSkills.filter((e) => e.fqn !== name)}
             availableMcps={availableMcps}
             // Only thread agent-deps autocomplete + missing highlight
             // for agent forms — skills never render the agent-deps
             // chip group, so passing them would be inert noise.
             {...(kind === "agent"
               ? {
-                  availableAgents,
-                  missingAgents: form.agents.filter((a) => !availableAgents.includes(a)),
+                  availableAgents: availableAgents.filter((e) => e.fqn !== name),
+                  missingAgents: form.agents.filter((o) => !agentOriginSet.has(o)),
                 }
               : {})}
-            // form.skills/mcps are FQN strings; surface ones not in
-            // the installed set as missing.
-            missingSkills={form.skills.filter((s) => !availableSkills.includes(s))}
-            missingMcps={form.mcps.filter((m) => !availableMcps.includes(m))}
+            // form.skills/mcps hold origin URI strings; surface ones
+            // not in the installed set as missing.
+            missingSkills={form.skills.filter((o) => !skillOriginSet.has(o))}
+            missingMcps={form.mcps.filter((o) => !mcpOriginSet.has(o))}
             disabled={saving}
           />
         ) : (

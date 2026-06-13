@@ -1,4 +1,14 @@
-import { ChipsInput } from "./ChipsInput";
+import { ChipsInput, type ChipsInputOption } from "./ChipsInput";
+
+/**
+ * One entry in the per-kind `availableX` lists that PatchDialog hands
+ * to the form. Carries both the FQN (what the user recognises) and
+ * the origin URI (what the wire shape needs).
+ */
+export interface MetadataFormDepOption {
+  readonly fqn: string;
+  readonly origin: string;
+}
 
 export interface MetadataFormValues {
   description: string;
@@ -6,18 +16,18 @@ export interface MetadataFormValues {
   /** undefined = field absent (skill only) */
   prereqs: string;
   /**
-   * Catalog v2: dep refs surface to the dashboard as resolved fqns
-   * (`{ fqn: string }`). The form holds the fqn strings directly so
-   * the chip UI stays simple. Adding new deps still requires switching
-   * to source mode (origin URI authoring lives in the markdown
-   * frontmatter, not here).
+   * Dep refs surface to the form as **origin URI strings**, matching
+   * the wire shape expected by `SkillMetadataPatch.dependencies.skills`
+   * / `AgentMetadataPatch.dependencies.skills`. The form does the
+   * FQN ↔ origin display lookup via the per-kind `availableX` props
+   * so the user still sees FQN labels in the chips and dropdown.
    */
   skills: string[];
   mcps: string[];
   /**
-   * Agent → agent dep FQNs. Always empty for skills (skills cannot
-   * declare agent deps); kept as a required field so callers don't
-   * need to discriminate on `kind`.
+   * Agent → agent dep origin URIs. Always empty for skills (skills
+   * cannot declare agent deps); kept as a required field so callers
+   * don't need to discriminate on `kind`.
    */
   agents: string[];
 }
@@ -26,15 +36,23 @@ interface MetadataFormProps {
   kind: "skill" | "agent";
   values: MetadataFormValues;
   onChange: (next: MetadataFormValues) => void;
-  availableSkills: string[];
-  availableMcps: string[];
   /**
-   * Installed agent FQNs for the agent-deps chip group. Only meaningful
+   * Installed entries available for the skill-deps autocomplete. Each
+   * entry's `fqn` is the dropdown label; `origin` is the value stored
+   * in `values.skills` when the user picks it.
+   */
+  availableSkills: readonly MetadataFormDepOption[];
+  availableMcps: readonly MetadataFormDepOption[];
+  /**
+   * Installed agents for the agent-deps chip group. Only meaningful
    * for `kind === "agent"`; omit for skills (skill forms never render
    * the agent-deps group).
    */
-  availableAgents?: string[];
-  /** Currently-listed deps that aren't in the catalog — shown red. */
+  availableAgents?: readonly MetadataFormDepOption[];
+  /**
+   * Origin URIs in `values.X` that don't resolve to any installed
+   * entry — chips matching one of these get the red "missing" treatment.
+   */
   missingSkills?: readonly string[];
   missingMcps?: readonly string[];
   /** See {@link availableAgents}. */
@@ -42,13 +60,16 @@ interface MetadataFormProps {
   disabled?: boolean;
 }
 
+const toChipOptions = (list: readonly MetadataFormDepOption[]): readonly ChipsInputOption[] =>
+  list.map((e) => ({ value: e.origin, label: e.fqn }));
+
 export function MetadataForm({
   kind,
   values,
   onChange,
-  availableSkills: _availableSkills,
-  availableMcps: _availableMcps,
-  availableAgents: _availableAgents,
+  availableSkills,
+  availableMcps,
+  availableAgents,
   missingSkills,
   missingMcps,
   missingAgents,
@@ -57,24 +78,9 @@ export function MetadataForm({
   const update = <K extends keyof MetadataFormValues>(key: K, val: MetadataFormValues[K]) =>
     onChange({ ...values, [key]: val });
 
-  // Dependency form values are FQN strings. We allow remove-only here;
-  // adding new deps still requires switching to source mode (the
-  // origin-URI authoring path lives in the markdown frontmatter).
-  const skillLabels = values.skills;
-  const mcpLabels = values.mcps;
-  const agentLabels = values.agents;
-  const onSkillsChange = (next: string[]) => {
-    const kept = next.filter((label) => values.skills.includes(label));
-    update("skills", kept);
-  };
-  const onMcpsChange = (next: string[]) => {
-    const kept = next.filter((label) => values.mcps.includes(label));
-    update("mcps", kept);
-  };
-  const onAgentsChange = (next: string[]) => {
-    const kept = next.filter((label) => values.agents.includes(label));
-    update("agents", kept);
-  };
+  const skillOptions = toChipOptions(availableSkills);
+  const mcpOptions = toChipOptions(availableMcps);
+  const agentOptions = toChipOptions(availableAgents ?? []);
 
   return (
     <div className="metadata-form">
@@ -106,17 +112,17 @@ export function MetadataForm({
         <label htmlFor="md-skills">Skill dependencies</label>
         <ChipsInput
           inputId="md-skills"
-          values={skillLabels}
-          onChange={onSkillsChange}
-          options={[]}
-          placeholder="Edit in source mode to add new dependencies"
+          values={values.skills}
+          onChange={(next) => update("skills", next)}
+          options={skillOptions}
+          placeholder="Add an installed skill…"
           disabled={disabled}
           emptyText="No skill dependencies"
           invalidValues={missingSkills}
         />
         <p className="form-hint">
-          Remove with × on each chip. To add new dependencies (which require an origin URI), switch
-          to source mode.
+          Pick from installed skills, or remove with × on each chip. To add a dependency not in your
+          catalog, switch to source mode and write the origin URI directly.
         </p>
       </div>
 
@@ -124,10 +130,10 @@ export function MetadataForm({
         <label htmlFor="md-mcps">MCP dependencies</label>
         <ChipsInput
           inputId="md-mcps"
-          values={mcpLabels}
-          onChange={onMcpsChange}
-          options={[]}
-          placeholder="Edit in source mode to add new dependencies"
+          values={values.mcps}
+          onChange={(next) => update("mcps", next)}
+          options={mcpOptions}
+          placeholder="Add an installed MCP…"
           disabled={disabled}
           emptyText="No MCP dependencies"
           invalidValues={missingMcps}
@@ -139,17 +145,17 @@ export function MetadataForm({
           <label htmlFor="md-agents">Agent dependencies</label>
           <ChipsInput
             inputId="md-agents"
-            values={agentLabels}
-            onChange={onAgentsChange}
-            options={[]}
-            placeholder="Edit in source mode to add new dependencies"
+            values={values.agents}
+            onChange={(next) => update("agents", next)}
+            options={agentOptions}
+            placeholder="Add an installed agent…"
             disabled={disabled}
             emptyText="No agent dependencies"
             invalidValues={missingAgents}
           />
           <p className="form-hint">
-            Remove with × on each chip. To add new dependencies (which require an origin URI),
-            switch to source mode.
+            Pick from installed agents, or remove with × on each chip. To add a dependency not in
+            your catalog, switch to source mode and write the origin URI directly.
           </p>
         </div>
       )}

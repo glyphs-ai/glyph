@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setActiveWorkspace } from "../src/api";
 import { DetailDialog } from "../src/components/DetailDialog";
@@ -75,11 +76,14 @@ describe("DetailDialog — agent→agent deps row", () => {
     );
 
     render(
-      <DetailDialog
-        target={{ kind: "agent", name: "official/engineer" }}
-        onClose={() => {}}
-        onSynced={() => {}}
-      />,
+      <MemoryRouter>
+        <DetailDialog
+          target={{ kind: "agent", name: "official/engineer" }}
+          workspaceId="ws-1"
+          onClose={() => {}}
+          onSynced={() => {}}
+        />
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -87,6 +91,71 @@ describe("DetailDialog — agent→agent deps row", () => {
     });
     expect(screen.getByText("official/reviewer")).toBeTruthy();
     expect(screen.getByText("acme/qa")).toBeTruthy();
+  });
+
+  it("renders dep chips as Catalog deep-link <a href> elements (no target=_blank)", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        agent: {
+          fqn: "official/engineer",
+          origin: "file:/tmp/dev",
+          description: "self-dev agent",
+          version: "1.0.0",
+          mutable: false,
+          prereqsAck: true,
+          disabledByUser: false,
+          installedAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          dependencies: {
+            skills: [{ fqn: "official/git-pr" }],
+            mcps: [{ fqn: "github/mcp" }],
+            agents: [{ fqn: "official/coordinator" }],
+          },
+        },
+        status: "ready",
+        content: "# dev agent",
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <DetailDialog
+          target={{ kind: "agent", name: "official/engineer" }}
+          workspaceId="ws-1"
+          onClose={() => {}}
+          onSynced={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    // Each dep chip should be an <a> with a Catalog-page deep-link
+    // pointing at the dep's own dialog. Slashes inside the FQN are
+    // %-encoded so URLSearchParams round-trips them cleanly. No
+    // target="_blank" — same-tab navigation is the contract; cmd-click
+    // opens a new tab via browser default.
+    const skillLink = (await waitFor(() => {
+      const a = document.querySelector(
+        'a.detail-dialog__dep[href$="entry=official%2Fgit-pr"]',
+      ) as HTMLAnchorElement | null;
+      expect(a).toBeTruthy();
+      return a!;
+    })) as HTMLAnchorElement;
+    expect(skillLink.getAttribute("href")).toBe(
+      "/workspaces/ws-1/catalog/skills?entry=official%2Fgit-pr",
+    );
+    expect(skillLink.getAttribute("target")).toBeNull();
+
+    const mcpLink = document.querySelector(
+      'a.detail-dialog__dep[href$="entry=github%2Fmcp"]',
+    ) as HTMLAnchorElement | null;
+    expect(mcpLink?.getAttribute("href")).toBe("/workspaces/ws-1/catalog/mcps?entry=github%2Fmcp");
+
+    const agentLink = document.querySelector(
+      'a.detail-dialog__dep[href$="entry=official%2Fcoordinator"]',
+    ) as HTMLAnchorElement | null;
+    expect(agentLink?.getAttribute("href")).toBe(
+      "/workspaces/ws-1/catalog/agents?entry=official%2Fcoordinator",
+    );
   });
 
   it("renders the Agents row with `None` when the agent has no agent deps", async () => {
@@ -109,11 +178,14 @@ describe("DetailDialog — agent→agent deps row", () => {
     );
 
     render(
-      <DetailDialog
-        target={{ kind: "agent", name: "acme/lonely" }}
-        onClose={() => {}}
-        onSynced={() => {}}
-      />,
+      <MemoryRouter>
+        <DetailDialog
+          target={{ kind: "agent", name: "acme/lonely" }}
+          workspaceId="ws-1"
+          onClose={() => {}}
+          onSynced={() => {}}
+        />
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -145,11 +217,14 @@ describe("DetailDialog — agent→agent deps row", () => {
     );
 
     render(
-      <DetailDialog
-        target={{ kind: "skill", name: "acme/some-skill" }}
-        onClose={() => {}}
-        onSynced={() => {}}
-      />,
+      <MemoryRouter>
+        <DetailDialog
+          target={{ kind: "skill", name: "acme/some-skill" }}
+          workspaceId="ws-1"
+          onClose={() => {}}
+          onSynced={() => {}}
+        />
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
