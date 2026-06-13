@@ -1,41 +1,42 @@
 ---
 name: dispatch-watchdog
 scope: official
-description: "Spawns a properly-detached cross-platform watchdog over a running glyph task — polls status, exits on terminal state, and reliably surfaces runtime completion notifications to the orchestrator session"
-version: 0.1.0
+description: "Spawns a properly-detached cross-platform watchdog over a running glyph task or workflow — polls status, exits on terminal state, and reliably surfaces runtime completion notifications to the orchestrator session"
+version: 0.2.0
 ---
 
 # Dispatch Watchdog Skill
 
 ## Domain
 
-A single primitive for any orchestrator agent that dispatches
-long-running `glyph` tasks: given a task id, spawn a watchdog that
-polls `glyph task show` on a configurable cadence and exits when
-the task reaches a terminal status (`succeeded`, `failed`,
-`cancelled`). The watchdog must be spawned in a way that the glyph
-runtime can observe its completion and deliver a notification back to
-the orchestrator's session — not all spawn patterns achieve this.
+A single primitive for any orchestrator agent that dispatches a
+long-running `glyph` task or workflow: given an id, spawn a watchdog
+that polls `glyph <kind> show <id> --json` on a configurable cadence
+and exits when the entity reaches a terminal status (`succeeded`,
+`failed`, `cancelled`). The watchdog must be spawned in a way that
+the glyph runtime can observe its completion and deliver a
+notification back to the orchestrator's session — not all spawn
+patterns achieve this.
 
 ## Boundary
 
 **In scope:**
-- Spawning a detached PowerShell or bash watchdog process from the
-  orchestrator's shell.
-- A polling loop that reads task status via the glyph CLI and exits
-  cleanly on terminal state.
+- Spawning a detached watchdog process from the orchestrator's shell
+  using the runtime's `mode:async + detach:true` primitive.
+- A polling loop that reads task or workflow status via the glyph CLI
+  and exits cleanly on terminal state.
 - A persisted watchdog log (one line per poll) for after-the-fact
   inspection.
-- Cross-platform variants (PowerShell on Windows; bash on
-  macOS/Linux).
+- Cross-platform invocation (Windows and macOS/Linux share one Node
+  body; only the OS-level spawn wrapper differs).
 
 **Out of scope:**
 - Interpreting task output or success/failure semantics — that is the
   caller's job after notification.
 - Cancelling stuck tasks — see the caller's stuck-task playbook.
 - Replacing the orchestrator's own monitoring tick loop; this is for
-  *single* long-running tasks where polling-in-foreground would block
-  other work.
+  *single* long-running tasks or workflows where polling-in-foreground
+  would block other work.
 
 ## Why this skill exists
 
@@ -57,84 +58,64 @@ orchestrator has to rediscover them.
 
 ## Primitive
 
-### PowerShell (Windows)
+The skill ships a Node script `watchdog.mjs` next to this file. Refer
+to it via the `<SKILL_DIR>` placeholder — your runtime resolves the
+path from context, so the body stays neutral across Copilot CLI,
+Claude Code, Gemini CLI, Cursor, Windsurf, Codex, and any other
+provisioner. The script depends only on the Node stdlib and runs
+identically on Windows, macOS, and Linux.
 
-Write the watchdog body to a script file inside the mission folder
-(so it survives across shells), then invoke it once via the
-mode:async + detach:true primitive:
+> `<SKILL_DIR>` is the directory containing this `SKILL.md`. Resolve
+> from your runtime context.
 
-```pwsh
-# Step 1 — write the watchdog script. Adjust $tid, $interval, $log path.
-$missionDir = "$env:GLYPH_WORKSPACE_DIR\.pilot\active-missions\<mission-id>"
-$tid        = "<task-id>"
-$interval   = 60   # seconds between polls
-$logPath    = Join-Path $missionDir "watchdog.log"
+### Script CLI
 
-$body = @"
-`$ErrorActionPreference = 'Continue'
-"`$(Get-Date -Format o) watchdog started for $tid" | Add-Content '$logPath'
-while (`$true) {
-    # Join the array (CLI stdout is split by line in PowerShell) into a
-    # single string so the -match operator populates `$Matches reliably.
-    # PowerShell's -match on a string array behaves as a filter and does
-    # NOT populate `$Matches consistently — this is a known footgun.
-    `$raw = (& glyph task show '$tid' --json 2>`$null) -join "``n"
-    # Regex-extract status to avoid host-shell JSON parser quirks.
-    if (`$raw -match '"status"\s*:\s*"([^"]+)"') {
-        `$status = `$Matches[1]
-        "`$(Get-Date -Format o) status=`$status" | Add-Content '$logPath'
-        if (`$status -in 'succeeded','failed','cancelled') { break }
-    }
-    Start-Sleep -Seconds $interval
-}
-"@
-Set-Content -Path (Join-Path $missionDir 'watchdog.ps1') -Value $body -Encoding UTF8
+```
+node <SKILL_DIR>/watchdog.mjs \
+     <task|workflow> <id> <abs-log-path> [poll-sec=60] [max-loops=240]
 ```
 
-```pwsh
-# Step 2 — spawn it with mode:async + detach:true (pattern 4).
+- `<task|workflow>` — selects which glyph subcommand to poll
+  (`glyph task show` vs `glyph workflow show`).
+- `<id>` — the task or workflow id. Server-generated ids match
+  `^[A-Za-z0-9-]+$`; the script rejects anything else (defence-in-depth
+  against shell injection through the polled CLI command).
+- `<abs-log-path>` — **must be absolute**. The script does not resolve
+  relative paths; under detached spawn `process.cwd()` is unspecified.
+- `[poll-sec]` — seconds between polls; default 60.
+- `[max-loops]` — give-up bound; default 240 (≈4 hours at the default
+  cadence). On hitting the bound the script writes
+  `max-loops-exceeded` and exits 1.
+
+Status extraction uses `JSON.parse(raw).status`, which indexes the
+top-level field directly. This is robust against long string values,
+backslash escapes (e.g. Windows paths in workflow `details`), and any
+`"status": "..."` substrings that appear inside nested string content
+— a regex against the raw JSON cannot make that distinction.
+
+### PowerShell (Windows) — spawn via `mode:async + detach:true`
+
+```text
 # In glyph / Copilot CLI tool form:
 #   powershell:
-#     command:     pwsh -NoProfile -File "<missionDir>\watchdog.ps1"
+#     command:     node <SKILL_DIR>/watchdog.mjs task <tid> "<missionDir>\watchdog.log"
 #     mode:        async
 #     detach:      true
 #     initial_wait: 10
 ```
 
-The orchestrator returns immediately to other work; runtime notifies
-the session when the watchdog exits.
+Use `workflow` in place of `task` to poll `glyph workflow show
+<wfid> --json` instead.
 
-### Bash (macOS / Linux)
+The orchestrator returns immediately to other work; the runtime
+notifies the session when the watchdog exits.
 
-```bash
-# Step 1 — write the watchdog script.
-mission_dir="${GLYPH_WORKSPACE_DIR}/.pilot/active-missions/<mission-id>"
-tid="<task-id>"
-interval=60
-log_path="${mission_dir}/watchdog.log"
-
-cat > "${mission_dir}/watchdog.sh" <<EOF
-#!/usr/bin/env bash
-set +e
-printf '%s watchdog started for %s\n' "\$(date -Iseconds)" "${tid}" >> "${log_path}"
-while :; do
-  raw=\$(glyph task show "${tid}" --json 2>/dev/null)
-  status=\$(printf '%s' "\$raw" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
-  printf '%s status=%s\n' "\$(date -Iseconds)" "\$status" >> "${log_path}"
-  case "\$status" in
-    succeeded|failed|cancelled) exit 0 ;;
-  esac
-  sleep ${interval}
-done
-EOF
-chmod +x "${mission_dir}/watchdog.sh"
-```
+### Bash (macOS / Linux) — same pattern, runtime auto-wraps in `setsid`
 
 ```text
-# Step 2 — spawn with mode:async + detach:true.
 # In glyph / Copilot CLI tool form:
 #   bash / shell:
-#     command:     "${mission_dir}/watchdog.sh"
+#     command:     node <SKILL_DIR>/watchdog.mjs task <tid> "${mission_dir}/watchdog.log"
 #     mode:        async
 #     detach:      true
 #     initial_wait: 10
@@ -151,7 +132,7 @@ per poll thereafter, monotonic-timestamp-prefixed, for debugging stuck
 or runaway watchdogs:
 
 ```
-2026-05-22T08:30:00+00:00 watchdog started for tsk_abc123
+2026-05-22T08:30:00+00:00 watchdog started for 20260522-abc12345
 2026-05-22T08:31:00+00:00 status=running
 2026-05-22T08:32:00+00:00 status=running
 2026-05-22T08:33:00+00:00 status=succeeded
@@ -167,35 +148,43 @@ or runaway watchdogs:
   shutdown will kill it.
 - **Do not** poll faster than every ~15s without good reason — every
   poll is a CLI invocation that spawns a Node process.
-- **Do not** call `-match` directly on the PowerShell-side CLI
-  output without `-join`-ing the array into a single string first.
-  PowerShell returns multi-line CLI output as `System.String[]`, and
-  `-match` on arrays behaves as a filter — it does NOT populate
-  `$Matches` reliably, causing `$Matches[1]` to be the empty string
-  and the terminal-status check to silently never fire. The primitive
-  above already does the `-join`; preserve it.
+- **Do not** reach for `child_process.execFileSync('glyph', ...)`
+  when authoring an ad-hoc watchdog variant. On Windows + Node 22+
+  the CVE-2024-27980 hardening refuses to spawn `.cmd` shims via
+  `execFileSync` and throws `EINVAL`. The shipped `watchdog.mjs`
+  uses `execSync` with a shell-routed command and a strict id-regex
+  guard for exactly this reason — do not "fix" it to `execFileSync`.
+- **Do not** extract `status` with a regex over the raw JSON. The
+  `glyph workflow show --json` payload includes a `details` field
+  that JSON-encodes the workflow brief verbatim; briefs frequently
+  contain `"status": "..."` substrings, and a first-match regex
+  picks those up instead of the top-level field. `watchdog.mjs`
+  uses `JSON.parse(raw).status` to dodge this; preserve that.
 
 ## Caller contract
 
 The caller (orchestrator) MUST:
-1. Persist the task id (`task-id.txt` in the mission folder is the
-   convention).
-2. Invoke the watchdog once per task. Do not re-spawn if one is
+1. Persist the id (`task-id.txt` in the mission folder is the
+   convention for task ids; workflow ids follow the same per-mission
+   file convention).
+2. Invoke the watchdog once per id. Do not re-spawn if one is
    already alive. **Liveness = `watchdog.log` mtime within 2× the
    configured poll interval.** Older = dead; respawn.
 3. On notification, read `watchdog.log`'s last line for the final
    status and proceed.
 4. **Verify start within 5s of spawning.** Read the first line of
-   `watchdog.log`; it MUST contain `watchdog started for <tid>`. If
-   the marker is absent, the watchdog is dead (bad args, missing tid,
+   `watchdog.log`; it MUST contain `watchdog started for <id>`. If
+   the marker is absent, the watchdog is dead (bad args, missing id,
    exec failure) — fix the invocation and respawn. Do not proceed
    assuming monitoring is active.
 5. **Verify status capture within 2× the configured poll interval.**
    Read `watchdog.log` and confirm at least one non-empty
    `status=<value>` line exists. A line reading `status=` with no
-   value indicates the parse step is broken (e.g. the array `-match`
-   trap above). If detected, fix the primitive and respawn — do NOT
-   wait for a completion notification, it will never arrive.
+   value indicates the polled CLI returned a payload without a
+   top-level `status` field, or the call itself failed (look for a
+   `poll-error: …` line on the previous tick for detail). Fix the
+   underlying issue and respawn — do NOT wait for a completion
+   notification, it will never arrive.
 
 ## CHANGELOG
 
