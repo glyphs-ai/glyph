@@ -88,6 +88,53 @@ export function CatalogPage({
     };
   }, [agentHint, tab]);
 
+  // `?entry=<fqn>` deep-link — auto-opens the entry's dialog when the
+  // current tab's list contains a match. Used by DetailDialog dep
+  // chips and any external link into a specific catalog entry.
+  // `appliedEntryRef` tracks the last-opened value so a parent re-fetch
+  // that retains `?entry=` doesn't re-open a dialog the user just closed.
+  const [entryParam, setEntryParam] = useUrlSearchValue("entry", "");
+  const appliedEntryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (entryParam === "") {
+      appliedEntryRef.current = null;
+      return;
+    }
+    if (appliedEntryRef.current === entryParam) return;
+    const kind = TAB_KIND[tab];
+    if (kind === "agent") {
+      const a = agents.find((x) => x.agent.fqn === entryParam);
+      if (!a) return; // Silent no-op while the list loads or on stale link.
+      appliedEntryRef.current = entryParam;
+      setError(null);
+      setEdit({ kind: "agent", name: entryParam, mutable: a.agent.mutable ?? true });
+    } else if (kind === "skill") {
+      const s = skills.find((x) => x.skill.fqn === entryParam);
+      if (!s) return;
+      appliedEntryRef.current = entryParam;
+      setError(null);
+      setEdit({ kind: "skill", name: entryParam, mutable: s.skill.mutable ?? true });
+    } else {
+      const m = mcps.find((x) => x.fqn === entryParam);
+      if (!m) return;
+      appliedEntryRef.current = entryParam;
+      setError(null);
+      setEdit({ kind: "mcp", name: entryParam, mutable: m.mutable ?? true });
+    }
+  }, [entryParam, tab, agents, skills, mcps]);
+
+  // Centralised dialog-close hook so the ?entry= URL key is always
+  // stripped alongside the in-memory edit state. Used by both the
+  // mutable (PatchDialog) and immutable (DetailDialog) branches.
+  const closeEdit = () => {
+    setEdit(null);
+    if (entryParam !== "") setEntryParam("");
+  };
+  const closeEditAndRefresh = () => {
+    closeEdit();
+    onChanged();
+  };
+
   const filteredSkills = useMemo(() => {
     if (statusFilter === "all") return skills;
     if (statusFilter === "ready") return skills.filter((s) => s.status === "ready");
@@ -326,23 +373,24 @@ export function CatalogPage({
               <PatchDialog
                 kind={edit.kind}
                 name={edit.name}
-                availableSkills={skills.map((s) => s.skill.fqn)}
-                availableMcps={mcps.map((m) => m.fqn)}
-                availableAgents={agents.map((a) => a.agent.fqn)}
-                onClose={() => setEdit(null)}
-                onSaved={() => {
-                  setEdit(null);
-                  onChanged();
-                }}
+                availableSkills={skills.map((s) => ({
+                  fqn: s.skill.fqn,
+                  origin: s.skill.origin,
+                }))}
+                availableMcps={mcps.map((m) => ({ fqn: m.fqn, origin: m.origin }))}
+                availableAgents={agents.map((a) => ({
+                  fqn: a.agent.fqn,
+                  origin: a.agent.origin,
+                }))}
+                onClose={closeEdit}
+                onSaved={closeEditAndRefresh}
               />
             ) : (
               <DetailDialog
                 target={{ kind: edit.kind, name: edit.name }}
-                onClose={() => setEdit(null)}
-                onSynced={() => {
-                  setEdit(null);
-                  onChanged();
-                }}
+                workspaceId={currentWorkspaceId}
+                onClose={closeEdit}
+                onSynced={closeEditAndRefresh}
               />
             ))}
         </>

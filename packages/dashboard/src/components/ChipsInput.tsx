@@ -2,10 +2,25 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon, PlusIcon } from "./Icons";
 
+/**
+ * One selectable item in the dropdown. `value` is what gets stored in
+ * `values`; `label` is what the user sees in the chip + dropdown row.
+ *
+ * For form inputs where the stored shape is opaque (e.g. dep origin
+ * URIs while the user only recognises FQNs), the label/value split
+ * lets the chip carry the human-friendly text while the form holds
+ * the wire-shaped data. For the simpler case (single-token entries
+ * where label === value), pass `{ value: v, label: v }`.
+ */
+export interface ChipsInputOption {
+  readonly value: string;
+  readonly label: string;
+}
+
 interface ChipsInputProps {
   values: string[];
   onChange: (values: string[]) => void;
-  options: string[];
+  options: readonly ChipsInputOption[];
   placeholder?: string;
   disabled?: boolean;
   emptyText?: string;
@@ -23,6 +38,14 @@ interface SuggestRect {
 
 /**
  * Multi-select with autocomplete and free-text fallback.
+ *
+ * The suggestion dropdown shows label-only entries from `options`
+ * (filtered to ones whose `value` is not already in `values`). On
+ * select, the option's `value` is appended to `values` — the label
+ * is only ever a display concern. Free-text Enter is the escape
+ * hatch for power users adding a value not represented in `options`
+ * (e.g. a remote origin URI not in the local catalog); the typed
+ * string is stored verbatim as the value.
  *
  * The suggestion dropdown is rendered via a portal so it can escape ancestor
  * `overflow: hidden` containers (e.g. a modal body that scrolls). It uses
@@ -49,8 +72,19 @@ export function ChipsInput({
   const inputId = inputIdProp ?? generatedInputId;
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const add = (raw: string) => {
-    const v = raw.trim();
+  // Display lookup: stored value → user-facing label. Values added via
+  // free-text (not present in `options`) fall back to their raw form
+  // — the chip still renders, typically alongside an `invalidValues`
+  // red-highlight so the user sees it's not catalog-resolved.
+  const labelOf = (value: string): string => {
+    for (const o of options) {
+      if (o.value === value) return o.label;
+    }
+    return value;
+  };
+
+  const addValue = (value: string) => {
+    const v = value.trim();
     if (!v) return;
     if (values.includes(v)) return;
     onChange([...values, v]);
@@ -61,9 +95,10 @@ export function ChipsInput({
     onChange(values.filter((x) => x !== v));
   };
 
+  const lowered = text.toLowerCase();
   const suggestions = options
-    .filter((o) => !values.includes(o))
-    .filter((o) => o.toLowerCase().includes(text.toLowerCase()))
+    .filter((o) => !values.includes(o.value))
+    .filter((o) => o.label.toLowerCase().includes(lowered))
     .slice(0, 8);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: rect updates whenever focus / values change
@@ -108,19 +143,20 @@ export function ChipsInput({
         )}
         {values.map((v) => {
           const isInvalid = invalidValues?.includes(v) ?? false;
+          const label = labelOf(v);
           return (
             <span
               key={v}
               className={`chips__chip${isInvalid ? " chips__chip--invalid" : ""}`}
-              title={isInvalid ? `Missing: not found in catalog` : undefined}
+              title={isInvalid ? `Missing: not found in catalog` : v}
             >
-              <span className="chips__chip-text">{v}</span>
+              <span className="chips__chip-text">{label}</span>
               {!disabled && (
                 <button
                   type="button"
                   className="chips__chip-remove"
                   onClick={() => remove(v)}
-                  aria-label={`Remove ${v}`}
+                  aria-label={`Remove ${label}`}
                 >
                   <CloseIcon />
                 </button>
@@ -138,12 +174,12 @@ export function ChipsInput({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              add(text);
+              addValue(text);
             } else if (e.key === "Backspace" && text === "" && values.length > 0) {
               remove(values[values.length - 1]!);
             } else if (e.key === "," && text.trim()) {
               e.preventDefault();
-              add(text);
+              addValue(text);
             } else if (e.key === "Escape") {
               setFocused(false);
             }
@@ -161,16 +197,16 @@ export function ChipsInput({
           >
             {suggestions.map((o) => (
               <button
-                key={o}
+                key={o.value}
                 type="button"
                 className="chips__suggest-item"
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  add(o);
+                  addValue(o.value);
                 }}
               >
                 <PlusIcon />
-                <span>{o}</span>
+                <span>{o.label}</span>
               </button>
             ))}
           </div>,

@@ -20,6 +20,7 @@ import {
   type SkillDetail,
 } from "../api";
 import { type EntityKind, KIND_ICON, KIND_TAG, KIND_TITLE } from "../kind-meta";
+import { KIND_TAB } from "../pages/catalog/catalog-verbs";
 import { splitFqnForDisplay } from "../utils/fqn";
 import { Modal } from "./Modal";
 import { ResolveTree } from "./ResolveTree";
@@ -55,6 +56,15 @@ import { ResolveTree } from "./ResolveTree";
  */
 export interface DetailDialogProps {
   target: { kind: EntityKind; name: string };
+  /**
+   * Catalog page's current workspace id. Threaded through so the dep
+   * chips can build same-tab Catalog deep-links of the form
+   * `/workspaces/<wsid>/catalog/<tab>?entry=<fqn>`. `null` ⇒ no
+   * workspace selected (the Catalog page itself wouldn't render in
+   * that case, so this is effectively unreachable in production);
+   * dep chips render as plain text instead of links.
+   */
+  workspaceId: string | null;
   onClose: () => void;
   /** Called after a successful Sync / Acknowledge / Enable / Disable; parent re-fetches catalog list. */
   onSynced: () => void;
@@ -83,7 +93,7 @@ interface LoadedDetail {
 
 type DetailTab = "overview" | "source";
 
-export function DetailDialog({ target, onClose, onSynced }: DetailDialogProps) {
+export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailDialogProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<LoadedDetail | null>(null);
@@ -257,7 +267,9 @@ export function DetailDialog({ target, onClose, onSynced }: DetailDialogProps) {
               </button>
             </div>
 
-            {activeTab === "overview" && <OverviewTab target={target} detail={detail} />}
+            {activeTab === "overview" && (
+              <OverviewTab target={target} detail={detail} workspaceId={workspaceId} />
+            )}
 
             {activeTab === "source" && (
               <pre className={`detail-dialog__code lang-${detail.sourceLanguage}`}>
@@ -421,6 +433,8 @@ function DetailHero({ target, detail, hideStatus }: DetailHeroProps) {
 interface OverviewTabProps {
   target: { kind: EntityKind; name: string };
   detail: LoadedDetail;
+  /** Catalog page's workspace id — required to build dep-chip deep-links. */
+  workspaceId: string | null;
 }
 
 /**
@@ -429,7 +443,7 @@ interface OverviewTabProps {
  * footer alongside the primary CTA so the body stays purely
  * informational.
  */
-function OverviewTab({ target, detail }: OverviewTabProps) {
+function OverviewTab({ target, detail, workspaceId }: OverviewTabProps) {
   return (
     <dl className="detail-dialog__dl">
       {detail.description && (
@@ -473,7 +487,7 @@ function OverviewTab({ target, detail }: OverviewTabProps) {
             {detail.deps.skills.length === 0 ? (
               <span className="detail-dialog__empty">None</span>
             ) : (
-              <DepList items={detail.deps.skills} />
+              <DepList items={detail.deps.skills} kind="skill" workspaceId={workspaceId} />
             )}
           </dd>
           <dt>MCPs</dt>
@@ -481,7 +495,7 @@ function OverviewTab({ target, detail }: OverviewTabProps) {
             {detail.deps.mcps.length === 0 ? (
               <span className="detail-dialog__empty">None</span>
             ) : (
-              <DepList items={detail.deps.mcps} />
+              <DepList items={detail.deps.mcps} kind="mcp" workspaceId={workspaceId} />
             )}
           </dd>
           {/* Agents row only renders for agent details — skills cannot
@@ -496,7 +510,7 @@ function OverviewTab({ target, detail }: OverviewTabProps) {
                 {detail.deps.agents.length === 0 ? (
                   <span className="detail-dialog__empty">None</span>
                 ) : (
-                  <DepList items={detail.deps.agents} />
+                  <DepList items={detail.deps.agents} kind="agent" workspaceId={workspaceId} />
                 )}
               </dd>
             </>
@@ -639,22 +653,53 @@ function projectMcp(d: McpDetail): LoadedDetail {
   };
 }
 
-function DepList({ items }: { items: readonly string[] }) {
+/**
+ * Renders an entry's dep list as Catalog-page deep-links. Each chip
+ * is a plain `<a href>` so the browser's universal context-preserving
+ * gestures (cmd/ctrl/middle-click → new tab) work without special
+ * handling; same-tab click drives the user to the dep's own dialog
+ * via the Catalog page's `?entry=<fqn>` URL state.
+ *
+ * `target="_blank"` is intentionally NOT set: multi-tab accumulation
+ * while exploring a chain of deps is friction, and the close-button →
+ * browser-back path naturally returns the user to the original
+ * dialog when they want it.
+ *
+ * `workspaceId === null` is unreachable in practice (the Catalog page
+ * doesn't render without a workspace selected), but we still degrade
+ * gracefully by rendering the chips as plain text — never a hash-only
+ * dead link.
+ */
+function DepList({
+  items,
+  kind,
+  workspaceId,
+}: {
+  items: readonly string[];
+  kind: EntityKind;
+  workspaceId: string | null;
+}) {
   return (
     <ul className="detail-dialog__deps">
-      {items.map((origin) => (
-        <li key={origin}>
-          <a
-            href={hrefForOrigin(origin)}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="detail-dialog__dep"
-            title={origin}
-          >
-            {origin}
-          </a>
-        </li>
-      ))}
+      {items.map((fqn) => {
+        if (workspaceId === null) {
+          return (
+            <li key={fqn}>
+              <span className="detail-dialog__dep" title={fqn}>
+                {fqn}
+              </span>
+            </li>
+          );
+        }
+        const href = `/workspaces/${encodeURIComponent(workspaceId)}/catalog/${KIND_TAB[kind]}?entry=${encodeURIComponent(fqn)}`;
+        return (
+          <li key={fqn}>
+            <a href={href} className="detail-dialog__dep" title={fqn}>
+              {fqn}
+            </a>
+          </li>
+        );
+      })}
     </ul>
   );
 }
