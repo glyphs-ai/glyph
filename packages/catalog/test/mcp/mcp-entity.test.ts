@@ -7,11 +7,18 @@ describe("McpEntity.create", () => {
   it("validates name and origin, returns an entity with parseable spec", () => {
     const m = McpEntity.create("azure/mcp", "file:/abs/azure", '{"command":"node"}');
     expect(m.fqn).toBe("azure/mcp");
-    expect(m.origin).toBe("file:/abs/azure");
+    expect(m.origin).toBe("file:///abs/azure");
     expect(m.installedAt).toBeTypeOf("string");
     const { meta, body } = McpFormat.parse(m.spec, "test");
     expect(meta).toEqual({ name: "azure/mcp" });
     expect(body.command).toBe("node");
+  });
+
+  it("normalizes the origin to canonical form", () => {
+    const m = McpEntity.create("azure/mcp", "file:F:\\path\\mcps\\azure.json", "{}");
+    expect(m.origin).toBe("file:///F:/path/mcps/azure.json");
+    const n = McpEntity.create("azure/mcp", "file:F:/path/mcps/azure.json", "{}");
+    expect(n.origin).toBe(m.origin);
   });
 
   it("injects _meta.name when input lacks one", () => {

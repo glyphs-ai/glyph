@@ -8,7 +8,7 @@ import {
   AgentOriginConflictError,
   AgentPlanStaleError,
 } from "../../src/agent/errors.js";
-import type { EntryFile } from "../../src/fetcher/index.js";
+import { type EntryFile, safeNormalize } from "../../src/fetcher/index.js";
 import { bootstrapCatalogDb } from "../helpers/bootstrap.js";
 
 function makeFetcher(): {
@@ -18,14 +18,14 @@ function makeFetcher(): {
   const trees = new Map<string, Map<string, Buffer>>();
   const fetcher: AgentFetcher = {
     async fetchAnchor(origin) {
-      const tree = trees.get(origin);
+      const tree = trees.get(safeNormalize(origin));
       if (tree === undefined) throw new Error(`fake fetcher: no fixture for ${origin}`);
       const anchor = tree.get("AGENTS.md");
       if (anchor === undefined) throw new Error(`fake fetcher: no AGENTS.md for ${origin}`);
       return anchor.toString("utf8");
     },
     async *fetchTree(origin) {
-      const tree = trees.get(origin);
+      const tree = trees.get(safeNormalize(origin));
       if (tree === undefined) throw new Error(`fake fetcher: no fixture for ${origin}`);
       for (const [relPath, content] of tree) {
         yield { relPath, content } satisfies EntryFile;
@@ -37,7 +37,7 @@ function makeFetcher(): {
     set(origin, files) {
       const map = new Map<string, Buffer>();
       for (const [k, v] of Object.entries(files)) map.set(k, Buffer.from(v, "utf8"));
-      trees.set(origin, map);
+      trees.set(safeNormalize(origin), map);
     },
   };
 }
@@ -210,6 +210,16 @@ describe("AgentService — single-entity API", () => {
     const a = await svc.get("public/agent");
     expect(a).toBeInstanceOf(AgentEntity);
     expect(a!.fqn).toBe("public/agent");
+  });
+
+  it("getByOrigin normalizes the input so cross-separator file: lookups match", async () => {
+    expect((await svc.getByOrigin("file:///abs/agent"))?.fqn).toBe("public/agent");
+    expect((await svc.getByOrigin("file:/abs/agent/"))?.fqn).toBe("public/agent");
+  });
+
+  it("getByOrigin returns null without throwing on garbage input", async () => {
+    expect(await svc.getByOrigin("not-a-valid-origin")).toBeNull();
+    expect(await svc.getByOrigin("")).toBeNull();
   });
 
   it("has returns true / false", async () => {

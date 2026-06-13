@@ -3,6 +3,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
 import { emptyDeps } from "../_shared/dep-keys.js";
 import { HasDependentsError } from "../_shared/dependents-error.js";
+import { safeNormalize } from "../fetcher/index.js";
 import type * as schema from "../schema.js";
 import { agentAgentDeps, agentFiles, agentMcpDeps, agentSkillDeps, agents } from "../schema.js";
 import { type AgentDependencies, AgentEntity } from "./agent-entity.js";
@@ -121,7 +122,8 @@ export class AgentRepository {
   }
 
   async findByOrigin(origin: string): Promise<AgentEntity | undefined> {
-    const row = this.db.select().from(agents).where(eq(agents.origin, origin)).get();
+    const key = safeNormalize(origin);
+    const row = this.db.select().from(agents).where(eq(agents.origin, key)).get();
     if (row === undefined) return undefined;
     const deps = await this.listDependencies(row.fqn);
     return rowToAgent(row, deps);

@@ -8,7 +8,7 @@ import type {
   McpResolveAdapter,
   McpResolvedNode,
 } from "../../src/facade/plan-types.js";
-import type { EntryFile } from "../../src/fetcher/index.js";
+import { type EntryFile, safeNormalize } from "../../src/fetcher/index.js";
 import * as McpFormat from "../../src/mcp/mcp-format.js";
 import { McpRepository } from "../../src/mcp/mcp-repository.js";
 import { McpService } from "../../src/mcp/mcp-service.js";
@@ -35,7 +35,7 @@ function makeFakeFetchers(): {
   const mcpStore = new Map<string, { origin: string; content: string }>();
 
   function tree(origin: string): Map<string, Buffer> {
-    const t = trees.get(origin);
+    const t = trees.get(safeNormalize(origin));
     if (t === undefined) throw new Error(`fake fetcher: no fixture for ${origin}`);
     return t;
   }
@@ -65,12 +65,12 @@ function makeFakeFetchers(): {
     },
   };
   const mcpFetchFile = async (origin: string): Promise<string> => {
-    const store = mcpStore.get(origin);
+    const store = mcpStore.get(safeNormalize(origin));
     if (store === undefined) throw new Error(`no MCP at ${origin}`);
     return store.content;
   };
   const mcpResolveAdapter: McpResolveAdapter = async (origin) => {
-    const store = mcpStore.get(origin);
+    const store = mcpStore.get(safeNormalize(origin));
     if (store === undefined) {
       const conflict: CatalogConflict = {
         kind: "mcp",
@@ -97,24 +97,25 @@ function makeFakeFetchers(): {
     setSkill(origin, files) {
       const map = new Map<string, Buffer>();
       for (const [k, v] of Object.entries(files)) map.set(k, Buffer.from(v, "utf8"));
-      trees.set(origin, map);
+      trees.set(safeNormalize(origin), map);
     },
     setAgent(origin, files) {
       const map = new Map<string, Buffer>();
       for (const [k, v] of Object.entries(files)) map.set(k, Buffer.from(v, "utf8"));
-      trees.set(origin, map);
+      trees.set(safeNormalize(origin), map);
     },
     setMcp(origin, name, content) {
       // Pre-merge _meta.name into the stored content so resolveMcp can
       // derive the FQN by parsing — mirrors how a real fetcher would
       // serve a manifest with `_meta.name` baked in.
       const merged = McpFormat.writeMeta(content, { name }, `seed:${origin}`);
-      mcpStore.set(origin, { origin, content: merged });
+      const key = safeNormalize(origin);
+      mcpStore.set(key, { origin: key, content: merged });
       // Also stash in trees so McpService.install (which uses the
       // tree-based fetcher) can read it back.
       const map = new Map<string, Buffer>();
       map.set("mcp.json", Buffer.from(merged, "utf8"));
-      trees.set(origin, map);
+      trees.set(key, map);
     },
   };
 }
@@ -292,9 +293,9 @@ describe("CatalogService.resolveSkill", () => {
     // The path includes both nodes plus the back-edge target so the
     // user can read the cycle off the message.
     expect((err as CyclicDependencyError).cycle).toEqual([
-      "file:/abs/a",
-      "file:/abs/b",
-      "file:/abs/a",
+      "file:///abs/a",
+      "file:///abs/b",
+      "file:///abs/a",
     ]);
   });
 
@@ -314,10 +315,10 @@ describe("CatalogService.resolveSkill", () => {
     );
     expect(err).toBeInstanceOf(CyclicDependencyError);
     expect((err as CyclicDependencyError).cycle).toEqual([
-      "file:/abs/a",
-      "file:/abs/b",
-      "file:/abs/c",
-      "file:/abs/a",
+      "file:///abs/a",
+      "file:///abs/b",
+      "file:///abs/c",
+      "file:///abs/a",
     ]);
   });
 
@@ -471,6 +472,66 @@ describe("CatalogService.install", () => {
     ).toBe(true);
   });
 
+  it("re-installing the same root from a non-canonical file: origin is recognised as already-installed (POSIX)", async () => {
+    // Pre-PR: the second installSkill call passed the raw `file:/abs/x`
+    // through `runResolvePipeline` unchanged, so `buildLocalClosure`'s
+    // Map keyed by canonical `file:///abs/x` missed the root entry and
+    // diffed the root as `new` instead of up-to-date.
+    fetchers.setSkill("file:/abs/dup-skill", { "SKILL.md": SKILL_ANCHOR("dup-skill") });
+    const first = await mgr.installSkill("file:/abs/dup-skill");
+    expect(first.installed.map((n) => n.fqn)).toContain("public/dup-skill");
+
+    const second = await mgr.installSkill("file:/abs/dup-skill");
+    expect(second.installed).toEqual([]);
+    // The root re-install lands in `alreadyInstalled` with
+    // disposition `up-to-date` (the version+fqn matched after
+    // `nodesAreUpToDate`); the skipped reason mirrors that.
+    expect(
+      second.skipped.some((s) => s.fqn === "public/dup-skill" && s.reason === "up-to-date"),
+    ).toBe(true);
+  });
+
+  it("re-installing the same root from a non-canonical Windows file: origin is recognised as already-installed", async () => {
+    // Companion of the POSIX case above; the raw input uses backslashes
+    // and a drive letter (`file:F:\path\x`) while the stored canonical
+    // row is `file:///F:/path/x`. The pipeline must normalise on entry
+    // so the second install reports `installed === []`.
+    fetchers.setAgent("file:F:\\path\\dup-agent", {
+      "AGENTS.md": AGENT_ANCHOR("dup-agent"),
+    });
+    const first = await mgr.installAgent("file:F:\\path\\dup-agent");
+    expect(first.installed.map((n) => `${n.kind}:${n.fqn}`)).toEqual(["agent:public/dup-agent"]);
+
+    const second = await mgr.installAgent("file:F:\\path\\dup-agent");
+    expect(second.installed).toEqual([]);
+    expect(
+      second.skipped.some((s) => s.fqn === "public/dup-agent" && s.reason === "up-to-date"),
+    ).toBe(true);
+
+    // And the cross-separator form (forward slashes) of the same logical
+    // path also collapses to the same already-installed row.
+    const third = await mgr.installAgent("file:F:/path/dup-agent");
+    expect(third.installed).toEqual([]);
+    expect(
+      third.skipped.some((s) => s.fqn === "public/dup-agent" && s.reason === "up-to-date"),
+    ).toBe(true);
+  });
+
+  it("re-installing the same mcp from a non-canonical file: origin is recognised as already-installed", async () => {
+    fetchers.setMcp("file:/abs/dup-mcp", "vendor/dup-mcp", MCP_BODY);
+    const first = await mgr.installMcpFromOrigin("file:/abs/dup-mcp");
+    expect(first.installed.map((n) => n.fqn)).toContain("vendor/dup-mcp");
+
+    const second = await mgr.installMcpFromOrigin("file:/abs/dup-mcp");
+    expect(second.installed).toEqual([]);
+    // MCP lookup is unconditional (no `isRoot` gate in walkMcp), so the
+    // re-install lands in `alreadyInstalled` with `source: "local"` and
+    // disposition undefined; the skipped reason is `"already-installed"`.
+    expect(
+      second.skipped.some((s) => s.fqn === "vendor/dup-mcp" && s.reason === "already-installed"),
+    ).toBe(true);
+  });
+
   // ─── agent → agent cascade ────────────────────────
 
   it("installAgent cascades through agent → agent edges in dep-first order", async () => {
@@ -548,11 +609,48 @@ describe("CatalogService.install", () => {
     await mgr.installAgent("file:/abs/parent");
     const sub = await mgr.getAgent("public/sub");
     expect(sub).not.toBeNull();
-    expect(sub!.origin).toBe("file:/abs/sub");
+    expect(sub!.origin).toBe("file:///abs/sub");
     // Sanity: dependent listing comes from DB rows (the agent_agent
     // dep table) — not a filesystem index.
     const dependents = await mgr.findDependents("public/sub");
     expect(dependents).toEqual([{ kind: "agent", name: "public/parent" }]);
+  });
+
+  it("agent → agent dep ref with mixed separators resolves to the same row", async () => {
+    // Pre-install the dep target under a Windows-style backslash
+    // path; the storage seam normalizes the row to canonical form.
+    fetchers.setAgent("file:F:\\path\\engineer", { "AGENTS.md": AGENT_ANCHOR("engineer") });
+    await mgr.installAgent("file:F:\\path\\engineer");
+    const engineer = await mgr.getAgent("public/engineer");
+    expect(engineer?.origin).toBe("file:///F:/path/engineer");
+
+    // The coord declares the dep with YAML-typical forward slashes.
+    // After this fix the lookup goes through `safeNormalize` on the
+    // read seam, so the canonical row matches even though the typed
+    // origin used backslashes and the YAML ref uses forward slashes.
+    fetchers.setAgent("file:F:/path/coord", {
+      "AGENTS.md": AGENT_ANCHOR("coord", `dependencies:\n  agents:\n    - "file:F:/path/engineer"`),
+    });
+    await mgr.installAgent("file:F:/path/coord");
+    const coord = await mgr.getAgent("public/coord");
+    expect(coord?.dependencies?.agents).toEqual([{ fqn: "public/engineer" }]);
+  });
+
+  it("agent → agent dep ref resolves regardless of which side typed which separator", async () => {
+    // Reverse direction: target installed with forward slashes,
+    // declaring coord uses backslashes (e.g. paste-from-Explorer).
+    fetchers.setAgent("file:F:/path/engineer-fwd", { "AGENTS.md": AGENT_ANCHOR("engineer-fwd") });
+    await mgr.installAgent("file:F:/path/engineer-fwd");
+
+    fetchers.setAgent("file:F:/path/coord-bwd", {
+      "AGENTS.md": AGENT_ANCHOR(
+        "coord-bwd",
+        `dependencies:\n  agents:\n    - "file:F:\\\\path\\\\engineer-fwd"`,
+      ),
+    });
+    await mgr.installAgent("file:F:/path/coord-bwd");
+    const coord = await mgr.getAgent("public/coord-bwd");
+    expect(coord?.dependencies?.agents).toEqual([{ fqn: "public/engineer-fwd" }]);
   });
 
   it("agent without dependencies.agents projects without that bucket", async () => {

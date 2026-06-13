@@ -236,9 +236,11 @@ export function parseOrigin(uri: string): ParsedOrigin {
  *    string is stable across equivalent input encodings. `org` and `repo`
  *    are NOT case-folded — Azure DevOps treats both as case-sensitive
  *    identifiers, unlike GitHub.
- *  - `file`: pass through. Callers that care about path canonicalisation
- *    (resolving symlinks, normalising case on Windows) should do that
- *    before calling parseOrigin.
+ *  - `file`: collapse backslash separators to forward slashes (so the
+ *    Windows-typed `F:\path` and YAML-typical `F:/path` produce the same
+ *    canonical key) and drop a single trailing slash. Symlink resolution
+ *    and case folding remain the caller's responsibility — apply those
+ *    before calling parseOrigin if needed.
  */
 export function normalizeOrigin(origin: ParsedOrigin): string {
   switch (origin.scheme) {
@@ -260,11 +262,18 @@ export function normalizeOrigin(origin: ParsedOrigin): string {
         .join("/");
       return `https://dev.azure.com/${origin.org}/${encProject}/_git/${origin.repo}?path=${encPath}`;
     }
-    case "file":
-      // Canonical file URI form: `file:///<path>`. Both the parser
-      // and existing storage may have stripped the leading `//`, so
-      // re-add when normalising for cross-platform equality.
-      return `file:///${origin.path.replace(/^\/+/, "")}`;
+    case "file": {
+      // Canonical file URI form: `file:///<path>` with forward slashes.
+      // Order matters: strip leading slashes first (the parser may have
+      // already done this, but be defensive), then translate backslashes
+      // so any `\` that surfaced after the leading-slash strip also
+      // becomes `/`, then trim a single trailing slash (gated on length
+      // > 1 so POSIX root `/` survives intact).
+      const stripped = origin.path.replace(/^\/+/, "");
+      const fwd = stripped.replace(/\\/g, "/");
+      const trimmed = fwd.length > 1 && fwd.endsWith("/") ? fwd.slice(0, -1) : fwd;
+      return `file:///${trimmed}`;
+    }
   }
 }
 
@@ -283,5 +292,20 @@ export function sameOrigin(a: string, b: string): boolean {
     return normalizeOrigin(parseOrigin(a)) === normalizeOrigin(parseOrigin(b));
   } catch {
     return a === b;
+  }
+}
+
+/**
+ * Tolerant variant of {@link normalizeOrigin} that accepts a raw URI
+ * string instead of a {@link ParsedOrigin} and returns the input
+ * verbatim if parsing fails. Used on the read seam (repository
+ * `findByOrigin`) so a malformed lookup key does not throw — it just
+ * fails to match, which is the correct behaviour for a query.
+ */
+export function safeNormalize(origin: string): string {
+  try {
+    return normalizeOrigin(parseOrigin(origin));
+  } catch {
+    return origin;
   }
 }

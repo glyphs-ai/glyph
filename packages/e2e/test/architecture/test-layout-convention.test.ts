@@ -75,6 +75,11 @@ interface FlatException {
 const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
   // catalog
   {
+    file: "packages/catalog/test/agent/agent-service.test.ts",
+    rationale:
+      "grouped by area (agent/); imports `safeNormalize` from src/fetcher/ to share the canonical file: key with the read seam under test — rule says flat. Per-area test stays grouped by subject.",
+  },
+  {
     file: "packages/catalog/test/facade/catalog-service.sync.test.ts",
     rationale:
       "grouped by area (facade/); imports span agent + skill + mcp sibling subdirs of src/ — rule says flat. Facade service coverage stays co-located by subject.",
@@ -83,6 +88,11 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
     file: "packages/catalog/test/facade/catalog-service.test.ts",
     rationale:
       "grouped by area (facade/); imports span agent + skill + mcp sibling subdirs of src/ — rule says flat. Facade service coverage stays co-located by subject.",
+  },
+  {
+    file: "packages/catalog/test/skill/skill-service.test.ts",
+    rationale:
+      "grouped by area (skill/); imports `safeNormalize` from src/fetcher/ to share the canonical file: key with the read seam under test — rule says flat. Per-area test stays grouped by subject.",
   },
   // cli
   // dashboard

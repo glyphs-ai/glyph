@@ -16,13 +16,20 @@ describe("SkillEntity.create", () => {
     expect(s.fqn).toBe("public/tool-use");
     expect(s.scope).toBe("public"); // derived from fqn
     expect(s.shortName).toBe("tool-use");
-    expect(s.origin).toBe("file:/abs/skills/tool-use");
+    expect(s.origin).toBe("file:///abs/skills/tool-use");
     expect(s.description).toBe("Helpful patterns");
     expect(s.version).toBe("1.0.0");
     expect(s.dependencies).toEqual({ skills: [], mcps: [] });
     expect(s.depsRefs).toEqual({ skills: [], mcps: [] });
     expect(s.installedAt).toBeTypeOf("string");
     expect(s.updatedAt).toBeTypeOf("string");
+  });
+
+  it("normalizes the origin to canonical form", () => {
+    const s = SkillEntity.create(MIN_VALID, "file:F:\\path\\skills\\tool-use", "test");
+    expect(s.origin).toBe("file:///F:/path/skills/tool-use");
+    const t = SkillEntity.create(MIN_VALID, "file:F:/path/skills/tool-use", "test");
+    expect(t.origin).toBe(s.origin);
   });
 
   it("exposes frontmatter dep origins via depsRefs", () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { EntryFile } from "../../src/fetcher/index.js";
+import { type EntryFile, safeNormalize } from "../../src/fetcher/index.js";
 import {
   PlanStaleError,
   SkillFrontmatterError,
@@ -18,14 +18,14 @@ function makeFetcher(): {
   const trees = new Map<string, Map<string, Buffer>>();
   const fetcher: SkillFetcher = {
     async fetchAnchor(origin) {
-      const tree = trees.get(origin);
+      const tree = trees.get(safeNormalize(origin));
       if (tree === undefined) throw new Error(`fake fetcher: no fixture for ${origin}`);
       const anchor = tree.get("SKILL.md");
       if (anchor === undefined) throw new Error(`fake fetcher: no SKILL.md for ${origin}`);
       return anchor.toString("utf8");
     },
     async *fetchTree(origin) {
-      const tree = trees.get(origin);
+      const tree = trees.get(safeNormalize(origin));
       if (tree === undefined) throw new Error(`fake fetcher: no fixture for ${origin}`);
       for (const [relPath, content] of tree) {
         yield { relPath, content } satisfies EntryFile;
@@ -37,7 +37,7 @@ function makeFetcher(): {
     set(origin, files) {
       const map = new Map<string, Buffer>();
       for (const [k, v] of Object.entries(files)) map.set(k, Buffer.from(v, "utf8"));
-      trees.set(origin, map);
+      trees.set(safeNormalize(origin), map);
     },
   };
 }
@@ -247,6 +247,19 @@ describe("SkillService — single-entity API", () => {
   it("getByOrigin returns the entity matching origin", async () => {
     const s = await svc.getByOrigin("file:/abs/tool");
     expect(s!.fqn).toBe("public/tool");
+  });
+
+  it("getByOrigin normalizes the input so cross-separator file: lookups match", async () => {
+    // Stored under canonical `file:///abs/tool` (normalized at
+    // install time). A raw `file:/abs/tool` or backslash form must
+    // still resolve to the same row.
+    expect((await svc.getByOrigin("file:///abs/tool"))?.fqn).toBe("public/tool");
+    expect((await svc.getByOrigin("file:/abs/tool/"))?.fqn).toBe("public/tool");
+  });
+
+  it("getByOrigin returns null without throwing on garbage input", async () => {
+    expect(await svc.getByOrigin("not-a-valid-origin")).toBeNull();
+    expect(await svc.getByOrigin("")).toBeNull();
   });
 
   it("has returns true / false", async () => {
