@@ -105,6 +105,16 @@ export interface CatalogInstallResult {
   readonly installed: readonly CatalogInstalledEntry[];
   readonly skipped: readonly CatalogInstallSkip[];
   readonly failed: readonly CatalogInstallFailure[];
+  /**
+   * Non-fatal resolve-pipeline conflicts encountered while crawling
+   * the upstream closure: deps that were silently dropped from the
+   * install (e.g. a frontmatter `dependencies.agents` reference whose
+   * origin failed to fetch or parse). The root entry and its
+   * successfully-fetched deps install regardless; conflicts let
+   * callers surface dropped deps so a missing dep never becomes an
+   * invisible foot-gun.
+   */
+  readonly conflicts: readonly CatalogConflict[];
 }
 
 export interface CatalogSyncResult extends CatalogInstallResult {

@@ -34,7 +34,6 @@ interface InstallSourceFlags {
   readonly url?: string;
   readonly file?: string;
 }
-
 /**
  * Build the canonical wire origin from the CLI's `--url` / `--file` flags.
  *
@@ -74,6 +73,107 @@ function buildInstallOrigin(opts: InstallSourceFlags): { origin: string } | { er
     return { origin: url };
   }
   return { origin: file.startsWith("file:") ? file : `file:${file}` };
+}
+
+/**
+ * Build a non-fatal `warning:` block describing dependencies that were
+ * silently dropped from the install plan (e.g. a frontmatter origin
+ * whose anchor file failed to fetch). The block is emitted to stderr
+ * after the regular stdout JSON; the install itself still exited 0.
+ *
+ * Returns an empty string when there are no conflicts so callers can
+ * unconditionally append it to `stderr`.
+ */
+function formatInstallConflicts(conflicts: readonly InstallConflictPayload[]): string {
+  if (conflicts.length === 0) return "";
+  const header =
+    conflicts.length === 1
+      ? "warning: 1 dependency was not installed (failed to resolve from upstream):"
+      : `warning: ${conflicts.length} dependencies were not installed (failed to resolve from upstream):`;
+  const lines: string[] = [header];
+  for (const c of conflicts) {
+    const kind = typeof c.kind === "string" ? c.kind : "entry";
+    const origin = typeof c.origin === "string" ? c.origin : "(origin unknown)";
+    lines.push(`  - ${kind} ${origin}`);
+    const reason = c.reason;
+    if (reason && typeof reason === "object") {
+      const r = reason as { kind?: unknown; cause?: unknown; existingOrigin?: unknown };
+      const rk = typeof r.kind === "string" ? r.kind : "unknown";
+      const cause = r.cause;
+      const causeMsg =
+        cause instanceof Error
+          ? cause.message
+          : typeof cause === "string"
+            ? cause
+            : cause !== undefined
+              ? safeString(cause)
+              : "";
+      if (rk === "origin-conflict" && typeof r.existingOrigin === "string") {
+        lines.push(`    reason: ${rk} (already installed from ${r.existingOrigin})`);
+      } else if (causeMsg !== "") {
+        lines.push(`    reason: ${rk}: ${causeMsg}`);
+      } else {
+        lines.push(`    reason: ${rk}`);
+      }
+      if (rk === "fetch-failed") {
+        lines.push(
+          "    fix: verify the path/URL exists and is readable; " +
+            "for a file: URI pointing at the anchor file, use a directory URI " +
+            "(e.g. file:/path/to/<name>/) instead",
+        );
+      } else if (rk === "parse-failed") {
+        lines.push("    fix: fix the frontmatter or JSON at the upstream source, then retry");
+      }
+    } else {
+      lines.push("    reason: (none reported)");
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Defensive shape of one conflict on the wire. The server promises
+ * `{kind, origin, fqn, reason: {kind, ...}}`; the CLI treats every
+ * field as `unknown` so a malformed payload degrades to a generic
+ * warning instead of throwing.
+ */
+interface InstallConflictPayload {
+  readonly kind?: unknown;
+  readonly origin?: unknown;
+  readonly fqn?: unknown;
+  readonly reason?: unknown;
+}
+
+/**
+ * Extract `conflicts` defensively from a wire install result. Old
+ * servers that predate the field return `undefined`; we treat that
+ * as zero conflicts (no warning emitted).
+ */
+function extractConflicts(result: unknown): readonly InstallConflictPayload[] {
+  if (typeof result !== "object" || result === null) return [];
+  const c = (result as { conflicts?: unknown }).conflicts;
+  if (!Array.isArray(c)) return [];
+  return c as readonly InstallConflictPayload[];
+}
+
+function safeString(v: unknown): string {
+  try {
+    return typeof v === "string" ? v : JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
+}
+
+/**
+ * Build the `CommandResult` for a successful install. JSON output goes
+ * to stdout (unchanged); non-empty `conflicts` produce a
+ * human-readable `warning:` block on stderr without changing the
+ * exit code — these conflicts are non-fatal by design.
+ */
+function installResultToCommand(result: unknown): CommandResult {
+  const warning = formatInstallConflicts(extractConflicts(result));
+  if (warning === "") return { exitCode: 0, stdout: formatJson(result) };
+  return { exitCode: 0, stdout: formatJson(result), stderr: warning };
 }
 
 // ─── overview ──────────────────────────────────────────────────────────
@@ -249,7 +349,7 @@ export async function catalogSkillInstall(opts: CatalogSkillInstallOpts): Promis
       params: { id: workspaceId },
       body: { origin: built.origin },
     });
-    return { exitCode: 0, stdout: formatJson(result) };
+    return installResultToCommand(result);
   } catch (err) {
     return formatError(err);
   }
@@ -383,7 +483,7 @@ export async function catalogSkillSync(
       params: { id: workspaceId, name },
       body: { planToken },
     });
-    return { exitCode: 0, stdout: formatJson(result) };
+    return installResultToCommand(result);
   } catch (err) {
     return formatError(err);
   }
@@ -504,7 +604,7 @@ export async function catalogAgentInstall(opts: CatalogAgentInstallOpts): Promis
       params: { id: workspaceId },
       body: { origin: built.origin },
     });
-    return { exitCode: 0, stdout: formatJson(result) };
+    return installResultToCommand(result);
   } catch (err) {
     return formatError(err);
   }
@@ -628,7 +728,7 @@ export async function catalogAgentSync(
       params: { id: workspaceId, name },
       body: { planToken },
     });
-    return { exitCode: 0, stdout: formatJson(result) };
+    return installResultToCommand(result);
   } catch (err) {
     return formatError(err);
   }
@@ -771,7 +871,7 @@ export async function catalogMcpInstall(opts: CatalogMcpInstallOpts): Promise<Co
       params: { id: workspaceId },
       body: { origin: built.origin },
     });
-    return { exitCode: 0, stdout: formatJson(result) };
+    return installResultToCommand(result);
   } catch (err) {
     return formatError(err);
   }
@@ -868,7 +968,7 @@ export async function catalogMcpSync(
       params: { id: workspaceId, name: fqn },
       body: { planToken },
     });
-    return { exitCode: 0, stdout: formatJson(result) };
+    return installResultToCommand(result);
   } catch (err) {
     return formatError(err);
   }

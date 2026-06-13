@@ -140,6 +140,17 @@ interface InstalledEntry {
   prereqsAck?: boolean;
 }
 
+/** Wire mirror of `@glyphs-ai/catalog` ``CatalogConflict``. */
+export interface InstallConflict {
+  kind: "skill" | "agent" | "mcp";
+  origin: string;
+  fqn: string | null;
+  reason:
+    | { kind: "fetch-failed"; cause?: unknown }
+    | { kind: "parse-failed"; cause?: unknown }
+    | { kind: "origin-conflict"; existingOrigin: string };
+}
+
 /** Wire mirror of `@glyphs-ai/catalog` ``CatalogInstallResult``. */
 export interface InstallResult {
   installed: InstalledEntry[];
@@ -149,6 +160,15 @@ export interface InstallResult {
     fqn: string;
     error: { name: string; message: string };
   }[];
+  /**
+   * Non-fatal resolve-pipeline conflicts: deps the install pipeline
+   * dropped while crawling the upstream closure (e.g. a frontmatter
+   * `dependencies.agents` reference whose anchor file failed to
+   * fetch). Surface inline so a dropped dep does not become an
+   * invisible foot-gun. Optional for forward compat with servers that
+   * predate the field.
+   */
+  conflicts?: InstallConflict[];
 }
 
 /** Wire mirror of `@glyphs-ai/catalog` ``CatalogSyncResult``. */

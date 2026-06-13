@@ -62,6 +62,28 @@ export class FileFetcher implements Fetcher {
         throw new FetchError(uri, "origin path is neither a regular file nor a directory");
       }
     } else {
+      // Tolerance: an origin URI may point at the anchor file directly
+      // (e.g. `file:/abs/engineer/AGENTS.md`) rather than its containing
+      // directory. Treat as already-resolved when the origin is a regular
+      // file and its basename matches the requested `relPath` — the
+      // basename guard rejects accidental cross-anchor reads (asking for
+      // `AGENTS.md` against a `mcp.json` origin still errors).
+      //
+      // A `stat` failure here is silently swallowed: the canonical
+      // "cannot stat <relPath>" error from the join path below is the
+      // shape callers and tests expect for missing origins.
+      let originStat: Awaited<ReturnType<typeof stat>> | undefined;
+      try {
+        originStat = await stat(origin.path);
+      } catch {
+        originStat = undefined;
+      }
+      if (originStat?.isFile() && basenameMatches(origin.path, relPath)) {
+        if (originStat.size > MAX_FILE_BYTES) {
+          throw new FetchError(uri, `file exceeds ${MAX_FILE_BYTES}-byte cap`);
+        }
+        return readFile(origin.path);
+      }
       // Origin points at a directory; join POSIX-style relPath against it.
       const segs = relPath.split("/").filter((s) => s !== "");
       target = path.join(origin.path, ...segs);
@@ -134,4 +156,17 @@ async function* walk(absRoot: string, relParent: string): AsyncIterable<EntryFil
 
 function toPosix(p: string): string {
   return path.sep === "/" ? p : p.split(path.sep).join("/");
+}
+
+/**
+ * True iff `basename(absPath)` equals `expected`. Case-insensitive on
+ * Windows (native FS semantics), case-sensitive elsewhere — matches
+ * what `stat` would resolve against on each platform.
+ */
+function basenameMatches(absPath: string, expected: string): boolean {
+  const actual = path.basename(absPath);
+  if (process.platform === "win32") {
+    return actual.toLowerCase() === expected.toLowerCase();
+  }
+  return actual === expected;
 }

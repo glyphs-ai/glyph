@@ -1,6 +1,6 @@
 import type { AgentEntry, CatalogKind, SkillEntry } from "@glyphs-ai/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { InstallSource, McpItem } from "../api";
+import type { InstallConflict, InstallSource, McpItem } from "../api";
 import { DetailDialog } from "../components/DetailDialog";
 import { EntryGrid } from "../components/EntryGrid";
 import { HeaderActions } from "../components/HeaderActions";
@@ -39,6 +39,7 @@ export function CatalogPage({
   const tabVerbs = CATALOG_VERBS[TAB_KIND[tab]];
 
   const [installOpen, setInstallOpen] = useState(false);
+  const [installConflicts, setInstallConflicts] = useState<readonly InstallConflict[]>([]);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditTarget | null>(null);
   const [busy, setBusy] = useState(false);
@@ -124,11 +125,27 @@ export function CatalogPage({
     }
   };
 
-  const doInstall = (src: InstallSource) =>
-    runMutation(
-      () => tabVerbs.install(src),
-      () => setInstallOpen(false),
-    );
+  const doInstall = async (src: InstallSource) => {
+    setBusy(true);
+    setError(null);
+    setInstallConflicts([]);
+    try {
+      const result = await tabVerbs.install(src);
+      const conflicts = result.conflicts ?? [];
+      setInstallConflicts(conflicts);
+      // Conflicts are non-fatal: the install itself succeeded. When the
+      // server flagged dropped deps, keep the dialog open so the user
+      // can read the warning row before dismissing.
+      if (conflicts.length === 0) {
+        setInstallOpen(false);
+      }
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const doRemove = (name: string) =>
     runMutation(
@@ -183,6 +200,7 @@ export function CatalogPage({
               className="btn btn--primary"
               onClick={() => {
                 setError(null);
+                setInstallConflicts([]);
                 setInstallOpen(true);
               }}
             >
@@ -302,8 +320,10 @@ export function CatalogPage({
             open={installOpen}
             busy={busy}
             error={error}
+            conflicts={installConflicts}
             onClose={() => {
               setInstallOpen(false);
+              setInstallConflicts([]);
               setError(null);
             }}
             onSubmit={doInstall}

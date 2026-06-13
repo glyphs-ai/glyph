@@ -1,6 +1,6 @@
 import type { CatalogKind } from "@glyphs-ai/contracts";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import type { InstallProvider, InstallSource, ResolveManifest } from "../../api";
+import type { InstallConflict, InstallProvider, InstallSource, ResolveManifest } from "../../api";
 import { Modal } from "../../components/Modal";
 import { ResolveTree } from "../../components/ResolveTree";
 import { CATALOG_VERBS } from "./catalog-verbs";
@@ -10,6 +10,13 @@ interface InstallDialogProps {
   open: boolean;
   busy: boolean;
   error: string | null;
+  /**
+   * Non-fatal resolve-pipeline conflicts surfaced by the most recent
+   * install attempt. When non-empty the dialog stays open after the
+   * install resolves so the user can read the warning row before
+   * dismissing.
+   */
+  conflicts: readonly InstallConflict[];
   onClose: () => void;
   /**
    * `src` is the structured install source (provider + location);
@@ -26,7 +33,15 @@ type InstallStage = "input" | "previewing" | "preview" | "applying";
  * through; whether the kind supports preview is data-driven via
  * `CATALOG_VERBS[kind].resolveInstall !== null`.
  */
-export function InstallDialog({ kind, open, busy, error, onClose, onSubmit }: InstallDialogProps) {
+export function InstallDialog({
+  kind,
+  open,
+  busy,
+  error,
+  conflicts,
+  onClose,
+  onSubmit,
+}: InstallDialogProps) {
   const verbs = CATALOG_VERBS[kind];
   const supportsPreview = verbs.resolveInstall !== null;
 
@@ -148,6 +163,30 @@ export function InstallDialog({ kind, open, busy, error, onClose, onSubmit }: In
 
           {showPreview && manifest && <ResolveTree manifest={manifest} />}
 
+          {conflicts.length > 0 && (
+            <div
+              className="alert alert--warning install-dialog__conflicts"
+              role="status"
+              aria-live="polite"
+            >
+              <strong>
+                {conflicts.length === 1
+                  ? "1 dependency was not installed:"
+                  : `${conflicts.length} dependencies were not installed:`}
+              </strong>
+              <ul>
+                {conflicts.map((c) => (
+                  <li key={`${c.kind}:${c.origin}`}>
+                    <code>
+                      {c.kind} {c.origin}
+                    </code>
+                    <div className="form-hint">{describeConflictReason(c)}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {(error || resolveError) && (
             <div className="alert alert--error">⚠ {error ?? resolveError}</div>
           )}
@@ -268,3 +307,30 @@ const LOCAL_EXAMPLE: Record<CatalogKind, string> = {
   agent: "/home/me/agents/my-agent",
   mcp: "/home/me/mcps/my-mcp.json",
 };
+
+/**
+ * Human-readable summary of a single `InstallConflict.reason`. Mirrors
+ * the CLI warning wording so the same dropped dep reads the same way
+ * across surfaces.
+ */
+function describeConflictReason(c: InstallConflict): string {
+  const r = c.reason;
+  switch (r.kind) {
+    case "fetch-failed":
+      return `failed to fetch from upstream — verify the path/URL exists and is readable; for a file: URI pointing at the anchor file, use a directory URI (e.g. file:/path/to/${c.kind}/) instead.${formatCauseSuffix(r.cause)}`;
+    case "parse-failed":
+      return `failed to parse the upstream source — fix the frontmatter or JSON at the dependency origin, then retry.${formatCauseSuffix(r.cause)}`;
+    case "origin-conflict":
+      return `another installed ${c.kind} already maps to a different origin (${r.existingOrigin}).`;
+  }
+}
+
+function formatCauseSuffix(cause: unknown): string {
+  if (cause === undefined || cause === null) return "";
+  if (cause instanceof Error) return ` (${cause.message})`;
+  if (typeof cause === "string") return ` (${cause})`;
+  if (typeof cause === "object" && "message" in cause && typeof cause.message === "string") {
+    return ` (${cause.message})`;
+  }
+  return "";
+}
