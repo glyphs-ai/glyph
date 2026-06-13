@@ -53,9 +53,14 @@ for (let i = 0; i < maxLoops; i++) {
     // throws EINVAL on Windows + Node 22+ for `.cmd`/`.bat` (CVE-2024-27980
     // hardening). The id arg is regex-validated above so the shell call is
     // not an injection vector.
+    //
+    // stdio fd 2 is captured (not ignored) so a non-zero exit attaches the
+    // CLI's real diagnostic to `error.stderr`. Without it, only Node's
+    // wrapper message ("Command failed: glyph … exit code N") survives,
+    // which strips the signal callers need under caller contract item 5.
     const raw = execSync(`glyph ${kind} show ${id} --json`, {
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
     // `JSON.parse` indexes the top-level `status` field directly — robust
     // against long string values, backslash escapes (e.g. Windows paths in
@@ -66,7 +71,9 @@ for (let i = 0; i < maxLoops; i++) {
   } catch (e) {
     status = "";
     const msg = String(e?.message ?? e).replace(/\s+/g, " ").slice(0, 200);
-    appendFileSync(logPath, `${new Date().toISOString()} poll-error: ${msg}\n`);
+    const stderrTail = String(e?.stderr ?? "").replace(/\s+/g, " ").trim().slice(-200);
+    const suffix = stderrTail ? ` (stderr-tail: ${stderrTail})` : "";
+    appendFileSync(logPath, `${new Date().toISOString()} poll-error: ${msg}${suffix}\n`);
   }
 
   appendFileSync(logPath, `${new Date().toISOString()} status=${status}\n`);

@@ -58,17 +58,20 @@ orchestrator has to rediscover them.
 
 ## Primitive
 
-The skill ships a Node script `watchdog.mjs` next to this file. The
-orchestrator runtime materializes every skill artifact into
-`<workdir>/.github/skills/official__dispatch-watchdog/`, so callers
-can spawn it by relative path with no extra setup. The script depends
-only on the Node stdlib and runs identically on Windows, macOS, and
-Linux.
+The skill ships a Node script `watchdog.mjs` next to this file. Refer
+to it via the `<SKILL_DIR>` placeholder — your runtime resolves the
+path from context, so the body stays neutral across Copilot CLI,
+Claude Code, Gemini CLI, Cursor, Windsurf, Codex, and any other
+provisioner. The script depends only on the Node stdlib and runs
+identically on Windows, macOS, and Linux.
+
+> `<SKILL_DIR>` is the directory containing this `SKILL.md`. Resolve
+> from your runtime context.
 
 ### Script CLI
 
 ```
-node .github/skills/official__dispatch-watchdog/watchdog.mjs \
+node <SKILL_DIR>/watchdog.mjs \
      <task|workflow> <id> <abs-log-path> [poll-sec=60] [max-loops=240]
 ```
 
@@ -95,7 +98,7 @@ backslash escapes (e.g. Windows paths in workflow `details`), and any
 ```text
 # In glyph / Copilot CLI tool form:
 #   powershell:
-#     command:     node .github/skills/official__dispatch-watchdog/watchdog.mjs task <tid> "<missionDir>\watchdog.log"
+#     command:     node <SKILL_DIR>/watchdog.mjs task <tid> "<missionDir>\watchdog.log"
 #     mode:        async
 #     detach:      true
 #     initial_wait: 10
@@ -112,7 +115,7 @@ notifies the session when the watchdog exits.
 ```text
 # In glyph / Copilot CLI tool form:
 #   bash / shell:
-#     command:     node .github/skills/official__dispatch-watchdog/watchdog.mjs task <tid> "${mission_dir}/watchdog.log"
+#     command:     node <SKILL_DIR>/watchdog.mjs task <tid> "${mission_dir}/watchdog.log"
 #     mode:        async
 #     detach:      true
 #     initial_wait: 10
@@ -129,7 +132,7 @@ per poll thereafter, monotonic-timestamp-prefixed, for debugging stuck
 or runaway watchdogs:
 
 ```
-2026-05-22T08:30:00+00:00 watchdog started for tsk_abc123
+2026-05-22T08:30:00+00:00 watchdog started for 20260522-abc12345
 2026-05-22T08:31:00+00:00 status=running
 2026-05-22T08:32:00+00:00 status=running
 2026-05-22T08:33:00+00:00 status=succeeded
