@@ -234,6 +234,22 @@ export class WorkflowRepository {
   }
 
   /**
+   * Replace a node's `metadata` column with the JSON-encoded
+   * `metadata`. Used by `respondHumanNode` to persist the human
+   * response into `metadata.response`. Throws
+   * `WorkflowNodeNotFoundError` if the row is gone.
+   */
+  updateNodeMetadata(tx: Db, id: string, metadata: Readonly<Record<string, unknown>>): void {
+    assertValidWorkflowNodeId(id);
+    const result = tx
+      .update(workflowNodes)
+      .set({ metadata: JSON.stringify(metadata) })
+      .where(eq(workflowNodes.id, id))
+      .run();
+    if (result.changes === 0) throw new WorkflowNodeNotFoundError("<unknown>", id);
+  }
+
+  /**
    * Delete a single node row by id. Adjacent edges are NOT cascaded
    * by this helper — the caller must invoke
    * {@link deleteEdgesAdjacentToNodeTx} in the same tx so the edge

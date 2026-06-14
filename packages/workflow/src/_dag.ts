@@ -21,6 +21,7 @@ import { WorkflowEntity, WorkflowNodeEntity } from "./workflow-entity.js";
 
 export const COORDINATOR_KIND: WorkflowNodeKind = "coordinator";
 export const WORKER_KIND: WorkflowNodeKind = "worker";
+export const HUMAN_KIND: WorkflowNodeKind = "human";
 
 const TERMINAL_NODE_STATUSES: ReadonlySet<WorkflowNodeStatus> = new Set([
   "succeeded",
@@ -111,6 +112,7 @@ export function parentsReadyForKind(
   if (parents.length === 0) return true;
   switch (kind) {
     case "worker":
+    case "human":
       return parents.every((p) => p.status === "succeeded");
     case "coordinator":
       return parents.every((p) => TERMINAL_NODE_STATUSES.has(p.status));

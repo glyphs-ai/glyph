@@ -10,6 +10,7 @@ import type { Workspace, WorkspaceService } from "@glyphs-ai/workspace";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeCoordNodeRunner } from "./wiring/workflow-coord-task-runner.js";
+import { makeHumanNodeRunner } from "./wiring/workflow-human-node-runner.js";
 import { makeWorkerNodeRunner } from "./wiring/workflow-worker-task-runner.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
@@ -386,11 +387,15 @@ export class WorkspaceContextRegistry {
         catalog: catalogModule.service,
         logger: this.logger,
       });
+      const humanRunner = makeHumanNodeRunner({
+        getService: getWorkflowService,
+        logger: this.logger,
+      });
       workflowModule = await composeWorkflowModule({
         dbFile,
         workspaceDir: workspace.workspaceDir,
         logger: this.logger,
-        runners: { coordinator: coordRunner, worker: workerRunner },
+        runners: { coordinator: coordRunner, worker: workerRunner, human: humanRunner },
       });
       workflowSvc = workflowModule.service;
       cleanup.push(() => workflowModule.close());

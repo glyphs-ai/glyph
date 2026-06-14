@@ -1157,7 +1157,7 @@ describe("workflowAddNode", () => {
   it("rejects unknown --kind with exit 2, no fetch", async () => {
     const specFile = await writeSpec({});
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const r = await workflowAddNode(WFID, { ...commonOpts(), kind: "human", specFile });
+    const r = await workflowAddNode(WFID, { ...commonOpts(), kind: "evaluator", specFile });
     expect(r.exitCode).toBe(2);
     expect(fetchSpy).not.toHaveBeenCalled();
   });

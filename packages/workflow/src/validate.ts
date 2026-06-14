@@ -157,7 +157,7 @@ export function assertValidWorkflowNodeKind(kind: unknown): asserts kind is Work
   if (typeof kind !== "string" || kind.length === 0) {
     throw new WorkflowNodeKindShapeError(String(kind));
   }
-  if (kind !== "coordinator" && kind !== "worker") {
+  if (kind !== "coordinator" && kind !== "worker" && kind !== "human") {
     throw new WorkflowNodeKindCorruptionError(kind);
   }
 }

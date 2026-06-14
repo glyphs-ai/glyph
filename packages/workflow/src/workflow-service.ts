@@ -7,6 +7,7 @@ import {
   COORDINATOR_KIND,
   classifyStuckReason,
   computePhaseFromParents,
+  HUMAN_KIND,
   type NodeRef,
   nodeEntityFor,
   normalizeSubgraphInput,
@@ -47,6 +48,8 @@ import { workflowDir, workflowNodeDir } from "./paths.js";
 import type * as schema from "./schema.js";
 import { workflows } from "./schema.js";
 import type {
+  HumanNodeResponse,
+  HumanNodeSpec,
   WorkflowCancellation,
   WorkflowFailure,
   WorkflowNodeKind,
@@ -60,6 +63,7 @@ import type {
   WorkflowSubstrateFailureReason,
   WorkflowSuccess,
 } from "./types.js";
+import { HUMAN_FREEFORM_CHOICE_ID } from "./types.js";
 import { assertValidWorkflowId, generateWorkflowId, generateWorkflowNodeId } from "./validate.js";
 import {
   extractWorkflowNodeRetryMetadata,
@@ -407,6 +411,8 @@ export class WorkflowService {
         return this.runners.coordinator;
       case WORKER_KIND:
         return this.runners.worker;
+      case HUMAN_KIND:
+        return this.runners.human;
       default:
         throw new WorkflowNodeKindCorruptionError(kind);
     }
@@ -720,7 +726,7 @@ export class WorkflowService {
       }
 
       // Kind-aware parent-state restriction.
-      if (opts.kind === WORKER_KIND) {
+      if (opts.kind === WORKER_KIND || opts.kind === HUMAN_KIND) {
         for (const p of parentEntities) {
           if (p.status === "failed" || p.status === "cancelled") {
             throw new ParentStateError(workflowId, opts.kind, p.id, p.status);
@@ -827,10 +833,10 @@ export class WorkflowService {
         throw new WorkflowNodeNotMutableError(workflowId, opts.toNodeId, toNode.status, "addEdge");
       }
 
-      // Kind-aware from-state by the to-node's kind. Worker-kind
-      // dispatch needs every parent succeeded; coordinator-kind
-      // dispatch accepts any terminal parent (wakes on failure).
-      if (toNode.kind === WORKER_KIND) {
+      // Kind-aware from-state by the to-node's kind. Worker-kind and
+      // human-kind dispatch needs every parent succeeded; coordinator-
+      // kind dispatch accepts any terminal parent (wakes on failure).
+      if (toNode.kind === WORKER_KIND || toNode.kind === HUMAN_KIND) {
         if (fromNode.status === "failed" || fromNode.status === "cancelled") {
           throw new ParentStateError(workflowId, toNode.kind, fromNode.id, fromNode.status);
         }
@@ -1885,6 +1891,82 @@ export class WorkflowService {
         );
       }
     }
+  }
+
+  // ─── respondHumanNode ───────────────────────────────────
+
+  /**
+   * External API: respond to a human-kind node that is waiting for
+   * input. Validates the response against the node's spec, writes
+   * `metadata.response`, and marks the node succeeded so downstream
+   * nodes can proceed.
+   *
+   * Rejects when:
+   *   - node not found or belongs to different workflow
+   *   - node kind is not `"human"`
+   *   - node status is not `"running"`
+   *   - `response.choiceId` is not a valid choice id from spec
+   *   - `response.choiceId` is `__freeform__` but `input` is empty
+   */
+  async respondHumanNode(
+    workflowId: string,
+    nodeId: string,
+    response: HumanNodeResponse,
+  ): Promise<void> {
+    const nowIso = this.now().toISOString();
+    let retryResult: StuckRecoveryOutcome = { inserted: false };
+
+    this.db.transaction((tx) => {
+      const node = this.repo.readNodeTx(tx, nodeId);
+      if (node === null) throw new WorkflowNodeNotFoundError(workflowId, nodeId);
+      if (node.workflowId !== workflowId) {
+        throw new WorkflowNodeNotFoundError(workflowId, nodeId);
+      }
+      if (node.kind !== HUMAN_KIND) {
+        throw new WorkflowError(
+          `respondHumanNode: node "${nodeId}" is kind "${node.kind}", not "human"`,
+        );
+      }
+      if (node.status !== "running") {
+        throw new WorkflowError(
+          `respondHumanNode: node "${nodeId}" status is "${node.status}", expected "running"`,
+        );
+      }
+
+      // Validate choiceId against spec choices
+      const spec = node.spec as HumanNodeSpec;
+      const validChoiceIds = new Set<string>((spec.choices ?? []).map((c) => c.id));
+      validChoiceIds.add(HUMAN_FREEFORM_CHOICE_ID);
+
+      if (!validChoiceIds.has(response.choiceId)) {
+        throw new WorkflowError(
+          `respondHumanNode: choiceId "${response.choiceId}" is not a valid choice for node "${nodeId}"`,
+        );
+      }
+
+      if (
+        response.choiceId === HUMAN_FREEFORM_CHOICE_ID &&
+        (response.input === undefined || response.input.trim().length === 0)
+      ) {
+        throw new WorkflowError(`respondHumanNode: freeform choice requires non-empty input`);
+      }
+
+      // Write response into metadata
+      const updatedMetadata = { ...node.metadata, response };
+      this.repo.updateNodeMetadata(tx, nodeId, updatedMetadata);
+
+      // Mark node succeeded
+      this.repo.updateNodeLifecycle(tx, {
+        id: nodeId,
+        status: "succeeded",
+        endedAt: nowIso,
+      });
+
+      retryResult = this.checkStuckAndRecoverInTx(tx, workflowId, nowIso);
+    });
+
+    await this.dispatchRetryIfInserted(retryResult);
+    this.nudgeEngine(workflowId);
   }
 
   // ─── markNodeTerminal ────────────────────────────────────

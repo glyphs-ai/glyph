@@ -178,16 +178,17 @@ describe("assertValidWorkflowNodeStatusEnum", () => {
   });
 });
 
-describe("assertValidWorkflowNodeKind (closed enum: 'coordinator' | 'worker')", () => {
-  it("accepts the two WorkflowNodeKind values", () => {
+describe("assertValidWorkflowNodeKind (closed enum: 'coordinator' | 'worker' | 'human')", () => {
+  it("accepts the three WorkflowNodeKind values", () => {
     expect(() => assertValidWorkflowNodeKind("worker")).not.toThrow();
     expect(() => assertValidWorkflowNodeKind("coordinator")).not.toThrow();
+    expect(() => assertValidWorkflowNodeKind("human")).not.toThrow();
   });
 
   it("rejects values outside the closed WorkflowNodeKind enum", () => {
-    // The substrate's `WorkflowNodeKind` is `'coordinator' | 'worker'`. Any
+    // The substrate's `WorkflowNodeKind` is `'coordinator' | 'worker' | 'human'`. Any
     // other persisted string value signals schema corruption.
-    for (const bad of ["task", "evaluator", "unknown-kind-99", "Worker", "WORKER", "human"]) {
+    for (const bad of ["task", "evaluator", "unknown-kind-99", "Worker", "WORKER", "Human"]) {
       expect(() => assertValidWorkflowNodeKind(bad), `expected reject: ${bad}`).toThrowError(
         WorkflowNodeKindCorruptionError,
       );

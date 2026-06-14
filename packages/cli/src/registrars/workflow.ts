@@ -29,6 +29,7 @@ import {
   workflowRemoveEdge,
   workflowRemoveNode,
   workflowReplaceSpec,
+  workflowRespond,
   workflowRm,
   workflowShow,
 } from "../commands/workflow.js";
@@ -312,6 +313,23 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
         ...parseWorkspaceFlags(opts),
         ...optionalString(opts, "summary"),
         ...optionalString(opts, "message"),
+      });
+    });
+
+  withWorkspaceFlags(workflowCmd.command("respond"))
+    .description("Respond to a human-kind node that is waiting for input")
+    .argument("<workflow-id>", "Workflow id")
+    .argument("<node-id>", "Node id")
+    .requiredOption(
+      "--choice-id <id>",
+      'Choice id (one of the spec choices, or "__freeform__" for freeform input)',
+    )
+    .option("--input <text>", "Freeform text input (required when --choice-id is __freeform__)")
+    .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowRespond(workflowId, nodeId, {
+        ...parseWorkspaceFlags(opts),
+        choiceId: pickString(opts, "choiceId") ?? "",
+        ...optionalString(opts, "input"),
       });
     });
 }

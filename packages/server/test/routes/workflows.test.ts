@@ -651,7 +651,7 @@ describe("workflowsRoutes — addNode (POST /:wfid/nodes)", () => {
     const res = await mountRoutes(svc).request(`/${WID}/nodes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "human", spec: {}, parents: [COORD_NID] }),
+      body: JSON.stringify({ kind: "evaluator", spec: {}, parents: [COORD_NID] }),
     });
     expect(res.status).toBe(400);
     expect(addNode).not.toHaveBeenCalled();

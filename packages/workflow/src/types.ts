@@ -147,7 +147,7 @@ export type WorkflowNodeStatus =
  * persisted row carries a value outside this union (schema
  * corruption).
  */
-export type WorkflowNodeKind = "coordinator" | "worker";
+export type WorkflowNodeKind = "coordinator" | "worker" | "human";
 
 // ─── Node metadata: retry-coord recovery ─────────────────────────────
 
@@ -415,4 +415,51 @@ export interface WorkflowNodeRunner {
 export interface WorkflowRunners {
   readonly coordinator: WorkflowNodeRunner;
   readonly worker: WorkflowNodeRunner;
+  readonly human: WorkflowNodeRunner;
+}
+
+// ─── Human-node types ───────────────────────────────────────────────
+
+/** Reserved choice id appended by the backend to every human node's choice list. */
+export const HUMAN_FREEFORM_CHOICE_ID = "__freeform__";
+
+/** Maximum number of user-supplied choices on a human node spec. */
+export const HUMAN_MAX_CHOICES = 5;
+
+/**
+ * One selectable choice on a human node. `id` must be a non-empty
+ * string unique within the spec's choices array and must not equal
+ * {@link HUMAN_FREEFORM_CHOICE_ID}.
+ */
+export interface HumanNodeChoice {
+  readonly id: string;
+  readonly label: string;
+}
+
+/**
+ * Spec shape for a `human`-kind workflow node. Declared by the
+ * coordinator via `add-subgraph` to insert a gate that waits for
+ * external human input.
+ *
+ *   - `prompt` — required non-empty string shown to the human.
+ *   - `choices` — optional array of up to {@link HUMAN_MAX_CHOICES}
+ *     selectable options. An omitted or empty array means freeform-only.
+ */
+export interface HumanNodeSpec {
+  readonly prompt: string;
+  readonly choices?: readonly HumanNodeChoice[];
+}
+
+/**
+ * Response shape written into `node.metadata.response` when a human
+ * responds to a human-kind node via the respond API.
+ *
+ *   - `choiceId` — the selected choice id, or
+ *     {@link HUMAN_FREEFORM_CHOICE_ID} for freeform input.
+ *   - `input` — freeform text; required when `choiceId` is
+ *     `__freeform__`, optional otherwise.
+ */
+export interface HumanNodeResponse {
+  readonly choiceId: string;
+  readonly input?: string;
 }

@@ -79,6 +79,7 @@ export type WorkflowCoordinatorNodeSpecWire = {
 export type WorkflowNodeWireSpec =
   | WorkflowWorkerNodeSpecWire
   | WorkflowCoordinatorNodeSpecWire
+  | WorkflowHumanNodeSpecWire
   | { readonly kind: string; readonly spec: unknown };
 
 // ─── HTTP wire-shape DTOs ─────────────────────────────────────────
@@ -313,7 +314,7 @@ export interface WorkflowListQuery {
  * literal-union string here so this pkg has no runtime dep on the
  * substrate.
  */
-export type WorkflowNodeKindWire = "coordinator" | "worker";
+export type WorkflowNodeKindWire = "coordinator" | "worker" | "human";
 
 /**
  * Request body for `POST /workspaces/:id/workflows/:wfid/nodes`.
@@ -523,4 +524,30 @@ export type WorkflowArtifactWire =
  */
 export interface WorkflowArtifactsResponse {
   readonly artifacts: readonly WorkflowArtifactWire[];
+}
+
+// ─── Human node wire types ────────────────────────────────────────
+
+/**
+ * Wire-shape spec for a human-kind workflow node. Flat projection
+ * matching the substrate's `HumanNodeSpec`.
+ */
+export interface WorkflowHumanNodeSpecWire {
+  readonly kind: "human";
+  readonly prompt: string;
+  readonly choices?: readonly { readonly id: string; readonly label: string }[];
+}
+
+/**
+ * Request body for `POST /workspaces/:id/workflows/:wfid/nodes/:nid/respond`.
+ * Responds to a human-kind node that is in `running` status.
+ *
+ *   - `choiceId` — the selected choice id, or `"__freeform__"` for
+ *     freeform text input.
+ *   - `input` — freeform text; required when `choiceId` is
+ *     `"__freeform__"`, optional otherwise.
+ */
+export interface RespondHumanNodeBody {
+  readonly choiceId: string;
+  readonly input?: string;
 }
