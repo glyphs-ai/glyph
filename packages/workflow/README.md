@@ -25,9 +25,12 @@ the coord's prerogative.
   current coord agent FQN is denormalized into
   `workflows.coordinator_agent` for cheap "who's running this
   workflow" queries.
-- **Closed kind enum**: the substrate ships exactly two `WorkflowNodeKind`
-  values — `'coordinator'` and `'worker'`. Adding a new kind is a
-  substrate change: extend `WorkflowNodeKind`, add a matching field on
+- **Closed kind enum**: the substrate ships exactly three
+  `WorkflowNodeKind` values — `'coordinator'`, `'worker'`, and
+  `'human'`. A human node is a gate that pauses execution until
+  external input arrives via the `respondHumanNode` API (choice
+  selection or free-form input). Adding a new kind is a substrate
+  change: extend `WorkflowNodeKind`, add a matching field on
   `WorkflowRunners`, and the compiler walks every `switch (kind)`
   branch until each is handled.
 
@@ -35,10 +38,10 @@ the coord's prerogative.
 
 Service methods split into two groups:
 
-- **8 mutation primitives**: `addNode`, `addEdge`,
+- **9 mutation primitives**: `addNode`, `addEdge`,
   `addSubgraph`, `removeNode`, `removeEdge`, `replaceSpec`,
-  `cancelNode`, `finishWorkflow`. Each is independently atomic; the
-  substrate has no monolithic-batch API.
+  `cancelNode`, `finishWorkflow`, `respondHumanNode`. Each is
+  independently atomic; the substrate has no monolithic-batch API.
 - **4 read APIs**: `getWorkflow`, `getDag`, `getNode`, `getNodeDir`.
 
 ## Layout
@@ -64,9 +67,9 @@ README.md               this file
 
 ## Wiring
 
-Runners are injected at compose time. Both fields are non-optional,
-so a missing runner is a TypeScript compile error rather than a
-runtime throw:
+Runners are injected at compose time. All three fields are
+non-optional, so a missing runner is a TypeScript compile error rather
+than a runtime throw:
 
 ```ts
 const workflowModule = await composeWorkflowModule({
@@ -75,16 +78,18 @@ const workflowModule = await composeWorkflowModule({
   runners: {
     coordinator: makeCoordinatorNodeRunner({ ... }),
     worker:      makeWorkerNodeRunner({ ... }),
+    human:       makeHumanNodeRunner({ ... }),
   },
 });
 ```
 
-Both runners live in `packages/api/src/wiring/` because they bridge
-`@glyphs-ai/workflow`, `@glyphs-ai/task`, and `@glyphs-ai/catalog`.
+All three runners live in `packages/api/src/wiring/` because they
+bridge `@glyphs-ai/workflow`, `@glyphs-ai/task`, and
+`@glyphs-ai/catalog`.
 
 ## Coord-callback API
 
-The 8 mutation primitives on `WorkflowService`, plus the per-node
+The 9 mutation primitives on `WorkflowService`, plus the per-node
 `getNode` structural read, are exposed over HTTP on
 `/api/workspaces/:id/workflows/:workflowId/*` so a coordinator agent's task
 can grow / shrink / inspect the DAG from its own process. HTTP routes
@@ -107,6 +112,7 @@ and surface as their own typed errors.
 | `DELETE` | `/:workflowId/nodes/:nodeId`               | `removeNode`     | _none_                                                                                                         | `204 No Content`                              |
 | `DELETE` | `/:workflowId/edges/:fromNodeId/:toNodeId` | `removeEdge`     | _none_                                                                                                         | `204 No Content`                              |
 | `PATCH`  | `/:workflowId/nodes/:nodeId/spec`          | `replaceSpec`    | `{ newSpec }`                                                                                                  | `WorkflowNodeWire` (post-replace projection)  |
+| `POST`   | `/:workflowId/nodes/:nodeId/respond`       | `respondHumanNode` | `{ choiceId?, input? }`                                                                                      | `WorkflowNodeWire` (post-respond projection)  |
 
 `NodeRefWire` on the wire is a structural-discriminator union — exactly
 one of `{nodeId}` (resolve to an existing node) or `{tempId}` (resolve
@@ -138,7 +144,7 @@ calling the service.
 The CLI surface mirrors the HTTP surface 1:1 — every route has a
 matching `glyph workflow <verb>` subcommand: `add-node`, `add-edge`,
 `add-subgraph`, `remove-node`, `remove-edge`, `replace-spec`,
-`cancel-node`, `finish` (the eight mutations), plus `node-show` for the
+`cancel-node`, `finish`, `respond` (the nine mutations), plus `node-show` for the
 `getNode` read. Spec payloads are read from `--spec-file <path>` so
 multi-line JSON survives shell quoting. See
 `packages/cli/src/commands/workflow.ts` for the per-flag rationale.
