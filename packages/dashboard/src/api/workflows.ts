@@ -1,11 +1,13 @@
 import type {
   CancelWorkflowBody,
   CreateWorkflowBody,
+  RespondHumanNodeBody,
   WorkflowArtifactsResponse,
   WorkflowArtifactWire,
   WorkflowDagWire,
   WorkflowEdgeWire,
   WorkflowHeaderWire,
+  WorkflowHumanNodeSpecWire,
   WorkflowListQuery,
   WorkflowNodeWire,
   WorkflowNodeWireSpec,
@@ -15,11 +17,13 @@ import { fetchJson, jsonInit, mutate, mutateJson, workspacePrefix } from "./http
 export type {
   CancelWorkflowBody,
   CreateWorkflowBody,
+  RespondHumanNodeBody,
   WorkflowArtifactsResponse,
   WorkflowArtifactWire,
   WorkflowDagWire,
   WorkflowEdgeWire,
   WorkflowHeaderWire,
+  WorkflowHumanNodeSpecWire,
   WorkflowListQuery,
   WorkflowNodeWire,
   WorkflowNodeWireSpec,
@@ -119,3 +123,17 @@ export const listWorkflowArtifacts = (workflowId: string): Promise<WorkflowArtif
  */
 export const workflowArtifactUrl = (workflowId: string, subPath: string): string =>
   `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/artifacts/${encodeURIComponent(subPath)}`;
+
+/**
+ * Respond to a human-kind workflow node that is in `running` status.
+ * Returns the updated node wire shape.
+ */
+export const respondHumanNode = (
+  workflowId: string,
+  nodeId: string,
+  body: RespondHumanNodeBody,
+): Promise<WorkflowNodeWire> =>
+  mutateJson<WorkflowNodeWire>(
+    `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/nodes/${encodeURIComponent(nodeId)}/respond`,
+    jsonInit("POST", body),
+  );
