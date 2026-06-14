@@ -925,11 +925,13 @@ export async function workflowRespond(
       ...(opts.choiceId !== undefined ? { choiceId: opts.choiceId } : {}),
       ...(opts.input !== undefined ? { input: opts.input } : {}),
     };
-    await client.call("workflows.nodes.respond", {
+    const updated = await client.call("workflows.nodes.respond", {
       params: { id: workspaceId, wfid: workflowId, nid: nodeId },
       body,
     });
-    return { exitCode: 0, stdout: `node ${nodeId} responded\n` };
+    const fmt = pickFormat(opts, "table");
+    if (fmt === "json") return { exitCode: 0, stdout: formatJson(updated) };
+    return { exitCode: 0, stdout: `node ${nodeId} responded\n${renderNode(updated, opts)}` };
   } catch (err) {
     return formatError(err);
   }

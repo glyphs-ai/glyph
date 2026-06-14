@@ -1911,7 +1911,7 @@ export class WorkflowService {
     workflowId: string,
     nodeId: string,
     response: HumanNodeResponse,
-  ): Promise<void> {
+  ): Promise<WorkflowNodeEntity> {
     const nowIso = this.now().toISOString();
     let retryResult: StuckRecoveryOutcome = { inserted: false };
 
@@ -1964,6 +1964,8 @@ export class WorkflowService {
 
     await this.dispatchRetryIfInserted(retryResult);
     this.nudgeEngine(workflowId);
+
+    return this.getNode(nodeId);
   }
 
   // ─── markNodeTerminal ────────────────────────────────────

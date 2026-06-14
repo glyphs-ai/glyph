@@ -868,7 +868,7 @@ export const ROUTES = {
    */
   "workflows.nodes.respond": defineRoute<
     { params: WorkflowNodePathParams; body: RespondHumanNodeBody },
-    { ok: true }
+    WorkflowNodeWire
   >("POST", "/api/workspaces/:id/workflows/:wfid/nodes/:nid/respond"),
   /**
    * Last act of a coord task: flip the workflow terminal. `kind`

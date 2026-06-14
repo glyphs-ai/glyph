@@ -1215,9 +1215,10 @@ export function workflowsRoutes(
       ...(input !== undefined ? { input } : {}),
     };
     try {
-      await resolve(c).respondHumanNode(wfid, nid, response);
+      const node = await resolve(c).respondHumanNode(wfid, nid, response);
+      const wire = await projectWorkflowNodeWithTaskId(node, { tasks: resolveTasks(c) });
       logEvent(c, "workflow.respondHumanNode", { workflowId: wfid, nodeId: nid });
-      return c.json({ ok: true });
+      return c.json(wire);
     } catch (err) {
       return respondError(c, err, {
         route: "workflows.respondHumanNode",
