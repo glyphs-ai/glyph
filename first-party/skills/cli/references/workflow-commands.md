@@ -38,6 +38,7 @@ DAG node via `task.metadata.workflowNodeId`.
 | [`cancel`](#glyph-workflow-cancel) | Cancel a running workflow (operator) | no |
 | [`cancel-node`](#glyph-workflow-cancel-node) | Cancel a single worker node | **yes** |
 | [`finish`](#glyph-workflow-finish) | Flip the workflow terminal | **yes** |
+| [`respond`](#glyph-workflow-respond) | Respond to a human-kind node | no |
 
 "Coord-only" is a logical marker — the substrate no longer enforces a
 caller-coord authorization gate, so any client with workspace access can
@@ -395,6 +396,54 @@ glyph workflow finish "$WFID" --outcome succeeded \
 glyph workflow finish "$WFID" --outcome failed \
   --message "dev iteration ended in failed; cannot make progress."
 ```
+
+---
+
+## `glyph workflow respond`
+
+Respond to a human-kind node that is in `running` status.
+
+### Synopsis
+
+```sh
+glyph workflow respond <workflow-id> <node-id> [options]
+```
+
+### Options
+
+| Flag | Description |
+| --- | --- |
+| `--choice-id <id>` | Choice id (one of the spec choices; omit for freeform) |
+| `--input <text>` | Freeform text input (required when `--choice-id` is not provided) |
+
+### HTTP route
+
+`POST /api/workspaces/:id/workflows/:wfid/nodes/:nid/respond`
+
+### Request body
+
+```jsonc
+{ "choiceId"?: string, "input"?: string }
+```
+
+### Response
+
+`WorkflowNodeWire` (the updated node after transitioning to `succeeded`)
+
+### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | success |
+| 1 | server error / network failure |
+| 2 | invalid arguments (missing positional, `--input` required without `--choice-id`) |
+
+### Notes
+
+- The target node must be `kind === "human"` and `status === "running"`
+- If `--choice-id` is provided, it must match one of `spec.choices[].id`
+- If `--choice-id` is omitted, `--input` is required (non-empty)
+- On success the node transitions to `succeeded` and downstream nodes are evaluated
 
 ---
 

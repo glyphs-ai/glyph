@@ -2,7 +2,7 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.3.1
+version: 0.4.0
 ---
 
 # Glyph Workflow Coordination Skill
@@ -155,20 +155,45 @@ Strategy skills SHOULD re-quote this schema (verbatim, or as a worked example wi
 
 ---
 
-## §D — Brief plumbing meta-pattern
+## §D — Brief assembly
 
-Treat workers as pure specialists: they MUST NOT depend on any workflow-specific skill or know they are inside a workflow. All workflow context reaches them via the task brief coord writes when dispatching them. Every worker brief a strategy template emits MUST follow this pattern:
+Treat workers as pure specialists: they MUST NOT depend on any workflow-specific skill or know they are inside a workflow. All workflow context reaches them via the task brief coord writes when dispatching them.
 
-- **Always include**: workflow id (so the worker can call `glyph workflow show $WF --json` itself), `workflow.brief` verbatim (no trim, no summary, no paraphrase), `workflow.details` verbatim (empty string if `null`), and concrete fetch instructions for any prior-iter outputs the worker needs (e.g. `glyph task show ${PRIOR_<role>_TASK_ID}` then `<task-workdir>/artifact/verdict.json`). Workers do their own fetching; coord does not pre-digest.
-- **Never include**: technical content (quality bars, fix suggestions, design opinions — workers own those domains), coord's interpretation of prior-iter findings (the worker reads the raw `verdict.json` itself), or hints about future coord wake-ups (workers are workflow-unaware).
-- **Always inline the output protocol**: for reviewer workers, the §C `verdict.json` schema (verbatim, or as a worked example) plus validation rules and the optional narrative-file convention (also under `<workdir>/artifact/`). For implementer workers, the expected branch / PR convention the next coord wake-up relies on.
-- **Use `${PLACEHOLDER}` substitution** for every per-dispatch slot. Coord fills slots via plain string replacement before writing the brief into `add-subgraph`. Substitution is total — a literal `${...}` in the dispatched brief is a bug. Unresolved placeholders (e.g. `${WORKFLOW_DETAILS}` when the creator passed nothing) substitute the empty string.
-- **Pre-flight validation against the dispatched agent's current constitution.** Before writing the `add-subgraph` payload, SKIM each dispatched agent's `AGENTS.md` (sections: "Required output protocol" / equivalent, "Boundaries" / "What I do NOT do", `dependencies.skills`). Compare against the strategy's brief template prescriptions:
-  - **Output path / protocol drift** — template says `<workdir>/X` but agent's current AGENTS.md says `<workdir>/artifact/X`. Severity: blocker → coord MUST `finishWorkflow(failed, "template drift: <agent>'s output protocol moved to <new path>; strategy <fqn> v<X.Y.Z> templates need re-validation")`.
-  - **Restated skill content** — template restates instructions already covered by one of the agent's depended-on skills (e.g. branch naming when `git-pr` is a dep). Severity: warning → log to coord-decisions, continue dispatch (worker will pick the skill's version anyway).
-  - **Forbidden behavior** — template asks for something the agent's "Boundaries" section explicitly forbids. Severity: blocker → finishWorkflow(failed).
+### How coord assembles briefs
 
-  Coord does NOT edit the template to fix drift — coord is a robot template-filler by design. Coord's only job in validation is to detect drift and escalate. Fixing the template is the strategy author's job, done out-of-band via a new strategy skill version + re-dispatch.
+Coord reads the full workflow context — the creator's brief and details, the current DAG state, parent outputs, iteration history — and assembles a brief tailored to the worker's specific task and the current situation. This is NOT rigid template substitution; coord uses judgment about emphasis, ordering, and what context is most relevant given why this worker is being dispatched.
+
+### What a good brief contains
+
+- **The workflow's original goal** — from `workflow.brief` and `workflow.details`. Workers need to understand the big picture to do their job well.
+- **What the worker needs to do THIS iteration specifically** — first implementation? Fixing reviewer blockers? Fixing CI failures? Acting on human feedback? The brief's framing should match the reason for dispatch.
+- **Where to find prior outputs** — concrete fetch instructions (task ids, artifact paths) so the worker can read raw verdicts, prior reviews, or CI logs itself. Workers do their own fetching; coord does not pre-digest.
+- **The output protocol the worker must follow** — for reviewer workers, the §C `verdict.json` schema (verbatim or as a worked example) plus validation rules. For implementer workers, the expected branch / PR convention.
+
+### What coord MUST NOT put in briefs
+
+- **Technical opinions** — code quality judgments, design choices, fix suggestions. Workers own those domains.
+- **Pre-digested findings** — the worker reads the raw `verdict.json` or CI logs itself. Coord points to where the data lives, not what it says.
+- **Instructions that belong in the worker's own agent body / skills** — if the agent's AGENTS.md or its depended-on skills already cover a behavior, don't restate it in the brief.
+- **Hints about future coord wake-ups** — workers are workflow-unaware.
+
+### Adapting emphasis by dispatch reason
+
+- **First iteration** — emphasize the workflow goal and output expectations. Keep it clean and forward-looking.
+- **Fixing reviewer blockers** — lead with the fact that reviewers found issues, point to where findings are, note the branch to continue on.
+- **Fixing CI failures** — lead with the CI failure, instruct worker to check `gh pr checks`, note the branch.
+- **Post-human-feedback** — include the human's response text as additional direction, frame what the human decided or requested.
+- **Post-human-approval** — (coord handles this internally; no worker dispatch needed for approval)
+
+### Pre-flight validation
+
+Before writing the `add-subgraph` payload, SKIM each dispatched agent's `AGENTS.md` (sections: "Required output protocol" / equivalent, "Boundaries" / "What I do NOT do", `dependencies.skills`). Compare against the brief being assembled:
+
+- **Output path / protocol drift** — brief references `<workdir>/X` but agent's current AGENTS.md says `<workdir>/artifact/X`. Severity: blocker → coord MUST `finishWorkflow(failed, "template drift: <agent>'s output protocol moved to <new path>; strategy <fqn> v<X.Y.Z> needs re-validation")`.
+- **Restated skill content** — brief restates instructions already covered by one of the agent's depended-on skills (e.g. branch naming when `git-pr` is a dep). Severity: warning → log to coord-decisions, continue dispatch.
+- **Forbidden behavior** — brief asks for something the agent's "Boundaries" section explicitly forbids. Severity: blocker → finishWorkflow(failed).
+
+Coord does NOT silently drop content to fix drift — coord's job in validation is to detect drift and escalate. Fixing the strategy is the author's job, done out-of-band via a new strategy skill version + re-dispatch.
 
 ---
 
@@ -208,6 +233,55 @@ Content-only: **no `dependencies:`** (the coord agent already declares the gener
 - Strategy skills MUST NOT redefine the `verdict.json` schema — point at §C (verbatim re-quoting inside a reviewer brief template is fine; introducing a different schema is forbidden).
 - Strategy skills MUST NOT introduce strategy selection logic — that lives in §A. A strategy skill body assumes "I have been selected; here is what I do".
 - Strategy skills MUST NOT compose technical content. Quality bars, fix opinions, and review heuristics live in worker agents; strategy briefs only plumb workflow context and the verdict schema.
+
+---
+
+## §F — Human nodes
+
+Human nodes are gates that pause workflow execution until an external actor responds. The substrate handles all lifecycle mechanics; coord only needs to know how to insert them and read their responses.
+
+### Inserting a human node via add-subgraph
+
+Human nodes use `kind: "human"` in the add-subgraph payload. The spec carries a `prompt` (the question shown to the human) and optional `choices` (predefined options, max 5):
+
+```jsonc
+{
+  "nodes": [
+    { "tempId": "approval", "kind": "human", "existingParents": ["<self-node-id>"],
+      "spec": { "prompt": "...", "choices": [{ "id": "approve", "label": "Approve & merge" }, ...] } },
+    { "tempId": "coord", "kind": "coordinator",
+      "spec": { "agent": "official/coordinator" } }
+  ],
+  "edges": [
+    { "from": { "tempId": "approval" }, "to": { "tempId": "coord" } }
+  ]
+}
+```
+
+Notes:
+- `choices` is optional. When omitted, the human gets only a freeform text input.
+- Max 5 choices. The system always provides a freeform input option alongside choices.
+- The `prompt` should be self-contained: include enough context for the human to decide without needing to look elsewhere.
+
+### Reading a human node's response
+
+When a coord wakes up with a human-kind parent, read the response from the node's metadata:
+
+```sh
+glyph workflow node-show <workflow-id> <node-id> --json
+```
+
+The response lives at `metadata.response`:
+```jsonc
+{
+  "choiceId": "approve",     // which choice was selected (absent if freeform-only)
+  "input": "optional text"   // freeform input (required when no choiceId)
+}
+```
+
+### Parent readiness
+
+Human nodes follow worker readiness rules: all parents must be `succeeded` before the human node becomes actionable. A human node's own parent being a coord (i.e. coord inserts it directly) means it becomes ready immediately after coord exits.
 
 ---
 

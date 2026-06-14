@@ -2,7 +2,7 @@
 name: software-development-lifecycle
 scope: official
 description: "Strategy skill for the official/coordinator agent — the engineer → review+designer iterate-to-clean orchestration: case bank, brief templates, placeholder resolution, stop condition, failure-mode coverage"
-version: 0.2.1
+version: 0.3.0
 ---
 
 # Glyph Software-Development-Lifecycle Strategy Skill
@@ -67,11 +67,19 @@ CASE "two parents, both worker, agents in {official/reviewer, official/designer}
   if every check.bucket in ("pass", "skipping"):
        # `skipping` is terminal-OK (the job was deliberately skipped, e.g.
        #  conditional `if:` evaluated false); treat as pass for gating.
-    finishWorkflow(succeeded, summary={
-      "iterations": <count of dev nodes in DAG>,
-      "minor_findings_remaining": <count if any>,
-      "ci": "all green"
-    })
+    addSubgraph:
+      approval (human, spec={
+        prompt: "<assembled from workflow brief + iteration count + reviewer summary + PR link>",
+        choices: [
+          { id: "approve", label: "Approve & merge" },
+          { id: "changes", label: "Request more changes" },
+          { id: "cancel", label: "Cancel workflow" }
+        ]
+      })
+         parents = [self]
+      next-coord (coordinator)
+         parents = [approval]
+    exit
   elif any check.bucket in ("fail", "cancel"):
     addSubgraph:
       dev (worker, agent=official/engineer, brief=<template-dev-iter-2-plus>)
@@ -96,11 +104,19 @@ CASE "one parent, worker, agent=official/reviewer, status=succeeded" (the ci-wai
   # always a ci-waiter dispatched via template-review-ci.
   fetch verdict: read <workdir>/artifact/verdict.json (parse per §C of generic skill)
   if verdict == "APPROVE" and (findings == [] or all minor):
-    finishWorkflow(succeeded, summary={
-      "iterations": <count of dev nodes>,
-      "minor_findings_remaining": <count>,
-      "ci": "all green (waited)"
-    })
+    addSubgraph:
+      approval (human, spec={
+        prompt: "<assembled from workflow brief + iteration count + reviewer summary + PR link + CI waited>",
+        choices: [
+          { id: "approve", label: "Approve & merge" },
+          { id: "changes", label: "Request more changes" },
+          { id: "cancel", label: "Cancel workflow" }
+        ]
+      })
+         parents = [self]
+      next-coord (coordinator)
+         parents = [approval]
+    exit
   else:  # REQUEST_CHANGES — CI ended red
     addSubgraph:
       dev (worker, agent=official/engineer, brief=<template-dev-iter-2-plus>)
@@ -116,252 +132,141 @@ CASE "one parent, worker, agent=official/reviewer, status in (failed, cancelled)
 CASE "two parents, both worker, any status in (failed, cancelled)":
   finishWorkflow(failed, "reviewer iteration ended in {status}; coord cannot decide without verdict")
   exit
+
+CASE "one parent, human, status=succeeded":
+  read metadata.response from parent node via:
+    glyph workflow node-show $WF <parent-node-id> --json
+  if response.choiceId == "approve":
+    finishWorkflow(succeeded, summary={
+      "iterations": <count of dev nodes in DAG>,
+      "minor_findings_remaining": <count if any>,
+      "ci": "all green",
+      "approved_by": "human"
+    })
+  elif response.choiceId == "changes":
+    addSubgraph:
+      dev (worker, agent=official/engineer, brief=<assembled per brief guidance: dev iteration 2+>)
+         parents = [self]
+      next-coord (coordinator)
+         parents = [dev]
+    # brief should include the human's input text as additional guidance
+    exit
+  elif response.choiceId == "cancel":
+    finishWorkflow(failed, "cancelled by human")
+    exit
+  else (freeform only, no choiceId):
+    # interpret the input text as guidance, dispatch next dev iteration
+    addSubgraph:
+      dev (worker, agent=official/engineer, brief=<assembled per brief guidance: dev iteration 2+>)
+         parents = [self]
+      next-coord (coordinator)
+         parents = [dev]
+    exit
+
+CASE (coord judgment): workflow is stuck or needs clarification
+  # Triggered when coord detects ambiguity, repeated failures on same issue,
+  # or design decisions that need human input
+  addSubgraph:
+    intervention (human, spec={
+      prompt: "<describe the problem and what decision is needed>",
+      choices: [<relevant options based on situation>]
+    })
+       parents = [self]
+    next-coord (coordinator)
+       parents = [intervention]
+  exit
 ```
 
 Use the §B "Batch-mutate the DAG atomically" `add-subgraph` payload shape from the generic skill; substitute `<self-node-id>` with the actual id from the DAG snapshot.
 
 ---
 
-## Brief templates
+## Brief guidance
 
-Coord at dispatch time substitutes `${PLACEHOLDER}` slots per the resolution table below; do not paraphrase template prose — workers receive these as their primary contract.
+Coord assembles briefs based on workflow context, DAG state, and parent outputs. The following guidance describes what each brief type should convey — coord adapts emphasis, ordering, and phrasing to the current situation rather than filling rigid templates.
 
-### Template: template-dev-iter-1 (the initial dev call)
+### Brief guidance: dev iteration (first)
 
-```
-Implement the feature per the workflow brief.
+The brief should convey:
+- The workflow's original goal (from `workflow.brief` and `workflow.details`)
+- That this is the first implementation attempt
+- Output expectations (branch, PR, etc. — follow the worker's normal dev workflow)
 
-# Workflow context
-- Workflow id: ${WORKFLOW_ID}
-- Workflow brief (verbatim from creator):
-  ${WORKFLOW_BRIEF}
-- Workflow details (verbatim from creator):
-  ${WORKFLOW_DETAILS}
+### Brief guidance: dev iteration (2+)
 
-# Output expectations
-Follow your normal dev workflow (branch, PR, etc.). The coord will pick
-up your PR via the workflow DAG; no special output protocol on your end.
-```
+The brief should convey:
+- The workflow's original goal
+- Which iteration this is and why another iteration is needed
+- If from reviewer blockers: what needs fixing (point to where findings are via task ids and artifact paths — don't pre-digest the content)
+- If from CI failure: that CI failed, instruct worker to check `gh pr checks`
+- If from human feedback: include the human's response text as additional direction
+- The branch name to continue on
+- Where to find prior verdicts (task ids for fetch)
+- CI state instructions: `gh pr checks <pr_number> --json name,state,bucket,link` — for any failing check, how to retrieve logs
 
-### Template: template-dev-iter-2-plus (after a review round)
+### Brief guidance: reviewer
 
-```
-Re-implement the feature for iteration ${ITERATION_NUMBER}.
+The brief should convey:
+- The workflow's goal
+- Which dev iteration to review (parent node's task)
+- The review MODE (code or ci)
+- If iteration 2+: where to find prior review verdict to check for regressions
+- The `verdict.json` output protocol (always inline the full schema and validation rules from §C of the generic skill)
+- Coord decision rule (so the reviewer understands impact of their verdict)
 
-# Workflow context
-- Workflow id: ${WORKFLOW_ID}
-- Workflow brief (verbatim):
-  ${WORKFLOW_BRIEF}
-- Workflow details (verbatim):
-  ${WORKFLOW_DETAILS}
+### Brief guidance: designer
 
-# Prior iteration outputs (you must fetch these yourself)
-- Prior review verdict + narrative:
-    glyph task show ${PRIOR_REVIEW_TASK_ID} --json
-    then read <workdir>/artifact/verdict.json and <workdir>/artifact/review.md
-- Prior designer verdict + narrative:
-    glyph task show ${PRIOR_DESIGNER_TASK_ID} --json
-    then read <workdir>/artifact/verdict.json and <workdir>/artifact/review.md
-- CI state on the PR (in case the prior iteration was waved through by
-  reviewers but failed in CI — coord re-dispatches you with the same
-  brief so always check):
-    gh pr checks ${PR_NUMBER} --json name,state,bucket,link
-    For any check whose bucket is "fail" or "cancel":
-      Parse runId from the `link` field (regex: actions/runs/(\d+)/)
-      then: gh run view <runId> --log-failed | tail -c 2000
-    If `link` does not match the Actions URL shape (external provider),
-    embed the `link` URL itself in the iteration brief as context.
+The brief should convey:
+- The workflow's goal
+- Which dev iteration to review for UI/UX
+- If iteration 2+: where to find prior designer verdict
+- The `verdict.json` output protocol (same schema as reviewer)
 
-# What to do
-Address every finding marked severity=blocker or major. Apply your own
-judgment on severity=minor findings — fix what you'd fix as a
-professional. For any red CI check, fix the underlying breakage in the
-same commit set.
+### Brief guidance: ci-waiter
 
-Keep working on branch ${BRANCH_NAME} (already-pushed prior iteration
-commits are visible; rebase / amend as you see fit).
-```
+The brief should convey:
+- The workflow's goal
+- The PR number and repository
+- MODE: ci — block on automated checks until terminal
+- Detailed instructions for capturing per-job state and log tails
+- The `verdict.json` output protocol with CI-specific mapping rules (pass/skipping → APPROVE, fail/cancel → REQUEST_CHANGES with blocker severity)
 
-### Template: template-review (MODE: code — same every iteration)
+### Brief guidance: human approval
 
-```
-MODE: code
-
-Review the latest dev iteration in this workflow.
-
-# Workflow context
-- Workflow id: ${WORKFLOW_ID}
-- Workflow brief (verbatim):
-  ${WORKFLOW_BRIEF}
-
-# What to review
-The dev node immediately preceding you in the workflow DAG. Find it via:
-  glyph workflow dag ${WORKFLOW_ID} --json
-The dev node is your direct parent. Read dev's task via its taskId, see
-what changed, apply your normal review standards.
-
-If this is review iteration 2 or later, fetch the prior review node
-(same agent as you, lower phase in the DAG) — read its
-<workdir>/artifact/verdict.json to confirm previously-flagged findings
-are now addressed.
-
-# Required output protocol
-Write to <workdir>/artifact/verdict.json (the substrate auto-harvests
-files under <workdir>/artifact/ into the task's success.artifacts, which
-is how the next coord wake-up reads your verdict):
-{
-  "verdict":  "APPROVE" | "REQUEST_CHANGES",
-  "findings": [
-    {
-      "id":       "F1",                                       // unique within this verdict
-      "severity": "blocker" | "major" | "minor",
-      "summary":  "<≤200 chars, single line>",
-      "detail":   "<free-form, any length>"
-    }
-  ]
-}
-
-Validation rules:
-- verdict == "APPROVE"           ⇒ findings MAY be [] OR contain only "minor" items
-- verdict == "REQUEST_CHANGES"   ⇒ findings MUST contain ≥1 "blocker" or "major"
-- findings[].id must be unique within this verdict
-
-Coord decision rule (so you understand the impact):
-- All verdicts APPROVE with only minor findings → CI quality gate runs
-  next; all-green CI → workflow finishes succeeded
-- Any blocker/major → next dev iteration dispatched, current findings
-  propagated to next dev brief (it will read your verdict.json itself)
-
-Optionally write <workdir>/artifact/review.md for free-form narrative.
-The next dev iteration will read it for context if produced.
-```
-
-### Template: template-designer (same every iteration)
-
-```
-Review the latest dev iteration's UI / UX in this workflow.
-
-# Workflow context
-- Workflow id: ${WORKFLOW_ID}
-- Workflow brief (verbatim):
-  ${WORKFLOW_BRIEF}
-
-# What to review
-The dev node immediately preceding you in the workflow DAG. Find it via:
-  glyph workflow dag ${WORKFLOW_ID} --json
-Apply your normal frontend / design review standards.
-
-If this is designer iteration 2 or later, fetch the prior designer node
-(same agent as you, lower phase) and confirm previously-flagged findings 
-are resolved.
-
-# Required output protocol
-Identical to review's protocol (<workdir>/artifact/verdict.json + optional
-<workdir>/artifact/review.md). See template-review above for the schema
-and validation rules.
-```
-
-### Template: template-review-ci (MODE: ci — CI quality-gate watcher)
-
-```
-MODE: ci
-
-Block on the PR's automated checks until terminal, then write a verdict
-the coordinator unions with the prior code-review and design-review
-verdicts.
-
-# Workflow context
-- Workflow id: ${WORKFLOW_ID}
-- Workflow brief (verbatim):
-  ${WORKFLOW_BRIEF}
-- PR number: ${PR_NUMBER}
-- Repository: glyphs-ai/glyph
-
-# What to do
-1. Run `gh pr checks ${PR_NUMBER} --watch` with a 30-minute
-   process-level timeout. On timeout, write a timeout verdict per the
-   output protocol below and exit.
-2. On terminal, capture per-job state:
-     gh pr checks ${PR_NUMBER} --json name,state,bucket,link
-   `bucket` is gh's normalised category for each check, one of
-   `pass | fail | pending | skipping | cancel`. `link` is the per-check
-   URL (GitHub Actions form:
-   `https://github.com/<owner>/<repo>/actions/runs/<runId>/job/<jobId>`).
-3. For each check whose `bucket` is `fail` or `cancel`:
-   a. Parse the GitHub Actions run id from `link` with the regex
-      `actions/runs/(\d+)/`.
-   b. If the regex matches, fetch the failing job's tail (≤2 KB) from the
-      actually-failing job (not the whole workflow's log):
-        gh run view <runId> --log-failed | tail -c 2000
-      Embed the tail in the corresponding finding's `detail` field.
-   c. If the regex does not match (external provider — Vercel,
-      third-party CI — whose `link` URL has a different shape and
-      `gh run view` cannot introspect it), fall back to embedding just
-      the `link` URL and the check `name` in `detail` and note
-      `"non-Actions check — log retrieval not supported"` so coord sees
-      the degradation.
-4. Do NOT read the PR diff. Do NOT post inline review comments. Do NOT
-   make merge / deploy decisions. Do NOT auto-retry flaky CI runs.
-
-# Required output protocol
-Write to <workdir>/artifact/verdict.json (substrate auto-harvests
-artifact/ → success.artifacts → coord reads):
-{
-  "verdict":  "APPROVE" | "REQUEST_CHANGES",
-  "findings": [
-    {
-      "id":       "ci-<job-name>",
-      "severity": "blocker" | "major" | "minor",
-      "summary":  "<job name + bucket + ≤200 chars>",
-      "detail":   "<failing job log tail (≤2 KB) + link URL>"
-    }
-  ]
-}
-
-Mapping rules:
-- Every check.bucket in ("pass", "skipping") ⇒ verdict = "APPROVE",
-  findings = []. (`skipping` is terminal-OK — the job was deliberately
-  skipped, e.g. a conditional `if:` evaluated false — and is treated as
-  pass for gating purposes.)
-- Any check.bucket in ("fail", "cancel") ⇒ verdict = "REQUEST_CHANGES",
-  one finding per failing check, severity = "blocker" (CI failure blocks
-  merge).
-- 30-minute timeout fired before terminal ⇒
-  verdict = "REQUEST_CHANGES", one finding id = "ci-timeout",
-  severity = "major".
-
-Coord decision rule (so you understand the impact):
-- verdict APPROVE → workflow finishes succeeded
-- verdict REQUEST_CHANGES → next dev iteration dispatched with this
-  verdict as context (dev fetches it itself per its brief)
-```
+The prompt should include:
+- Brief summary of what was implemented (assembled from workflow brief)
+- Iteration count (how many rounds it took)
+- PR link
+- Reviewer verdict summary (both APPROVE, N minor findings remaining)
+- CI status (all green / all green after waiting)
 
 ---
 
-## Placeholder resolution table
+## Context sources for brief assembly
 
-Plain string replacement; placeholders with no value (e.g. `${WORKFLOW_DETAILS}` when the creator passed nothing) substitute the empty string rather than leaving the literal `${...}` in the dispatched brief.
+When assembling briefs, coord pulls context from these sources. The specific data included depends on the dispatch reason and worker role.
 
-| Placeholder | Source | Notes |
+| Context | Source | Notes |
 | --- | --- | --- |
-| `${WORKFLOW_ID}` | `workflow.id` from `glyph workflow show` | string |
-| `${WORKFLOW_BRIEF}` | `workflow.brief` | verbatim, no rewriting |
-| `${WORKFLOW_DETAILS}` | `workflow.details` (may be `null` → emit empty string) | verbatim |
-| `${ITERATION_NUMBER}` | count of `official/engineer` worker nodes already in the DAG, +1 | integer; `template-dev-iter-2-plus` only |
-| `${PRIOR_REVIEW_TASK_ID}` | `taskId` of the most recent `agent=official/reviewer` worker parent of the prior coord (the reviewer-in-pair from the previous round, NOT a ci-waiter) | string; `template-dev-iter-2-plus` only |
-| `${PRIOR_DESIGNER_TASK_ID}` | `taskId` of the most recent `agent=official/designer` worker parent of the prior coord | string; `template-dev-iter-2-plus` only |
-| `${BRANCH_NAME}` | derived from the prior dev task: parse `pr_number` from `glyph task show <prior_dev.taskId> --json` (its `success.output` and/or activity log carry the `gh pr create` URL), then `gh pr view <pr_number> --json headRefName -q '.headRefName'` | string; `template-dev-iter-2-plus` only — replaces the legacy `<task-workdir>/branch.txt` convention, which is dropped |
-| `${PR_NUMBER}` | derived from the prior dev task: parse PR number from `glyph task show <prior_dev.taskId> --json` (its `success.output` and/or activity log carry the `gh pr create` URL) | integer; `template-dev-iter-2-plus` and `template-review-ci` |
+| Workflow id | `workflow.id` from `glyph workflow show` | Always included |
+| Workflow brief | `workflow.brief` | Always included; verbatim, no rewriting |
+| Workflow details | `workflow.details` (may be `null`) | Include when non-empty |
+| Iteration number | count of `official/engineer` worker nodes already in the DAG, +1 | Dev iteration 2+ briefs |
+| Prior review task id | `taskId` of the most recent `agent=official/reviewer` worker parent of the prior coord (the reviewer-in-pair, NOT a ci-waiter) | Dev iteration 2+ briefs — point worker to where findings live |
+| Prior designer task id | `taskId` of the most recent `agent=official/designer` worker parent of the prior coord | Dev iteration 2+ briefs |
+| Branch name | derived from the prior dev task: parse `pr_number` from `glyph task show <prior_dev.taskId> --json`, then `gh pr view <pr_number> --json headRefName -q '.headRefName'` | Dev iteration 2+ briefs |
+| PR number | derived from the prior dev task: parse PR number from `glyph task show <prior_dev.taskId> --json` (its `success.output` carries the `gh pr create` URL) | Dev iteration 2+, ci-waiter, and human approval prompt |
+| Human response | `metadata.response` from human parent node via `glyph workflow node-show` | Dev iteration briefs dispatched after human feedback |
 
-`${PRIOR_*_TASK_ID}` lookups use the "Find prior-iter siblings" snippet from the generic skill §B (same agent FQN, lower phase). For `${PRIOR_REVIEW_TASK_ID}` specifically, restrict the lookup to reviewer nodes that paired with a designer sibling — i.e. ignore `ci-waiter` reviewer nodes (single-parent shape per the case bank) so the dev brief points at the latest *code* review verdict, not the latest CI watcher.
+Prior-iter lookups use the "Find prior-iter siblings" snippet from the generic skill §B (same agent FQN, lower phase). For prior review specifically, restrict the lookup to reviewer nodes that paired with a designer sibling — i.e. ignore `ci-waiter` reviewer nodes (single-parent shape per the case bank).
 
 ---
 
 ## Stop condition
 
-Trigger `finishWorkflow(succeeded, ...)` in the "two parents, both reviewers" case when both verdicts parse cleanly per §C, the union of findings filtered to `severity in ('blocker', 'major')` is empty, AND the CI quality gate is green (either inline via `gh pr checks --json` showing every check's `bucket` in `("pass", "skipping")`, or via a subsequent `ci-waiter` whose `verdict.json` is `APPROVE`). The success `summary` records `iterations` (count of `official/engineer` nodes in the final DAG), `minor_findings_remaining` (visibility — the work ships with them outstanding), and `ci` (`"all green"` or `"all green (waited)"`).
+Trigger `finishWorkflow(succeeded, ...)` when a human approval node's response carries `choiceId == "approve"`. The human approval gate is reached after: both reviewer verdicts parse cleanly per §C, the union of findings filtered to `severity in ('blocker', 'major')` is empty, AND the CI quality gate is green (either inline via `gh pr checks --json` or via a subsequent `ci-waiter` whose `verdict.json` is `APPROVE`). The success `summary` records `iterations` (count of `official/engineer` nodes in the final DAG), `minor_findings_remaining` (visibility — the work ships with them outstanding), `ci` (`"all green"` or `"all green (waited)"`), and `approved_by: "human"`.
 
-No hard iteration cap is baked into this strategy; coord uses its judgment to call `finishWorkflow(failed, "convergence stalled — N iterations and still seeing the same finding category")` when iteration is no longer productive (e.g. the same blocker keeps reappearing, CI keeps flaking on the same job).
+No hard iteration cap is baked into this strategy; coord uses its judgment to call `finishWorkflow(failed, "convergence stalled — N iterations and still seeing the same finding category")` when iteration is no longer productive (e.g. the same blocker keeps reappearing, CI keeps flaking on the same job). Coord may also insert a human intervention node when it detects ambiguity or repeated failures requiring human judgment.
 
 ---
 
@@ -375,27 +280,34 @@ Every `(parent role, parent terminal status)` cell on every expected parent role
 | 1 parent | `official/engineer` worker | `succeeded` | "one parent, dev, succeeded" | addSubgraph review + designer + next-coord |
 | 1 parent | `official/engineer` worker | `failed` | "one parent, dev, failed/cancelled" | finish(failed, "dev iteration ended in failed") |
 | 1 parent | `official/engineer` worker | `cancelled` | "one parent, dev, failed/cancelled" | finish(failed, "dev iteration ended in cancelled") |
-| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, every `gh pr checks` bucket in `("pass", "skipping")` | "two parents, both reviewers" → CI sub-case all-green | finish(succeeded, ci="all green") |
-| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, any `gh pr checks` bucket in `("fail", "cancel")` | "two parents, both reviewers" → CI sub-case any-red | addSubgraph next dev iter (dev brief instructs it to fetch CI failure context) |
-| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, any `gh pr checks` bucket == `"pending"` | "two parents, both reviewers" → CI sub-case pending | addSubgraph ci-waiter (reviewer MODE: ci) + next-coord |
+| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, every `gh pr checks` bucket in `("pass", "skipping")` | "two parents, both reviewers" → CI sub-case all-green | addSubgraph human approval + next-coord |
+| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, any `gh pr checks` bucket in `("fail", "cancel")` | "two parents, both reviewers" → CI sub-case any-red | addSubgraph next dev iter |
+| 2 parents | both reviewers (review + designer) | both `succeeded`, both verdicts APPROVE w/ no blocker/major, any `gh pr checks` bucket == `"pending"` | "two parents, both reviewers" → CI sub-case pending | addSubgraph ci-waiter + next-coord |
 | 2 parents | both reviewers (review + designer) | both `succeeded`, any verdict carries blocker/major | "two parents, both reviewers" → blockers/majors path | addSubgraph next dev iter |
 | 2 parents | reviewer | `failed` | "two parents, any failed/cancelled" | finish(failed, "reviewer iteration ended in failed") |
 | 2 parents | reviewer | `cancelled` | "two parents, any failed/cancelled" | finish(failed, "reviewer iteration ended in cancelled") |
 | 2 parents | reviewer | `succeeded` but `verdict.json` missing / unparseable | "two parents, both reviewers" → §C parse failure | finish(failed, "reviewer <agent> did not produce valid verdict.json") |
-| 1 parent | `official/reviewer` worker (ci-waiter) | `succeeded`, verdict APPROVE | "one parent, reviewer, succeeded" (ci-waiter terminal) | finish(succeeded, ci="all green (waited)") |
+| 1 parent | `official/reviewer` worker (ci-waiter) | `succeeded`, verdict APPROVE | "one parent, reviewer, succeeded" (ci-waiter terminal) | addSubgraph human approval + next-coord |
 | 1 parent | `official/reviewer` worker (ci-waiter) | `succeeded`, verdict REQUEST_CHANGES | "one parent, reviewer, succeeded" (ci-waiter terminal) | addSubgraph next dev iter |
 | 1 parent | `official/reviewer` worker (ci-waiter) | `failed` | "one parent, reviewer, failed/cancelled" (ci-waiter failed) | finish(failed, "ci-waiter iteration ended in failed") |
 | 1 parent | `official/reviewer` worker (ci-waiter) | `cancelled` | "one parent, reviewer, failed/cancelled" (ci-waiter failed) | finish(failed, "ci-waiter iteration ended in cancelled") |
+| 1 parent | human node | `succeeded`, choiceId="approve" | "one parent, human, succeeded" | finish(succeeded) |
+| 1 parent | human node | `succeeded`, choiceId="changes" | "one parent, human, succeeded" | addSubgraph next dev iter + next-coord (include human input as guidance) |
+| 1 parent | human node | `succeeded`, choiceId="cancel" | "one parent, human, succeeded" | finish(failed, "cancelled by human") |
+| 1 parent | human node | `succeeded`, freeform only (no choiceId) | "one parent, human, succeeded" | addSubgraph next dev iter + next-coord (interpret input as guidance) |
+| 1 parent | human node (intervention) | `succeeded` | "(coord judgment)" | interpret response, dispatch appropriate next step |
 
 ## Agent compatibility statement
 
-The case bank and brief templates above were validated against:
+The case bank and brief guidance above were validated against:
 
 | Agent FQN | Minimum AGENTS.md version |
 | --- | --- |
 | `official/engineer` | 0.2.0 |
 | `official/reviewer` | 0.2.0 |
 | `official/designer` | 0.2.0 |
-| `official/coordinator` | 0.1.2 |
+| `official/coordinator` | 0.2.0 |
 
-When any of those agents publishes a new minor or major version, re-read its `AGENTS.md` and bump this strategy's version if any template needs updating (per `official/workflow-coordination` §E item 6). Coord uses this list at runtime pre-flight (per `official/workflow-coordination` §D) to decide whether the template + agent are still in sync.
+Human node support requires coordinator ≥ 0.2.0 (human node awareness in wake-up loop + brief assembly approach).
+
+When any of those agents publishes a new minor or major version, re-read its `AGENTS.md` and bump this strategy's version if any brief guidance needs updating (per `official/workflow-coordination` §E item 6). Coord uses this list at runtime pre-flight (per `official/workflow-coordination` §D) to decide whether the brief + agent are still in sync.

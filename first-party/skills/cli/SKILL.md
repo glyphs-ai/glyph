@@ -2,7 +2,7 @@
 name: cli
 scope: official
 description: "Control a glyph server from the CLI — workspaces, agents, tasks, sessions, catalog, workflows"
-version: 0.2.0
+version: 0.2.1
 ---
 
 # official/cli skill
