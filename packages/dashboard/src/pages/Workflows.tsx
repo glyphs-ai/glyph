@@ -453,7 +453,6 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
                     workflow={detailWorkflow}
                     dag={detail.dag}
                     nodeId={humanNodeId as string}
-                    pollIntervalMs={nodeTaskPollIntervalMs}
                     onBack={onBackToWorkflow}
                     onNavigate={onNavigateHumanNode}
                   />

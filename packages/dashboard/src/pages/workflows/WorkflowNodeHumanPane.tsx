@@ -14,7 +14,6 @@ export interface WorkflowNodeHumanPaneProps {
   workflow: WorkflowHeaderWire;
   dag: WorkflowDagWire | null;
   nodeId: string;
-  pollIntervalMs: number;
   onBack: () => void;
   onNavigate: (nextNodeId: string) => void;
 }
@@ -226,13 +225,10 @@ function HumanRespondForm({ node, spec, choices }: HumanRespondFormProps) {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
-    const body: RespondHumanNodeBody = {};
-    if (selectedChoiceId !== null) {
-      (body as { choiceId?: string }).choiceId = selectedChoiceId;
-    }
-    if (input.trim().length > 0) {
-      (body as { input?: string }).input = input.trim();
-    }
+    const body: RespondHumanNodeBody = {
+      ...(selectedChoiceId !== null && { choiceId: selectedChoiceId }),
+      ...(input.trim().length > 0 && { input: input.trim() }),
+    };
     try {
       await respondHumanNode(node.workflowId, node.id, body);
     } catch (e) {
@@ -242,21 +238,18 @@ function HumanRespondForm({ node, spec, choices }: HumanRespondFormProps) {
   }, [canSubmit, selectedChoiceId, input, node.workflowId, node.id]);
 
   const placeholder =
-    selectedChoiceId !== null
-      ? "Additional input (optional)"
-      : choices.length > 0
-        ? "Additional input (optional)"
-        : "Enter your response";
+    selectedChoiceId !== null ? "Additional input (optional)" : "Enter your response";
 
   return (
     <div className="human-respond-panel__body" data-testid="human-content-running">
       <p className="human-respond-panel__prompt">{spec.prompt}</p>
       {choices.length > 0 && (
-        <div className="human-respond-panel__choices">
+        <fieldset className="human-respond-panel__choices" aria-label="Choices">
           {choices.map((c) => (
             <button
               key={c.id}
               type="button"
+              aria-pressed={c.id === selectedChoiceId}
               className={`human-choice-card${c.id === selectedChoiceId ? " human-choice-card--selected" : ""}`}
               onClick={() => setSelectedChoiceId(c.id === selectedChoiceId ? null : c.id)}
               data-testid={`human-choice-${c.id}`}
@@ -264,7 +257,7 @@ function HumanRespondForm({ node, spec, choices }: HumanRespondFormProps) {
               {c.label}
             </button>
           ))}
-        </div>
+        </fieldset>
       )}
       <textarea
         className="human-respond-panel__textarea"
