@@ -87,6 +87,9 @@ function projectNodeSpec(node: WorkflowNodeEntity): WorkflowNodeWireSpec {
   if (node.kind === "coordinator") {
     return { kind: "coordinator", ...(node.spec as object) } as WorkflowNodeWireSpec;
   }
+  if (node.kind === "human") {
+    return { kind: "human", ...(node.spec as object) } as WorkflowNodeWireSpec;
+  }
   return { kind: node.kind, spec: node.spec };
 }
 

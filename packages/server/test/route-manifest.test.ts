@@ -166,7 +166,7 @@ describe("route manifest", () => {
     // the handler in a single commit keeps this assertion satisfied
     // and forces a deliberate ++N here, which surfaces in code review.
     // The running total is the only fact a reader needs here.
-    expect(listRoutes()).toHaveLength(82);
+    expect(listRoutes()).toHaveLength(83);
   });
 });
 

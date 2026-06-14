@@ -65,6 +65,9 @@ export {
 } from "./paths.js";
 // ─── Re-exported types ──────────────────────────────────────────────
 export type {
+  HumanNodeChoice,
+  HumanNodeResponse,
+  HumanNodeSpec,
   WorkflowCancellation,
   WorkflowFailure,
   WorkflowNodeDispatchOpts,
@@ -81,7 +84,11 @@ export type {
   WorkflowSubstrateFailureReason,
   WorkflowSuccess,
 } from "./types.js";
-export { deriveIterationCount, hasLiveCoord } from "./types.js";
+export {
+  deriveIterationCount,
+  HUMAN_MAX_CHOICES,
+  hasLiveCoord,
+} from "./types.js";
 // ─── Validators ─────────────────────────────────────────────────────
 export {
   assertValidWorkflowId,

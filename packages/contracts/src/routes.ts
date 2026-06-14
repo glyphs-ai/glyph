@@ -62,6 +62,7 @@ import type {
   CreateWorkflowBody,
   FinishWorkflowBody,
   ReplaceNodeSpecBody,
+  RespondHumanNodeBody,
   WorkflowArtifactsResponse,
   WorkflowDagWire,
   WorkflowHeaderWire,
@@ -859,6 +860,16 @@ export const ROUTES = {
     "POST",
     "/api/workspaces/:id/workflows/:wfid/nodes/:nid/cancel",
   ),
+  /**
+   * Respond to a human-kind node that is waiting for input. The node
+   * must be `kind === "human"` and `status === "running"`. On success,
+   * the response is written into `node.metadata.response` and the node
+   * transitions to `succeeded`, waking downstream nodes.
+   */
+  "workflows.nodes.respond": defineRoute<
+    { params: WorkflowNodePathParams; body: RespondHumanNodeBody },
+    WorkflowNodeWire
+  >("POST", "/api/workspaces/:id/workflows/:wfid/nodes/:nid/respond"),
   /**
    * Last act of a coord task: flip the workflow terminal. `kind`
    * MUST be `succeeded` or `failed`. Substrate enforces "no other

@@ -142,7 +142,16 @@ async function makeHarness(): Promise<Harness> {
   const module = await composeWorkflowModule({
     db: dbHandle.db,
     workspaceDir,
-    runners: { coordinator: coord, worker },
+    runners: {
+      coordinator: coord,
+      worker,
+      human: {
+        validate: async (s) => s,
+        dispatch: async () => {},
+        hasInFlightForNode: async () => false,
+        cancel: async () => {},
+      },
+    },
     logger: silentLogger,
   });
   return {

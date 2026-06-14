@@ -143,12 +143,12 @@ describe("@glyphs-ai/workflow public API guard", () => {
     >();
   });
 
-  it("locks the closed WorkflowNodeKind enum to {'coordinator', 'worker'}", () => {
+  it("locks the closed WorkflowNodeKind enum to {'coordinator', 'worker', 'human'}", () => {
     // Closed-enum substrate: adding a new kind requires updating
     // `WorkflowNodeKind`, adding a `WorkflowRunners` field, and the exhaustive
     // `switch (kind)` branches inside the service. This assertion
     // fails on every kind addition/removal — that's the point.
-    expectTypeOf<WorkflowNodeKind>().toEqualTypeOf<"coordinator" | "worker">();
+    expectTypeOf<WorkflowNodeKind>().toEqualTypeOf<"coordinator" | "worker" | "human">();
   });
 
   it("preserves the substrate envelope + runner interface", () => {

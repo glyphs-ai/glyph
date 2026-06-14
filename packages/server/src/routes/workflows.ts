@@ -87,6 +87,7 @@ import type {
   FinishWorkflowBody,
   NodeRefWire,
   ReplaceNodeSpecBody,
+  RespondHumanNodeBody,
   WorkflowArtifactsResponse,
   WorkflowArtifactWire,
   WorkflowDagWire,
@@ -126,7 +127,7 @@ type WorkflowTasksResolver = (c: import("hono").Context) => TaskService;
 type WorkflowWorkspaceDirResolver = (c: import("hono").Context) => string;
 
 const ALLOWED_CREATE_KEYS = new Set(["brief", "details", "coordinatorAgent", "metadata"]);
-const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker"];
+const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker", "human"];
 const KNOWN_FINISH_KINDS: readonly ("succeeded" | "failed")[] = ["succeeded", "failed"];
 
 interface ValidationFail {
@@ -1181,6 +1182,46 @@ export function workflowsRoutes(
     } catch (err) {
       return respondError(c, err, {
         route: "workflows.replaceNodeSpec",
+        policy: workflowsErrorPolicy,
+        meta: { workflowId: wfid, nodeId: nid },
+      });
+    }
+  });
+
+  // ── POST /:wfid/nodes/:nid/respond — human node respond ──────────
+  app.post("/:wfid/nodes/:nid/respond", async (c) => {
+    const wfid = c.req.param("wfid");
+    const nid = c.req.param("nid");
+    const parsed = await parseJsonBody(c);
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    const body = parsed.body as Record<string, unknown>;
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "request body must be an object" }, 400);
+    }
+    const { choiceId, input } = body;
+    if (choiceId !== undefined && (typeof choiceId !== "string" || choiceId.length === 0)) {
+      return c.json({ error: "choiceId, when set, must be a non-empty string" }, 400);
+    }
+    if (choiceId === undefined) {
+      if (typeof input !== "string" || input.trim().length === 0) {
+        return c.json({ error: "input is required when choiceId is absent" }, 400);
+      }
+    }
+    if (input !== undefined && typeof input !== "string") {
+      return c.json({ error: "input, when set, must be a string" }, 400);
+    }
+    const response: RespondHumanNodeBody = {
+      ...(choiceId !== undefined ? { choiceId } : {}),
+      ...(input !== undefined ? { input } : {}),
+    };
+    try {
+      const node = await resolve(c).respondHumanNode(wfid, nid, response);
+      const wire = await projectWorkflowNodeWithTaskId(node, { tasks: resolveTasks(c) });
+      logEvent(c, "workflow.respondHumanNode", { workflowId: wfid, nodeId: nid });
+      return c.json(wire);
+    } catch (err) {
+      return respondError(c, err, {
+        route: "workflows.respondHumanNode",
         policy: workflowsErrorPolicy,
         meta: { workflowId: wfid, nodeId: nid },
       });

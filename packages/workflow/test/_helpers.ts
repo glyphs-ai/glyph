@@ -132,7 +132,11 @@ export function makeWorkflowTestHandle(
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-test-"));
   const coordRunner = opts.coordRunner ?? makeStubRunner();
   const workerRunner = opts.workerRunner ?? makeStubRunner();
-  const runners: WorkflowRunners = { coordinator: coordRunner, worker: workerRunner };
+  const runners: WorkflowRunners = {
+    coordinator: coordRunner,
+    worker: workerRunner,
+    human: makeStubRunner(),
+  };
   const nowRef = { value: opts.initialNow ?? new Date("2026-06-07T00:00:00.000Z") };
   const repo = new WorkflowRepository({ db: db.db });
   const service = new WorkflowService({
