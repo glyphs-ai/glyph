@@ -199,7 +199,7 @@ Coord does NOT silently drop content to fix drift — coord's job in validation 
 
 ## §E — How to author a strategy skill
 
-A strategy skill is a content-only sibling skill the coord agent loads alongside this one — providing the case bank, brief templates, and stop condition for one orchestration strategy. Multiple strategy skills coexist; the coord agent picks one per workflow per §A step 5.
+A strategy skill is a content-only sibling skill the coord agent loads alongside this one — providing the case bank, brief guidance, and stop condition for one orchestration strategy. Multiple strategy skills coexist; the coord agent picks one per workflow per §A step 5.
 
 ### Required frontmatter
 
@@ -216,12 +216,12 @@ Content-only: **no `dependencies:`** (the coord agent already declares the gener
 
 ### Required body sections (use these exact headings — the coord LLM and lint tooling key on them)
 
-1. **Case bank** — enumerate every parent-classification case. Each case carries the matching predicate on `(kind, status, agent)` tuples of own direct parents (use the §B classifier) plus an action: `addSubgraph: <node list>` (with the new workers + briefs + a trailing `next-coord` per §B) or `finishWorkflow(<outcome>, "<message>")`. Fall-through is forbidden; every reachable parent combination must match exactly one case (see "Failure-mode coverage" below).
-2. **Brief templates** — one verbatim text block per worker role the strategy dispatches. Each template MUST follow the §D meta-pattern: workflow context + prior-iter fetch instructions + output protocol + `${PLACEHOLDER}` slots. The case bank quotes templates by reference (e.g. `brief=<template-review>`); coord substitutes placeholders at runtime.
-3. **Placeholder resolution table** — for every `${...}` slot used in any template, the source it resolves from (`workflow.id`, `workflow.brief`, a parent `taskId`, a DAG-derived counter, etc.). Coord reads this table to resolve the slot before dispatch.
+1. **Case bank** — enumerate every parent-classification case. Each case carries the matching predicate on `(kind, status, agent)` tuples of own direct parents (use the §B classifier) plus an action: `addSubgraph: <node list>` (with the new workers + briefs + a trailing `next-coord` per §B) or `finishWorkflow(<outcome>, "<message>")`. Fall-through is forbidden; every reachable parent combination must match exactly one case (see "Failure-mode coverage" below). Note: coord-judgment interventions (e.g. inserting a human node on repeated failures) are meta-actions outside the parent-classification model — they are triggered by coord's own assessment, not by a classifier match, and need not appear as a case predicate.
+2. **Brief guidance** — for each worker role the strategy dispatches, describe what the assembled brief should convey. Follow the §D principles: workflow goal, what this worker must do in the current iteration, where to find prior outputs (task ids, artifact paths), and the output protocol the worker must follow. The case bank references guidance sections by name (e.g. `brief-guidance=<engineer-iter>`); coord assembles the actual brief at runtime by reading workflow context and DAG state.
+3. **Context sources table** — for each piece of runtime information the briefs reference, document where coord pulls it from (`workflow.id`, `workflow.brief`, a parent `taskId`, DAG-derived counters, artifact paths, etc.). Coord consults this table when assembling briefs to ensure all relevant context is included.
 4. **Stop condition** — the explicit predicate that triggers `finishWorkflow(succeeded, ...)`. Strategies without a clean terminal state MUST NOT exist in this catalog.
 5. **Failure-mode coverage** — an explicit `(role, terminal status)` matrix mapping each cell to the case that catches it, so a future author editing the case bank can re-check coverage without re-deriving it.
-6. **Agent compatibility statement** — at the bottom of the skill body, list each agent the strategy dispatches with the minimum AGENTS.md version it was validated against. When any of those agents publishes a new minor / major version, the strategy author re-reads the agent's AGENTS.md and bumps the strategy's version if any template needs updating. Coord uses this list at runtime pre-flight (see §D) to decide whether the template + agent are still in sync.
+6. **Agent compatibility statement** — at the bottom of the skill body, list each agent the strategy dispatches with the minimum AGENTS.md version it was validated against. When any of those agents publishes a new minor / major version, the strategy author re-reads the agent's AGENTS.md and bumps the strategy's version if any brief guidance needs updating. Coord uses this list at runtime pre-flight (see §D) to decide whether the strategy + agent are still in sync.
 
 ### Optional body sections
 
@@ -230,7 +230,7 @@ Content-only: **no `dependencies:`** (the coord agent already declares the gener
 
 ### Constraints
 
-- Strategy skills MUST NOT redefine the `verdict.json` schema — point at §C (verbatim re-quoting inside a reviewer brief template is fine; introducing a different schema is forbidden).
+- Strategy skills MUST NOT redefine the `verdict.json` schema — point at §C (verbatim re-quoting inside a reviewer brief is fine; introducing a different schema is forbidden).
 - Strategy skills MUST NOT introduce strategy selection logic — that lives in §A. A strategy skill body assumes "I have been selected; here is what I do".
 - Strategy skills MUST NOT compose technical content. Quality bars, fix opinions, and review heuristics live in worker agents; strategy briefs only plumb workflow context and the verdict schema.
 

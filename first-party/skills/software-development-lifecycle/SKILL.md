@@ -1,7 +1,7 @@
 ---
 name: software-development-lifecycle
 scope: official
-description: "Strategy skill for the official/coordinator agent — the engineer → review+designer iterate-to-clean orchestration: case bank, brief templates, placeholder resolution, stop condition, failure-mode coverage"
+description: "Strategy skill for the official/coordinator agent — the engineer → review+designer iterate-to-clean orchestration: case bank, brief guidance, context sources, stop condition, failure-mode coverage"
 version: 0.3.0
 ---
 
