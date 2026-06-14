@@ -5244,6 +5244,107 @@ button {
 .dag-node__status--ready {
   color: var(--color-text-muted);
 }
+.dag-node__status--not_started {
+  color: var(--color-text-muted);
+}
+
+.dag-node--human {
+  border-left-color: #7c3aed;
+}
+
+/* ─── Human respond panel ─────────────────────────────────────────── */
+
+.human-respond-panel {
+  padding: var(--space-4);
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.human-respond-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.human-respond-panel__node-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.human-respond-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.human-respond-panel__prompt {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.5;
+  margin: 0;
+}
+.human-respond-panel__choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.human-choice-card {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.human-choice-card:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-bg);
+}
+.human-choice-card--selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+.human-choice-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.human-choice-card--disabled:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+.human-respond-panel__textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  resize: vertical;
+}
+.human-respond-panel__textarea:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.human-respond-panel__submit {
+  align-self: flex-start;
+}
+.human-respond-panel__response-text {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0;
+}
 
 /* Workflow detail pane (3-tab chrome). */
 /* Header chrome reuses `.task-detail__head` from the Tasks detail

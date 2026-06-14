@@ -204,7 +204,7 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
                 const inner = (
                   <>
                     <span className="dag-node__kind-icon" aria-hidden="true">
-                      {kind === "coordinator" ? "🧠" : "⚙"}
+                      {kind === "coordinator" ? "🧠" : kind === "human" ? "👤" : "⚙"}
                     </span>
                     <span className="dag-node__id">{idShort}</span>
                     {/*
@@ -285,7 +285,7 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
                     </div>
                   );
                 }
-                const interactive = node.taskId !== undefined;
+                const interactive = node.taskId !== undefined || kind === "human";
                 return (
                   <button
                     key={node.id}
@@ -294,7 +294,13 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
                     className={className}
                     data-node-id={node.id}
                     data-testid={`dag-node-${node.id}`}
-                    title={interactive ? `Open task ${node.taskId}` : title}
+                    title={
+                      interactive
+                        ? kind === "human"
+                          ? `Open human node ${idShort}`
+                          : `Open task ${node.taskId}`
+                        : title
+                    }
                     aria-current={isSelected ? "true" : undefined}
                     aria-disabled={interactive ? undefined : true}
                     onClick={() => {
@@ -316,12 +322,13 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
 
 /**
  * Best-effort agent extraction from a node spec. Coordinator and worker
- * specs both carry an `agent` field; unknown spec kinds fall back to
- * "—" so the row still renders a placeholder rather than an empty
- * span (visual stability).
+ * specs both carry an `agent` field; human nodes use a static label;
+ * unknown spec kinds fall back to "—" so the row still renders a
+ * placeholder rather than an empty span (visual stability).
  */
 function extractAgent(node: WorkflowNodeWire): string {
   const spec = node.spec;
+  if (spec.kind === "human") return "Human gate";
   if (
     (spec.kind === "coordinator" || spec.kind === "worker") &&
     "agent" in spec &&
@@ -333,22 +340,21 @@ function extractAgent(node: WorkflowNodeWire): string {
 }
 
 /**
- * Worker brief extraction. Worker nodes carry a user-authored single
- * line in `spec.brief` that names what the task is doing; coordinator
- * nodes have no brief (they are auto-spawned by the substrate and
- * their identity is already named by the agent FQN), so this returns
- * `null` for them. Returning null lets the caller skip rendering the
- * brief row entirely rather than reserving empty vertical space.
- *
- * The contract (`WorkflowWorkerNodeSpec` in
- * `packages/contracts/src/workflows.ts`) guarantees `brief` is a
- * non-empty single line of ≤ 200 chars, so no empty-string guard is
- * required at this seam.
+ * Worker/human brief extraction. Worker nodes carry a user-authored single
+ * line in `spec.brief` that names what the task is doing; human nodes
+ * carry `spec.prompt` (the question being asked); coordinator nodes have
+ * no brief (they are auto-spawned by the substrate and their identity is
+ * already named by the agent FQN), so this returns `null` for them.
+ * Returning null lets the caller skip rendering the brief row entirely
+ * rather than reserving empty vertical space.
  */
 function extractBrief(node: WorkflowNodeWire): string | null {
   const spec = node.spec;
   if (spec.kind === "worker" && "brief" in spec && typeof spec.brief === "string") {
     return spec.brief;
+  }
+  if (spec.kind === "human" && "prompt" in spec && typeof spec.prompt === "string") {
+    return spec.prompt;
   }
   return null;
 }
@@ -360,6 +366,8 @@ function extractBrief(node: WorkflowNodeWire): string | null {
  * server-side projection); unknown kinds fall back to
  * `"worker"` so the visual still renders a recognisable node.
  */
-function nodeKind(node: WorkflowNodeWire): "coordinator" | "worker" {
-  return node.spec.kind === "coordinator" ? "coordinator" : "worker";
+function nodeKind(node: WorkflowNodeWire): "coordinator" | "worker" | "human" {
+  if (node.spec.kind === "coordinator") return "coordinator";
+  if (node.spec.kind === "human") return "human";
+  return "worker";
 }

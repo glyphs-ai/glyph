@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useMemo } from "react";
 import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
 import { TaskView } from "../../components/task-view";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
+import { orderNodesForNav } from "./workflow-nav-utils.js";
 
 export interface WorkflowNodeTaskPaneProps {
   /** The parent workflow header (used for the back-label only). */
@@ -47,7 +48,12 @@ export function WorkflowNodeTaskPane({
   onBack,
   onNavigate,
 }: WorkflowNodeTaskPaneProps) {
-  const orderedNodes = useMemo(() => orderNodesForNav(dag), [dag]);
+  const orderedNodes = useMemo(() => {
+    // For the task pane, only nodes with a taskId are navigable.
+    return orderNodesForNav(dag).filter(
+      (n): n is WorkflowNodeWire & { taskId: string } => n.taskId !== undefined,
+    );
+  }, [dag]);
   const currentIndex = useMemo(
     () => orderedNodes.findIndex((n) => n.taskId === nodeTaskId),
     [orderedNodes, nodeTaskId],
@@ -111,26 +117,6 @@ export function WorkflowNodeTaskPane({
       />
     </aside>
   );
-}
-
-/**
- * Project the DAG into a flat, navigation-ordered node list. Only
- * nodes with a `taskId` are kept (a node without a dispatched task
- * has nothing to show in the right pane). Ordering matches the
- * Graph tab's visual top-to-bottom order:
- *
- *   1. phase ASC (earlier phases first)
- *   2. createdAt ASC (within a phase, the node inserted earliest is
- *      walked first — mirrors `groupByPhase` / `buildSlotMap`).
- */
-function orderNodesForNav(dag: WorkflowDagWire | null): WorkflowNodeWire[] {
-  if (dag === null) return [];
-  return dag.nodes
-    .filter((n): n is WorkflowNodeWire & { taskId: string } => n.taskId !== undefined)
-    .sort((a, b) => {
-      if (a.phase !== b.phase) return a.phase - b.phase;
-      return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
-    });
 }
 
 interface FallbackBackRowProps {

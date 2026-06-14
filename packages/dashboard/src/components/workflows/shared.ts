@@ -105,3 +105,12 @@ export type StatusGroup = "running" | "completed";
 export function statusGroup(status: WorkflowHeaderWire["status"]): StatusGroup {
   return status === "running" ? "running" : "completed";
 }
+
+/**
+ * Returns true when at least one human-kind node in the list is in
+ * `running` status (i.e. awaiting human input). Useful for surfacing
+ * an indicator on the workflow list item.
+ */
+export function hasAwaitingHuman(nodes: ReadonlyArray<{ kind: string; status: string }>): boolean {
+  return nodes.some((n) => n.kind === "human" && n.status === "running");
+}

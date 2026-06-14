@@ -30,6 +30,7 @@ import { useUrlSearchValue } from "../hooks/useUrlState";
 import { useWorkflowDetail } from "../hooks/useWorkflowDetail";
 import { useWorkflows } from "../hooks/useWorkflows";
 import { WorkflowDetail } from "./workflows/WorkflowDetail";
+import { WorkflowNodeHumanPane } from "./workflows/WorkflowNodeHumanPane";
 import { WorkflowNodeTaskPane } from "./workflows/WorkflowNodeTaskPane";
 
 export interface WorkflowsPageProps {
@@ -87,16 +88,22 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
   const [selectedIdRaw] = useUrlSearchValue("workflowId", "");
   const [nodeTaskIdRaw] = useUrlSearchValue("nodeTaskId", "");
+  const [humanNodeIdRaw] = useUrlSearchValue("humanNodeId", "");
   const selectedId = selectedIdRaw === "" ? null : selectedIdRaw;
   const nodeTaskId = nodeTaskIdRaw === "" ? null : nodeTaskIdRaw;
+  const humanNodeId = humanNodeIdRaw === "" ? null : humanNodeIdRaw;
 
-  // Atomic URL writer: updates `workflowId` and `nodeTaskId` in a
-  // single `navigate()` call so two sequential single-key setters
-  // can't race via stale `location.search` snapshots. Pass
-  // `undefined` to leave a key untouched, empty string / null to
-  // delete it.
+  // Atomic URL writer: updates `workflowId`, `nodeTaskId`, and
+  // `humanNodeId` in a single `navigate()` call so two sequential
+  // single-key setters can't race via stale `location.search`
+  // snapshots. Pass `undefined` to leave a key untouched, empty
+  // string / null to delete it.
   const setMasterDetailUrl = useCallback(
-    (next: { workflowId?: string | null; nodeTaskId?: string | null }) => {
+    (next: {
+      workflowId?: string | null;
+      nodeTaskId?: string | null;
+      humanNodeId?: string | null;
+    }) => {
       const params = new URLSearchParams(location.search);
       if (next.workflowId !== undefined) {
         if (next.workflowId === null || next.workflowId === "") params.delete("workflowId");
@@ -105,6 +112,10 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
       if (next.nodeTaskId !== undefined) {
         if (next.nodeTaskId === null || next.nodeTaskId === "") params.delete("nodeTaskId");
         else params.set("nodeTaskId", next.nodeTaskId);
+      }
+      if (next.humanNodeId !== undefined) {
+        if (next.humanNodeId === null || next.humanNodeId === "") params.delete("humanNodeId");
+        else params.set("humanNodeId", next.humanNodeId);
       }
       const search = params.toString();
       navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
@@ -158,46 +169,63 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   const detail = useWorkflowDetail(effectiveSelectedId);
 
   // Compute the selected node id for the Graph tab's highlight. When
-  // Mode B is active (`nodeTaskId` set), map it back to a node id via
-  // the dag — the selected node is "the node whose taskId matches the
-  // URL." A dag that hasn't loaded yet keeps the selection null so
-  // the chip just renders un-styled.
-  const selectedNodeId =
-    nodeTaskId !== null && detail.dag !== null
-      ? (detail.dag.nodes.find((n) => n.taskId === nodeTaskId)?.id ?? null)
-      : null;
+  // Mode B is active (`nodeTaskId` or `humanNodeId` set), map it back
+  // to a node id via the dag. A dag that hasn't loaded yet keeps the
+  // selection null so the chip just renders un-styled.
+  const selectedNodeId = useMemo(() => {
+    if (humanNodeId !== null) return humanNodeId;
+    if (nodeTaskId !== null && detail.dag !== null) {
+      return detail.dag.nodes.find((n) => n.taskId === nodeTaskId)?.id ?? null;
+    }
+    return null;
+  }, [humanNodeId, nodeTaskId, detail.dag]);
 
   // Master selection write: clears any in-flight Mode B at the same
   // time so the right pane never falls into the inconsistent state
   // "workflow A's header + workflow B's nodeTaskId."
   const onSelectWorkflow = useCallback(
     (id: string | null) => {
-      setMasterDetailUrl({ workflowId: id, nodeTaskId: null });
+      setMasterDetailUrl({ workflowId: id, nodeTaskId: null, humanNodeId: null });
     },
     [setMasterDetailUrl],
   );
 
-  // Mode B entry: parent renders the node-task pane on the right.
-  // Nodes without a `taskId` (transient: dispatched but not yet
-  // recorded) are silently skipped — the Graph tab's button is also
-  // `aria-disabled` in that case so this branch is defence in depth.
+  // Mode B entry: parent renders the appropriate pane on the right.
+  // Human nodes use `humanNodeId`; task-backed nodes use `nodeTaskId`.
   const onSelectNode = useCallback(
     (node: WorkflowNodeWire) => {
-      if (node.taskId === undefined) return;
-      setMasterDetailUrl({ nodeTaskId: node.taskId });
+      if (node.spec.kind === "human") {
+        setMasterDetailUrl({ nodeTaskId: null, humanNodeId: node.id });
+      } else {
+        if (node.taskId === undefined) return;
+        setMasterDetailUrl({ nodeTaskId: node.taskId, humanNodeId: null });
+      }
     },
     [setMasterDetailUrl],
   );
 
   const onBackToWorkflow = useCallback(() => {
-    setMasterDetailUrl({ nodeTaskId: null });
+    setMasterDetailUrl({ nodeTaskId: null, humanNodeId: null });
   }, [setMasterDetailUrl]);
 
   const onNavigateNode = useCallback(
     (nextTaskId: string) => {
-      setMasterDetailUrl({ nodeTaskId: nextTaskId });
+      setMasterDetailUrl({ nodeTaskId: nextTaskId, humanNodeId: null });
     },
     [setMasterDetailUrl],
+  );
+
+  const onNavigateHumanNode = useCallback(
+    (nextNodeId: string) => {
+      // Determine if the target node is a human or task node
+      const target = detail.dag?.nodes.find((n) => n.id === nextNodeId);
+      if (target?.spec.kind === "human") {
+        setMasterDetailUrl({ humanNodeId: nextNodeId, nodeTaskId: null });
+      } else if (target?.taskId) {
+        setMasterDetailUrl({ nodeTaskId: target.taskId, humanNodeId: null });
+      }
+    },
+    [setMasterDetailUrl, detail.dag],
   );
 
   const mounted = useMounted();
@@ -236,7 +264,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   const handleCreated = useCallback(
     (created: WorkflowHeaderWire) => {
       setError(null);
-      setMasterDetailUrl({ workflowId: created.id, nodeTaskId: null });
+      setMasterDetailUrl({ workflowId: created.id, nodeTaskId: null, humanNodeId: null });
       // Best-effort: refresh the list so the new row is sourced from
       // the server rather than synthesised on the client. Status
       // grouping puts the freshly-`running` row in the Running
@@ -284,7 +312,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
       // this on the next refresh tick, but clearing inline avoids
       // the transient "workflow not found" alert.
       if (effectiveSelectedId === deleteTarget.id) {
-        setMasterDetailUrl({ workflowId: null, nodeTaskId: null });
+        setMasterDetailUrl({ workflowId: null, nodeTaskId: null, humanNodeId: null });
       }
       setDeleteTarget(null);
       setDeletePurge(false);
@@ -321,6 +349,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     idQuery !== "" || agentFilter !== ALL_AGENTS || timeFilter !== DEFAULT_TIME_PRESET;
   const detailWorkflow = detail.workflow;
   const showNodeTaskPane = nodeTaskId !== null && effectiveSelectedId !== null;
+  const showHumanNodePane = humanNodeId !== null && effectiveSelectedId !== null;
 
   return (
     <>
@@ -414,6 +443,19 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
                     pollIntervalMs={nodeTaskPollIntervalMs}
                     onBack={onBackToWorkflow}
                     onNavigate={onNavigateNode}
+                  />
+                );
+              }
+              if (showHumanNodePane && detailWorkflow != null) {
+                return (
+                  <WorkflowNodeHumanPane
+                    key={`${effectiveSelectedId}:human:${humanNodeId}`}
+                    workflow={detailWorkflow}
+                    dag={detail.dag}
+                    nodeId={humanNodeId as string}
+                    pollIntervalMs={nodeTaskPollIntervalMs}
+                    onBack={onBackToWorkflow}
+                    onNavigate={onNavigateHumanNode}
                   />
                 );
               }
