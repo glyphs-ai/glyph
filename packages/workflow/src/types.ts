@@ -420,16 +420,12 @@ export interface WorkflowRunners {
 
 // ─── Human-node types ───────────────────────────────────────────────
 
-/** Reserved choice id appended by the backend to every human node's choice list. */
-export const HUMAN_FREEFORM_CHOICE_ID = "__freeform__";
-
 /** Maximum number of user-supplied choices on a human node spec. */
 export const HUMAN_MAX_CHOICES = 5;
 
 /**
  * One selectable choice on a human node. `id` must be a non-empty
- * string unique within the spec's choices array and must not equal
- * {@link HUMAN_FREEFORM_CHOICE_ID}.
+ * string unique within the spec's choices array.
  */
 export interface HumanNodeChoice {
   readonly id: string;
@@ -454,12 +450,12 @@ export interface HumanNodeSpec {
  * Response shape written into `node.metadata.response` when a human
  * responds to a human-kind node via the respond API.
  *
- *   - `choiceId` — the selected choice id, or
- *     {@link HUMAN_FREEFORM_CHOICE_ID} for freeform input.
- *   - `input` — freeform text; required when `choiceId` is
- *     `__freeform__`, optional otherwise.
+ *   - `choiceId` — the selected choice id (must match one of
+ *     `spec.choices[].id`). When absent, the response is freeform.
+ *   - `input` — freeform text; required when `choiceId` is absent,
+ *     optional otherwise.
  */
 export interface HumanNodeResponse {
-  readonly choiceId: string;
+  readonly choiceId?: string;
   readonly input?: string;
 }

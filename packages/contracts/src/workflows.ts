@@ -542,12 +542,12 @@ export interface WorkflowHumanNodeSpecWire {
  * Request body for `POST /workspaces/:id/workflows/:wfid/nodes/:nid/respond`.
  * Responds to a human-kind node that is in `running` status.
  *
- *   - `choiceId` — the selected choice id, or `"__freeform__"` for
- *     freeform text input.
- *   - `input` — freeform text; required when `choiceId` is
- *     `"__freeform__"`, optional otherwise.
+ *   - `choiceId` — the selected choice id (must match one of
+ *     `spec.choices[].id`). When absent, the response is freeform.
+ *   - `input` — freeform text; required when `choiceId` is absent,
+ *     optional otherwise.
  */
 export interface RespondHumanNodeBody {
-  readonly choiceId: string;
+  readonly choiceId?: string;
   readonly input?: string;
 }

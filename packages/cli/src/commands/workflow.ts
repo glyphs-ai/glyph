@@ -896,7 +896,7 @@ export async function workflowFinish(
 
 // ─── respond ────────────────────────────────────────────────────────────
 export interface WorkflowRespondOpts extends CommonFlags {
-  readonly choiceId: string;
+  readonly choiceId?: string;
   readonly input?: string;
 }
 
@@ -911,14 +911,18 @@ export async function workflowRespond(
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
     return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
-  if (typeof opts.choiceId !== "string" || opts.choiceId.trim() === "") {
+  if (opts.choiceId === undefined) {
+    if (opts.input === undefined || opts.input.trim() === "") {
+      return { exitCode: 2, stderr: "--input is required when --choice-id is not provided\n" };
+    }
+  } else if (opts.choiceId.trim() === "") {
     return { exitCode: 2, stderr: "--choice-id must be a non-empty string\n" };
   }
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: RespondHumanNodeBody = {
-      choiceId: opts.choiceId,
+      ...(opts.choiceId !== undefined ? { choiceId: opts.choiceId } : {}),
       ...(opts.input !== undefined ? { input: opts.input } : {}),
     };
     await client.call("workflows.nodes.respond", {

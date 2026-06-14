@@ -86,7 +86,6 @@ export type {
 } from "./types.js";
 export {
   deriveIterationCount,
-  HUMAN_FREEFORM_CHOICE_ID,
   HUMAN_MAX_CHOICES,
   hasLiveCoord,
 } from "./types.js";

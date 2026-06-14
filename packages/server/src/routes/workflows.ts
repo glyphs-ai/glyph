@@ -1199,14 +1199,19 @@ export function workflowsRoutes(
       return c.json({ error: "request body must be an object" }, 400);
     }
     const { choiceId, input } = body;
-    if (typeof choiceId !== "string" || choiceId.length === 0) {
-      return c.json({ error: "choiceId must be a non-empty string" }, 400);
+    if (choiceId !== undefined && (typeof choiceId !== "string" || choiceId.length === 0)) {
+      return c.json({ error: "choiceId, when set, must be a non-empty string" }, 400);
+    }
+    if (choiceId === undefined) {
+      if (typeof input !== "string" || input.trim().length === 0) {
+        return c.json({ error: "input is required when choiceId is absent" }, 400);
+      }
     }
     if (input !== undefined && typeof input !== "string") {
       return c.json({ error: "input, when set, must be a string" }, 400);
     }
     const response: RespondHumanNodeBody = {
-      choiceId,
+      ...(choiceId !== undefined ? { choiceId } : {}),
       ...(input !== undefined ? { input } : {}),
     };
     try {

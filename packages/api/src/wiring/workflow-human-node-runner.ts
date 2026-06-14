@@ -16,7 +16,6 @@
  */
 
 import {
-  HUMAN_FREEFORM_CHOICE_ID,
   HUMAN_MAX_CHOICES,
   type HumanNodeSpec,
   WorkflowError,
@@ -65,11 +64,6 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
           const choice = c as Record<string, unknown>;
           if (typeof choice.id !== "string" || choice.id.length === 0) {
             throw new WorkflowError(`human node spec.choices[${i}].id must be a non-empty string`);
-          }
-          if (choice.id === HUMAN_FREEFORM_CHOICE_ID) {
-            throw new WorkflowError(
-              `human node spec.choices[${i}].id must not be the reserved value "${HUMAN_FREEFORM_CHOICE_ID}"`,
-            );
           }
           if (seenIds.has(choice.id)) {
             throw new WorkflowError(

@@ -320,15 +320,12 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
     .description("Respond to a human-kind node that is waiting for input")
     .argument("<workflow-id>", "Workflow id")
     .argument("<node-id>", "Node id")
-    .requiredOption(
-      "--choice-id <id>",
-      'Choice id (one of the spec choices, or "__freeform__" for freeform input)',
-    )
-    .option("--input <text>", "Freeform text input (required when --choice-id is __freeform__)")
+    .option("--choice-id <id>", "Choice id (one of the spec choices)")
+    .option("--input <text>", "Freeform text input (required when --choice-id is not provided)")
     .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
       slot.result = await workflowRespond(workflowId, nodeId, {
         ...parseWorkspaceFlags(opts),
-        choiceId: pickString(opts, "choiceId") ?? "",
+        ...optionalString(opts, "choiceId"),
         ...optionalString(opts, "input"),
       });
     });

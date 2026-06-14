@@ -63,7 +63,6 @@ import type {
   WorkflowSubstrateFailureReason,
   WorkflowSuccess,
 } from "./types.js";
-import { HUMAN_FREEFORM_CHOICE_ID } from "./types.js";
 import { assertValidWorkflowId, generateWorkflowId, generateWorkflowNodeId } from "./validate.js";
 import {
   extractWorkflowNodeRetryMetadata,
@@ -1905,8 +1904,8 @@ export class WorkflowService {
    *   - node not found or belongs to different workflow
    *   - node kind is not `"human"`
    *   - node status is not `"running"`
-   *   - `response.choiceId` is not a valid choice id from spec
-   *   - `response.choiceId` is `__freeform__` but `input` is empty
+   *   - `response.choiceId` is present but not a valid choice id from spec
+   *   - `response.choiceId` is absent but `input` is empty
    */
   async respondHumanNode(
     workflowId: string,
@@ -1933,22 +1932,20 @@ export class WorkflowService {
         );
       }
 
-      // Validate choiceId against spec choices
+      // Validate response against spec
       const spec = node.spec as HumanNodeSpec;
-      const validChoiceIds = new Set<string>((spec.choices ?? []).map((c) => c.id));
-      validChoiceIds.add(HUMAN_FREEFORM_CHOICE_ID);
 
-      if (!validChoiceIds.has(response.choiceId)) {
-        throw new WorkflowError(
-          `respondHumanNode: choiceId "${response.choiceId}" is not a valid choice for node "${nodeId}"`,
-        );
-      }
-
-      if (
-        response.choiceId === HUMAN_FREEFORM_CHOICE_ID &&
-        (response.input === undefined || response.input.trim().length === 0)
-      ) {
-        throw new WorkflowError(`respondHumanNode: freeform choice requires non-empty input`);
+      if (response.choiceId !== undefined) {
+        const validChoiceIds = new Set<string>((spec.choices ?? []).map((c) => c.id));
+        if (!validChoiceIds.has(response.choiceId)) {
+          throw new WorkflowError(
+            `respondHumanNode: choiceId "${response.choiceId}" is not a valid choice for node "${nodeId}"`,
+          );
+        }
+      } else {
+        if (response.input === undefined || response.input.trim().length === 0) {
+          throw new WorkflowError(`respondHumanNode: freeform response requires non-empty input`);
+        }
       }
 
       // Write response into metadata
