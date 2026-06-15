@@ -2,7 +2,7 @@
 name: software-development-lifecycle
 scope: official
 description: "Strategy skill for the official/coordinator agent — the engineer → review+designer iterate-to-clean orchestration: case bank, brief guidance, context sources, stop condition, failure-mode coverage"
-version: 0.3.0
+version: 0.3.1
 ---
 
 # Glyph Software-Development-Lifecycle Strategy Skill
@@ -137,11 +137,27 @@ CASE "one parent, human, status=succeeded":
   read metadata.response from parent node via:
     glyph workflow node-show $WF <parent-node-id> --json
   if response.choiceId == "approve":
+    # The "& merge" half of the choice label is a contract, not aspirational
+    # text. Auto-merge fires only on the explicit "approve" path; humans who
+    # want approval without merge use the freeform input branch instead.
+    pr_number, repo = parse from prior dev task's success.output
+      (PR URL captured per §Brief inputs table: matches
+       https://github.com/<owner>/<repo>/pull/<N>)
+    merge_result = sh: gh pr merge <pr_number> --repo <repo> --squash --delete-branch
+    if merge_result.exitCode != 0:
+      finishWorkflow(failed,
+        "human approved but auto-merge failed (exit <code>): <stderr>. " +
+        "PR #<pr_number> remains open for manual triage.")
+      exit
+    merge_commit_sha = sh: gh pr view <pr_number> --repo <repo> --json mergeCommit -q '.mergeCommit.oid'
     finishWorkflow(succeeded, summary={
       "iterations": <count of dev nodes in DAG>,
       "minor_findings_remaining": <count if any>,
       "ci": "all green",
-      "approved_by": "human"
+      "approved_by": "human",
+      "merged": true,
+      "merge_strategy": "squash",
+      "merge_commit": "<merge_commit_sha>"
     })
   elif response.choiceId == "changes":
     addSubgraph:
@@ -264,7 +280,7 @@ Prior-iter lookups use the "Find prior-iter siblings" snippet from the generic s
 
 ## Stop condition
 
-Trigger `finishWorkflow(succeeded, ...)` when a human approval node's response carries `choiceId == "approve"`. The human approval gate is reached after: both reviewer verdicts parse cleanly per §C, the union of findings filtered to `severity in ('blocker', 'major')` is empty, AND the CI quality gate is green (either inline via `gh pr checks --json` or via a subsequent `ci-waiter` whose `verdict.json` is `APPROVE`). The success `summary` records `iterations` (count of `official/engineer` nodes in the final DAG), `minor_findings_remaining` (visibility — the work ships with them outstanding), `ci` (`"all green"` or `"all green (waited)"`), and `approved_by: "human"`.
+Trigger PR merge (`gh pr merge <N> --repo <owner/repo> --squash --delete-branch`) followed by `finishWorkflow(succeeded, ...)` when a human approval node's response carries `choiceId == "approve"`. If the merge fails (non-zero exit), call `finishWorkflow(failed, "human approved but auto-merge failed: <reason>; PR remains open")` so the PR is visible for manual triage. The human approval gate is reached after: both reviewer verdicts parse cleanly per §C, the union of findings filtered to `severity in ('blocker', 'major')` is empty, AND the CI quality gate is green (either inline via `gh pr checks --json` or via a subsequent `ci-waiter` whose `verdict.json` is `APPROVE`). The success `summary` records `iterations` (count of `official/engineer` nodes in the final DAG), `minor_findings_remaining` (visibility — the work ships with them outstanding), `ci` (`"all green"` or `"all green (waited)"`), and `approved_by: "human"`.
 
 No hard iteration cap is baked into this strategy; coord uses its judgment to call `finishWorkflow(failed, "convergence stalled — N iterations and still seeing the same finding category")` when iteration is no longer productive (e.g. the same blocker keeps reappearing, CI keeps flaking on the same job). Coord may also insert a human intervention node when it detects ambiguity or repeated failures requiring human judgment.
 
@@ -291,7 +307,7 @@ Every `(parent role, parent terminal status)` cell on every expected parent role
 | 1 parent | `official/reviewer` worker (ci-waiter) | `succeeded`, verdict REQUEST_CHANGES | "one parent, reviewer, succeeded" (ci-waiter terminal) | addSubgraph next dev iter |
 | 1 parent | `official/reviewer` worker (ci-waiter) | `failed` | "one parent, reviewer, failed/cancelled" (ci-waiter failed) | finish(failed, "ci-waiter iteration ended in failed") |
 | 1 parent | `official/reviewer` worker (ci-waiter) | `cancelled` | "one parent, reviewer, failed/cancelled" (ci-waiter failed) | finish(failed, "ci-waiter iteration ended in cancelled") |
-| 1 parent | human node | `succeeded`, choiceId="approve" | "one parent, human, succeeded" | finish(succeeded) |
+| 1 parent | human node | `succeeded`, choiceId="approve" | "one parent, human, succeeded" | merge PR via `gh pr merge --squash --delete-branch`, then finish(succeeded) on merge success / finish(failed, "auto-merge failed") on merge failure |
 | 1 parent | human node | `succeeded`, choiceId="changes" | "one parent, human, succeeded" | addSubgraph next dev iter + next-coord (include human input as guidance) |
 | 1 parent | human node | `succeeded`, choiceId="cancel" | "one parent, human, succeeded" | finish(failed, "cancelled by human") |
 | 1 parent | human node | `succeeded`, freeform only (no choiceId) | "one parent, human, succeeded" | addSubgraph next dev iter + next-coord (interpret input as guidance) |
