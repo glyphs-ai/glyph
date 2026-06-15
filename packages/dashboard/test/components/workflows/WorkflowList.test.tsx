@@ -10,6 +10,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHead
     status: "running",
     coordinatorAgent: "official/engineer",
     metadata: {},
+    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
     iterationCount: 0,
     ...overrides,
@@ -108,5 +109,55 @@ describe("WorkflowList — single-open menu coordination", () => {
     fireEvent.click(screen.getByTestId("workflow-row-menu-trigger-wf-2"));
     expect(onMenuOpenChange).toHaveBeenCalledTimes(1);
     expect(onMenuOpenChange).toHaveBeenCalledWith("wf-2");
+  });
+});
+
+describe("WorkflowList — Awaiting you group", () => {
+  it("renders 'Awaiting you' group when a workflow has awaitingHumanCount > 0", () => {
+    const workflows = [
+      makeWorkflow({ id: "wf-awaiting", brief: "Awaiting", awaitingHumanCount: 1 }),
+      makeWorkflow({ id: "wf-running", brief: "Running" }),
+      makeWorkflow({ id: "wf-done", brief: "Done", status: "succeeded" }),
+    ];
+    render(
+      <WorkflowList
+        workflows={workflows}
+        selectedId={null}
+        onSelect={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+        openMenuId={null}
+        onMenuOpenChange={vi.fn()}
+      />,
+    );
+    const headers = screen.getAllByRole("button", { expanded: true });
+    const labels = headers.map((h) => h.textContent);
+    expect(labels[0]).toContain("Awaiting you");
+    expect(labels[1]).toContain("Running");
+    expect(labels[2]).toContain("Completed");
+  });
+
+  it("group order is awaiting → running → completed", () => {
+    const workflows = [
+      makeWorkflow({ id: "wf-done", brief: "Done", status: "succeeded" }),
+      makeWorkflow({ id: "wf-awaiting", brief: "Awaiting", awaitingHumanCount: 2 }),
+      makeWorkflow({ id: "wf-running", brief: "Running" }),
+    ];
+    render(
+      <WorkflowList
+        workflows={workflows}
+        selectedId={null}
+        onSelect={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+        openMenuId={null}
+        onMenuOpenChange={vi.fn()}
+      />,
+    );
+    const sections = document.querySelectorAll(".task-list-group");
+    expect(sections).toHaveLength(3);
+    expect(sections[0]?.textContent).toContain("Awaiting you");
+    expect(sections[1]?.textContent).toContain("Running");
+    expect(sections[2]?.textContent).toContain("Completed");
   });
 });

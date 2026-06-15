@@ -44,6 +44,8 @@ const NODE_ID_MIG_COORD_0 = "c000aaaa-1f3a-4b9c-8a00-20260608c000";
 const NODE_ID_MIG_TASK_1A = "c1a1aaaa-1f3a-4b9c-9a01-20260608c1a0";
 const NODE_ID_MIG_COORD_2 = "c002aaaa-1f3a-4b9c-8a02-20260608c002";
 const NODE_ID_MIG_TASK_3A = "c3a3aaaa-1f3a-4b9c-9a03-20260608c3a0";
+const NODE_ID_APPROVE_COORD_0 = "c000eeee-5a7b-4c9d-8e00-20260608e000";
+const NODE_ID_APPROVE_HUMAN_1 = "c1h1eeee-5a7b-4c9d-9e01-20260608e1h0";
 const NODE_ID_LOG_COORD_0 = "c000bbbb-2e4b-4cad-8b00-20260607c000";
 const NODE_ID_LOG_TASK_1A = "c1a1bbbb-2e4b-4cad-9b01-20260607c1a0";
 const NODE_ID_LOG_TASK_1B = "c1b1bbbb-2e4b-4cad-9b01-20260607c1b0";
@@ -62,6 +64,7 @@ const TASK_ID_MIG_COORD_0 = "20260608-c0000000";
 const TASK_ID_MIG_TASK_1A = "20260608-71a00001";
 const TASK_ID_MIG_COORD_2 = "20260608-c0000002";
 const TASK_ID_MIG_TASK_3A = "20260608-73a00003";
+const TASK_ID_APPROVE_COORD_0 = "20260608-e0000000";
 const TASK_ID_LOG_COORD_0 = "20260607-c0000000";
 const TASK_ID_LOG_TASK_1A = "20260607-71a00001";
 const TASK_ID_LOG_TASK_1B = "20260607-71b00001";
@@ -75,6 +78,8 @@ export const fixtureWorkflowMockIds = {
     migTask1a: NODE_ID_MIG_TASK_1A,
     migCoord2: NODE_ID_MIG_COORD_2,
     migTask3a: NODE_ID_MIG_TASK_3A,
+    approveCoord0: NODE_ID_APPROVE_COORD_0,
+    approveHuman1: NODE_ID_APPROVE_HUMAN_1,
     logCoord0: NODE_ID_LOG_COORD_0,
     logTask1a: NODE_ID_LOG_TASK_1A,
     logTask1b: NODE_ID_LOG_TASK_1B,
@@ -87,6 +92,7 @@ export const fixtureWorkflowMockIds = {
     migTask1a: TASK_ID_MIG_TASK_1A,
     migCoord2: TASK_ID_MIG_COORD_2,
     migTask3a: TASK_ID_MIG_TASK_3A,
+    approveCoord0: TASK_ID_APPROVE_COORD_0,
     logCoord0: TASK_ID_LOG_COORD_0,
     logTask1a: TASK_ID_LOG_TASK_1A,
     logTask1b: TASK_ID_LOG_TASK_1B,
@@ -105,9 +111,23 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     status: "running",
     coordinatorAgent: "official/engineer",
     metadata: {},
+    awaitingHumanCount: 0,
     createdAt: iso(-180),
     startedAt: iso(-180),
     iterationCount: 3,
+  },
+  {
+    id: "20260608-5a7b9c1f",
+    brief: "Review deployment plan and approve rollout strategy",
+    details:
+      "Coordinator dispatched a human node asking for approval on the multi-region rollout plan before proceeding.",
+    status: "running",
+    coordinatorAgent: "official/engineer",
+    metadata: {},
+    awaitingHumanCount: 1,
+    createdAt: iso(-60),
+    startedAt: iso(-60),
+    iterationCount: 2,
   },
   {
     id: "20260607-2e4b8cad",
@@ -117,6 +137,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     status: "succeeded",
     coordinatorAgent: "official/reviewer",
     metadata: {},
+    awaitingHumanCount: 0,
     createdAt: iso(-1440),
     startedAt: iso(-1440),
     endedAt: iso(-1320),
@@ -129,6 +150,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     status: "failed",
     coordinatorAgent: "official/engineer",
     metadata: {},
+    awaitingHumanCount: 0,
     createdAt: iso(-2880),
     startedAt: iso(-2880),
     endedAt: iso(-2820),
@@ -142,6 +164,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     status: "cancelled",
     coordinatorAgent: "official/designer",
     metadata: {},
+    awaitingHumanCount: 0,
     createdAt: iso(-4320),
     startedAt: iso(-4320),
     endedAt: iso(-4200),
@@ -222,7 +245,7 @@ const dagRunningMultistage: WorkflowDagWire = {
 };
 
 const dagSucceededSimple: WorkflowDagWire = {
-  workflow: fixtureWorkflows[1]!,
+  workflow: fixtureWorkflows[2]!,
   nodes: [
     {
       id: NODE_ID_LOG_COORD_0,
@@ -279,7 +302,7 @@ const dagSucceededSimple: WorkflowDagWire = {
 };
 
 const dagFailedEarly: WorkflowDagWire = {
-  workflow: fixtureWorkflows[2]!,
+  workflow: fixtureWorkflows[3]!,
   nodes: [
     {
       id: NODE_ID_BUMP_COORD_0,
@@ -299,7 +322,7 @@ const dagFailedEarly: WorkflowDagWire = {
 };
 
 const dagCancelledLate: WorkflowDagWire = {
-  workflow: fixtureWorkflows[3]!,
+  workflow: fixtureWorkflows[4]!,
   nodes: [
     {
       id: NODE_ID_BRAND_COORD_0,
@@ -335,9 +358,41 @@ const dagCancelledLate: WorkflowDagWire = {
   edges: [{ from: NODE_ID_BRAND_COORD_0, to: NODE_ID_BRAND_TASK_1A }],
 };
 
+const dagAwaitingHuman: WorkflowDagWire = {
+  workflow: fixtureWorkflows[1]!,
+  nodes: [
+    {
+      id: NODE_ID_APPROVE_COORD_0,
+      workflowId: "20260608-5a7b9c1f",
+      status: "succeeded",
+      phase: 0,
+      taskId: TASK_ID_APPROVE_COORD_0,
+      spec: { kind: "coordinator", agent: "official/engineer" },
+      metadata: {},
+      createdAt: iso(-60),
+      readyAt: iso(-60),
+      runningAt: iso(-60),
+      endedAt: iso(-50),
+    },
+    {
+      id: NODE_ID_APPROVE_HUMAN_1,
+      workflowId: "20260608-5a7b9c1f",
+      status: "running",
+      phase: 1,
+      spec: { kind: "human", prompt: "Approve the multi-region rollout plan?" },
+      metadata: {},
+      createdAt: iso(-49),
+      readyAt: iso(-49),
+      runningAt: iso(-48),
+    },
+  ],
+  edges: [{ from: NODE_ID_APPROVE_COORD_0, to: NODE_ID_APPROVE_HUMAN_1 }],
+};
+
 export const fixtureWorkflowDags: ReadonlyMap<string, WorkflowDagWire> = new Map([
   [fixtureWorkflows[0]!.id, dagRunningMultistage],
-  [fixtureWorkflows[1]!.id, dagSucceededSimple],
-  [fixtureWorkflows[2]!.id, dagFailedEarly],
-  [fixtureWorkflows[3]!.id, dagCancelledLate],
+  [fixtureWorkflows[1]!.id, dagAwaitingHuman],
+  [fixtureWorkflows[2]!.id, dagSucceededSimple],
+  [fixtureWorkflows[3]!.id, dagFailedEarly],
+  [fixtureWorkflows[4]!.id, dagCancelledLate],
 ]);

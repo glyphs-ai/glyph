@@ -466,6 +466,7 @@ export const handlers = [
       status: "running",
       coordinatorAgent: body.coordinatorAgent,
       metadata: body.metadata ?? {},
+      awaitingHumanCount: 0,
       createdAt: now,
       startedAt: now,
       iterationCount: 0,

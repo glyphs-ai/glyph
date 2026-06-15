@@ -33,6 +33,7 @@ function makeWorkflow(): WorkflowHeaderWire {
     status: "running",
     coordinatorAgent: "official/engineer",
     metadata: {},
+    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
     iterationCount: 0,
   };
