@@ -617,9 +617,9 @@ describe("CatalogService.install", () => {
     // lock in whatever the actual flow produces.
     // Because the skill was never installed, the agent's
     // resolveDepOrigins will throw — so the agent lands in `failed`.
-    expect(result.failed.some((f) => f.kind === "agent" && f.fqn === "public/broken-dep-agent")).toBe(
-      true,
-    );
+    expect(
+      result.failed.some((f) => f.kind === "agent" && f.fqn === "public/broken-dep-agent"),
+    ).toBe(true);
   });
 
   it("agent dep is installed via DB seam — no workDir materialization", async () => {
