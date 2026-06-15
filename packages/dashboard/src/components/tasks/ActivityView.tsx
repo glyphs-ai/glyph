@@ -1,7 +1,7 @@
-import Ansi from "ansi-to-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ActivityItem, TaskActivity } from "../../api";
 import { formatAbsolute, formatRelative } from "../../utils/time";
+import { Ansi } from "./Ansi";
 
 /**
  * Activity view + supporting row renderers for the runtime-neutral
