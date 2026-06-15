@@ -105,6 +105,7 @@ export interface CatalogInstallResult {
   readonly installed: readonly CatalogInstalledEntry[];
   readonly skipped: readonly CatalogInstallSkip[];
   readonly failed: readonly CatalogInstallFailure[];
+  readonly conflicts: readonly CatalogConflict[];
 }
 
 export interface CatalogSyncResult extends CatalogInstallResult {

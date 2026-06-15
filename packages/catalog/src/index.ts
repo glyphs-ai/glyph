@@ -17,6 +17,7 @@ export {
   AgentNotFoundError,
   AgentOriginConflictError,
   AgentPlanStaleError,
+  AgentUnresolvedDepError,
 } from "./agent/errors.js";
 // ─── Entities + service namespaces ──────────────────
 export type { AgentFetcher } from "./agent/index.js";
@@ -84,6 +85,7 @@ export {
   SkillNameInvalidError,
   SkillNotFoundError,
   SkillOriginConflictError,
+  SkillUnresolvedDepError,
 } from "./skill/errors.js";
 export type { SkillFetcher } from "./skill/index.js";
 export * as skill from "./skill/index.js";

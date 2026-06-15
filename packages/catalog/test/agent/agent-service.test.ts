@@ -7,6 +7,7 @@ import {
   AgentNotFoundError,
   AgentOriginConflictError,
   AgentPlanStaleError,
+  AgentUnresolvedDepError,
 } from "../../src/agent/errors.js";
 import { type EntryFile, safeNormalize } from "../../src/fetcher/index.js";
 import { bootstrapCatalogDb } from "../helpers/bootstrap.js";
@@ -326,5 +327,73 @@ with multiple lines
       name: "ImmutableOriginError",
       fqn: "public/upstream-meta",
     });
+  });
+});
+
+// ─── resolveDepOrigins — fail-loud ───────────────────────────────
+
+describe("AgentService — resolveDepOrigins fail-loud", () => {
+  it("throws AgentUnresolvedDepError for unresolvable skill dep", async () => {
+    const deps = `dependencies:
+  skills:
+    - "file:/abs/skills/missing"`;
+    fetcher.set("file:/abs/agent", { "AGENTS.md": ANCHOR("agent", deps) });
+    const skillRepo = new (await import("../../src/skill/skill-repository.js")).SkillRepository({
+      db: orm.db,
+    });
+    svc = new AgentService({ repo, fetcher: fetcher.fetcher, siblings: { skills: skillRepo } });
+    await expect(svc.install("file:/abs/agent")).rejects.toThrow(AgentUnresolvedDepError);
+    expect(await repo.findById("public/agent")).toBeUndefined();
+  });
+
+  it("throws AgentUnresolvedDepError for unresolvable mcp dep", async () => {
+    const deps = `dependencies:
+  mcps:
+    - "file:/abs/mcps/missing"`;
+    fetcher.set("file:/abs/agent", { "AGENTS.md": ANCHOR("agent", deps) });
+    const mcpRepo = new (await import("../../src/mcp/mcp-repository.js")).McpRepository({
+      db: orm.db,
+    });
+    svc = new AgentService({ repo, fetcher: fetcher.fetcher, siblings: { mcps: mcpRepo } });
+    await expect(svc.install("file:/abs/agent")).rejects.toThrow(AgentUnresolvedDepError);
+    expect(await repo.findById("public/agent")).toBeUndefined();
+  });
+
+  it("throws AgentUnresolvedDepError for unresolvable agent-to-agent dep", async () => {
+    const deps = `dependencies:
+  agents:
+    - "file:/abs/agents/missing"`;
+    fetcher.set("file:/abs/agent", { "AGENTS.md": ANCHOR("agent", deps) });
+    await expect(svc.install("file:/abs/agent")).rejects.toThrow(AgentUnresolvedDepError);
+    expect(await repo.findById("public/agent")).toBeUndefined();
+  });
+
+  it("succeeds when dep skill is present at the declared origin", async () => {
+    const deps = `dependencies:
+  skills:
+    - "file:/abs/skills/helper"`;
+    fetcher.set("file:/abs/agent", { "AGENTS.md": ANCHOR("agent", deps) });
+    const skillRepo = new (await import("../../src/skill/skill-repository.js")).SkillRepository({
+      db: orm.db,
+    });
+    const { SkillEntity } = await import("../../src/skill/skill-entity.js");
+    const skillEntity = SkillEntity.create(
+      `---\nname: helper\ndescription: x\nversion: 1.0.0\n---\n# Body\n`,
+      "file:/abs/skills/helper",
+      "test",
+    );
+    await skillRepo.insert(
+      skillEntity,
+      new Map([
+        [
+          "SKILL.md",
+          Buffer.from("---\nname: helper\ndescription: x\nversion: 1.0.0\n---\n# Body\n"),
+        ],
+      ]),
+      { skills: [], mcps: [] },
+    );
+    svc = new AgentService({ repo, fetcher: fetcher.fetcher, siblings: { skills: skillRepo } });
+    const a = await svc.install("file:/abs/agent");
+    expect(a.fqn).toBe("public/agent");
   });
 });
