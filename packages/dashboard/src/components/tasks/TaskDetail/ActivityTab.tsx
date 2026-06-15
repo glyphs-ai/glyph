@@ -7,13 +7,20 @@ export interface ActivityTabProps {
   activity: TaskActivity | null;
   activityError: string | null;
   onLoadOlder: () => Promise<void>;
+  isStreaming?: boolean;
 }
 
 /**
  * Activity tab — the full live-tailing activity stream with
  * stick-to-bottom + load-older-on-scroll-up behaviour.
  */
-export function ActivityTab({ taskId, activity, activityError, onLoadOlder }: ActivityTabProps) {
+export function ActivityTab({
+  taskId,
+  activity,
+  activityError,
+  onLoadOlder,
+  isStreaming,
+}: ActivityTabProps) {
   return (
     <StickToBottomScroll
       className="task-detail__body"
@@ -21,7 +28,12 @@ export function ActivityTab({ taskId, activity, activityError, onLoadOlder }: Ac
       followKey={activity?.activity[activity.activity.length - 1]?.seq ?? 0}
       topAnchorKey={activity?.activity[0]?.seq ?? 0}
     >
-      <ActivityView activity={activity} activityError={activityError} onLoadOlder={onLoadOlder} />
+      <ActivityView
+        activity={activity}
+        activityError={activityError}
+        onLoadOlder={onLoadOlder}
+        isStreaming={isStreaming}
+      />
     </StickToBottomScroll>
   );
 }

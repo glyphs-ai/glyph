@@ -3173,6 +3173,45 @@ button {
   color: var(--color-text);
 }
 
+/* Streaming indicator — pulsing dots + label shown at the bottom of
+   the activity list while the task agent is actively working. Sits
+   inside StickToBottomScroll so auto-scroll brings it into view. */
+
+.activity-streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.activity-streaming-indicator__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: activity-streaming-pulse 1.2s ease-in-out infinite;
+}
+
+.activity-streaming-indicator__dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.activity-streaming-indicator__dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.activity-streaming-indicator__label {
+  font-size: 12px;
+  color: var(--color-text-subtle);
+  margin-left: 4px;
+}
+
+@keyframes activity-streaming-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
 /*  ResolveTree (install preview) ─ */
 
 .resolve-tree {

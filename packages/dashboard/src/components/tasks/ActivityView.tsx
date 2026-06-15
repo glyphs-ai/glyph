@@ -1,3 +1,4 @@
+import Ansi from "ansi-to-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ActivityItem, TaskActivity } from "../../api";
 import { formatAbsolute, formatRelative } from "../../utils/time";
@@ -13,10 +14,12 @@ export function ActivityView({
   activity,
   activityError,
   onLoadOlder,
+  isStreaming = false,
 }: {
   activity: TaskActivity | null;
   activityError: string | null;
   onLoadOlder: () => Promise<void>;
+  isStreaming?: boolean;
 }) {
   if (activity === null) {
     if (activityError) {
@@ -27,10 +30,34 @@ export function ActivityView({
         </p>
       );
     }
-    return <p className="muted">No activity yet.</p>;
+    return (
+      <>
+        <p className="muted">No activity yet.</p>
+        {isStreaming && (
+          <div className="activity-streaming-indicator" aria-live="polite">
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__label">Agent working…</span>
+          </div>
+        )}
+      </>
+    );
   }
   if (activity.activity.length === 0) {
-    return <p className="muted">No activity yet for this task.</p>;
+    return (
+      <>
+        <p className="muted">No activity yet for this task.</p>
+        {isStreaming && (
+          <div className="activity-streaming-indicator" aria-live="polite">
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__label">Agent working…</span>
+          </div>
+        )}
+      </>
+    );
   }
   const oldestSeq = activity.activity[0]?.seq ?? 0;
   const hasOlder = oldestSeq > 0;
@@ -62,6 +89,14 @@ export function ActivityView({
           <ActivityRow key={item.seq} item={item} />
         ))}
       </ol>
+      {isStreaming && (
+        <div className="activity-streaming-indicator" aria-live="polite">
+          <span className="activity-streaming-indicator__dot" />
+          <span className="activity-streaming-indicator__dot" />
+          <span className="activity-streaming-indicator__dot" />
+          <span className="activity-streaming-indicator__label">Agent working…</span>
+        </div>
+      )}
     </>
   );
 }
@@ -237,9 +272,11 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
                 Result
               </summary>
               <pre className="activity-row__pre">
-                {typeof item.result === "string"
-                  ? item.result
-                  : JSON.stringify(item.result, null, 2)}
+                {typeof item.result === "string" ? (
+                  <Ansi>{item.result}</Ansi>
+                ) : (
+                  JSON.stringify(item.result, null, 2)
+                )}
               </pre>
             </details>
           )
@@ -318,11 +355,14 @@ function ToolDisplay({ content }: { content: string }) {
   if (!isLong) {
     return (
       <p className="activity-row__body" style={{ fontSize: 12 }}>
-        {content}
+        <Ansi>{content}</Ansi>
       </p>
     );
   }
-  const previewSrc = content.split("\n", 1)[0] ?? content;
+  // Strip ANSI escapes from preview to avoid splitting an escape sequence mid-byte.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional ANSI escape matching
+  const ANSI_RE = /\x1b\[[0-9;]*m/g;
+  const previewSrc = (content.split("\n", 1)[0] ?? content).replace(ANSI_RE, "");
   const preview =
     previewSrc.length > TOOL_DISPLAY_PREVIEW_CHARS
       ? `${previewSrc.slice(0, TOOL_DISPLAY_PREVIEW_CHARS)}…`
@@ -331,11 +371,11 @@ function ToolDisplay({ content }: { content: string }) {
     <div>
       {expanded ? (
         <pre id={bodyId} className="activity-row__pre">
-          {content}
+          <Ansi>{content}</Ansi>
         </pre>
       ) : (
         <p id={bodyId} className="activity-row__body" style={{ fontSize: 12 }}>
-          {preview}
+          <Ansi>{preview}</Ansi>
         </p>
       )}
       <button

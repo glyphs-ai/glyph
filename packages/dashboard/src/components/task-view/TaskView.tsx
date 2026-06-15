@@ -155,6 +155,7 @@ export function TaskView({
           activity={activity}
           activityError={activityError}
           onLoadOlder={onLoadOlder}
+          isStreaming={isRunning}
         />
       )}
       {task && tab === "artifacts" && <ArtifactsTab task={task} />}
