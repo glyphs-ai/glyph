@@ -130,7 +130,7 @@ describe("OverviewTab — awaiting CTA", () => {
     workflowId: "wf-1",
     phase: 1,
     status: "running",
-    spec: { kind: "human", prompt: "Please confirm" },
+    spec: { kind: "human", prompt: "Please confirm", promptStyle: "plain" },
     createdAt: "2026-05-28T00:01:00.000Z",
   } as unknown as WorkflowNodeWire;
 

@@ -438,13 +438,37 @@ export interface HumanNodeChoice {
  * external human input.
  *
  *   - `prompt` — required non-empty string shown to the human.
+ *   - `promptStyle` — required rendering hint for `prompt`. Coord MUST
+ *     consciously declare format on every human-node insertion.
+ *     Renderers dispatch:
+ *       - `"plain"` — literal text (whitespace-folded by HTML normal
+ *         rules); choose for single-sentence prompts and any text
+ *         that contains characters a markdown renderer would
+ *         interpret (asterisks, backticks, underscores in identifiers).
+ *       - `"markdown"` — block elements via the dashboard's in-house
+ *         renderer (headings / lists / code blocks / inline emphasis /
+ *         safe links). Choose whenever the prompt uses any formatting.
+ *     Future styles MAY be added; consumers MUST handle the union
+ *     exhaustively.
  *   - `choices` — optional array of up to {@link HUMAN_MAX_CHOICES}
  *     selectable options. An omitted or empty array means freeform-only.
  */
 export interface HumanNodeSpec {
   readonly prompt: string;
+  readonly promptStyle: HumanNodePromptStyle;
   readonly choices?: readonly HumanNodeChoice[];
 }
+
+/**
+ * Closed enum of supported prompt rendering styles on
+ * {@link HumanNodeSpec.promptStyle}. Extending the union is a
+ * backward-compatible schema change as long as renderers continue to
+ * fall back to `"plain"` for unknown values.
+ */
+export type HumanNodePromptStyle = "plain" | "markdown";
+
+/** All valid {@link HumanNodePromptStyle} values; used by validators. */
+export const HUMAN_PROMPT_STYLES: readonly HumanNodePromptStyle[] = ["plain", "markdown"];
 
 /**
  * Response shape written into `node.metadata.response` when a human

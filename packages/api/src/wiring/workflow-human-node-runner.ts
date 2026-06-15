@@ -4,7 +4,8 @@
  * A human node is a gate that waits indefinitely for external input
  * via the respond API. The runner:
  *
- *   - **validate**: ensures spec has a non-empty `prompt` string and
+ *   - **validate**: ensures spec has a non-empty `prompt` string, a
+ *     `promptStyle` enum value (`"plain"` | `"markdown"`), and an
  *     optional `choices` array (≤5 entries, each with unique non-
  *     reserved `id` + non-empty `label`).
  *   - **dispatch**: no-op — the node sits in `running` until the
@@ -17,6 +18,8 @@
 
 import {
   HUMAN_MAX_CHOICES,
+  HUMAN_PROMPT_STYLES,
+  type HumanNodePromptStyle,
   type HumanNodeSpec,
   WorkflowError,
   type WorkflowNodeDispatchOpts,
@@ -44,6 +47,21 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
       if (typeof s.prompt !== "string" || s.prompt.trim().length === 0) {
         throw new WorkflowError("human node spec.prompt must be a non-empty string");
       }
+
+      if (s.promptStyle === undefined) {
+        throw new WorkflowError(
+          `human node spec.promptStyle is required; must be one of: ${HUMAN_PROMPT_STYLES.join(", ")}`,
+        );
+      }
+      if (
+        typeof s.promptStyle !== "string" ||
+        !(HUMAN_PROMPT_STYLES as readonly string[]).includes(s.promptStyle)
+      ) {
+        throw new WorkflowError(
+          `human node spec.promptStyle must be one of: ${HUMAN_PROMPT_STYLES.join(", ")}`,
+        );
+      }
+      const promptStyle = s.promptStyle as HumanNodePromptStyle;
 
       const choices = s.choices;
       if (choices !== undefined) {
@@ -82,6 +100,7 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
       // Return the validated/normalized spec
       const validated: HumanNodeSpec = {
         prompt: s.prompt as string,
+        promptStyle,
         ...(choices !== undefined
           ? {
               choices: (choices as Array<{ id: string; label: string }>).map((c) => ({

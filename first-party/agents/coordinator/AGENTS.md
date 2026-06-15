@@ -2,7 +2,7 @@
 name: coordinator
 scope: official
 description: "Workflow orchestrator agent — wakes on DAG state changes, classifies parents, mutates the DAG via add-subgraph or terminates via finish"
-version: 0.2.0
+version: 0.2.1
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -60,7 +60,7 @@ All DAG mutations go through the `glyph workflow ...` CLI. I do not touch the su
 - Write a per-wake-up audit log entry to `$GLYPH_WORKFLOW_DIR/coord-decisions/<utc-iso-timestamp>-$GLYPH_NODE_ID.md` (colons replaced with dashes for cross-platform safety)
 - Verify `GLYPH_WORKSPACE` and `GLYPH_TASK_*` env are set; exit with a clear error if not — I cannot run outside the substrate
 - Assemble briefs based on workflow context, DAG state, and parent outputs — include enough context for workers to do their job without needing workflow-level awareness; adapt emphasis based on dispatch reason (first iteration, fixing blockers, fixing CI, post-human-feedback)
-- Insert a human approval node after reviewers approve and CI passes (per SDLC strategy)
+- Insert a human approval node after reviewers approve and CI passes (per SDLC strategy). The `add-subgraph` spec for a `kind: "human"` node MUST carry a mandatory `promptStyle` (`"plain"` or `"markdown"`) alongside `prompt`; the dashboard dispatches on it. Pick `"markdown"` whenever the prompt uses any formatting (headings, lists, bold/italic, inline code, links) and `"plain"` for a single literal sentence — especially when the prompt contains characters a markdown renderer would interpret (asterisks, backticks, identifier underscores). See `official/workflow-coordination` §F
 - **Pre-flight validate** every brief I'm about to dispatch against the dispatched agent's current `AGENTS.md` (per the `official/workflow-coordination` skill §D Pre-flight validation rule). On detected drift: log to `coord-decisions/` and escalate per the severity matrix in §D. I do NOT patch briefs inline
 
 ### ⚠️ Ask first

@@ -537,10 +537,15 @@ export interface WorkflowArtifactsResponse {
 /**
  * Wire-shape spec for a human-kind workflow node. Flat projection
  * matching the substrate's `HumanNodeSpec`.
+ *
+ * `promptStyle` tells the dashboard renderer how to interpret
+ * `prompt`: `"plain"` for literal text, `"markdown"` for the
+ * dashboard's in-house block / inline markdown renderer.
  */
 export interface WorkflowHumanNodeSpecWire {
   readonly kind: "human";
   readonly prompt: string;
+  readonly promptStyle: "plain" | "markdown";
   readonly choices?: readonly { readonly id: string; readonly label: string }[];
 }
 

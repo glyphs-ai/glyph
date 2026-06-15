@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import type {
   RespondHumanNodeBody,
   WorkflowDagWire,
@@ -7,6 +7,7 @@ import type {
   WorkflowNodeWire,
 } from "../../api";
 import { respondHumanNode } from "../../api/workflows.js";
+import { MarkdownSummary } from "../../components/tasks/TaskDetail/MarkdownSummary";
 import { WORKFLOW_NODE_STATUS_LABEL } from "../../components/workflows/shared";
 import { orderNodesForNav } from "./workflow-nav-utils.js";
 
@@ -146,7 +147,7 @@ function HumanNodeContent({ node }: HumanNodeContentProps) {
   if (status === "not_started" || status === "ready") {
     return (
       <div className="human-respond-panel__body" data-testid="human-content-waiting">
-        <p className="human-respond-panel__prompt">{spec.prompt}</p>
+        {renderPrompt(spec)}
         {choices.length > 0 && (
           <div className="human-respond-panel__choices">
             {choices.map((c) => (
@@ -177,7 +178,7 @@ function HumanNodeContent({ node }: HumanNodeContentProps) {
     const inputText = response?.input;
     return (
       <div className="human-respond-panel__body" data-testid="human-content-succeeded">
-        <p className="human-respond-panel__prompt">{spec.prompt}</p>
+        {renderPrompt(spec)}
         {choices.length > 0 && (
           <div className="human-respond-panel__choices">
             {choices.map((c) => (
@@ -199,11 +200,37 @@ function HumanNodeContent({ node }: HumanNodeContentProps) {
   // failed / cancelled
   return (
     <div className="human-respond-panel__body" data-testid="human-content-terminal">
-      <p className="human-respond-panel__prompt">{spec.prompt}</p>
+      {renderPrompt(spec)}
       <p className="muted" style={{ marginTop: 12 }}>
         Node {status === "failed" ? "failed" : "was cancelled"}
       </p>
     </div>
+  );
+}
+
+/**
+ * Dispatch the prompt to the renderer chosen by `spec.promptStyle`.
+ *
+ * The substrate marks `promptStyle` mandatory at write time, but
+ * in-flight human nodes stored before that contract landed do not
+ * carry the field. Falling back to `"plain"` preserves the literal
+ * rendering those nodes had when authored — a coord-intended plain
+ * prompt like "Pick version 1.0.*" must not start italicising itself
+ * after the schema lands.
+ */
+function renderPrompt(spec: WorkflowHumanNodeSpecWire): ReactNode {
+  const style = spec.promptStyle ?? "plain";
+  if (style === "markdown") {
+    return (
+      <div className="human-respond-panel__prompt" data-testid="human-prompt-markdown">
+        <MarkdownSummary source={spec.prompt} />
+      </div>
+    );
+  }
+  return (
+    <p className="human-respond-panel__prompt" data-testid="human-prompt-plain">
+      {spec.prompt}
+    </p>
   );
 }
 
@@ -242,7 +269,7 @@ function HumanRespondForm({ node, spec, choices }: HumanRespondFormProps) {
 
   return (
     <div className="human-respond-panel__body" data-testid="human-content-running">
-      <p className="human-respond-panel__prompt">{spec.prompt}</p>
+      {renderPrompt(spec)}
       {choices.length > 0 && (
         <fieldset className="human-respond-panel__choices" aria-label="Choices">
           {choices.map((c) => (

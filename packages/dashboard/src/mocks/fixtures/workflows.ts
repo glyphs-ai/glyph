@@ -46,6 +46,7 @@ const NODE_ID_MIG_COORD_2 = "c002aaaa-1f3a-4b9c-8a02-20260608c002";
 const NODE_ID_MIG_TASK_3A = "c3a3aaaa-1f3a-4b9c-9a03-20260608c3a0";
 const NODE_ID_APPROVE_COORD_0 = "c000eeee-5a7b-4c9d-8e00-20260608e000";
 const NODE_ID_APPROVE_HUMAN_1 = "c1h1eeee-5a7b-4c9d-9e01-20260608e1h0";
+const NODE_ID_APPROVE_HUMAN_2 = "c2h2eeee-5a7b-4c9d-9e02-20260608e2h0";
 const NODE_ID_LOG_COORD_0 = "c000bbbb-2e4b-4cad-8b00-20260607c000";
 const NODE_ID_LOG_TASK_1A = "c1a1bbbb-2e4b-4cad-9b01-20260607c1a0";
 const NODE_ID_LOG_TASK_1B = "c1b1bbbb-2e4b-4cad-9b01-20260607c1b0";
@@ -379,14 +380,51 @@ const dagAwaitingHuman: WorkflowDagWire = {
       workflowId: "20260608-5a7b9c1f",
       status: "running",
       phase: 1,
-      spec: { kind: "human", prompt: "Approve the multi-region rollout plan?" },
+      spec: {
+        kind: "human",
+        prompt: "Approve the multi-region rollout plan?",
+        promptStyle: "plain",
+      },
       metadata: {},
       createdAt: iso(-49),
       readyAt: iso(-49),
       runningAt: iso(-48),
     },
+    {
+      id: NODE_ID_APPROVE_HUMAN_2,
+      workflowId: "20260608-5a7b9c1f",
+      status: "running",
+      phase: 1,
+      spec: {
+        kind: "human",
+        prompt: [
+          "## Rollout window",
+          "",
+          "Pick a maintenance window for the **multi-region** push:",
+          "",
+          "- Saturday 02:00 UTC (lowest traffic)",
+          "- Sunday 14:00 UTC (operator on-call coverage)",
+          "- Monday 09:00 UTC (full team available)",
+          "",
+          "Reply with any caveats in the freeform field.",
+        ].join("\n"),
+        promptStyle: "markdown",
+        choices: [
+          { id: "sat-02-utc", label: "Saturday 02:00 UTC" },
+          { id: "sun-14-utc", label: "Sunday 14:00 UTC" },
+          { id: "mon-09-utc", label: "Monday 09:00 UTC" },
+        ],
+      },
+      metadata: {},
+      createdAt: iso(-48),
+      readyAt: iso(-48),
+      runningAt: iso(-47),
+    },
   ],
-  edges: [{ from: NODE_ID_APPROVE_COORD_0, to: NODE_ID_APPROVE_HUMAN_1 }],
+  edges: [
+    { from: NODE_ID_APPROVE_COORD_0, to: NODE_ID_APPROVE_HUMAN_1 },
+    { from: NODE_ID_APPROVE_COORD_0, to: NODE_ID_APPROVE_HUMAN_2 },
+  ],
 };
 
 export const fixtureWorkflowDags: ReadonlyMap<string, WorkflowDagWire> = new Map([
