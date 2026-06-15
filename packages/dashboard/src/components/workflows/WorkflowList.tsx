@@ -102,6 +102,7 @@ export function WorkflowList({
                     onMenuOpenChange={(open) => onMenuOpenChange(open ? w.id : null)}
                     posinset={idx + 1}
                     setsize={arr.length}
+                    awaitingHumanCount={w.awaitingHumanCount}
                   />
                 ))}
               </ul>

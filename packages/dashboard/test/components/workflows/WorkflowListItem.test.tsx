@@ -306,6 +306,82 @@ describe("WorkflowListItem — row `⋯` menu", () => {
   });
 });
 
+describe("WorkflowListItem — amber awaiting pill", () => {
+  it("renders amber 'Awaiting' pill when status=running and awaitingHumanCount > 0", () => {
+    const onSelect = vi.fn();
+    const onCancel = vi.fn();
+    const onDelete = vi.fn();
+    const onMenuOpenChange = vi.fn();
+    const wf = makeWorkflow({ status: "running", awaitingHumanCount: 2 });
+    render(
+      <ul>
+        <WorkflowListItem
+          workflow={wf}
+          selected={false}
+          onSelect={onSelect}
+          onCancel={onCancel}
+          onDelete={onDelete}
+          menuOpen={false}
+          onMenuOpenChange={onMenuOpenChange}
+          posinset={1}
+          setsize={1}
+          awaitingHumanCount={2}
+        />
+      </ul>,
+    );
+    const row = screen.getByTestId(`workflow-row-${wf.id}`);
+    const pill = row.querySelector(".badge--warn");
+    expect(pill).not.toBeNull();
+    expect(pill?.textContent?.trim()).toBe("Awaiting");
+    expect(pill?.querySelector(".badge__dot--pulse")).not.toBeNull();
+  });
+
+  it("renders standard WorkflowStatusBadge when awaitingHumanCount is 0", () => {
+    const wf = makeWorkflow({ status: "running", awaitingHumanCount: 0 });
+    render(
+      <ul>
+        <WorkflowListItem
+          workflow={wf}
+          selected={false}
+          onSelect={vi.fn()}
+          onCancel={vi.fn()}
+          onDelete={vi.fn()}
+          menuOpen={false}
+          onMenuOpenChange={vi.fn()}
+          posinset={1}
+          setsize={1}
+          awaitingHumanCount={0}
+        />
+      </ul>,
+    );
+    const row = screen.getByTestId(`workflow-row-${wf.id}`);
+    expect(row.querySelector(".badge--warn")).toBeNull();
+    expect(row.textContent).toContain("Running");
+  });
+
+  it("renders standard badge for non-running status even with awaitingHumanCount > 0", () => {
+    const wf = makeWorkflow({ status: "succeeded", awaitingHumanCount: 1 });
+    render(
+      <ul>
+        <WorkflowListItem
+          workflow={wf}
+          selected={false}
+          onSelect={vi.fn()}
+          onCancel={vi.fn()}
+          onDelete={vi.fn()}
+          menuOpen={false}
+          onMenuOpenChange={vi.fn()}
+          posinset={1}
+          setsize={1}
+          awaitingHumanCount={1}
+        />
+      </ul>,
+    );
+    const row = screen.getByTestId(`workflow-row-${wf.id}`);
+    expect(row.querySelector(".badge--warn")).toBeNull();
+  });
+});
+
 describe("WorkflowListItem — row-menu placement", () => {
   it("flips an opened menu to `--above` when the next row's trigger would be overlapped", () => {
     // Geometry: row A's trigger at the middle of the viewport, row B's
