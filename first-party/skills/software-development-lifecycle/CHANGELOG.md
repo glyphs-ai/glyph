@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 (2026-06-15)
+
+- **§B approve branch now actually merges the PR.** Previously `choiceId == "approve"` only called `finishWorkflow(succeeded, ...)`, leaving the PR open and forcing the human to manually `gh pr merge` after the workflow ended — contradicting the human-node's "Approve & merge" choice label. The branch now calls `gh pr merge <pr_number> --repo <owner/repo> --squash --delete-branch` before finishing the workflow. Squash strategy is hardcoded (matches the dominant observed user preference across all SDLC ports to date). On merge failure (non-mergeable, push race, branch protection), the workflow finishes `failed` with a clear reason and the PR remains open for manual triage. §Stop-condition prose and §Failure-mode coverage table updated to match.
+
 ## 0.2.1 (2026-06-12)
 
 - Realign brief templates and the `${PR_NUMBER}` / `${BRANCH_NAME}` placeholder-derivation prose to the new CLI id-flag convention (`packages/cli/README.md` → "Naming conventions"): `glyph task show --tid <id>` → `glyph task show <id>` (positional); `glyph workflow dag --wfid ${WORKFLOW_ID}` → `glyph workflow dag ${WORKFLOW_ID}` (positional). Documentation-only change.
