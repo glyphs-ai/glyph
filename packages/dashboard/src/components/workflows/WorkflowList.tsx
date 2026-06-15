@@ -41,19 +41,24 @@ export function WorkflowList({
   onMenuOpenChange,
 }: WorkflowListProps) {
   const groups = useMemo<Group[]>(() => {
+    const awaiting: WorkflowHeaderWire[] = [];
     const running: WorkflowHeaderWire[] = [];
     const completed: WorkflowHeaderWire[] = [];
     for (const w of workflows) {
-      if (statusGroup(w.status) === "running") running.push(w);
+      const g = statusGroup(w.status, w.awaitingHumanCount);
+      if (g === "awaiting") awaiting.push(w);
+      else if (g === "running") running.push(w);
       else completed.push(w);
     }
     return [
-      { key: "running", label: "Running", workflows: running },
-      { key: "completed", label: "Completed", workflows: completed },
+      { key: "awaiting" as const, label: "Awaiting you", workflows: awaiting },
+      { key: "running" as const, label: "Running", workflows: running },
+      { key: "completed" as const, label: "Completed", workflows: completed },
     ];
   }, [workflows]);
 
   const [collapsed, setCollapsed] = useState<Record<StatusGroup, boolean>>({
+    awaiting: false,
     running: false,
     completed: false,
   });
@@ -97,6 +102,7 @@ export function WorkflowList({
                     onMenuOpenChange={(open) => onMenuOpenChange(open ? w.id : null)}
                     posinset={idx + 1}
                     setsize={arr.length}
+                    awaitingHumanCount={w.awaitingHumanCount}
                   />
                 ))}
               </ul>

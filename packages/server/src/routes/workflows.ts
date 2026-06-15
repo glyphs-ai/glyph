@@ -116,6 +116,7 @@ import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
 import { respondError } from "./_respond-error.js";
 import { errorBody, logEvent, parseJsonBody } from "./_shared.js";
 import {
+  countAwaitingHuman,
   iterationCountForNodes,
   projectWorkflowDag,
   projectWorkflowHeader,
@@ -509,13 +510,16 @@ export function workflowsRoutes(
     }
     if (createdSinceResult.value !== undefined) opts.createdSince = createdSinceResult.value;
     try {
-      const list = await resolve(c).list(Object.keys(opts).length === 0 ? undefined : opts);
+      const [list, awaitingMap] = await Promise.all([
+        resolve(c).list(Object.keys(opts).length === 0 ? undefined : opts),
+        resolve(c).countAwaitingHumanByWorkflow(),
+      ]);
       // `iterationCount` is omitted from list rows to keep the
       // endpoint O(workflows): computing it per row would require a
       // DAG snapshot per workflow. Clients that need the accurate
       // count fetch the header via `GET /:wfid`.
       const wire: readonly WorkflowHeaderWire[] = list.map((wf) =>
-        projectWorkflowHeader(wf, undefined),
+        projectWorkflowHeader(wf, undefined, awaitingMap.get(wf.id) ?? 0),
       );
       return c.json(wire);
     } catch (err) {
@@ -549,7 +553,7 @@ export function workflowsRoutes(
         workflowId,
         coordinatorAgent: body.coordinatorAgent,
       });
-      return c.json(projectWorkflowHeader(wf, 1), 201);
+      return c.json(projectWorkflowHeader(wf, 1, 0), 201);
     } catch (err) {
       return respondError(c, err, {
         route: "workflows.create",
@@ -564,7 +568,8 @@ export function workflowsRoutes(
     try {
       const dag = await resolve(c).getDag(wfid);
       const iter = iterationCountForNodes(dag.nodes);
-      return c.json(projectWorkflowHeader(dag.workflow, iter));
+      const awaiting = countAwaitingHuman(dag.nodes);
+      return c.json(projectWorkflowHeader(dag.workflow, iter, awaiting));
     } catch (err) {
       return respondError(c, err, {
         route: "workflows.get",
@@ -637,7 +642,7 @@ export function workflowsRoutes(
       const dag = await resolve(c).getDag(wfid);
       const iter = iterationCountForNodes(dag.nodes);
       logEvent(c, "workflow.cancel", { workflowId: wfid });
-      return c.json(projectWorkflowHeader(dag.workflow, iter));
+      return c.json(projectWorkflowHeader(dag.workflow, iter, countAwaitingHuman(dag.nodes)));
     } catch (err) {
       return respondError(c, err, {
         route: "workflows.cancel",
@@ -992,7 +997,7 @@ export function workflowsRoutes(
       const dag = await resolve(c).getDag(wfid);
       const iter = iterationCountForNodes(dag.nodes);
       logEvent(c, "workflow.finish", { workflowId: wfid, kind: body.kind });
-      return c.json(projectWorkflowHeader(dag.workflow, iter));
+      return c.json(projectWorkflowHeader(dag.workflow, iter, countAwaitingHuman(dag.nodes)));
     } catch (err) {
       return respondError(c, err, {
         route: "workflows.finish",

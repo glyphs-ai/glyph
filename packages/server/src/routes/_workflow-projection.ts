@@ -46,10 +46,15 @@ interface ProjectionTasksDep {
  * the count computed from a fresh `listNodesByWorkflow` call; list
  * routes pass `undefined` so the field is omitted from the response
  * (computing it per row would be N+1 — see {@link deriveIterationCount}).
+ *
+ * `awaitingHumanCount` is the number of human-kind nodes currently in
+ * `running` status. The caller computes it from the DAG snapshot (show/
+ * dag routes) or from a batch query (list route).
  */
 export function projectWorkflowHeader(
   wf: WorkflowEntity,
   iterationCount: number | undefined,
+  awaitingHumanCount: number,
 ): WorkflowHeaderWire {
   return {
     id: wf.id,
@@ -59,6 +64,7 @@ export function projectWorkflowHeader(
     status: wf.status,
     metadata: wf.metadata,
     ...(iterationCount !== undefined ? { iterationCount } : {}),
+    awaitingHumanCount,
     createdAt: wf.createdAt,
     ...(wf.startedAt !== undefined ? { startedAt: wf.startedAt } : {}),
     ...(wf.endedAt !== undefined ? { endedAt: wf.endedAt } : {}),
@@ -66,6 +72,14 @@ export function projectWorkflowHeader(
     ...(wf.failure !== undefined ? { failure: wf.failure } : {}),
     ...(wf.cancellation !== undefined ? { cancellation: wf.cancellation } : {}),
   };
+}
+
+/**
+ * Count human-kind nodes in `running` status from a list of nodes.
+ * Used by show/dag routes that already have the full node list in hand.
+ */
+export function countAwaitingHuman(nodes: readonly { kind: string; status: string }[]): number {
+  return nodes.filter((n) => n.kind === "human" && n.status === "running").length;
 }
 
 /**
@@ -164,11 +178,12 @@ export async function projectWorkflowDag(
 ): Promise<WorkflowDagWire> {
   const coordCount = snapshot.nodes.filter((n) => n.kind === "coordinator").length;
   const iterationCount = deriveIterationCount(coordCount);
+  const awaitingHuman = countAwaitingHuman(snapshot.nodes);
   const nodes = await Promise.all(
     snapshot.nodes.map((n) => projectWorkflowNodeWithTaskId(n, deps)),
   );
   return {
-    workflow: projectWorkflowHeader(snapshot.workflow, iterationCount),
+    workflow: projectWorkflowHeader(snapshot.workflow, iterationCount, awaitingHuman),
     nodes,
     edges: snapshot.edges.map(projectWorkflowEdge),
   };

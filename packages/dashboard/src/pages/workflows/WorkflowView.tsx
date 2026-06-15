@@ -137,6 +137,14 @@ export function WorkflowView({
     [active, focusTab],
   );
 
+  const handleGoToHumanNode = useCallback(
+    (node: WorkflowNodeWire) => {
+      setActive("graph");
+      onSelectNode(node);
+    },
+    [onSelectNode],
+  );
+
   return (
     <aside className="tasks-pane__detail workflow-detail" data-testid="workflow-detail">
       <header className="task-detail__head">
@@ -207,7 +215,9 @@ export function WorkflowView({
         // biome-ignore lint/a11y/noNoninteractiveTabindex: WAI-ARIA tabpanel pattern requires the panel itself to be focusable (`tabIndex=0`) when it has no focusable descendants so the keyboard user can shift-tab into it.
         tabIndex={0}
       >
-        {active === "overview" ? <OverviewTab workflow={workflow} /> : null}
+        {active === "overview" ? (
+          <OverviewTab workflow={workflow} dag={dag} onGoToHumanNode={handleGoToHumanNode} />
+        ) : null}
         {active === "graph" ? (
           <GraphTab
             dag={dag}

@@ -74,6 +74,12 @@ export interface WorkflowListItemProps {
   posinset: number;
   /** Total visible rows (for `aria-setsize`). */
   setsize: number;
+  /**
+   * When > 0, the row renders an amber "Awaiting" pill instead of
+   * the standard blue "Running" badge. Plumbed from
+   * `WorkflowHeaderWire.awaitingHumanCount`.
+   */
+  awaitingHumanCount?: number;
 }
 
 /**
@@ -108,6 +114,7 @@ export function WorkflowListItem({
   onMenuOpenChange,
   posinset,
   setsize,
+  awaitingHumanCount = 0,
 }: WorkflowListItemProps) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -306,7 +313,14 @@ export function WorkflowListItem({
         onClick={onSelect}
       >
         <span id={statusId} className="task-list__item-head">
-          <WorkflowStatusBadge status={workflow.status} />
+          {workflow.status === "running" && awaitingHumanCount > 0 ? (
+            <span className="badge badge--warn badge--with-dot">
+              <span className="badge__dot badge__dot--pulse" aria-hidden="true" />
+              Awaiting
+            </span>
+          ) : (
+            <WorkflowStatusBadge status={workflow.status} />
+          )}
         </span>
         <span
           id={headlineId}

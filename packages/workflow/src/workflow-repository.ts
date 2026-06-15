@@ -184,6 +184,25 @@ export class WorkflowRepository {
     return rows.map((row) => WorkflowNodeEntity.fromRow(row));
   }
 
+  /**
+   * Batch-count human-kind nodes in `running` status, grouped by
+   * workflow id. Returns a Map keyed by workflow id; workflows with
+   * zero awaiting-human nodes are absent from the map. Used by the
+   * list route to avoid an N+1 fan-out.
+   */
+  async countAwaitingHumanByWorkflow(): Promise<ReadonlyMap<string, number>> {
+    const rows = this.db
+      .select({
+        workflowId: workflowNodes.workflowId,
+        count: sql<number>`count(*)`,
+      })
+      .from(workflowNodes)
+      .where(and(eq(workflowNodes.kind, "human"), eq(workflowNodes.status, "running")))
+      .groupBy(workflowNodes.workflowId)
+      .all();
+    return new Map(rows.map((r) => [r.workflowId, r.count]));
+  }
+
   insertNode(tx: Db, entity: WorkflowNodeEntity): void {
     const row = entity.toRow();
     assertValidWorkflowNodeId(row.id);

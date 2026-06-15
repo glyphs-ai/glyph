@@ -116,6 +116,7 @@ function makeDag(): WorkflowDagSnapshot {
 function stubService(overrides: Partial<Record<keyof WorkflowService, unknown>>): WorkflowService {
   const stub: Partial<Record<keyof WorkflowService, unknown>> = {
     list: vi.fn(async () => [makeHeader()]),
+    countAwaitingHumanByWorkflow: vi.fn(async () => new Map()),
     createWorkflow: vi.fn(async () => ({ workflowId: WID, initialCoordNodeId: COORD_NID })),
     getWorkflow: vi.fn(async () => makeHeader()),
     getDag: vi.fn(async () => makeDag()),
@@ -158,6 +159,7 @@ describe("workflowsRoutes — list", () => {
     expect(body[0]?.id).toBe(WID);
     expect(body[0]).not.toHaveProperty("iterationCount");
     expect(body[0]?.status).toBe("running");
+    expect(body[0]?.awaitingHumanCount).toBe(0);
     expect(svc.list).toHaveBeenCalledWith(undefined);
   });
 
@@ -369,6 +371,7 @@ describe("workflowsRoutes — get", () => {
     // deriveIterationCount(coordNodes.length) — silent-retry coords
     // are counted too, so the seeded coord = iteration 1.
     expect(body.iterationCount).toBe(1);
+    expect(body.awaitingHumanCount).toBe(0);
   });
 
   it("GET /:wfid maps WorkflowNotFoundError to 404 with typed envelope", async () => {

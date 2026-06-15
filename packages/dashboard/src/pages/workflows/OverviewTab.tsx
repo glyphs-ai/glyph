@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
-import type { WorkflowHeaderWire } from "../../api";
+import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
 import { MarkdownSummary } from "../../components/tasks/TaskDetail/MarkdownSummary";
 
 export interface OverviewTabProps {
   workflow: WorkflowHeaderWire;
+  dag?: WorkflowDagWire | null;
+  onGoToHumanNode?: (node: WorkflowNodeWire) => void;
 }
 
 /**
@@ -35,7 +37,7 @@ export interface OverviewTabProps {
  * {@link import("./WorkflowView").WorkflowView} so the tab body stays
  * purely about the workflow's narrative.
  */
-export function OverviewTab({ workflow }: OverviewTabProps) {
+export function OverviewTab({ workflow, dag, onGoToHumanNode }: OverviewTabProps) {
   const summaryText =
     typeof workflow.success?.output === "string" ? workflow.success.output.trim() : "";
   const hasSummary = summaryText.length > 0;
@@ -44,7 +46,7 @@ export function OverviewTab({ workflow }: OverviewTabProps) {
   const metadataEntries = Object.entries(workflow.metadata ?? {});
   const hasMetadata = metadataEntries.length > 0;
 
-  const strip = renderStateStrip({ workflow, hasSummary });
+  const strip = renderStateStrip({ workflow, hasSummary, dag, onGoToHumanNode });
 
   return (
     <div className="overview-tab" data-testid="workflow-overview-tab">
@@ -102,9 +104,13 @@ export function OverviewTab({ workflow }: OverviewTabProps) {
 function renderStateStrip({
   workflow,
   hasSummary,
+  dag,
+  onGoToHumanNode,
 }: {
   workflow: WorkflowHeaderWire;
   hasSummary: boolean;
+  dag?: WorkflowDagWire | null;
+  onGoToHumanNode?: (node: WorkflowNodeWire) => void;
 }): ReactNode {
   if (workflow.status === "failed") {
     if (workflow.failure) {
@@ -161,6 +167,33 @@ function renderStateStrip({
     );
   }
   // Running.
+  if (workflow.awaitingHumanCount > 0) {
+    const count = workflow.awaitingHumanCount;
+    const firstHumanNode =
+      dag?.nodes.find((n) => n.spec.kind === "human" && n.status === "running") ?? null;
+    const message =
+      count === 1
+        ? "1 human node is waiting for your input."
+        : `${count} human nodes are waiting for your input.`;
+    return (
+      <div
+        className="alert alert--warn overview-tab__strip overview-tab__running-hint"
+        data-testid="workflow-overview-awaiting-hint"
+      >
+        <span>{message}</span>
+        {firstHumanNode && onGoToHumanNode && (
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            data-testid="workflow-overview-go-to-node"
+            onClick={() => onGoToHumanNode(firstHumanNode)}
+          >
+            {count > 1 ? "Open first node →" : "Open node →"}
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
     <div
       className="alert alert--info overview-tab__strip overview-tab__running-hint"

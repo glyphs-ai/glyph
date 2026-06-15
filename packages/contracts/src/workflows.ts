@@ -134,6 +134,12 @@ export interface WorkflowHeaderWire {
    * snapshot fan-out across the result set.
    */
   readonly iterationCount?: number;
+  /**
+   * Count of human-kind nodes currently in `running` status (i.e.
+   * awaiting human input). Always emitted; 0 when no human nodes
+   * are waiting.
+   */
+  readonly awaitingHumanCount: number;
   readonly createdAt: string;
   readonly startedAt?: string;
   readonly endedAt?: string;

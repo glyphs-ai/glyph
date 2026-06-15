@@ -95,24 +95,18 @@ export function isTerminal(status: WorkflowHeaderWire["status"]): boolean {
 }
 
 /**
- * Two-bucket grouping used by `WorkflowList` to slice the list into
- * Running / Completed sections. Mirrors the Tasks page grouping; the
- * three terminal statuses (`succeeded` / `failed` / `cancelled`)
- * collapse into `completed`.
+ * Three-bucket grouping used by `WorkflowList` to slice the list into
+ * Awaiting you / Running / Completed sections. A running workflow with
+ * at least one human-kind node in `running` status is placed into the
+ * "awaiting" bucket so the user sees it immediately.
  */
-export type StatusGroup = "running" | "completed";
+export type StatusGroup = "awaiting" | "running" | "completed";
 
-export function statusGroup(status: WorkflowHeaderWire["status"]): StatusGroup {
-  return status === "running" ? "running" : "completed";
-}
-
-/**
- * Returns true when at least one human-kind node in the list is in
- * `running` status (i.e. awaiting human input). Useful for surfacing
- * an indicator on the workflow list item.
- */
-export function hasAwaitingHuman(
-  nodes: ReadonlyArray<{ spec: { kind: string }; status: string }>,
-): boolean {
-  return nodes.some((n) => n.spec.kind === "human" && n.status === "running");
+export function statusGroup(
+  status: WorkflowHeaderWire["status"],
+  awaitingHumanCount: number,
+): StatusGroup {
+  if (status === "running" && awaitingHumanCount > 0) return "awaiting";
+  if (status === "running") return "running";
+  return "completed";
 }
