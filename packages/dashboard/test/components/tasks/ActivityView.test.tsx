@@ -5,9 +5,7 @@ import { ActivityRow, ActivityView } from "../../../src/components/tasks/Activit
 
 const noop = vi.fn(() => Promise.resolve());
 
-function makeToolCallItem(
-  overrides: Partial<ToolCallActivityItem> = {},
-): ToolCallActivityItem {
+function makeToolCallItem(overrides: Partial<ToolCallActivityItem> = {}): ToolCallActivityItem {
   return {
     seq: 1,
     timestamp: "2026-06-01T00:00:00Z",
@@ -39,12 +37,7 @@ describe("ActivityView streaming indicator", () => {
   describe("isStreaming={true} renders indicator", () => {
     it("when activity === null and no error", () => {
       render(
-        <ActivityView
-          activity={null}
-          activityError={null}
-          onLoadOlder={noop}
-          isStreaming={true}
-        />,
+        <ActivityView activity={null} activityError={null} onLoadOlder={noop} isStreaming={true} />,
       );
       expect(screen.getByText("Agent working…")).toBeTruthy();
     });
