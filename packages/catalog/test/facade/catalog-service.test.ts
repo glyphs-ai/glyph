@@ -596,6 +596,32 @@ describe("CatalogService.install", () => {
     await expect(mgr.installAgent("file:/abs/a")).rejects.toBeInstanceOf(CyclicDependencyError);
   });
 
+  it("installAgent surfaces conflicts when a transitive skill dep fails to fetch", async () => {
+    // Register an agent whose skill dep origin is never registered in
+    // the fake fetcher — the resolve pipeline catches the fetch error
+    // and reports it as a conflict entry rather than aborting.
+    fetchers.setAgent("file:/abs/broken-dep-agent", {
+      "AGENTS.md": AGENT_ANCHOR(
+        "broken-dep-agent",
+        `dependencies:\n  skills:\n    - "file:/abs/missing-skill"`,
+      ),
+    });
+    const result = await mgr.installAgent("file:/abs/broken-dep-agent");
+    // The missing skill surfaces as a conflict
+    expect(result.conflicts.length).toBe(1);
+    expect(result.conflicts[0]?.kind).toBe("skill");
+    expect(result.conflicts[0]?.origin).toBe("file:///abs/missing-skill");
+    expect(result.conflicts[0]?.reason.kind).toBe("fetch-failed");
+    // The agent root itself may still install (it's the resolve-time
+    // dep linkage that fails later at install via resolveDepOrigins);
+    // lock in whatever the actual flow produces.
+    // Because the skill was never installed, the agent's
+    // resolveDepOrigins will throw — so the agent lands in `failed`.
+    expect(result.failed.some((f) => f.kind === "agent" && f.fqn === "public/broken-dep-agent")).toBe(
+      true,
+    );
+  });
+
   it("agent dep is installed via DB seam — no workDir materialization", async () => {
     // The catalog substrate writes through its repository (DB rows
     // and atomic-write seam). There is no `workDir` plumbing in the

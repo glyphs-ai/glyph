@@ -333,10 +333,12 @@ export class AgentService {
   }
 
   /**
-   * Resolve frontmatter dep origins to local sibling fqns. Origins
-   * that don't resolve to an installed sibling are silently skipped —
-   * matches the catalog's tolerant behaviour and lets the resolve
-   * pipeline surface `MissingDep` separately if the consumer cares.
+   * Resolve frontmatter dep origins to local sibling fqns.
+   *
+   * Throws `AgentUnresolvedDepError` if any origin doesn't match an
+   * installed sibling — this enforces the fqn↔origin 1:1 invariant
+   * (every declared dep MUST have a corresponding catalog row).
+   * `parentFqn` is included in the error for diagnostics only.
    *
    * Inlined per kind (agent owns this lookup loop) — no shared
    * sibling-lookup helper exists, by design.

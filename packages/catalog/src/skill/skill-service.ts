@@ -310,10 +310,12 @@ export class SkillService {
   }
 
   /**
-   * Resolve frontmatter dep origins to local sibling fqns. Skill deps
-   * are looked up in THIS repo (skills can depend on other skills);
-   * MCP deps go through `siblings.mcps`. Origins that don't resolve
-   * are silently skipped (matches the catalog's tolerant behaviour).
+   * Resolve frontmatter dep origins to local sibling fqns.
+   *
+   * Throws `SkillUnresolvedDepError` if any origin doesn't match an
+   * installed sibling — this enforces the fqn↔origin 1:1 invariant
+   * (every declared dep MUST have a corresponding catalog row).
+   * `parentFqn` is included in the error for diagnostics only.
    *
    * Inlined per kind (skill owns this lookup loop) — the skill bucket
    * points at THIS service's repo, not an injected sibling, so the
