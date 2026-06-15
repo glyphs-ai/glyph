@@ -1,3 +1,4 @@
+import Ansi from "ansi-to-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ActivityItem, TaskActivity } from "../../api";
 import { formatAbsolute, formatRelative } from "../../utils/time";
@@ -13,10 +14,12 @@ export function ActivityView({
   activity,
   activityError,
   onLoadOlder,
+  isStreaming = false,
 }: {
   activity: TaskActivity | null;
   activityError: string | null;
   onLoadOlder: () => Promise<void>;
+  isStreaming?: boolean;
 }) {
   if (activity === null) {
     if (activityError) {
@@ -62,6 +65,14 @@ export function ActivityView({
           <ActivityRow key={item.seq} item={item} />
         ))}
       </ol>
+      {isStreaming && (
+        <div className="activity-streaming-indicator" aria-live="polite">
+          <span className="activity-streaming-indicator__dot" />
+          <span className="activity-streaming-indicator__dot" />
+          <span className="activity-streaming-indicator__dot" />
+          <span className="activity-streaming-indicator__label">Agent working…</span>
+        </div>
+      )}
     </>
   );
 }
@@ -237,9 +248,11 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
                 Result
               </summary>
               <pre className="activity-row__pre">
-                {typeof item.result === "string"
-                  ? item.result
-                  : JSON.stringify(item.result, null, 2)}
+                <Ansi>
+                  {typeof item.result === "string"
+                    ? item.result
+                    : JSON.stringify(item.result, null, 2)}
+                </Ansi>
               </pre>
             </details>
           )
@@ -318,7 +331,7 @@ function ToolDisplay({ content }: { content: string }) {
   if (!isLong) {
     return (
       <p className="activity-row__body" style={{ fontSize: 12 }}>
-        {content}
+        <Ansi>{content}</Ansi>
       </p>
     );
   }
@@ -331,11 +344,11 @@ function ToolDisplay({ content }: { content: string }) {
     <div>
       {expanded ? (
         <pre id={bodyId} className="activity-row__pre">
-          {content}
+          <Ansi>{content}</Ansi>
         </pre>
       ) : (
         <p id={bodyId} className="activity-row__body" style={{ fontSize: 12 }}>
-          {preview}
+          <Ansi>{preview}</Ansi>
         </p>
       )}
       <button
