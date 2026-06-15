@@ -30,10 +30,34 @@ export function ActivityView({
         </p>
       );
     }
-    return <p className="muted">No activity yet.</p>;
+    return (
+      <>
+        <p className="muted">No activity yet.</p>
+        {isStreaming && (
+          <div className="activity-streaming-indicator" aria-live="polite">
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__label">Agent working…</span>
+          </div>
+        )}
+      </>
+    );
   }
   if (activity.activity.length === 0) {
-    return <p className="muted">No activity yet for this task.</p>;
+    return (
+      <>
+        <p className="muted">No activity yet for this task.</p>
+        {isStreaming && (
+          <div className="activity-streaming-indicator" aria-live="polite">
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__dot" />
+            <span className="activity-streaming-indicator__label">Agent working…</span>
+          </div>
+        )}
+      </>
+    );
   }
   const oldestSeq = activity.activity[0]?.seq ?? 0;
   const hasOlder = oldestSeq > 0;
@@ -236,7 +260,9 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
             <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>
               Arguments
             </summary>
-            <pre className="activity-row__pre">{JSON.stringify(item.args, null, 2)}</pre>
+            <pre className="activity-row__pre">
+              <Ansi>{JSON.stringify(item.args, null, 2)}</Ansi>
+            </pre>
           </details>
         )}
         {item.display !== undefined ? (
