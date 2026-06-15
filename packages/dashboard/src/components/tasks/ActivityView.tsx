@@ -260,9 +260,7 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
             <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>
               Arguments
             </summary>
-            <pre className="activity-row__pre">
-              <Ansi>{JSON.stringify(item.args, null, 2)}</Ansi>
-            </pre>
+            <pre className="activity-row__pre">{JSON.stringify(item.args, null, 2)}</pre>
           </details>
         )}
         {item.display !== undefined ? (
@@ -274,11 +272,9 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
                 Result
               </summary>
               <pre className="activity-row__pre">
-                <Ansi>
-                  {typeof item.result === "string"
-                    ? item.result
-                    : JSON.stringify(item.result, null, 2)}
-                </Ansi>
+                {typeof item.result === "string"
+                  ? <Ansi>{item.result}</Ansi>
+                  : JSON.stringify(item.result, null, 2)}
               </pre>
             </details>
           )
@@ -361,7 +357,9 @@ function ToolDisplay({ content }: { content: string }) {
       </p>
     );
   }
-  const previewSrc = content.split("\n", 1)[0] ?? content;
+  // Strip ANSI escapes from preview to avoid splitting an escape sequence mid-byte.
+  const ANSI_RE = /\x1b\[[0-9;]*m/g;
+  const previewSrc = (content.split("\n", 1)[0] ?? content).replace(ANSI_RE, "");
   const preview =
     previewSrc.length > TOOL_DISPLAY_PREVIEW_CHARS
       ? `${previewSrc.slice(0, TOOL_DISPLAY_PREVIEW_CHARS)}…`
