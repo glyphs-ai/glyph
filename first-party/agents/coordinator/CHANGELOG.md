@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-06-15)
+
+- **Boundary**: extend the "Insert a human approval node" rule to call out the new mandatory `promptStyle` field on the `add-subgraph` human-node spec. Coord must declare `"plain"` or `"markdown"` on every human-node insertion so the dashboard renders intentional formatting; cross-references `official/workflow-coordination` §F for the per-value guidance.
+
 ## 0.1.3 (2026-06-12)
 
 - Realign the **Commands** table and **Wake-up loop** snippet to the new CLI id-flag convention (`packages/cli/README.md` → "Naming conventions"): `glyph workflow show --wfid $WF` → `glyph workflow show $WF` (positional `<workflow-id>`); `glyph task show --tid <id>` → `glyph task show <task-id>` (positional). Fix the **Expand the DAG** row's stale `--input <payload.json>` to the correct `--spec-file <payload.json>`. Update the **Verdict parsing** snippet to use the positional `<task-id>` form. No behavior change — the substrate-side mutation routes are unchanged.

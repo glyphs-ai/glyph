@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 (2026-06-15)
+
+- §F: document the new mandatory `promptStyle` field on the `add-subgraph` human-node spec. Coord must declare `"plain"` or `"markdown"` on every insertion; the dashboard dispatches on it (plain text vs the in-house markdown renderer used by Task Overview / Artifact viewer). Includes guidance on when to pick each value (especially when prompts contain characters a markdown renderer would interpret).
+
 ## 0.3.1 (2026-06-12)
 
 - Realign §A wake-up loop snippet and §D brief-plumbing example to the new CLI id-flag convention (`packages/cli/README.md` → "Naming conventions"): `glyph workflow show --wfid $WF` / `dag --wfid $WF` → positional `$WF`; `glyph task show --tid ${PRIOR_…_TASK_ID}` → positional. Documentation-only change.

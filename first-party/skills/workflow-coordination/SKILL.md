@@ -2,7 +2,7 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.4.0
+version: 0.4.1
 ---
 
 # Glyph Workflow Coordination Skill
@@ -242,13 +242,14 @@ Human nodes are gates that pause workflow execution until an external actor resp
 
 ### Inserting a human node via add-subgraph
 
-Human nodes use `kind: "human"` in the add-subgraph payload. The spec carries a `prompt` (the question shown to the human) and optional `choices` (predefined options, max 5):
+Human nodes use `kind: "human"` in the add-subgraph payload. The spec carries a `prompt` (the question shown to the human), a mandatory `promptStyle` (`"plain"` or `"markdown"` — see below), and optional `choices` (predefined options, max 5):
 
 ```jsonc
 {
   "nodes": [
     { "tempId": "approval", "kind": "human", "existingParents": ["<self-node-id>"],
-      "spec": { "prompt": "...", "choices": [{ "id": "approve", "label": "Approve & merge" }, ...] } },
+      "spec": { "prompt": "...", "promptStyle": "markdown",
+                "choices": [{ "id": "approve", "label": "Approve & merge" }, ...] } },
     { "tempId": "coord", "kind": "coordinator",
       "spec": { "agent": "official/coordinator" } }
   ],
@@ -259,6 +260,7 @@ Human nodes use `kind: "human"` in the add-subgraph payload. The spec carries a 
 ```
 
 Notes:
+- `promptStyle` is mandatory. Set `"markdown"` whenever the prompt uses any formatting (headings, lists, bold/italic, inline code, fenced code blocks, links) — the dashboard renders it via the same in-house markdown renderer the Task Overview and Artifact viewer use. Set `"plain"` when the prompt is a single literal sentence with no markdown intent, and especially when it contains characters a markdown renderer would interpret (asterisks, backticks, underscores in identifiers, square brackets). There is no auto-detection — coord must declare.
 - `choices` is optional. When omitted, the human gets only a freeform text input.
 - Max 5 choices. The system always provides a freeform input option alongside choices.
 - The `prompt` should be self-contained: include enough context for the human to decide without needing to look elsewhere.

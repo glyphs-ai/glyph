@@ -66,6 +66,7 @@ export {
 // ─── Re-exported types ──────────────────────────────────────────────
 export type {
   HumanNodeChoice,
+  HumanNodePromptStyle,
   HumanNodeResponse,
   HumanNodeSpec,
   WorkflowCancellation,
@@ -87,6 +88,7 @@ export type {
 export {
   deriveIterationCount,
   HUMAN_MAX_CHOICES,
+  HUMAN_PROMPT_STYLES,
   hasLiveCoord,
 } from "./types.js";
 // ─── Validators ─────────────────────────────────────────────────────
