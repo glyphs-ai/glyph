@@ -18,6 +18,7 @@ export type {
   AgentInstallBody,
   AgentMetadataPatch,
   BlockedReason,
+  CatalogConflict,
   CatalogInstallResult,
   CatalogKind,
   CatalogSyncResult,

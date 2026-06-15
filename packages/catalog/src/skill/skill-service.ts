@@ -9,6 +9,7 @@ import {
   SkillFrontmatterError,
   SkillNotFoundError,
   SkillOriginConflictError,
+  SkillUnresolvedDepError,
 } from "./errors.js";
 import { SkillEntity } from "./skill-entity.js";
 import { SKILL_DEP_SPECS, type SkillDepKind } from "./skill-frontmatter.js";
@@ -216,7 +217,7 @@ export class SkillService {
       entity = entity.withState({ prereqsAck });
     }
 
-    const resolvedDeps = await this.resolveDepOrigins(entity.depsRefs);
+    const resolvedDeps = await this.resolveDepOrigins(entity.fqn, entity.depsRefs);
     await this.repo.insert(entity, files, resolvedDeps);
     return (await this.repo.findById(entity.fqn)) ?? entity;
   }
@@ -255,7 +256,7 @@ export class SkillService {
       files.set(f.relPath, f.content);
     }
     files.set("SKILL.md", Buffer.from(newSkillMd, "utf8"));
-    const resolvedDeps = await this.resolveDepOrigins(updated.depsRefs);
+    const resolvedDeps = await this.resolveDepOrigins(fqn, updated.depsRefs);
     await this.repo.insert(updated, files, resolvedDeps);
     return (await this.repo.findById(fqn)) ?? updated;
   }
@@ -318,20 +319,25 @@ export class SkillService {
    * points at THIS service's repo, not an injected sibling, so the
    * loop reads cleanly without indirection.
    */
-  private async resolveDepOrigins(refs: {
-    readonly skills: readonly string[];
-    readonly mcps: readonly string[];
-  }): Promise<{ skills: string[]; mcps: string[] }> {
+  private async resolveDepOrigins(
+    parentFqn: string,
+    refs: {
+      readonly skills: readonly string[];
+      readonly mcps: readonly string[];
+    },
+  ): Promise<{ skills: string[]; mcps: string[] }> {
     const skillFqns: string[] = [];
     const mcpFqns: string[] = [];
     for (const origin of refs.skills) {
       const sib = await this.repo.findByOrigin(origin);
-      if (sib !== undefined) skillFqns.push(sib.fqn);
+      if (sib === undefined) throw new SkillUnresolvedDepError(parentFqn, "skill", origin);
+      skillFqns.push(sib.fqn);
     }
     if (this.siblings.mcps !== undefined) {
       for (const origin of refs.mcps) {
         const sib = await this.siblings.mcps.findByOrigin(origin);
-        if (sib !== undefined) mcpFqns.push(sib.fqn);
+        if (sib === undefined) throw new SkillUnresolvedDepError(parentFqn, "mcp", origin);
+        mcpFqns.push(sib.fqn);
       }
     }
     return { skills: skillFqns, mcps: mcpFqns };

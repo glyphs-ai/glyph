@@ -230,7 +230,7 @@ export class CatalogService {
       }
     }
 
-    return { installed, skipped, failed };
+    return { installed, skipped, failed, conflicts: plan.conflicts };
   }
 
   async installSkill(origin: string): Promise<CatalogInstallResult> {

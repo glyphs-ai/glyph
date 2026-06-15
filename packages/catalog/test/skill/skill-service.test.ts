@@ -5,6 +5,7 @@ import {
   SkillFrontmatterError,
   SkillNotFoundError,
   SkillOriginConflictError,
+  SkillUnresolvedDepError,
 } from "../../src/skill/errors.js";
 import { SkillEntity } from "../../src/skill/skill-entity.js";
 import { SkillRepository } from "../../src/skill/skill-repository.js";
@@ -161,16 +162,12 @@ describe("SkillService.install", () => {
     expect(s.fqn).toBe("public/tool");
   });
 
-  it("does NOT install dep skills / mcps (facade's job)", async () => {
+  it("throws SkillUnresolvedDepError when dep origin is not installed", async () => {
     const deps = `dependencies:
   skills:
     - "file:/abs/child"`;
     fetcher.set("file:/abs/parent", { "SKILL.md": ANCHOR("parent", deps) });
-    // Note: we do NOT register a fixture for file:./child — proving
-    // the service never tries to fetch it.
-    const s = await svc.install("file:/abs/parent");
-    expect(s.fqn).toBe("public/parent");
-    expect(await svc.has("public/child")).toBe(false);
+    await expect(svc.install("file:/abs/parent")).rejects.toThrow(SkillUnresolvedDepError);
   });
 
   it("upserts content under same origin", async () => {
@@ -366,5 +363,55 @@ with multiple lines
       name: "ImmutableOriginError",
       fqn: "public/upstream-meta",
     });
+  });
+});
+
+// ─── resolveDepOrigins — fail-loud ───────────────────────────────
+
+describe("SkillService — resolveDepOrigins fail-loud", () => {
+  it("throws SkillUnresolvedDepError for unresolvable skill dep", async () => {
+    const deps = `dependencies:
+  skills:
+    - "file:/abs/skills/missing"`;
+    fetcher.set("file:/abs/parent", { "SKILL.md": ANCHOR("parent", deps) });
+    await expect(svc.install("file:/abs/parent")).rejects.toThrow(SkillUnresolvedDepError);
+    expect(await repo.findById("public/parent")).toBeUndefined();
+  });
+
+  it("throws SkillUnresolvedDepError for unresolvable mcp dep", async () => {
+    const deps = `dependencies:
+  mcps:
+    - "file:/abs/mcps/missing"`;
+    fetcher.set("file:/abs/parent", { "SKILL.md": ANCHOR("parent", deps) });
+    const mcpRepo = new (await import("../../src/mcp/mcp-repository.js")).McpRepository({
+      db: orm.db,
+    });
+    svc = new SkillService({ repo, fetcher: fetcher.fetcher, siblings: { mcps: mcpRepo } });
+    await expect(svc.install("file:/abs/parent")).rejects.toThrow(SkillUnresolvedDepError);
+    expect(await repo.findById("public/parent")).toBeUndefined();
+  });
+
+  it("succeeds when dep skill is present at the declared origin", async () => {
+    const deps = `dependencies:
+  skills:
+    - "file:/abs/skills/child"`;
+    fetcher.set("file:/abs/parent", { "SKILL.md": ANCHOR("parent", deps) });
+    const childEntity = SkillEntity.create(
+      `---\nname: child\ndescription: x\nversion: 1.0.0\n---\n# Body\n`,
+      "file:/abs/skills/child",
+      "test",
+    );
+    await repo.insert(
+      childEntity,
+      new Map([
+        [
+          "SKILL.md",
+          Buffer.from("---\nname: child\ndescription: x\nversion: 1.0.0\n---\n# Body\n"),
+        ],
+      ]),
+      { skills: [], mcps: [] },
+    );
+    const s = await svc.install("file:/abs/parent");
+    expect(s.fqn).toBe("public/parent");
   });
 });

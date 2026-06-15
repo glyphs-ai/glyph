@@ -13,6 +13,7 @@ import {
   AgentNotFoundError,
   AgentOriginConflictError,
   AgentPlanStaleError,
+  AgentUnresolvedDepError,
 } from "./errors.js";
 
 /** FQN-immutable patch keys — never accepted by `updateMetadata`. */
@@ -217,7 +218,7 @@ export class AgentService {
       entity = entity.withState({ prereqsAck, disabledByUser: existing.disabledByUser });
     }
 
-    const resolvedDeps = await this.resolveDepOrigins(entity.depsRefs);
+    const resolvedDeps = await this.resolveDepOrigins(entity.fqn, entity.depsRefs);
     await this.repo.insert(entity, files, resolvedDeps);
     return (await this.repo.findById(entity.fqn)) ?? entity;
   }
@@ -256,7 +257,7 @@ export class AgentService {
       files.set(f.relPath, f.content);
     }
     files.set("AGENTS.md", Buffer.from(newAgentMd, "utf8"));
-    const resolvedDeps = await this.resolveDepOrigins(updated.depsRefs);
+    const resolvedDeps = await this.resolveDepOrigins(fqn, updated.depsRefs);
     await this.repo.insert(updated, files, resolvedDeps);
     return (await this.repo.findById(fqn)) ?? updated;
   }
@@ -344,17 +345,21 @@ export class AgentService {
    * its own self-reference table; there is no separate "agents
    * sibling repo" — agents resolve via the same `AgentRepository`).
    */
-  private async resolveDepOrigins(refs: {
-    readonly skills: readonly string[];
-    readonly mcps: readonly string[];
-    readonly agents: readonly string[];
-  }): Promise<{ skills: string[]; mcps: string[]; agents: string[] }> {
+  private async resolveDepOrigins(
+    parentFqn: string,
+    refs: {
+      readonly skills: readonly string[];
+      readonly mcps: readonly string[];
+      readonly agents: readonly string[];
+    },
+  ): Promise<{ skills: string[]; mcps: string[]; agents: string[] }> {
     const skills: string[] = [];
     if (this.siblings.skills !== undefined) {
       const repo = this.siblings.skills;
       for (const origin of refs.skills) {
         const sib = await repo.findByOrigin(origin);
-        if (sib !== undefined) skills.push(sib.fqn);
+        if (sib === undefined) throw new AgentUnresolvedDepError(parentFqn, "skill", origin);
+        skills.push(sib.fqn);
       }
     }
     const mcps: string[] = [];
@@ -362,13 +367,15 @@ export class AgentService {
       const repo = this.siblings.mcps;
       for (const origin of refs.mcps) {
         const sib = await repo.findByOrigin(origin);
-        if (sib !== undefined) mcps.push(sib.fqn);
+        if (sib === undefined) throw new AgentUnresolvedDepError(parentFqn, "mcp", origin);
+        mcps.push(sib.fqn);
       }
     }
     const agents: string[] = [];
     for (const origin of refs.agents) {
       const sib = await this.repo.findByOrigin(origin);
-      if (sib !== undefined) agents.push(sib.fqn);
+      if (sib === undefined) throw new AgentUnresolvedDepError(parentFqn, "agent", origin);
+      agents.push(sib.fqn);
     }
     return { skills, mcps, agents };
   }

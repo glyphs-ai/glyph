@@ -120,3 +120,24 @@ export class PlanStaleError extends CatalogError {
     );
   }
 }
+
+/**
+ * Thrown when `resolveDepOrigins` encounters a dep origin that does not
+ * match any installed entity. This means the fqn<->origin 1:1 invariant
+ * cannot be satisfied — either the dep was never fetched upstream or the
+ * user mixed incompatible origins.
+ */
+export class SkillUnresolvedDepError extends CatalogError {
+  override readonly name = "SkillUnresolvedDepError";
+
+  constructor(
+    public readonly parentFqn: string,
+    public readonly depKind: "skill" | "mcp",
+    public readonly depOrigin: string,
+  ) {
+    super(
+      `unresolved ${depKind} dep on ${parentFqn}: origin "${depOrigin}" matches no installed entity ` +
+        "(fqn must be bound 1:1 to origin; a sibling installed under a different origin is a different entity)",
+    );
+  }
+}
