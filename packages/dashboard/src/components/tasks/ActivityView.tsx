@@ -272,9 +272,11 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
                 Result
               </summary>
               <pre className="activity-row__pre">
-                {typeof item.result === "string"
-                  ? <Ansi>{item.result}</Ansi>
-                  : JSON.stringify(item.result, null, 2)}
+                {typeof item.result === "string" ? (
+                  <Ansi>{item.result}</Ansi>
+                ) : (
+                  JSON.stringify(item.result, null, 2)
+                )}
               </pre>
             </details>
           )
@@ -358,6 +360,7 @@ function ToolDisplay({ content }: { content: string }) {
     );
   }
   // Strip ANSI escapes from preview to avoid splitting an escape sequence mid-byte.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional ANSI escape matching
   const ANSI_RE = /\x1b\[[0-9;]*m/g;
   const previewSrc = (content.split("\n", 1)[0] ?? content).replace(ANSI_RE, "");
   const preview =
