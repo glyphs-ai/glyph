@@ -22,6 +22,7 @@ import {
   updateWorkspaceMetadata,
   type WorkspaceListItem,
 } from "./api";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { HeaderActionsContext } from "./components/HeaderActions";
 import { GitHubMark, PlusIcon, SearchIcon, TrashIcon } from "./components/Icons";
 import { Modal } from "./components/Modal";
@@ -796,7 +797,9 @@ function WorkspaceShell() {
             <BreadcrumbContext.Provider value={breadcrumbContextValue}>
               <div className="content">
                 {error && <div className="alert alert--error">{error}</div>}
-                <Outlet />
+                <ErrorBoundary label="page content">
+                  <Outlet />
+                </ErrorBoundary>
               </div>
             </BreadcrumbContext.Provider>
           </WorkspaceShellContext.Provider>

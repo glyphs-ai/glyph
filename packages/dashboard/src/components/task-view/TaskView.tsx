@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react";
 import type { TaskActivity, TaskRecord } from "../../api";
 import { formatAbsolute, formatDuration, formatRelative } from "../../utils/time";
+import { ErrorBoundary } from "../ErrorBoundary";
 import { StatusBadge } from "../tasks/StatusBadge";
 import { readRuntime, STATUS_TONE } from "../tasks/shared";
 import { ActivityTab } from "../tasks/TaskDetail/ActivityTab";
@@ -150,13 +151,15 @@ export function TaskView({
         <OverviewTab task={task} activity={activity} onSwitchTab={setTab} />
       )}
       {task && tab === "activity" && (
-        <ActivityTab
-          taskId={task.id}
-          activity={activity}
-          activityError={activityError}
-          onLoadOlder={onLoadOlder}
-          isStreaming={isRunning}
-        />
+        <ErrorBoundary label="Activity tab">
+          <ActivityTab
+            taskId={task.id}
+            activity={activity}
+            activityError={activityError}
+            onLoadOlder={onLoadOlder}
+            isStreaming={isRunning}
+          />
+        </ErrorBoundary>
       )}
       {task && tab === "artifacts" && <ArtifactsTab task={task} />}
     </>
