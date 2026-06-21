@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>报告标题 · Report Title</title>
+<style>
+/* Inline the design system — a report PDF must be self-contained
+   (no external CSS/fonts/images). Keep in sync with templates/report.css. */
+:root{
+  --brand:#13433a;--ink:#1c1c1c;--muted:#5a5f57;--line:#e2e4dc;--radius:2px;
+  --cl-ok-bg:#f8faf3;--cl-warn-bg:#fdf6f2;--cl-warn-bar:#b85020;
+  --cl-amber-bg:#fdf9ee;--cl-amber-bar:#c98a1a;--cl-info-bg:#f4f7fb;--cl-info-bar:#356998;
+  --formula-bg:#f7f7f4;--total-bg:#f6f8f2;
+}
+html,body{margin:0;padding:0}
+body{background:#fff;color:var(--ink);
+  font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Source Han Sans SC","Segoe UI",Arial,sans-serif;
+  font-size:12pt;line-height:1.6}
+.page{background:#fff;max-width:820px;margin:0 auto;padding:24px 28px}
+h1{color:var(--brand);font-size:20pt;margin:0 0 .4em}
+h2{color:var(--brand);font-size:14pt;margin:1.4em 0 .5em;padding-bottom:.2em;border-bottom:2px solid var(--line)}
+p{margin:.5em 0}.lead{font-size:12.5pt;color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin:.8em 0;font-size:11pt}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--brand);color:#fff;font-weight:600}
+tr.total td{background:var(--total-bg);font-weight:600}
+.callout,.callout-warn,.callout-amber,.callout-info,.conclude{margin:.9em 0;padding:10px 14px;border-radius:var(--radius);border-left:5px solid var(--brand)}
+.callout,.conclude{background:var(--cl-ok-bg)}
+.callout-warn{background:var(--cl-warn-bg);border-left-color:var(--cl-warn-bar)}
+.callout-amber{background:var(--cl-amber-bg);border-left-color:var(--cl-amber-bar)}
+.callout-info{background:var(--cl-info-bg);border-left-color:var(--cl-info-bar)}
+.formula{background:var(--formula-bg);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;font-family:Consolas,"Courier New",monospace;font-size:10.5pt}
+.pill{display:inline-block;padding:1px 8px;background:#eef1e6;border:1px solid #d4dac0;color:var(--brand);border-radius:var(--radius);font-size:9.5pt}
+.kpis{display:flex;flex-wrap:wrap;gap:12px;margin:1em 0}
+.kpi{flex:1 1 150px;background:#fff;border:1px solid var(--line);border-left:5px solid var(--brand);border-radius:var(--radius);padding:10px 14px}
+.kpi .num{color:var(--brand);font-size:18pt;font-weight:700;line-height:1.1}
+.kpi .lab{color:var(--muted);font-size:10pt}
+.footer-bar{margin-top:2em;padding-top:.6em;border-top:2px solid var(--line);color:var(--muted);font-size:9.5pt}
+@page{size:A4;margin:12mm}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>季度经营回顾报告</h1>
+  <p class="lead">这是一段导语 / lead — 用浅色摘要本报告的核心结论，控制在三行以内。</p>
+
+  <div class="kpis">
+    <div class="kpi"><div class="num">98.7%</div><div class="lab">交付准时率</div></div>
+    <div class="kpi"><div class="num">¥1,240万</div><div class="lab">季度营收</div></div>
+    <div class="kpi"><div class="num">23.4%</div><div class="lab">毛利率</div></div>
+  </div>
+
+  <h2>一、核心指标</h2>
+  <table>
+    <thead><tr><th>项目</th><th>本季</th><th>环比</th></tr></thead>
+    <tbody>
+      <tr><td>产量（万米）</td><td>312</td><td>+8.1%</td></tr>
+      <tr><td>新签订单（笔）</td><td>146</td><td>+12.0%</td></tr>
+      <tr class="total"><td>合计</td><td>458</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><strong>结论：</strong>整体运营平稳，交付准时率创新高，建议维持现有排产节奏。</div>
+  <div class="callout-warn"><strong>风险：</strong>原料价格上行，下季毛利或承压，需提前锁价。</div>
+  <div class="callout-amber"><strong>提示：</strong>两条产线设备到期需保养，安排在淡季窗口执行。</div>
+  <div class="callout-info"><strong>反方观点：</strong>若需求回落，扩产计划应推迟一个季度再评估。</div>
+
+  <h2>二、计算口径</h2>
+  <div class="formula">毛利率 = (营收 − 直接成本) ÷ 营收 × 100%</div>
+  <p>关键标签：<span class="pill">已核对</span><span class="pill">内部</span></p>
+
+  <div class="footer-bar">本报告由 cjk-pdf-report 渲染 · 仅供内部参考 · 第 1 页</div>
+</div>
+</body>
+</html>

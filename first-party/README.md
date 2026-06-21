@@ -41,6 +41,7 @@ The glyph dashboard's "Install from URL" field also accepts these.
 - `official/agency-role-reference` — index of ~185 abstract role templates for pilot's create-local hiring path
 - `official/karpathy-guidelines` — Karpathy's behavioral guidelines for engineering agents
 - `official/thermo-nuclear-code-quality-review` — extreme-scrutiny code-quality review heuristics
+- `official/cjk-pdf-report` — render a self-contained HTML report to a CJK-safe PDF (Chromium print with the browser footer stripped, a five-point pypdf self-check, and a white-background design system)
 
 ## Schema
 
