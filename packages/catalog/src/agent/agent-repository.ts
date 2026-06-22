@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
 import { emptyDeps } from "../_shared/dep-keys.js";
@@ -248,6 +248,34 @@ export class AgentRepository {
     if (Object.keys(patch).length === 0) return;
     patch.updatedAt = new Date().toISOString();
     this.db.update(agents).set(patch).where(eq(agents.fqn, fqn)).run();
+  }
+
+  /**
+   * Lightweight file listing — returns relative paths and sizes without
+   * materializing blob content. Uses SQL `length()` on the content column.
+   */
+  async listFilePaths(fqn: string): Promise<{ relPath: string; size: number }[]> {
+    const rows = this.db
+      .select({ relPath: agentFiles.relPath, size: sql<number>`length(${agentFiles.content})` })
+      .from(agentFiles)
+      .where(eq(agentFiles.agentFqn, fqn))
+      .orderBy(agentFiles.relPath)
+      .all();
+    return rows;
+  }
+
+  /**
+   * Read a single file's raw bytes by relative path. Returns `null` when
+   * the file does not exist for this agent.
+   */
+  async getFile(fqn: string, relPath: string): Promise<Buffer | null> {
+    const row = this.db
+      .select({ content: agentFiles.content })
+      .from(agentFiles)
+      .where(and(eq(agentFiles.agentFqn, fqn), eq(agentFiles.relPath, relPath)))
+      .get();
+    if (row === undefined) return null;
+    return toBuf(row.content);
   }
 
   private loadAllDeps(): Map<string, AgentDependencies> {

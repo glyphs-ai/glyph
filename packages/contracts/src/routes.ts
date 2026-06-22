@@ -179,6 +179,12 @@ export interface WorkspaceLoadFailedBody {
   readonly code: "WorkspaceLoadError";
 }
 
+/** Wire shape for a single file entry in the catalog file browser. */
+export interface CatalogFileEntry {
+  readonly relPath: string;
+  readonly size: number;
+}
+
 /** PUT /api/workspaces/current body. */
 export interface WorkspaceCurrentPutBody {
   readonly id: string;
@@ -562,6 +568,10 @@ export interface WorkflowArtifactPathParams {
 export interface CatalogResourcePathParams {
   readonly id: string;
   readonly name: string;
+}
+/** Catalog file path params for skill / agent file reads. */
+export interface CatalogFilePathParams extends CatalogResourcePathParams {
+  readonly path: string;
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -1080,6 +1090,14 @@ export const ROUTES = {
     "POST",
     "/api/workspaces/:id/catalog/skills/:name/acknowledge-prereqs",
   ),
+  "catalog.skills.files.list": defineRoute<
+    { params: CatalogResourcePathParams },
+    CatalogFileEntry[]
+  >("GET", "/api/workspaces/:id/catalog/skills/:name/files"),
+  "catalog.skills.files.get": defineRoute<{ params: CatalogFilePathParams }, ArrayBuffer>(
+    "GET",
+    "/api/workspaces/:id/catalog/skills/:name/files/:path",
+  ),
 
   // ── catalog agents ─────────────────────────────────────────────────
   "catalog.agents.list": defineRoute<{ params: WorkspacePathParams }, readonly AgentEntry[]>(
@@ -1125,6 +1143,14 @@ export const ROUTES = {
   "catalog.agents.enable": defineRoute<{ params: CatalogResourcePathParams }, Agent>(
     "POST",
     "/api/workspaces/:id/catalog/agents/:name/enable",
+  ),
+  "catalog.agents.files.list": defineRoute<
+    { params: CatalogResourcePathParams },
+    CatalogFileEntry[]
+  >("GET", "/api/workspaces/:id/catalog/agents/:name/files"),
+  "catalog.agents.files.get": defineRoute<{ params: CatalogFilePathParams }, ArrayBuffer>(
+    "GET",
+    "/api/workspaces/:id/catalog/agents/:name/files/:path",
   ),
 
   // ── catalog mcps (no resolve, no metadata patch) ───────────────────

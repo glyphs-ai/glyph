@@ -44,6 +44,10 @@ const ALLOWED_GAPS: ReadonlySet<RouteKey> = new Set<RouteKey>([
   "schedules.cron.preview", // dashboard-only live-preview endpoint for the create-schedule modal; CLI previewing is for persisted schedules via `glyph schedule preview <sid>`
   "workflows.artifacts.list", // dashboard-only artifact-listing endpoint for the Workflow Artifacts tab; CLI users have direct fs access to <workspace>/workflows/<wfid>/artifact/ and per-node task artifact dirs
   "workflows.artifacts.get", // dashboard-only static-bytes endpoint for the Workflow Artifacts tab (same rationale as `tasks.artifacts.get`); CLI users have direct fs access
+  "catalog.skills.files.list", // dashboard-only file browser; CLI users access files via `glyph catalog skill show --json`
+  "catalog.skills.files.get", // dashboard-only file content endpoint; CLI users have direct fs access or `--json` output
+  "catalog.agents.files.list", // dashboard-only file browser; CLI users access files via `glyph catalog agent show --json`
+  "catalog.agents.files.get", // dashboard-only file content endpoint; CLI users have direct fs access or `--json` output
 ]);
 
 /**

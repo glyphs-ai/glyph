@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
 import { emptyDeps } from "../_shared/dep-keys.js";
@@ -235,6 +235,26 @@ export class SkillRepository {
       .set({ prereqsAck: flags.prereqsAck ? 1 : 0, updatedAt: new Date().toISOString() })
       .where(eq(skills.fqn, fqn))
       .run();
+  }
+
+  async listFilePaths(fqn: string): Promise<{ relPath: string; size: number }[]> {
+    const rows = this.db
+      .select({ relPath: skillFiles.relPath, size: sql<number>`length(${skillFiles.content})` })
+      .from(skillFiles)
+      .where(eq(skillFiles.skillFqn, fqn))
+      .orderBy(skillFiles.relPath)
+      .all();
+    return rows;
+  }
+
+  async getFile(fqn: string, relPath: string): Promise<Buffer | null> {
+    const row = this.db
+      .select({ content: skillFiles.content })
+      .from(skillFiles)
+      .where(and(eq(skillFiles.skillFqn, fqn), eq(skillFiles.relPath, relPath)))
+      .get();
+    if (row === undefined) return null;
+    return toBuf(row.content);
   }
 
   private loadAllDeps(): Map<string, SkillDependencies> {

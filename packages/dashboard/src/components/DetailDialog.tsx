@@ -1,5 +1,5 @@
 import type { BlockedReason } from "@glyphs-ai/contracts";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   type AgentDetail,
@@ -8,11 +8,16 @@ import {
   applyAgentSync,
   applyMcpSync,
   applySkillSync,
+  type CatalogFileEntry,
   disableAgent,
   enableAgent,
   getAgent,
+  getAgentFile,
   getMcp,
   getSkill,
+  getSkillFile,
+  listAgentFiles,
+  listSkillFiles,
   type McpDetail,
   type ResolveManifest,
   resolveAgentSync,
@@ -23,6 +28,8 @@ import {
 import { type EntityKind, KIND_ICON, KIND_TAG, KIND_TITLE } from "../kind-meta";
 import { KIND_TAB } from "../pages/catalog/catalog-verbs";
 import { splitFqnForDisplay } from "../utils/fqn";
+import { FileTree } from "./catalog/FileTree.js";
+import { FileViewer } from "./catalog/FileViewer.js";
 import { Modal } from "./Modal";
 import { ResolveTree } from "./ResolveTree";
 
@@ -217,6 +224,7 @@ export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailD
 
   const inSync = syncStage !== "idle";
   const syncBusy = syncStage === "previewing" || syncStage === "applying";
+  const showFileBrowser = activeTab === "source" && target.kind !== "mcp";
 
   // Lifecycle action visibility — derived once and reused by both the
   // footer button cluster and the Overview tab status area. Keeping
@@ -240,7 +248,7 @@ export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailD
       onClose={onClose}
       title={`${KIND_TITLE[target.kind]}: ${target.name}`}
       header={header}
-      size={inSync ? "large" : "default"}
+      size={inSync || showFileBrowser ? "large" : "default"}
     >
       <div className="modal__body modal__body--scroll detail-dialog">
         {loading && <p className="form-hint">Loading...</p>}
@@ -264,7 +272,7 @@ export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailD
                 className={`detail-dialog__tab${activeTab === "source" ? " detail-dialog__tab--active" : ""}`}
                 onClick={() => setActiveTab("source")}
               >
-                {sourceLabel(target.kind)}
+                {target.kind === "mcp" ? "mcp.json" : "Source"}
               </button>
             </div>
 
@@ -272,7 +280,11 @@ export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailD
               <OverviewTab target={target} detail={detail} workspaceId={workspaceId} />
             )}
 
-            {activeTab === "source" && (
+            {activeTab === "source" && target.kind !== "mcp" && (
+              <SourceBrowser target={target} fqn={target.name} />
+            )}
+
+            {activeTab === "source" && target.kind === "mcp" && (
               <pre className={`detail-dialog__code lang-${detail.sourceLanguage}`}>
                 {detail.source}
               </pre>
@@ -382,6 +394,61 @@ export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailD
         )}
       </div>
     </Modal>
+  );
+}
+
+interface SourceBrowserProps {
+  target: { kind: EntityKind; name: string };
+  fqn: string;
+}
+
+function SourceBrowser({ target, fqn }: SourceBrowserProps) {
+  const [files, setFiles] = useState<CatalogFileEntry[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [loadingFiles, setLoadingFiles] = useState(true);
+
+  const anchor = target.kind === "agent" ? "AGENTS.md" : "SKILL.md";
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingFiles(true);
+    const listFn = target.kind === "agent" ? listAgentFiles : listSkillFiles;
+    listFn(fqn)
+      .then((list) => {
+        if (cancelled) return;
+        setFiles(list);
+        setSelectedFile(
+          list.find((f) => f.relPath === anchor)?.relPath ?? list[0]?.relPath ?? null,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFiles([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFiles(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fqn, target.kind, anchor]);
+
+  const fetchFile = useCallback(
+    (relPath: string): Promise<ArrayBuffer> => {
+      return target.kind === "agent" ? getAgentFile(fqn, relPath) : getSkillFile(fqn, relPath);
+    },
+    [fqn, target.kind],
+  );
+
+  if (loadingFiles) return <p className="form-hint">Loading files…</p>;
+
+  return (
+    <div className="source-browser">
+      <FileTree files={files} selected={selectedFile} anchor={anchor} onSelect={setSelectedFile} />
+      <div className="source-browser__content">
+        {selectedFile && <FileViewer relPath={selectedFile} fetchFile={fetchFile} />}
+        {!selectedFile && <p className="form-hint">Select a file to view</p>}
+      </div>
+    </div>
   );
 }
 
@@ -570,17 +637,6 @@ function summariseReason(r: BlockedReason): string {
     parts.push(`blocked deps: ${r.blockedDeps.map((d) => d.fqn).join(", ")}`);
   }
   return parts.length > 0 ? parts.join("; ") : "unknown reason";
-}
-
-function sourceLabel(kind: EntityKind): string {
-  switch (kind) {
-    case "skill":
-      return "SKILL.md";
-    case "agent":
-      return "AGENTS.md";
-    case "mcp":
-      return "mcp.json";
-  }
 }
 
 function schemeOf(origin: string): string {
