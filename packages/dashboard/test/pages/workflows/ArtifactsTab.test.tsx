@@ -110,7 +110,7 @@ describe("ArtifactsTab — empty + error states", () => {
 });
 
 describe("ArtifactsTab — dropdown UX", () => {
-  it("renders a <select> with `<optgroup>` per source (Summary + per-node)", async () => {
+  it("renders a <select> with `<optgroup>` per source (Workflow + per-node)", async () => {
     const artifacts: WorkflowArtifactWire[] = [
       {
         kind: "workflow-summary",
@@ -147,7 +147,7 @@ describe("ArtifactsTab — dropdown UX", () => {
     const optgroups = select.querySelectorAll("optgroup");
     expect(optgroups.length).toBe(2);
     const labels = Array.from(optgroups).map((og) => og.getAttribute("label"));
-    expect(labels[0]).toBe("Summary");
+    expect(labels[0]).toBe("Workflow");
     // Without a DAG we cannot resolve agent labels, so the per-node
     // group falls back to "Node <shortId>".
     expect(labels[1]).toMatch(/^Node n-a/);
