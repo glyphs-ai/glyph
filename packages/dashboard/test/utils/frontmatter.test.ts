@@ -19,7 +19,8 @@ describe("stripFrontmatter", () => {
   });
 
   it("handles nested YAML objects", () => {
-    const content = "---\ndependencies:\n  skills:\n    - skill-a\n    - skill-b\n---\nContent here";
+    const content =
+      "---\ndependencies:\n  skills:\n    - skill-a\n    - skill-b\n---\nContent here";
     const result = stripFrontmatter(content);
     expect(result.data).toEqual({
       dependencies: { skills: ["skill-a", "skill-b"] },
