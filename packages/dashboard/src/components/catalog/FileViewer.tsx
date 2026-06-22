@@ -5,11 +5,10 @@ import { MarkdownSummary } from "../tasks/TaskDetail/MarkdownSummary.js";
 
 export interface FileViewerProps {
   relPath: string;
-  fqn: string;
   fetchFile: (relPath: string) => Promise<ArrayBuffer>;
 }
 
-export function FileViewer({ relPath, fqn, fetchFile }: FileViewerProps) {
+export function FileViewer({ relPath, fetchFile }: FileViewerProps) {
   const [content, setContent] = useState<ArrayBuffer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,13 +78,7 @@ function RenderContent({ relPath, content, category }: RenderContentProps) {
     }
 
     case "image": {
-      const blob = new Blob([content]);
-      const url = URL.createObjectURL(blob);
-      return (
-        <div className="file-viewer__image">
-          <img src={url} alt={relPath} onLoad={() => URL.revokeObjectURL(url)} />
-        </div>
-      );
+      return <ImageRenderer content={content} relPath={relPath} />;
     }
 
     case "binary":
@@ -95,6 +88,23 @@ function RenderContent({ relPath, content, category }: RenderContentProps) {
     default:
       return <pre className="file-viewer__pre">{text}</pre>;
   }
+}
+
+function ImageRenderer({ content, relPath }: { content: ArrayBuffer; relPath: string }) {
+  const url = useMemo(() => {
+    const blob = new Blob([content]);
+    return URL.createObjectURL(blob);
+  }, [content]);
+
+  useEffect(() => {
+    return () => URL.revokeObjectURL(url);
+  }, [url]);
+
+  return (
+    <div className="file-viewer__image">
+      <img src={url} alt={relPath} />
+    </div>
+  );
 }
 
 function BinaryPlaceholder({

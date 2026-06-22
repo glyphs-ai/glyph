@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export interface FileTreeEntry {
   relPath: string;
@@ -60,7 +60,7 @@ export interface FileTreeProps {
 }
 
 export function FileTree({ files, selected, anchor, onSelect }: FileTreeProps) {
-  const tree = buildTree(files);
+  const tree = useMemo(() => buildTree(files), [files]);
 
   if (files.length === 0) {
     return (

@@ -445,7 +445,7 @@ function SourceBrowser({ target, fqn }: SourceBrowserProps) {
     <div className="source-browser">
       <FileTree files={files} selected={selectedFile} anchor={anchor} onSelect={setSelectedFile} />
       <div className="source-browser__content">
-        {selectedFile && <FileViewer relPath={selectedFile} fqn={fqn} fetchFile={fetchFile} />}
+        {selectedFile && <FileViewer relPath={selectedFile} fetchFile={fetchFile} />}
         {!selectedFile && <p className="form-hint">Select a file to view</p>}
       </div>
     </div>
