@@ -10,7 +10,6 @@ import { useUrlSearchValue } from "../hooks/useUrlState";
 import { CATALOG_VERBS, type CatalogTab, TAB_KIND } from "./catalog/catalog-verbs";
 import { FilterMenu, type StatusFilter } from "./catalog/FilterMenu";
 import { InstallDialog } from "./catalog/InstallDialog";
-import { PatchDialog } from "./catalog/PatchDialog";
 import { RmDialog } from "./catalog/RmDialog";
 
 export type { CatalogTab } from "./catalog/catalog-verbs";
@@ -25,7 +24,7 @@ interface CatalogProps {
   onChanged: () => void;
 }
 
-type EditTarget = { kind: CatalogKind; name: string; mutable: boolean };
+type EditTarget = { kind: CatalogKind; name: string };
 
 export function CatalogPage({
   tab,
@@ -107,25 +106,24 @@ export function CatalogPage({
       if (!a) return; // Silent no-op while the list loads or on stale link.
       appliedEntryRef.current = entryParam;
       setError(null);
-      setEdit({ kind: "agent", name: entryParam, mutable: a.agent.mutable ?? true });
+      setEdit({ kind: "agent", name: entryParam });
     } else if (kind === "skill") {
       const s = skills.find((x) => x.skill.fqn === entryParam);
       if (!s) return;
       appliedEntryRef.current = entryParam;
       setError(null);
-      setEdit({ kind: "skill", name: entryParam, mutable: s.skill.mutable ?? true });
+      setEdit({ kind: "skill", name: entryParam });
     } else {
       const m = mcps.find((x) => x.fqn === entryParam);
       if (!m) return;
       appliedEntryRef.current = entryParam;
       setError(null);
-      setEdit({ kind: "mcp", name: entryParam, mutable: m.mutable ?? true });
+      setEdit({ kind: "mcp", name: entryParam });
     }
   }, [entryParam, tab, agents, skills, mcps]);
 
   // Centralised dialog-close hook so the ?entry= URL key is always
-  // stripped alongside the in-memory edit state. Used by both the
-  // mutable (PatchDialog) and immutable (DetailDialog) branches.
+  // stripped alongside the in-memory edit state.
   const closeEdit = () => {
     setEdit(null);
     if (entryParam !== "") setEntryParam("");
@@ -301,8 +299,7 @@ export function CatalogPage({
               emptyHint={<>Agents wrap skills + MCPs into runnable templates.</>}
               onEdit={(name) => {
                 setError(null);
-                const a = agents.find((x) => x.agent.fqn === name);
-                setEdit({ kind: "agent", name, mutable: a?.agent.mutable ?? true });
+                setEdit({ kind: "agent", name });
               }}
               onRemove={setConfirmRemove}
             />
@@ -325,8 +322,7 @@ export function CatalogPage({
               emptyHint={<>A skill is a reusable capability package referenced by agents.</>}
               onEdit={(name) => {
                 setError(null);
-                const s = skills.find((x) => x.skill.fqn === name);
-                setEdit({ kind: "skill", name, mutable: s?.skill.mutable ?? true });
+                setEdit({ kind: "skill", name });
               }}
               onRemove={setConfirmRemove}
             />
@@ -337,8 +333,7 @@ export function CatalogPage({
               mcps={filteredMcps}
               onEdit={(name) => {
                 setError(null);
-                const m = mcps.find((x) => x.fqn === name);
-                setEdit({ kind: "mcp", name, mutable: m?.mutable ?? true });
+                setEdit({ kind: "mcp", name });
               }}
               onRemove={setConfirmRemove}
             />
@@ -368,31 +363,14 @@ export function CatalogPage({
             onConfirm={() => confirmRemove && doRemove(confirmRemove)}
           />
 
-          {edit !== null &&
-            (edit.mutable ? (
-              <PatchDialog
-                kind={edit.kind}
-                name={edit.name}
-                availableSkills={skills.map((s) => ({
-                  fqn: s.skill.fqn,
-                  origin: s.skill.origin,
-                }))}
-                availableMcps={mcps.map((m) => ({ fqn: m.fqn, origin: m.origin }))}
-                availableAgents={agents.map((a) => ({
-                  fqn: a.agent.fqn,
-                  origin: a.agent.origin,
-                }))}
-                onClose={closeEdit}
-                onSaved={closeEditAndRefresh}
-              />
-            ) : (
-              <DetailDialog
-                target={{ kind: edit.kind, name: edit.name }}
-                workspaceId={currentWorkspaceId}
-                onClose={closeEdit}
-                onSynced={closeEditAndRefresh}
-              />
-            ))}
+          {edit !== null && (
+            <DetailDialog
+              target={{ kind: edit.kind, name: edit.name }}
+              workspaceId={currentWorkspaceId}
+              onClose={closeEdit}
+              onSynced={closeEditAndRefresh}
+            />
+          )}
         </>
       )}
     </div>

@@ -1,5 +1,4 @@
 import { sameOrigin } from "../fetcher/index.js";
-import { ImmutableOriginError, isOriginMutable } from "../origin-mutability.js";
 import { McpNotFoundError, McpOriginConflictError } from "./errors.js";
 import { McpEntity } from "./mcp-entity.js";
 import type { McpRepository } from "./mcp-repository.js";
@@ -40,17 +39,6 @@ export class McpService {
   async installFromOrigin(name: string, origin: string): Promise<McpEntity> {
     const content = await this.fetcher(origin);
     return this.install(name, origin, content);
-  }
-
-  async updateContent(fqn: string, rawContent: string): Promise<McpEntity> {
-    const existing = await this.repo.findById(fqn);
-    if (!existing) throw new McpNotFoundError(fqn);
-    if (!isOriginMutable(existing.origin)) {
-      throw new ImmutableOriginError(fqn, existing.origin);
-    }
-    const updated = existing.withContent(rawContent);
-    await this.repo.insert(updated);
-    return (await this.repo.findById(fqn)) ?? updated;
   }
 
   async getContent(fqn: string): Promise<string> {

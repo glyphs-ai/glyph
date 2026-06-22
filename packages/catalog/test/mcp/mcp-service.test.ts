@@ -146,49 +146,6 @@ for (const backend of BACKENDS) {
       });
     });
 
-    describe("updateContent", () => {
-      it("replaces content while preserving the stored origin", async () => {
-        await svc.install("x/y", "file:/abs/x", '{"v":1}');
-        const updated = await svc.updateContent("x/y", '{"v":2,"updated":true}');
-        expect(updated.origin).toBe("file:///abs/x");
-        const { meta, body } = McpFormat.parse(updated.spec, "test");
-        expect(meta.name).toBe("x/y");
-        expect(body.v).toBe(2);
-        expect(body.updated).toBe(true);
-      });
-
-      it("ignores any _meta in update payload (entity wins for name; origin is read from row)", async () => {
-        await svc.install("x/y", "file:/abs/x", "{}");
-        const updated = await svc.updateContent(
-          "x/y",
-          JSON.stringify({ v: 2, _meta: { name: "evil/name", origin: "file:/abs/hijack" } }),
-        );
-        const { meta } = McpFormat.parse(updated.spec, "test");
-        expect(meta.name).toBe("x/y");
-        // Origin lives on the entity / SQLite row, never the file.
-        expect(updated.origin).toBe("file:///abs/x");
-      });
-
-      it("throws NotFound when updating a missing entry", async () => {
-        await expect(svc.updateContent("missing/x", "{}")).rejects.toThrow(McpNotFoundError);
-      });
-
-      it("rejects writes on immutable (non-file:) origins", async () => {
-        await svc.install(
-          "vendor/upstream",
-          "github:o/r/tree/main/mcps/upstream.json",
-          '{"command":"node"}',
-        );
-        await expect(
-          svc.updateContent("vendor/upstream", '{"command":"hacked"}'),
-        ).rejects.toMatchObject({
-          name: "ImmutableOriginError",
-          fqn: "vendor/upstream",
-          origin: "github:o/r/tree/main/mcps/upstream.json",
-        });
-      });
-    });
-
     describe("delete", () => {
       it("removes from storage", async () => {
         await svc.install("x/y", "file:/abs/x", "{}");

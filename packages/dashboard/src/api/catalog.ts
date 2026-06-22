@@ -21,8 +21,6 @@ export interface OverviewData {
 
 /**
  * Wire shape for an installed MCP — mirrors @glyphs-ai/catalog `Mcp`.
- * `mutable` controls whether the dashboard offers Edit (file: origin) vs
- * Sync (re-install from upstream for github: etc.).
  */
 export type McpItem = Mcp;
 
@@ -374,7 +372,6 @@ export const deleteMcp = (name: string) =>
 export interface McpDetail {
   name: string;
   origin: string;
-  mutable: boolean;
   orphaned: boolean;
   /** Raw JSON content as stored on disk (preserves user formatting). */
   content: string;
@@ -382,9 +379,6 @@ export interface McpDetail {
 
 export const getMcp = (name: string): Promise<McpDetail> =>
   fetchJson<McpDetail>(`${catalogPrefix()}/mcps/${encodeURIComponent(name)}`, "mcp");
-
-export const updateMcpContent = (name: string, content: string) =>
-  mutate(`${catalogPrefix()}/mcps/${encodeURIComponent(name)}`, jsonInit("PUT", { content }));
 
 export interface SkillDetail {
   skill: Skill;
@@ -397,23 +391,6 @@ export interface SkillDetail {
 export const getSkill = (name: string): Promise<SkillDetail> =>
   fetchJson<SkillDetail>(`${catalogPrefix()}/skills/${encodeURIComponent(name)}`, "skill");
 
-export const updateSkillContent = (name: string, content: string) =>
-  mutate(`${catalogPrefix()}/skills/${encodeURIComponent(name)}`, jsonInit("PUT", { content }));
-
-export interface SkillMetadataPatch {
-  description?: string;
-  version?: string;
-  prereqs?: string | null;
-  dependencies?: {
-    /** Origin URI strings — wire frontmatter shape (catalog v2 out-of-scope). */
-    skills?: string[];
-    mcps?: string[];
-  } | null;
-}
-
-export const patchSkillMetadata = (name: string, patch: SkillMetadataPatch) =>
-  mutate(`${catalogPrefix()}/skills/${encodeURIComponent(name)}`, jsonInit("PATCH", patch));
-
 export interface AgentDetail {
   agent: Agent;
   status: "ready" | "blocked";
@@ -424,25 +401,3 @@ export interface AgentDetail {
 
 export const getAgent = (name: string): Promise<AgentDetail> =>
   fetchJson<AgentDetail>(`${catalogPrefix()}/agents/${encodeURIComponent(name)}`, "agent");
-
-export const updateAgentContent = (name: string, content: string) =>
-  mutate(`${catalogPrefix()}/agents/${encodeURIComponent(name)}`, jsonInit("PUT", { content }));
-
-/** PATCH body for updating agent metadata; mirrors @glyphs-ai/catalog `AgentMetadataPatch`. */
-export interface AgentMetadataPatch {
-  description?: string;
-  version?: string;
-  prereqs?: string | null;
-  dependencies?: {
-    skills?: string[];
-    mcps?: string[];
-    /**
-     * Agent → agent edges. Only agents can declare other agents as
-     * deps; the skill patch shape deliberately omits this field.
-     */
-    agents?: string[];
-  } | null;
-}
-
-export const patchAgentMetadata = (name: string, patch: AgentMetadataPatch) =>
-  mutate(`${catalogPrefix()}/agents/${encodeURIComponent(name)}`, jsonInit("PATCH", patch));

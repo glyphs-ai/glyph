@@ -7,7 +7,6 @@ import {
   CyclicDependencyError,
   FetchError,
   HasDependentsError,
-  ImmutableOriginError,
   McpInvalidJsonError,
   McpNameInvalidError,
   McpNotFoundError,
@@ -120,7 +119,6 @@ describe("errorBody", () => {
       "SkillFrontmatterError",
       "FetchError",
       "HasDependentsError",
-      "ImmutableOriginError",
       "McpInvalidJsonError",
       "McpNameInvalidError",
       "SkillNameInvalidError",
@@ -238,8 +236,6 @@ describe("catalogErrorPolicy mapping", () => {
     ["SkillNotFoundError", new SkillNotFoundError("public/foo"), 404],
     ["AgentNotFoundError", new AgentNotFoundError("public/foo"), 404],
     ["McpNotFoundError", new McpNotFoundError("a/b"), 404],
-
-    ["ImmutableOriginError", new ImmutableOriginError("public/foo", "github://x"), 405],
 
     [
       "HasDependentsError",

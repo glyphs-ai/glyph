@@ -3,12 +3,7 @@ import { Hono } from "hono";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import {
-  readContentBody,
-  readMetadataBody,
-  readPlanTokenBody,
-  readSkillInstallBody,
-} from "./helpers.js";
+import { readPlanTokenBody, readSkillInstallBody } from "./helpers.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 
@@ -172,45 +167,6 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): Hono {
     } catch (err) {
       return respondError(c, err, {
         route: "catalog.skills.acknowledgePrereqs",
-        policy: catalogErrorPolicy,
-        meta: { fqn: name },
-      });
-    }
-  });
-
-  app.put("/:name{.+}", async (c) => {
-    const catalog = getCatalog(c);
-    const name = c.req.param("name");
-    const parsed = await readContentBody(c);
-    if ("error" in parsed) return c.json(parsed, 400);
-    try {
-      const skill = await catalog.updateSkillContent(name, parsed.content);
-      logEvent(c, "catalog: skill content updated", { kind: "skill", fqn: name });
-      return c.json(skill);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "catalog.skills.updateContent",
-        policy: catalogErrorPolicy,
-        meta: { fqn: name },
-      });
-    }
-  });
-
-  app.patch("/:name{.+}", async (c) => {
-    const catalog = getCatalog(c);
-    const name = c.req.param("name");
-    const parsed = await readMetadataBody(c);
-    if ("error" in parsed) return c.json(parsed, 400);
-    try {
-      const skill = await catalog.updateSkillMetadata(
-        name,
-        parsed.body as Parameters<typeof catalog.updateSkillMetadata>[1],
-      );
-      logEvent(c, "catalog: skill metadata updated", { kind: "skill", fqn: name });
-      return c.json(skill);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "catalog.skills.updateMetadata",
         policy: catalogErrorPolicy,
         meta: { fqn: name },
       });

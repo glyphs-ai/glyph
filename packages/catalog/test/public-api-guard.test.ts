@@ -17,7 +17,6 @@ import {
   type Agent,
   type AgentEntry,
   AgentFrontmatterError,
-  type AgentMetadataPatch,
   AgentNameInvalidError,
   AgentNotFoundError,
   AgentOriginConflictError,
@@ -34,7 +33,6 @@ import {
   type EntryStatus,
   FetchError,
   HasDependentsError,
-  ImmutableOriginError,
   type Mcp,
   McpInvalidJsonError,
   McpNameInvalidError,
@@ -46,7 +44,6 @@ import {
   type Skill,
   type SkillEntry,
   SkillFrontmatterError,
-  type SkillMetadataPatch,
   SkillNameInvalidError,
   SkillNotFoundError,
   SkillOriginConflictError,
@@ -80,7 +77,6 @@ describe("@glyphs-ai/catalog public API guard", () => {
       new McpNotFoundError("name"),
       new McpOriginConflictError("name", "existing", "attempted"),
       new HasDependentsError("target", []),
-      new ImmutableOriginError("fqn", "origin"),
       new FetchError("uri", "reason"),
       new OriginParseError("uri", "reason"),
     ];
@@ -137,9 +133,7 @@ describe("@glyphs-ai/catalog public API guard", () => {
     void k;
   });
 
-  it("exports the metadata-patch + entry + resolve-result shapes", () => {
-    expectTypeOf<SkillMetadataPatch>().toHaveProperty("description");
-    expectTypeOf<AgentMetadataPatch>().toHaveProperty("description");
+  it("exports the entry + resolve-result shapes", () => {
     expectTypeOf<SkillEntry>().toHaveProperty("skill");
     expectTypeOf<AgentEntry>().toHaveProperty("agent");
     expectTypeOf<AgentEntry>().toHaveProperty("coordEligible");
@@ -168,11 +162,6 @@ describe("@glyphs-ai/catalog public API guard", () => {
     expectTypeOf<CatalogService>().toHaveProperty("getSkillContent");
     expectTypeOf<CatalogService>().toHaveProperty("getAgentContent");
     expectTypeOf<CatalogService>().toHaveProperty("getMcpContent");
-    expectTypeOf<CatalogService>().toHaveProperty("updateSkillContent");
-    expectTypeOf<CatalogService>().toHaveProperty("updateAgentContent");
-    expectTypeOf<CatalogService>().toHaveProperty("updateMcpContent");
-    expectTypeOf<CatalogService>().toHaveProperty("updateSkillMetadata");
-    expectTypeOf<CatalogService>().toHaveProperty("updateAgentMetadata");
     expectTypeOf<CatalogService>().toHaveProperty("resolveAgent");
     expectTypeOf<CatalogService>().toHaveProperty("resolveSkillFromCatalog");
   });

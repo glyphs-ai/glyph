@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import { readContentBody, readMcpInstallBody, readPlanTokenBody } from "./helpers.js";
+import { readMcpInstallBody, readPlanTokenBody } from "./helpers.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 
@@ -26,10 +26,9 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): Hono {
 
   app.get("/", async (c) => {
     const catalog = getCatalog(c);
-    // listMcps() already returns Mcp[] (`{ name, origin, mutable }`),
+    // listMcps() already returns Mcp[] (`{ fqn, origin, ... }`),
     // matching the dashboard's `McpItem` shape. Returning it directly
-    // avoids wrapping each entry as `{ name: { name, origin, mutable } }`,
-    // which would crash React with "Objects are not valid as a React child".
+    // avoids unnecessary wrapping.
     return c.json(await catalog.listMcps());
   });
 
@@ -120,24 +119,6 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): Hono {
       return respondError(c, err, {
         route: "catalog.mcps.sync",
         policy: catalogErrorPolicy,
-      });
-    }
-  });
-
-  app.put("/:name{.+}", async (c) => {
-    const catalog = getCatalog(c);
-    const name = c.req.param("name");
-    const parsed = await readContentBody(c);
-    if ("error" in parsed) return c.json(parsed, 400);
-    try {
-      await catalog.updateMcpContent(name, parsed.content);
-      logEvent(c, "catalog: mcp content updated", { kind: "mcp", fqn: name });
-      return c.json({ ok: true });
-    } catch (err) {
-      return respondError(c, err, {
-        route: "catalog.mcps.updateContent",
-        policy: catalogErrorPolicy,
-        meta: { fqn: name },
       });
     }
   });

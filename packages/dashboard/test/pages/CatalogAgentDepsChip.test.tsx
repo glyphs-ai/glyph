@@ -25,7 +25,6 @@ function makeAgent(fqn: string, agentDeps: string[] = []): AgentEntry {
       short,
       description: `${fqn} description`,
       version: "1.0.0",
-      mutable: true,
       ...(agentDeps.length > 0
         ? { dependencies: { agents: agentDeps.map((f) => ({ fqn: f })) } }
         : {}),

@@ -33,14 +33,12 @@ import type {
   Agent,
   AgentEntry,
   AgentInstallBody,
-  AgentMetadataPatch,
   CatalogInstallResult,
   CatalogSyncResult,
   Mcp,
   Skill,
   SkillEntry,
   SkillInstallBody,
-  SkillMetadataPatch,
 } from "@glyphs-ai/catalog";
 import type { ActivityItem, TruncationInfo } from "@glyphs-ai/runtime";
 import type { PreviewScheduleResult, Schedule } from "@glyphs-ai/schedule";
@@ -461,11 +459,6 @@ export interface CatalogOverview {
     readonly blocked: number;
     readonly orphaned: number;
   };
-}
-
-/** PUT body shared by content-update routes (skills / agents / mcps). */
-export interface ContentUpdateBody {
-  readonly content: string;
 }
 
 /** GET /api/workspaces/:id/catalog/skills/:name response (entry + content). */
@@ -1071,14 +1064,6 @@ export const ROUTES = {
     { params: WorkspacePathParams; body: SkillInstallBody },
     CatalogInstallResult
   >("POST", "/api/workspaces/:id/catalog/skills"),
-  "catalog.skills.content.update": defineRoute<
-    { params: CatalogResourcePathParams; body: ContentUpdateBody },
-    SkillEntry
-  >("PUT", "/api/workspaces/:id/catalog/skills/:name"),
-  "catalog.skills.metadata.update": defineRoute<
-    { params: CatalogResourcePathParams; body: SkillMetadataPatch },
-    SkillEntry
-  >("PATCH", "/api/workspaces/:id/catalog/skills/:name"),
   "catalog.skills.delete": defineRoute<{ params: CatalogResourcePathParams }, OkResponse>(
     "DELETE",
     "/api/workspaces/:id/catalog/skills/:name",
@@ -1117,14 +1102,6 @@ export const ROUTES = {
     { params: WorkspacePathParams; body: AgentInstallBody },
     CatalogInstallResult
   >("POST", "/api/workspaces/:id/catalog/agents"),
-  "catalog.agents.content.update": defineRoute<
-    { params: CatalogResourcePathParams; body: ContentUpdateBody },
-    AgentEntry
-  >("PUT", "/api/workspaces/:id/catalog/agents/:name"),
-  "catalog.agents.metadata.update": defineRoute<
-    { params: CatalogResourcePathParams; body: AgentMetadataPatch },
-    AgentEntry
-  >("PATCH", "/api/workspaces/:id/catalog/agents/:name"),
   "catalog.agents.delete": defineRoute<{ params: CatalogResourcePathParams }, OkResponse>(
     "DELETE",
     "/api/workspaces/:id/catalog/agents/:name",
@@ -1166,10 +1143,6 @@ export const ROUTES = {
     },
     CatalogInstallResult
   >("POST", "/api/workspaces/:id/catalog/mcps"),
-  "catalog.mcps.content.update": defineRoute<
-    { params: CatalogResourcePathParams; body: ContentUpdateBody },
-    OkResponse
-  >("PUT", "/api/workspaces/:id/catalog/mcps/:name"),
   "catalog.mcps.delete": defineRoute<{ params: CatalogResourcePathParams }, OkResponse>(
     "DELETE",
     "/api/workspaces/:id/catalog/mcps/:name",

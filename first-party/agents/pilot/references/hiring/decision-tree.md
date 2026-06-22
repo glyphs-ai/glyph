@@ -72,7 +72,7 @@ Process:
 4. Draft the AGENTS.md using `template-base.md` as the frame and `writing-good-agent-prompts.md` for the body content. When step 3 yielded a template, mine it for: mission framing, critical rules, workflow phases, and success metrics — then **specialize each section for your mission** (your stack, your conventions, your acceptance criteria). Drop sections that don't apply.
 5. Install via `file:` origin (see template-base.md for the install command).
 6. **Probe** before adding to `hires.md`.
-7. Iterate the agent file based on probe results — `file:` origins are mutable; you can edit and re-install.
+7. Iterate the agent file based on probe results — edit the source and sync to pick up changes.
 
 ## When not to create a new agent
 
