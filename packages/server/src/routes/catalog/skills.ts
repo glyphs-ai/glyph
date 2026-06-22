@@ -4,6 +4,7 @@ import { catalogErrorPolicy } from "../_error-policies/catalog.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
 import { readPlanTokenBody, readSkillInstallBody } from "./helpers.js";
+import { mimeFromExt } from "./mime.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 
@@ -52,6 +53,44 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): Hono {
     } catch (err) {
       return respondError(c, err, {
         route: "catalog.skills.anchor",
+        policy: catalogErrorPolicy,
+        meta: { fqn: name },
+      });
+    }
+  });
+
+  app.get("/:name{.+}/files/:path{.+}", async (c) => {
+    const catalog = getCatalog(c);
+    const name = c.req.param("name");
+    const path = c.req.param("path");
+    let relPath = path;
+    try {
+      relPath = decodeURIComponent(path);
+      const buf = await catalog.getSkillFile(name, relPath);
+      if (buf === null) return c.json({ error: "not found", code: "NotFound" }, 404);
+      const ab = new ArrayBuffer(buf.byteLength);
+      new Uint8Array(ab).set(buf);
+      return new Response(ab, {
+        headers: { "Content-Type": mimeFromExt(relPath) },
+      });
+    } catch (err) {
+      return respondError(c, err, {
+        route: "catalog.skills.files.get",
+        policy: catalogErrorPolicy,
+        meta: { fqn: name, relPath },
+      });
+    }
+  });
+
+  app.get("/:name{.+}/files", async (c) => {
+    const catalog = getCatalog(c);
+    const name = c.req.param("name");
+    try {
+      const files = await catalog.listSkillFiles(name);
+      return c.json(files);
+    } catch (err) {
+      return respondError(c, err, {
+        route: "catalog.skills.files.list",
         policy: catalogErrorPolicy,
         meta: { fqn: name },
       });

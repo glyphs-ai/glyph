@@ -401,3 +401,41 @@ export interface AgentDetail {
 
 export const getAgent = (name: string): Promise<AgentDetail> =>
   fetchJson<AgentDetail>(`${catalogPrefix()}/agents/${encodeURIComponent(name)}`, "agent");
+
+// ── File browser API ────────────────────────────────────────────────
+
+/** Wire shape for a single file in the catalog file listing. */
+export interface CatalogFileEntry {
+  relPath: string;
+  size: number;
+}
+
+export const listSkillFiles = (fqn: string): Promise<CatalogFileEntry[]> =>
+  fetchJson<CatalogFileEntry[]>(
+    `${catalogPrefix()}/skills/${encodeURIComponent(fqn)}/files`,
+    "skill-files",
+  );
+
+export const listAgentFiles = (fqn: string): Promise<CatalogFileEntry[]> =>
+  fetchJson<CatalogFileEntry[]>(
+    `${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/files`,
+    "agent-files",
+  );
+
+export const getSkillFile = (fqn: string, relPath: string): Promise<ArrayBuffer> => {
+  const encoded = relPath.split("/").map(encodeURIComponent).join("/");
+  const url = `${catalogPrefix()}/skills/${encodeURIComponent(fqn)}/files/${encoded}`;
+  return fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`skill file: ${r.status}`);
+    return r.arrayBuffer();
+  });
+};
+
+export const getAgentFile = (fqn: string, relPath: string): Promise<ArrayBuffer> => {
+  const encoded = relPath.split("/").map(encodeURIComponent).join("/");
+  const url = `${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/files/${encoded}`;
+  return fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`agent file: ${r.status}`);
+    return r.arrayBuffer();
+  });
+};

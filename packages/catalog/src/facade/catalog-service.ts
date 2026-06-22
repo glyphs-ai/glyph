@@ -403,6 +403,22 @@ export class CatalogService {
     return this.rt.agent.getAnchor(fqn);
   }
 
+  async listAgentFiles(fqn: string): Promise<{ relPath: string; size: number }[]> {
+    return this.rt.agentRepo.listFilePaths(fqn);
+  }
+
+  async listSkillFiles(fqn: string): Promise<{ relPath: string; size: number }[]> {
+    return this.rt.skillRepo.listFilePaths(fqn);
+  }
+
+  async getAgentFile(fqn: string, relPath: string): Promise<Buffer | null> {
+    return this.rt.agentRepo.getFile(fqn, relPath);
+  }
+
+  async getSkillFile(fqn: string, relPath: string): Promise<Buffer | null> {
+    return this.rt.skillRepo.getFile(fqn, relPath);
+  }
+
   async getMcpContent(fqn: string): Promise<string> {
     return this.rt.mcp.getContent(fqn);
   }
