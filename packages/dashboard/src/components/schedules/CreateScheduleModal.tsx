@@ -1,7 +1,14 @@
 import type { AgentEntry } from "@glyphs-ai/contracts";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { type CreateScheduleBody, createSchedule, type ScheduleView } from "../../api";
+import {
+  type CreateScheduleBody,
+  type CreateWorkflowScheduleBody,
+  createSchedule,
+  createWorkflowSchedule,
+  type ScheduleView,
+} from "../../api";
 import { Modal } from "../Modal";
+import { coordEligibleAgents } from "../workflows/shared";
 import { presetToCron, validatePreset } from "./cron-presets";
 import { ScheduleFormFields } from "./ScheduleFormFields";
 import {
@@ -48,6 +55,7 @@ export function CreateScheduleModal({
   onCreated,
 }: CreateScheduleModalProps) {
   const [state, setState] = useState<ScheduleFormState>(() => ({
+    kind: "task",
     name: "",
     agent: "",
     runtime: "",
@@ -65,12 +73,30 @@ export function CreateScheduleModal({
     [],
   );
 
+  // Switching the target kind reseeds the agent to the first option
+  // valid for the new kind (coordinator-eligible for workflow, any
+  // installed agent for task) so the dropdown never carries a stale
+  // selection the other kind would reject.
+  const onKindChange = useCallback(
+    (kind: ScheduleFormState["kind"]) => {
+      setState((prev) => {
+        const pool = kind === "workflow" ? coordEligibleAgents(agents) : agents;
+        return { ...prev, kind, agent: pool[0]?.agent.fqn ?? "" };
+      });
+    },
+    [agents],
+  );
+
   // Mount-effect agent preselection. Re-runs each time the modal
   // opens or the agents list changes so re-opening with a fresh
-  // agent list reseeds the dropdown.
+  // agent list reseeds the dropdown. Respects the current kind so a
+  // workflow-kind re-open seeds a coordinator-eligible agent.
   useEffect(() => {
     if (!open) return;
-    setState((prev) => ({ ...prev, agent: agents[0]?.agent.fqn ?? "" }));
+    setState((prev) => {
+      const pool = prev.kind === "workflow" ? coordEligibleAgents(agents) : agents;
+      return { ...prev, agent: pool[0]?.agent.fqn ?? "" };
+    });
   }, [open, agents]);
 
   // Default runtime to the first registered kind. Empty runtime is a
@@ -128,18 +154,33 @@ export function CreateScheduleModal({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const body: CreateScheduleBody = {
-        name: state.name.trim(),
-        target: {
-          agent: state.agent,
-          brief: state.brief.trim(),
-          ...(state.details.trim() ? { details: state.details.trim() } : {}),
-          ...(state.runtime ? { runtime: state.runtime } : {}),
-        },
-        trigger: { kind: "cron", expr, tz: state.tz },
-        enabled,
-      };
-      const created = await createSchedule(body);
+      let created: ScheduleView;
+      if (state.kind === "workflow") {
+        const body: CreateWorkflowScheduleBody = {
+          name: state.name.trim(),
+          target: {
+            coordinatorAgent: state.agent,
+            brief: state.brief.trim(),
+            ...(state.details.trim() ? { details: state.details.trim() } : {}),
+          },
+          trigger: { kind: "cron", expr, tz: state.tz },
+          enabled,
+        };
+        created = await createWorkflowSchedule(body);
+      } else {
+        const body: CreateScheduleBody = {
+          name: state.name.trim(),
+          target: {
+            agent: state.agent,
+            brief: state.brief.trim(),
+            ...(state.details.trim() ? { details: state.details.trim() } : {}),
+            ...(state.runtime ? { runtime: state.runtime } : {}),
+          },
+          trigger: { kind: "cron", expr, tz: state.tz },
+          enabled,
+        };
+        created = await createSchedule(body);
+      }
       onCreated(created);
       onClose();
     } catch (err) {
@@ -181,12 +222,16 @@ export function CreateScheduleModal({
                 </div>
                 <select
                   id="new-schedule-target-kind"
-                  value="task"
-                  disabled
+                  value={state.kind}
+                  onChange={(e) =>
+                    onKindChange(e.target.value === "workflow" ? "workflow" : "task")
+                  }
+                  disabled={submitting}
                   className="select select--full"
                   data-testid="create-schedule-target-kind"
                 >
                   <option value="task">Task</option>
+                  <option value="workflow">Workflow</option>
                 </select>
               </label>
             }

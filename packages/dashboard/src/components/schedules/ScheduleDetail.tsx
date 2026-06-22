@@ -7,7 +7,7 @@ import {
 } from "../../api";
 import { formatAbsolute, formatRelative } from "../../utils/time";
 import { ScheduleRecentFires } from "./ScheduleRecentFires";
-import { targetAgent, targetRuntime } from "./shared";
+import { targetAgent, targetBrief, targetDetails, targetRuntime } from "./shared";
 
 export interface ScheduleDetailProps {
   scheduleId: string;
@@ -188,24 +188,25 @@ export function ScheduleDetail({
             className="muted"
             style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.45, margin: 0 }}
           >
-            {"brief" in detail.target ? (detail.target as { brief: string }).brief : ""}
+            {targetBrief(detail.target)}
           </p>
         </section>
 
-        {"details" in detail.target && (detail.target as { details?: string }).details && (
+        {targetDetails(detail.target) && (
           <section aria-label="Details">
             <h3 style={{ fontSize: 14, fontWeight: 600, margin: "12px 0 8px 0" }}>Details</h3>
             <p
               className="muted"
               style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.45, margin: 0 }}
             >
-              {(detail.target as { details?: string }).details}
+              {targetDetails(detail.target)}
             </p>
           </section>
         )}
 
         <ScheduleRecentFires
           scheduleId={scheduleId}
+          kind={detail.target.kind}
           currentWorkspaceId={currentWorkspaceId}
           refreshToken={recentFiresToken}
           onSelectFire={onSelectFire}

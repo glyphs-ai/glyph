@@ -53,6 +53,8 @@ const NODE_ID_LOG_TASK_1B = "c1b1bbbb-2e4b-4cad-9b01-20260607c1b0";
 const NODE_ID_BUMP_COORD_0 = "c000cccc-3d5c-4dbe-8c00-20260606c000";
 const NODE_ID_BRAND_COORD_0 = "c000dddd-4e6d-4abc-8d00-20260605c000";
 const NODE_ID_BRAND_TASK_1A = "c1a1dddd-4e6d-4abc-9d01-20260605c1a0";
+const NODE_ID_RELEASE_FIRE1_COORD = "c000f1f1-6b8c-4d0e-8f01-20260527f001";
+const NODE_ID_RELEASE_FIRE2_COORD = "c000f2f2-6b8c-4d0e-8f02-20260527f002";
 
 /**
  * Hand-authored task ids in the real `<YYYYMMDD>-<8hex>` shape
@@ -170,6 +172,39 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     startedAt: iso(-4320),
     endedAt: iso(-4200),
     iterationCount: 2,
+  },
+  // Schedule-launched workflow fires. Each `metadata.scheduleId` matches
+  // the workflow-kind entry in `fixtureSchedules` (`sched-release-workflow`)
+  // so the per-schedule "Recent fires" panel on the schedule detail
+  // surface renders workflow rows. The succeeded + running pair keeps the
+  // WorkflowStatusBadge variants exercised in mock mode and gives the
+  // FireWorkflowDetailPane a real header + DAG to drill into.
+  {
+    id: "20260527-9f1a0b01",
+    brief: "Coordinate the nightly release train",
+    details:
+      "Fan out build → test → package across the release agents, gather artifacts, and post a go/no-go summary to the release channel.",
+    status: "succeeded",
+    coordinatorAgent: "official/engineer",
+    metadata: { scheduleId: "sched-release-workflow", firedAt: "2026-05-27T18:00:00.000Z" },
+    awaitingHumanCount: 0,
+    createdAt: iso(-360),
+    startedAt: iso(-360),
+    endedAt: iso(-330),
+    iterationCount: 2,
+  },
+  {
+    id: "20260527-9f1a0b02",
+    brief: "Coordinate the nightly release train",
+    details:
+      "Fan out build → test → package across the release agents, gather artifacts, and post a go/no-go summary to the release channel.",
+    status: "running",
+    coordinatorAgent: "official/engineer",
+    metadata: { scheduleId: "sched-release-workflow", firedAt: "2026-05-27T22:00:00.000Z" },
+    awaitingHumanCount: 0,
+    createdAt: iso(-30),
+    startedAt: iso(-30),
+    iterationCount: 1,
   },
 ];
 
@@ -427,10 +462,49 @@ const dagAwaitingHuman: WorkflowDagWire = {
   ],
 };
 
+const dagReleaseFire1: WorkflowDagWire = {
+  workflow: fixtureWorkflows[5]!,
+  nodes: [
+    {
+      id: NODE_ID_RELEASE_FIRE1_COORD,
+      workflowId: "20260527-9f1a0b01",
+      status: "succeeded",
+      phase: 0,
+      spec: { kind: "coordinator", agent: "official/engineer" },
+      metadata: {},
+      createdAt: iso(-360),
+      readyAt: iso(-360),
+      runningAt: iso(-359),
+      endedAt: iso(-330),
+    },
+  ],
+  edges: [],
+};
+
+const dagReleaseFire2: WorkflowDagWire = {
+  workflow: fixtureWorkflows[6]!,
+  nodes: [
+    {
+      id: NODE_ID_RELEASE_FIRE2_COORD,
+      workflowId: "20260527-9f1a0b02",
+      status: "running",
+      phase: 0,
+      spec: { kind: "coordinator", agent: "official/engineer" },
+      metadata: {},
+      createdAt: iso(-30),
+      readyAt: iso(-30),
+      runningAt: iso(-29),
+    },
+  ],
+  edges: [],
+};
+
 export const fixtureWorkflowDags: ReadonlyMap<string, WorkflowDagWire> = new Map([
   [fixtureWorkflows[0]!.id, dagRunningMultistage],
   [fixtureWorkflows[1]!.id, dagAwaitingHuman],
   [fixtureWorkflows[2]!.id, dagSucceededSimple],
   [fixtureWorkflows[3]!.id, dagFailedEarly],
   [fixtureWorkflows[4]!.id, dagCancelledLate],
+  [fixtureWorkflows[5]!.id, dagReleaseFire1],
+  [fixtureWorkflows[6]!.id, dagReleaseFire2],
 ]);

@@ -17,7 +17,9 @@ import { type DefaultBodyType, HttpResponse, http } from "msw";
 import type {
   CreateScheduleBody,
   CreateWorkflowBody,
+  CreateWorkflowScheduleBody,
   PatchScheduleBody,
+  PatchWorkflowScheduleBody,
   ScheduleDetail,
   ScheduleView,
   SessionView,
@@ -175,6 +177,21 @@ export const handlers = [
         return typeof rowScheduleId === "string" && rowScheduleId === scheduleId;
       });
     }
+    return HttpResponse.json(rows);
+  }),
+  // `/scheduled-workflows` is the workflow-kind sibling of
+  // `/scheduled-tasks`: it carries the workflow runs a schedule has
+  // launched, surfaced by the schedule detail's "Recent fires" panel
+  // for workflow-kind schedules. Workflows have no `origin` field, so
+  // "schedule-launched" is inferred from a string `metadata.scheduleId`.
+  http.get(`/api/workspaces/${W}/scheduled-workflows`, ({ request }) => {
+    const url = new URL(request.url);
+    const scheduleId = url.searchParams.get("scheduleId");
+    const rows = workflowsState.filter((w) => {
+      const rowScheduleId = (w.metadata as Record<string, unknown> | undefined)?.scheduleId;
+      if (typeof rowScheduleId !== "string") return false;
+      return scheduleId === null || rowScheduleId === scheduleId;
+    });
     return HttpResponse.json(rows);
   }),
   http.get(`/api/workspaces/${W}/tasks/:taskId`, ({ params }) => {
@@ -337,6 +354,65 @@ export const handlers = [
     const { describe: _describe, ...entity } = created;
     return HttpResponse.json(entity satisfies ScheduleView, { status: 201 });
   }),
+  // POST /schedules/workflow is the workflow-kind sibling of
+  // /schedules/task — the "New schedule" modal lands here when the
+  // target-type switcher is set to "Workflow". The body carries a
+  // workflow target (`coordinatorAgent` + `brief` + optional
+  // `details`, no `runtime`); the mock injects `kind: "workflow"`
+  // before storing. Mirrors the server route's validation shape.
+  http.post(`/api/workspaces/${W}/schedules/workflow`, async ({ request }) => {
+    const body = (await request.json()) as CreateWorkflowScheduleBody;
+    if (typeof body.name !== "string" || body.name.trim() === "") {
+      return HttpResponse.json({ error: "name must be a non-empty string" }, { status: 400 });
+    }
+    if (
+      body.target === undefined ||
+      body.target === null ||
+      typeof body.target.coordinatorAgent !== "string" ||
+      typeof body.target.brief !== "string"
+    ) {
+      return HttpResponse.json(
+        { error: "target must be { coordinatorAgent, brief, details? }" },
+        { status: 400 },
+      );
+    }
+    if (
+      body.trigger === undefined ||
+      body.trigger === null ||
+      body.trigger.kind !== "cron" ||
+      typeof body.trigger.expr !== "string" ||
+      typeof body.trigger.tz !== "string"
+    ) {
+      return HttpResponse.json(
+        { error: "trigger must be { kind: 'cron', expr, tz }" },
+        { status: 400 },
+      );
+    }
+    const id = `sched-${cryptoRandom8()}`;
+    const now = new Date().toISOString();
+    const created: ScheduleDetail = {
+      id,
+      name: body.name.trim(),
+      target: {
+        kind: "workflow",
+        coordinatorAgent: body.target.coordinatorAgent,
+        brief: body.target.brief,
+        ...(typeof body.target.details === "string" && body.target.details.trim() !== ""
+          ? { details: body.target.details }
+          : {}),
+      },
+      trigger: body.trigger,
+      enabled: body.enabled ?? true,
+      createdAt: now,
+      updatedAt: now,
+      nextFireAt: new Date(Date.now() + 60_000).toISOString(),
+      lastFiredAt: undefined,
+      describe: `Mock describe for ${body.trigger.expr}`,
+    };
+    schedulesState.unshift(created);
+    const { describe: _describe, ...entity } = created;
+    return HttpResponse.json(entity satisfies ScheduleView, { status: 201 });
+  }),
   // GET /schedules/preview-cron is the unscoped cron preview.
   // MUST come BEFORE the GET /:scheduleId handlers so MSW matches the
   // literal `preview-cron` path before the `:scheduleId` wildcard.
@@ -410,6 +486,44 @@ export const handlers = [
     const { describe: _describe, ...entity } = merged;
     return HttpResponse.json(entity);
   }),
+  // PATCH /schedules/workflow/:scheduleId is the workflow-kind sibling
+  // of the task PATCH. `target` uses the same RFC 7396 deep-merge
+  // semantics (string sets, `null` deletes `details`, absent keeps),
+  // but over the workflow target shape (`coordinatorAgent` + `brief` +
+  // `details`, no `runtime`).
+  http.patch(`/api/workspaces/${W}/schedules/workflow/:scheduleId`, async ({ params, request }) => {
+    const idx = schedulesState.findIndex((s) => s.id === params.scheduleId);
+    if (idx === -1) return notFound("schedule not found");
+    const body = (await request.json()) as PatchWorkflowScheduleBody;
+    const current = schedulesState[idx]!;
+    let nextTarget = current.target;
+    if (body.target !== undefined && current.target.kind === "workflow") {
+      const ct = current.target as {
+        kind: "workflow";
+        coordinatorAgent: string;
+        brief: string;
+        details?: string;
+      };
+      const t = { ...ct };
+      if (body.target.coordinatorAgent !== undefined)
+        t.coordinatorAgent = body.target.coordinatorAgent;
+      if (body.target.brief !== undefined) t.brief = body.target.brief;
+      if (body.target.details === null) delete (t as { details?: string }).details;
+      else if (body.target.details !== undefined) t.details = body.target.details;
+      nextTarget = t;
+    }
+    const merged: ScheduleDetail = {
+      ...current,
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.trigger !== undefined ? { trigger: body.trigger } : {}),
+      target: nextTarget,
+      ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    schedulesState[idx] = merged;
+    const { describe: _describe, ...entity } = merged;
+    return HttpResponse.json(entity);
+  }),
   http.delete(`/api/workspaces/${W}/schedules/:scheduleId`, ({ params }) => {
     const idx = schedulesState.findIndex((s) => s.id === params.scheduleId);
     if (idx === -1) return notFound("schedule not found");
@@ -419,7 +533,52 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/schedules/:scheduleId/run`, ({ params }) => {
     const row = schedulesState.find((s) => s.id === params.scheduleId);
     if (!row) return notFound("schedule not found");
-    // Synthesise a freshly-running task so:
+    synthFireSeq += 1;
+    const firedAt = new Date().toISOString();
+    // Workflow-kind schedules synthesise a freshly-running workflow
+    // (header + single-coordinator DAG) tagged with `metadata.scheduleId`
+    // so the detail surface's "Recent fires" panel (which polls
+    // `/scheduled-workflows?scheduleId=…`) surfaces it, and clicking the
+    // row swaps the right-pane into the workflow Mode B pane
+    // (`FireWorkflowDetailPane`), which fetches the workflow + DAG by id.
+    if (row.target.kind === "workflow") {
+      const wfTarget = row.target as {
+        kind: "workflow";
+        coordinatorAgent: string;
+        brief: string;
+        details?: string;
+      };
+      const workflowId = `wf-${cryptoRandom8()}`;
+      const created: WorkflowHeaderWire = {
+        id: workflowId,
+        brief: `${row.name} (manual run)`,
+        ...(typeof wfTarget.details === "string" && wfTarget.details.trim() !== ""
+          ? { details: wfTarget.details }
+          : {}),
+        status: "running",
+        coordinatorAgent: wfTarget.coordinatorAgent,
+        metadata: { scheduleId: row.id, firedAt },
+        awaitingHumanCount: 0,
+        createdAt: firedAt,
+        startedAt: firedAt,
+        iterationCount: 0,
+      };
+      workflowsState.unshift(created);
+      const coordNode: WorkflowNodeWire = {
+        id: cryptoUuid(),
+        workflowId,
+        status: "running",
+        phase: 0,
+        spec: { kind: "coordinator", agent: wfTarget.coordinatorAgent },
+        metadata: {},
+        createdAt: firedAt,
+        readyAt: firedAt,
+        runningAt: firedAt,
+      };
+      dagsState.set(workflowId, { workflow: { ...created }, nodes: [coordNode], edges: [] });
+      return HttpResponse.json({ dispatchId: workflowId });
+    }
+    // Task-kind: synthesise a freshly-running task so:
     //   1. the "Recent fires" panel (which polls
     //      `/scheduled-tasks?scheduleId=…`) surfaces it on the
     //      next refresh triggered by the parent's `refreshToken`
@@ -428,9 +587,7 @@ export const handlers = [
     //      (`FireTaskDetailPane`), which fetches the task by id
     //      and renders it inside the schedules page (no
     //      cross-page navigation).
-    synthFireSeq += 1;
     const dispatchId = `sched-${row.id}-run-${synthFireSeq}`;
-    const firedAt = new Date().toISOString();
     const taskTarget = row.target.kind === "task" ? (row.target as TaskScheduleTargetWire) : null;
     const dispatchAgent = taskTarget?.agent ?? "";
     const dispatchRuntime = taskTarget?.runtime;

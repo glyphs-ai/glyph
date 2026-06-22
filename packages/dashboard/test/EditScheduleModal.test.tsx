@@ -9,6 +9,7 @@ vi.mock("../src/api", async () => {
     ...actual,
     previewCron: vi.fn(),
     patchSchedule: vi.fn(),
+    patchWorkflowSchedule: vi.fn(),
     getSchedule: vi.fn(),
   };
 });
@@ -18,13 +19,15 @@ import { EditScheduleModal } from "../src/components/schedules/EditScheduleModal
 
 const mockPreviewCron = api.previewCron as unknown as ReturnType<typeof vi.fn>;
 const mockPatchSchedule = api.patchSchedule as unknown as ReturnType<typeof vi.fn>;
+const mockPatchWorkflowSchedule = api.patchWorkflowSchedule as unknown as ReturnType<typeof vi.fn>;
 const mockGetSchedule = api.getSchedule as unknown as ReturnType<typeof vi.fn>;
 
-function makeAgent(fqn: string): AgentEntry {
+function makeAgent(fqn: string, coordEligible = false): AgentEntry {
   const [scope, short] = fqn.split("/");
   return {
     agent: { fqn, scope, short, version: "1.0.0" },
     status: "ready",
+    coordEligible,
   } as unknown as AgentEntry;
 }
 
@@ -44,6 +47,23 @@ const SAMPLE: ScheduleDetail = {
   createdAt: "2026-05-01T00:00:00Z",
   updatedAt: "2026-05-20T00:00:00Z",
   describe: "every day at 09:00 Asia/Shanghai",
+};
+
+const SAMPLE_WF: ScheduleDetail = {
+  id: "sched-wf",
+  name: "Nightly release",
+  enabled: true,
+  trigger: { kind: "cron", expr: "0 2 * * *", tz: "Asia/Shanghai" },
+  target: {
+    kind: "workflow",
+    coordinatorAgent: "official/engineer",
+    brief: "Coordinate the release train.",
+    details: "Fan out build/test/package.",
+  },
+  nextFireAt: "2026-06-01T02:00:00.000Z",
+  createdAt: "2026-05-01T00:00:00Z",
+  updatedAt: "2026-05-20T00:00:00Z",
+  describe: "every day at 02:00 Asia/Shanghai",
 };
 
 function renderModal(overrides: Partial<React.ComponentProps<typeof EditScheduleModal>> = {}) {
@@ -67,6 +87,7 @@ function renderModal(overrides: Partial<React.ComponentProps<typeof EditSchedule
 beforeEach(() => {
   mockPreviewCron.mockReset();
   mockPatchSchedule.mockReset();
+  mockPatchWorkflowSchedule.mockReset();
   mockGetSchedule.mockReset();
   mockPreviewCron.mockResolvedValue({
     describe: "preview describe",
@@ -79,6 +100,7 @@ beforeEach(() => {
     ],
   });
   mockPatchSchedule.mockResolvedValue({ ...SAMPLE });
+  mockPatchWorkflowSchedule.mockResolvedValue({ ...SAMPLE_WF });
   mockGetSchedule.mockResolvedValue({ ...SAMPLE });
 });
 
@@ -209,5 +231,65 @@ describe("EditScheduleModal", () => {
     const sel = screen.getByTestId("edit-schedule-agent") as HTMLSelectElement;
     const opts = Array.from(sel.options).map((o) => o.textContent);
     expect(opts.some((t) => t?.includes("not installed"))).toBe(true);
+  });
+
+  it("seeds a workflow-kind schedule: coordinator agent, no runtime select", () => {
+    renderModal({
+      schedule: SAMPLE_WF,
+      agents: [makeAgent("official/engineer", true), makeAgent("official/reviewer")],
+    });
+    // Coordinator agent seeded; Runtime select absent for workflow kind.
+    expect((screen.getByTestId("edit-schedule-agent") as HTMLSelectElement).value).toBe(
+      "official/engineer",
+    );
+    expect(screen.queryByTestId("edit-schedule-runtime")).toBeNull();
+    expect(screen.getByText("Coordinator agent")).toBeTruthy();
+    expect((screen.getByTestId("edit-schedule-brief") as HTMLInputElement).value).toBe(
+      "Coordinate the release train.",
+    );
+  });
+
+  it("editing a workflow schedule submits via patchWorkflowSchedule (not patchSchedule)", async () => {
+    const { onPatched, onClose } = renderModal({
+      schedule: SAMPLE_WF,
+      agents: [makeAgent("official/engineer", true), makeAgent("official/reviewer")],
+    });
+    fireEvent.change(screen.getByTestId("edit-schedule-brief"), {
+      target: { value: "Coordinate the nightly release train." },
+    });
+    const save = await waitFor(() => {
+      const btn = screen.getByTestId("edit-schedule-submit") as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+      return btn;
+    });
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(mockPatchWorkflowSchedule).toHaveBeenCalledWith("sched-wf", {
+        target: { brief: "Coordinate the nightly release train." },
+      });
+    });
+    expect(mockPatchSchedule).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockGetSchedule).toHaveBeenCalledWith("sched-wf"));
+    await waitFor(() => expect(onPatched).toHaveBeenCalled());
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("clearing a workflow schedule's details sends target.details: null via patchWorkflowSchedule", async () => {
+    renderModal({
+      schedule: SAMPLE_WF,
+      agents: [makeAgent("official/engineer", true), makeAgent("official/reviewer")],
+    });
+    fireEvent.change(screen.getByTestId("edit-schedule-details"), { target: { value: "" } });
+    const save = await waitFor(() => {
+      const btn = screen.getByTestId("edit-schedule-submit") as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+      return btn;
+    });
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(mockPatchWorkflowSchedule).toHaveBeenCalledWith("sched-wf", {
+        target: { details: null },
+      });
+    });
   });
 });

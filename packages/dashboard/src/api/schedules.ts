@@ -11,7 +11,12 @@
 // `target` (siblings preserved; `null` deletes `details` / `runtime`)
 // and wholesale-replace on `trigger`.
 
-import type { PreviewScheduleResult, Schedule, ScheduleWireTarget } from "@glyphs-ai/contracts";
+import type {
+  PreviewScheduleResult,
+  Schedule,
+  ScheduleWireTarget,
+  WorkflowHeaderWire,
+} from "@glyphs-ai/contracts";
 import {
   fetchJson,
   fetchJsonWithErrorBody,
@@ -189,12 +194,19 @@ export interface CreateWorkflowScheduleBody {
 export const createWorkflowSchedule = (body: CreateWorkflowScheduleBody): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/workflow`, jsonInit("POST", body));
 
-/** List workflows launched by schedules, optionally filtered to one schedule. */
-export const listScheduledWorkflows = (opts: { scheduleId?: string }): Promise<unknown[]> => {
+/**
+ * List workflows launched by schedules, optionally filtered to one
+ * schedule. The route contract (`workflows.scheduled.list`) responds
+ * with `WorkflowHeaderWire[]`, so the dashboard reads the typed shape
+ * directly rather than re-narrowing an `unknown[]` at every call site.
+ */
+export const listScheduledWorkflows = (opts: {
+  scheduleId?: string;
+}): Promise<WorkflowHeaderWire[]> => {
   const qs = new URLSearchParams();
   if (opts.scheduleId !== undefined) qs.set("scheduleId", opts.scheduleId);
   const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
-  return fetchJson<unknown[]>(
+  return fetchJson<WorkflowHeaderWire[]>(
     `${workspacePrefix()}/scheduled-workflows${suffix}`,
     "scheduled-workflows",
   );

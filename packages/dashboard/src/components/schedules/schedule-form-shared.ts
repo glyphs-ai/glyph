@@ -16,6 +16,16 @@ import type { Preset, PresetKind } from "./cron-presets";
  * mutable fields does not, which is what makes this state shareable.
  */
 export interface ScheduleFormState {
+  /**
+   * Target kind of the schedule being authored. Drives the agent
+   * dropdown's population (task → all agents; workflow → the
+   * coordinator-eligible subset), the agent label ("Agent" vs
+   * "Coordinator agent"), and whether the Runtime select renders
+   * (task only). `CreateScheduleModal` lets the user flip this;
+   * `EditScheduleModal` seeds it from the existing schedule's target
+   * and keeps it fixed (a schedule's kind is immutable post-create).
+   */
+  kind: "task" | "workflow";
   name: string;
   agent: string;
   runtime: string;

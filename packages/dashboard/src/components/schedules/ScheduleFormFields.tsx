@@ -1,6 +1,7 @@
 import type { AgentEntry } from "@glyphs-ai/contracts";
 import type { ReactNode } from "react";
 import type { SchedulePreview } from "../../api";
+import { coordEligibleAgents } from "../workflows/shared";
 import { PresetEditor } from "./PresetEditor";
 import type { ScheduleFormPatch, ScheduleFormState } from "./schedule-form-shared";
 
@@ -134,7 +135,13 @@ export function ScheduleFormFields({
   defaultOptionMode,
   showNotRegisteredFallback = true,
 }: ScheduleFormFieldsProps) {
-  const agentMissing = state.agent !== "" && !agents.some((a) => a.agent.fqn === state.agent);
+  const isWorkflowKind = state.kind === "workflow";
+  // Workflow schedules dispatch through a coordinator agent, so the
+  // agent dropdown is restricted to the coordinator-eligible subset;
+  // task schedules can target any installed agent.
+  const visibleAgents = isWorkflowKind ? coordEligibleAgents(agents) : agents;
+  const agentMissing =
+    state.agent !== "" && !visibleAgents.some((a) => a.agent.fqn === state.agent);
   const runtimeMissing = state.runtime !== "" && !runtimes.includes(state.runtime);
   const runtimeDisabled =
     disabled || (defaultOptionMode === "conditional" && runtimes.length === 0);
@@ -161,24 +168,28 @@ export function ScheduleFormFields({
 
       <label htmlFor={`${idPrefix}-agent`}>
         <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
-          Agent
+          {isWorkflowKind ? "Coordinator agent" : "Agent"}
         </div>
         <select
           id={`${idPrefix}-agent`}
           value={state.agent}
           onChange={(e) => onChange({ agent: e.target.value })}
-          disabled={disabled || agents.length === 0}
+          disabled={disabled || visibleAgents.length === 0}
           required
           className="select select--full"
           data-testid={`${testIdPrefix}-agent`}
         >
-          {agents.length === 0 ? <option value="">(no installed agents)</option> : null}
-          {/* If the schedule's current agent isn't in the installed list, surface
+          {visibleAgents.length === 0 ? (
+            <option value="">
+              {isWorkflowKind ? "(no coordinator-eligible agents)" : "(no installed agents)"}
+            </option>
+          ) : null}
+          {/* If the schedule's current agent isn't in the visible list, surface
               it anyway as a fallback option so submit doesn't silently rewrite
               to the top of the list. Only fires for Edit (Create seeds from the
               top of the list, so its selected agent is always registered). */}
           {agentMissing ? <option value={state.agent}>{state.agent} (not installed)</option> : null}
-          {agents.map((a) => (
+          {visibleAgents.map((a) => (
             <option key={a.agent.fqn} value={a.agent.fqn}>
               {a.agent.fqn}
             </option>
@@ -186,37 +197,39 @@ export function ScheduleFormFields({
         </select>
       </label>
 
-      <label htmlFor={`${idPrefix}-runtime`}>
-        <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
-          Runtime
-        </div>
-        <select
-          id={`${idPrefix}-runtime`}
-          value={state.runtime}
-          onChange={(e) => onChange({ runtime: e.target.value })}
-          disabled={runtimeDisabled}
-          className="select select--full"
-          data-testid={`${testIdPrefix}-runtime`}
-        >
-          {/* `(server default)` mirrors pre-extraction `main` behaviour:
-              Edit always renders it (a schedule may legitimately have
-              "let server pick"); Create only renders it when there are
-              zero installed runtimes (Create otherwise auto-seeds
-              `runtimes[0]`, so the sentinel would just clutter the
-              dropdown). */}
-          {defaultOptionMode === "always" || runtimes.length === 0 ? (
-            <option value="">(server default)</option>
-          ) : null}
-          {showNotRegisteredFallback && runtimeMissing ? (
-            <option value={state.runtime}>{state.runtime} (not registered)</option>
-          ) : null}
-          {runtimes.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!isWorkflowKind && (
+        <label htmlFor={`${idPrefix}-runtime`}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+            Runtime
+          </div>
+          <select
+            id={`${idPrefix}-runtime`}
+            value={state.runtime}
+            onChange={(e) => onChange({ runtime: e.target.value })}
+            disabled={runtimeDisabled}
+            className="select select--full"
+            data-testid={`${testIdPrefix}-runtime`}
+          >
+            {/* `(server default)` mirrors pre-extraction `main` behaviour:
+                Edit always renders it (a schedule may legitimately have
+                "let server pick"); Create only renders it when there are
+                zero installed runtimes (Create otherwise auto-seeds
+                `runtimes[0]`, so the sentinel would just clutter the
+                dropdown). */}
+            {defaultOptionMode === "always" || runtimes.length === 0 ? (
+              <option value="">(server default)</option>
+            ) : null}
+            {showNotRegisteredFallback && runtimeMissing ? (
+              <option value={state.runtime}>{state.runtime} (not registered)</option>
+            ) : null}
+            {runtimes.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {beforeBrief}
 

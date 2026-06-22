@@ -10,11 +10,13 @@ import type { ScheduleDetail } from "../../api/index.js";
  * epoch so the default list sort (ascending by `nextFireAt`) is
  * stable for screenshots.
  *
- * `target.agent` FQNs must exist in `fixtureAgents` so the agent
- * filter dropdown lists them and the cross-link from the Agents
- * page surfaces the right rows. The four agents used here —
- * `official/engineer`, `official/reviewer`, `official/designer` — are all
- * present in `fixtureAgents`.
+ * `target.agent` FQNs (task kind) and `target.coordinatorAgent` (workflow
+ * kind) must exist in `fixtureAgents` so the agent filter dropdown lists
+ * them and the cross-link from the Agents page surfaces the right rows. The
+ * agents used here — `official/engineer`, `official/reviewer`,
+ * `official/designer` — are all present in `fixtureAgents`. The workflow-kind
+ * coordinator (`official/engineer`) is `coordEligible` there so it also
+ * appears in the Create modal's coordinator dropdown.
  */
 const EPOCH = Date.parse("2026-05-28T00:00:00.000Z");
 
@@ -93,5 +95,23 @@ export const fixtureSchedules: ScheduleDetail[] = [
     updatedAt: "2026-05-26T08:00:00.000Z",
     nextFireAt: isoOffsetHours(0.25),
     describe: "Every 15 minutes",
+  },
+  {
+    id: "sched-release-workflow",
+    name: "Nightly release workflow",
+    trigger: { kind: "cron", expr: "0 2 * * *", tz: "Asia/Shanghai" },
+    target: {
+      kind: "workflow",
+      coordinatorAgent: "official/engineer",
+      brief: "Coordinate the nightly release train",
+      details:
+        "Fan out build → test → package across the release agents, gather the per-stage artifacts, and post a go/no-go summary to the release channel. The coordinator agent decides the worker fan-out each night based on what changed since the last green build.",
+    },
+    enabled: true,
+    createdAt: "2026-05-12T08:00:00.000Z",
+    updatedAt: "2026-05-25T08:00:00.000Z",
+    lastFiredAt: "2026-05-27T18:00:00.000Z",
+    nextFireAt: isoOffsetHours(2),
+    describe: "Daily at 2:00 AM",
   },
 ];

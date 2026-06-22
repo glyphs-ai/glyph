@@ -2,7 +2,12 @@ import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScheduleDetail as ScheduleDetailType, ScheduleView } from "../src/api";
+import type {
+  ScheduleDetail as ScheduleDetailType,
+  ScheduleView,
+  WorkflowDagWire,
+  WorkflowHeaderWire,
+} from "../src/api";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");
@@ -15,6 +20,9 @@ vi.mock("../src/api", async () => {
     deleteSchedule: vi.fn(),
     runSchedule: vi.fn(),
     listScheduledTasks: vi.fn(),
+    listScheduledWorkflows: vi.fn(),
+    getWorkflow: vi.fn(),
+    getWorkflowDag: vi.fn(),
   };
 });
 
@@ -28,6 +36,11 @@ const mockPatchSchedule = api.patchSchedule as unknown as ReturnType<typeof vi.f
 const mockDeleteSchedule = api.deleteSchedule as unknown as ReturnType<typeof vi.fn>;
 const mockRunSchedule = api.runSchedule as unknown as ReturnType<typeof vi.fn>;
 const mockListScheduledTasks = api.listScheduledTasks as unknown as ReturnType<typeof vi.fn>;
+const mockListScheduledWorkflows = api.listScheduledWorkflows as unknown as ReturnType<
+  typeof vi.fn
+>;
+const mockGetWorkflow = api.getWorkflow as unknown as ReturnType<typeof vi.fn>;
+const mockGetWorkflowDag = api.getWorkflowDag as unknown as ReturnType<typeof vi.fn>;
 
 function makeAgent(fqn: string): AgentEntry {
   const [scope, short] = fqn.split("/");
@@ -55,9 +68,80 @@ const SAMPLE_VIEW: ScheduleView = {
 
 const SAMPLE_DETAIL: ScheduleDetailType = { ...SAMPLE_VIEW, describe: "every day at 09:00" };
 
+const SAMPLE_WF_VIEW: ScheduleView = {
+  id: "sched-wf",
+  name: "Release workflow",
+  enabled: true,
+  trigger: { kind: "cron", expr: "0 2 * * *", tz: "UTC" },
+  target: {
+    kind: "workflow",
+    coordinatorAgent: "official/engineer",
+    brief: "Coordinate the release train.",
+  },
+  nextFireAt: "2026-05-30T02:00:00.000Z",
+  createdAt: "2026-05-01T00:00:00Z",
+  updatedAt: "2026-05-20T00:00:00Z",
+};
+
+const SAMPLE_WF_DETAIL: ScheduleDetailType = { ...SAMPLE_WF_VIEW, describe: "every day at 02:00" };
+
+const WF_FIRE: WorkflowHeaderWire = {
+  id: "wf-fire-1",
+  brief: "Coordinate the release train.",
+  status: "succeeded",
+  coordinatorAgent: "official/engineer",
+  metadata: { scheduleId: "sched-wf" },
+  awaitingHumanCount: 0,
+  createdAt: "2026-05-28T02:00:00Z",
+  startedAt: "2026-05-28T02:00:01Z",
+  endedAt: "2026-05-28T02:05:00Z",
+  iterationCount: 1,
+};
+
+const WF_DAG: WorkflowDagWire = {
+  workflow: WF_FIRE,
+  nodes: [
+    {
+      id: "00000000-0000-4000-8000-000000000001",
+      workflowId: "wf-fire-1",
+      status: "succeeded",
+      phase: 0,
+      spec: { kind: "coordinator", agent: "official/engineer" },
+      metadata: {},
+      createdAt: "2026-05-28T02:00:00Z",
+      readyAt: "2026-05-28T02:00:00Z",
+      runningAt: "2026-05-28T02:00:01Z",
+      endedAt: "2026-05-28T02:05:00Z",
+    },
+  ],
+  edges: [],
+};
+
 function renderDetail() {
   return render(
     <MemoryRouter initialEntries={["/workspaces/ws-1/runtime/schedules?scheduleId=sched-x"]}>
+      <Routes>
+        <Route
+          path="/workspaces/:workspaceId/runtime/schedules"
+          element={
+            <SchedulesPage agents={[makeAgent("official/engineer")]} currentWorkspaceId="ws-1" />
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+/**
+ * Mount the page at a workflow-kind schedule. `extraQuery` lets a test
+ * append `&fireWorkflowId=…` to exercise the Mode B workflow pane
+ * directly from the URL.
+ */
+function renderWorkflowDetail(extraQuery = "") {
+  return render(
+    <MemoryRouter
+      initialEntries={[`/workspaces/ws-1/runtime/schedules?scheduleId=sched-wf${extraQuery}`]}
+    >
       <Routes>
         <Route
           path="/workspaces/:workspaceId/runtime/schedules"
@@ -91,6 +175,9 @@ beforeEach(() => {
   mockDeleteSchedule.mockReset();
   mockRunSchedule.mockReset();
   mockListScheduledTasks.mockReset();
+  mockListScheduledWorkflows.mockReset();
+  mockGetWorkflow.mockReset();
+  mockGetWorkflowDag.mockReset();
   mockListSchedules.mockResolvedValue([SAMPLE_VIEW]);
   mockGetSchedule.mockResolvedValue(SAMPLE_DETAIL);
   mockPreviewSchedule.mockResolvedValue({
@@ -98,6 +185,9 @@ beforeEach(() => {
     nextRuns: ["2026-05-30T09:00:00.000Z", "2026-05-31T09:00:00.000Z", "2026-06-01T09:00:00.000Z"],
   });
   mockListScheduledTasks.mockResolvedValue([]);
+  mockListScheduledWorkflows.mockResolvedValue([]);
+  mockGetWorkflow.mockResolvedValue(WF_FIRE);
+  mockGetWorkflowDag.mockResolvedValue(WF_DAG);
 });
 
 afterEach(() => cleanup());
@@ -332,5 +422,44 @@ describe("Schedule detail panel", () => {
     fireEvent.click(fireRow);
     expect(await screen.findByTestId("fire-task-nav")).toBeTruthy();
     expect(screen.getByTestId("fire-task-back")).toBeTruthy();
+  });
+
+  it("renders workflow-kind recent fires via listScheduledWorkflows (not listScheduledTasks)", async () => {
+    mockListSchedules.mockResolvedValue([SAMPLE_WF_VIEW]);
+    mockGetSchedule.mockResolvedValue(SAMPLE_WF_DETAIL);
+    mockListScheduledWorkflows.mockResolvedValue([WF_FIRE]);
+    renderWorkflowDetail();
+    await waitFor(() => expect(screen.getByText(/Recent fires/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("wf-fire-1")).toBeTruthy());
+    // Workflow-kind schedules read the workflow fire history, never the task one.
+    expect(mockListScheduledWorkflows).toHaveBeenCalled();
+    expect(mockListScheduledTasks).not.toHaveBeenCalled();
+    // The workflow status badge surfaces the lifecycle label.
+    expect(screen.getAllByText(/Succeeded/i).length).toBeGreaterThan(0);
+  });
+
+  it("swaps to Mode B (fire-workflow detail pane) when a workflow fire row is clicked", async () => {
+    mockListSchedules.mockResolvedValue([SAMPLE_WF_VIEW]);
+    mockGetSchedule.mockResolvedValue(SAMPLE_WF_DETAIL);
+    mockListScheduledWorkflows.mockResolvedValue([WF_FIRE]);
+    renderWorkflowDetail();
+    const fireRow = await screen.findByTestId("schedule-fire-row-wf-fire-1");
+    fireEvent.click(fireRow);
+    // The workflow detail view mounts (WorkflowView renders this testid),
+    // and the shared Mode B nav pill is present.
+    expect(await screen.findByTestId("workflow-detail")).toBeTruthy();
+    expect(screen.getByTestId("fire-task-nav")).toBeTruthy();
+    expect(mockGetWorkflow).toHaveBeenCalledWith("wf-fire-1");
+  });
+
+  it("shows the workflow 'Fire not found' notice for a stale ?fireWorkflowId", async () => {
+    mockListSchedules.mockResolvedValue([SAMPLE_WF_VIEW]);
+    mockGetSchedule.mockResolvedValue(SAMPLE_WF_DETAIL);
+    // The recent-fires list does NOT contain the requested fire id.
+    mockListScheduledWorkflows.mockResolvedValue([WF_FIRE]);
+    renderWorkflowDetail("&fireWorkflowId=wf-aged-out");
+    expect(await screen.findByTestId("fire-workflow-not-found")).toBeTruthy();
+    // A stale id must never trigger a workflow detail fetch.
+    expect(mockGetWorkflow).not.toHaveBeenCalled();
   });
 });

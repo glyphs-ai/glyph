@@ -7,6 +7,7 @@ import {
   type WorkflowHeaderWire,
 } from "../../api";
 import { Modal } from "../Modal";
+import { coordEligibleAgents } from "./shared";
 
 export interface CreateWorkflowModalProps {
   open: boolean;
@@ -52,12 +53,12 @@ export function CreateWorkflowModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [agentFieldError, setAgentFieldError] = useState<string | null>(null);
 
-  const coordEligibleAgents = useMemo(() => agents.filter((a) => a.coordEligible), [agents]);
+  const coordEligible = useMemo(() => coordEligibleAgents(agents), [agents]);
 
   useEffect(() => {
     if (!open) return;
-    setAgent((prev) => (prev !== "" ? prev : (coordEligibleAgents[0]?.agent.fqn ?? "")));
-  }, [open, coordEligibleAgents]);
+    setAgent((prev) => (prev !== "" ? prev : (coordEligible[0]?.agent.fqn ?? "")));
+  }, [open, coordEligible]);
 
   useEffect(() => {
     if (!open) {
@@ -117,16 +118,16 @@ export function CreateWorkflowModal({
               id="new-workflow-agent"
               value={agent}
               onChange={(e) => setAgent(e.target.value)}
-              disabled={submitting || coordEligibleAgents.length === 0}
+              disabled={submitting || coordEligible.length === 0}
               className="select select--full"
               data-testid="create-workflow-agent"
               aria-describedby={agentFieldError !== null ? "new-workflow-agent-error" : undefined}
               aria-invalid={agentFieldError !== null || undefined}
             >
-              {coordEligibleAgents.length === 0 && (
+              {coordEligible.length === 0 && (
                 <option value="">(no coord-eligible agents installed)</option>
               )}
-              {coordEligibleAgents.map((a) => (
+              {coordEligible.map((a) => (
                 <option key={a.agent.fqn} value={a.agent.fqn}>
                   {a.agent.fqn}
                 </option>

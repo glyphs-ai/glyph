@@ -1,6 +1,13 @@
 import type { AgentEntry } from "@glyphs-ai/contracts";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { getSchedule, type PatchScheduleBody, patchSchedule, type ScheduleDetail } from "../../api";
+import {
+  getSchedule,
+  type PatchScheduleBody,
+  type PatchWorkflowScheduleBody,
+  patchSchedule,
+  patchWorkflowSchedule,
+  type ScheduleDetail,
+} from "../../api";
 import { Modal } from "../Modal";
 import { presetToCron, validatePreset } from "./cron-presets";
 import { ScheduleFormFields } from "./ScheduleFormFields";
@@ -10,6 +17,7 @@ import {
   type ScheduleFormPatch,
   type ScheduleFormState,
 } from "./schedule-form-shared";
+import { targetAgent, targetBrief, targetDetails, targetRuntime } from "./shared";
 import { useSchedulePreview } from "./useSchedulePreview";
 
 export interface EditScheduleModalProps {
@@ -56,19 +64,25 @@ export function EditScheduleModal({
   onClose,
   onPatched,
 }: EditScheduleModalProps) {
-  // The edit modal currently handles task-kind schedules. Extract target
-  // fields with fallbacks for other kinds (the modal is only opened for
-  // task schedules in the current UI).
-  const taskTarget: { agent: string; brief: string; details?: string; runtime?: string } =
-    schedule.target.kind === "task"
-      ? (schedule.target as { agent: string; brief: string; details?: string; runtime?: string })
-      : { agent: "", brief: "", details: undefined, runtime: undefined };
+  // Edit supports both task- and workflow-kind schedules. Target
+  // fields are extracted through the shared kind-guarded helpers so
+  // the seed never relies on an `as`-cast: `targetAgent` returns the
+  // task agent or the workflow coordinator agent, `targetRuntime` is
+  // task-only (undefined for workflow → empty string, and the Runtime
+  // select is hidden for workflow kind regardless).
+  const seedKind: ScheduleFormState["kind"] =
+    schedule.target.kind === "workflow" ? "workflow" : "task";
+  const seedAgent = targetAgent(schedule.target);
+  const seedBrief = targetBrief(schedule.target);
+  const seedDetails = targetDetails(schedule.target) ?? "";
+  const seedRuntime = targetRuntime(schedule.target) ?? "";
   const [state, setState] = useState<ScheduleFormState>(() => ({
+    kind: seedKind,
     name: schedule.name,
-    agent: taskTarget.agent,
-    runtime: taskTarget.runtime ?? "",
-    brief: taskTarget.brief,
-    details: taskTarget.details ?? "",
+    agent: seedAgent,
+    runtime: seedRuntime,
+    brief: seedBrief,
+    details: seedDetails,
     preset: { kind: "advanced", expr: schedule.trigger.expr },
     tz: schedule.trigger.tz,
   }));
@@ -87,11 +101,12 @@ export function EditScheduleModal({
   useEffect(() => {
     if (!open) return;
     setState({
+      kind: seedKind,
       name: schedule.name,
-      agent: taskTarget.agent,
-      runtime: taskTarget.runtime ?? "",
-      brief: taskTarget.brief,
-      details: taskTarget.details ?? "",
+      agent: seedAgent,
+      runtime: seedRuntime,
+      brief: seedBrief,
+      details: seedDetails,
       preset: { kind: "advanced", expr: schedule.trigger.expr },
       tz: schedule.trigger.tz,
     });
@@ -114,35 +129,51 @@ export function EditScheduleModal({
     presetError,
   });
 
-  // Build the sparse PATCH body. Trim-before-compare matches the
-  // "no diff disables submit" gate to the actual wire payload.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: taskTarget is derived from schedule — adding it would cause infinite re-renders
-  const patchBody = useMemo<PatchScheduleBody>(() => {
-    const body: PatchScheduleBody = {};
+  // Build the sparse PATCH body, discriminated by target kind so the
+  // task and workflow shapes each stay correctly typed (no union
+  // narrowing at the call site). Trim-before-compare matches the "no
+  // diff disables submit" gate to the actual wire payload.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the seed* values are derived from `schedule` (already a dep) — re-listing them would needlessly re-run on unrelated schedule mutations while the user is mid-edit
+  const patch = useMemo<
+    | { kind: "task"; body: PatchScheduleBody }
+    | { kind: "workflow"; body: PatchWorkflowScheduleBody }
+  >(() => {
     const trimmedName = state.name.trim();
-    if (trimmedName !== schedule.name) body.name = trimmedName;
-
     const trimmedBrief = state.brief.trim();
     const trimmedDetails = state.details.trim();
+    const triggerChanged = expr !== schedule.trigger.expr || state.tz !== schedule.trigger.tz;
 
+    if (state.kind === "workflow") {
+      const body: PatchWorkflowScheduleBody = {};
+      if (trimmedName !== schedule.name) body.name = trimmedName;
+      const target: NonNullable<PatchWorkflowScheduleBody["target"]> = {};
+      if (state.agent !== seedAgent) target.coordinatorAgent = state.agent;
+      if (trimmedBrief !== seedBrief) target.brief = trimmedBrief;
+      if (trimmedDetails !== seedDetails) {
+        target.details = trimmedDetails === "" ? null : trimmedDetails;
+      }
+      if (Object.keys(target).length > 0) body.target = target;
+      if (triggerChanged) body.trigger = { kind: "cron", expr, tz: state.tz };
+      return { kind: "workflow", body };
+    }
+
+    const body: PatchScheduleBody = {};
+    if (trimmedName !== schedule.name) body.name = trimmedName;
     const target: NonNullable<PatchScheduleBody["target"]> = {};
-    if (state.agent !== taskTarget.agent) target.agent = state.agent;
-    if (trimmedBrief !== taskTarget.brief) target.brief = trimmedBrief;
-    if (trimmedDetails !== (taskTarget.details ?? "")) {
+    if (state.agent !== seedAgent) target.agent = state.agent;
+    if (trimmedBrief !== seedBrief) target.brief = trimmedBrief;
+    if (trimmedDetails !== seedDetails) {
       target.details = trimmedDetails === "" ? null : trimmedDetails;
     }
-    if (state.runtime !== (taskTarget.runtime ?? "")) {
+    if (state.runtime !== seedRuntime) {
       target.runtime = state.runtime === "" ? null : state.runtime;
     }
     if (Object.keys(target).length > 0) body.target = target;
-
-    if (expr !== schedule.trigger.expr || state.tz !== schedule.trigger.tz) {
-      body.trigger = { kind: "cron", expr, tz: state.tz };
-    }
-    return body;
+    if (triggerChanged) body.trigger = { kind: "cron", expr, tz: state.tz };
+    return { kind: "task", body };
   }, [state, expr, schedule]);
 
-  const hasDiff = Object.keys(patchBody).length > 0;
+  const hasDiff = Object.keys(patch.body).length > 0;
 
   const canSubmit =
     !submitting &&
@@ -159,7 +190,11 @@ export function EditScheduleModal({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await patchSchedule(schedule.id, patchBody);
+      if (patch.kind === "workflow") {
+        await patchWorkflowSchedule(schedule.id, patch.body);
+      } else {
+        await patchSchedule(schedule.id, patch.body);
+      }
       // PATCH returns `ScheduleView` (no `describe`). Re-fetch via
       // `getSchedule` so the merged `ScheduleDetail` carries the
       // server's fresh `describe` whether or not the trigger changed;

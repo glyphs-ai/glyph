@@ -49,6 +49,18 @@ export function targetRuntime(t: ScheduleWireTarget): string | undefined {
   return undefined;
 }
 
+/** Extract the one-line brief shared by the task and workflow kinds. */
+export function targetBrief(t: ScheduleWireTarget): string {
+  if (isTaskTarget(t) || isWorkflowTarget(t)) return t.brief;
+  return "";
+}
+
+/** Extract the optional multi-line details shared by the task and workflow kinds. */
+export function targetDetails(t: ScheduleWireTarget): string | undefined {
+  if (isTaskTarget(t) || isWorkflowTarget(t)) return t.details;
+  return undefined;
+}
+
 /**
  * Sort a list of schedules by `nextFireAt` ascending, pushing entries
  * with no `nextFireAt` (e.g. invalid expression) to the bottom. The
