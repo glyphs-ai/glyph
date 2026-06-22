@@ -5,6 +5,11 @@
  * file stays narrow.
  */
 
+import type {
+  ScheduleWireTarget,
+  TaskScheduleTargetWire,
+  WorkflowScheduleTargetWire,
+} from "@glyphs-ai/contracts";
 import type { ScheduleView } from "../../api";
 
 /** Sentinel for the "All" option in the agent filter dropdown. */
@@ -20,6 +25,29 @@ export const ENABLED_FILTERS: { value: EnabledFilter; label: string }[] = [
   { value: "true", label: "Enabled" },
   { value: "false", label: "Paused" },
 ];
+
+/** Type guard: narrows ScheduleWireTarget to task kind. */
+export function isTaskTarget(t: ScheduleWireTarget): t is TaskScheduleTargetWire {
+  return t.kind === "task";
+}
+
+/** Type guard: narrows ScheduleWireTarget to workflow kind. */
+export function isWorkflowTarget(t: ScheduleWireTarget): t is WorkflowScheduleTargetWire {
+  return t.kind === "workflow";
+}
+
+/** Extract display agent for any schedule target. */
+export function targetAgent(t: ScheduleWireTarget): string {
+  if (isTaskTarget(t)) return t.agent;
+  if (isWorkflowTarget(t)) return t.coordinatorAgent;
+  return "";
+}
+
+/** Extract display runtime (task only, otherwise undefined). */
+export function targetRuntime(t: ScheduleWireTarget): string | undefined {
+  if (isTaskTarget(t)) return t.runtime;
+  return undefined;
+}
 
 /**
  * Sort a list of schedules by `nextFireAt` ascending, pushing entries

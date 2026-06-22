@@ -54,11 +54,55 @@ export interface TaskTargetPatch {
  */
 export type TaskScheduleTargetWire = { readonly kind: "task" } & TaskTargetData;
 
+// ─── Workflow-kind target shapes ─────────────────────────────────────
+
+/**
+ * Workflow-kind target data payload — flat, matches the create-body
+ * shape minus the URL-implied `kind`. Persisted opaquely as the
+ * `data` of the schedule envelope; consumed flatly on the wire.
+ */
+export interface WorkflowTargetData {
+  readonly coordinatorAgent: string;
+  /** Single line, ≤ 200 chars. Mirrors `CreateWorkflowBody.brief`. */
+  readonly brief: string;
+  /** Multi-line, optional. */
+  readonly details?: string;
+}
+
+/**
+ * RFC 7396 deep-merge patch for a workflow target.
+ *
+ *   - `coordinatorAgent` / `brief`: if present, set (must be a non-empty
+ *     string; `null` is rejected at the route boundary because these
+ *     are required-on-entity).
+ *   - `details`: if present and string → set; if `null` → delete the
+ *     field; if absent → keep existing.
+ *
+ * The `kind` discriminator is intentionally absent — it's implied
+ * by the URL (`/schedules/workflow/:sid`).
+ */
+export interface WorkflowTargetPatch {
+  readonly coordinatorAgent?: string;
+  readonly brief?: string;
+  readonly details?: string | null;
+}
+
+/**
+ * Flat wire projection for a workflow-kind schedule target. The
+ * internal envelope `{ kind: "workflow", data: { coordinatorAgent, brief, ... } }`
+ * is flattened to `{ kind: "workflow", coordinatorAgent, brief, ... }` for HTTP
+ * responses so consumers can read target fields without knowing the
+ * substrate envelope.
+ */
+export type WorkflowScheduleTargetWire = { readonly kind: "workflow" } & WorkflowTargetData;
+
 /**
  * Wire-shape target on schedule responses. Flat for the task kind
- * (`TaskScheduleTargetWire`); unrecognized kinds stay in the
+ * (`TaskScheduleTargetWire`) and workflow kind
+ * (`WorkflowScheduleTargetWire`); unrecognized kinds stay in the
  * substrate envelope shape the server projected.
  */
 export type ScheduleWireTarget =
   | TaskScheduleTargetWire
+  | WorkflowScheduleTargetWire
   | { readonly kind: string; readonly data: unknown };

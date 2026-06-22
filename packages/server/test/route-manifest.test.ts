@@ -45,6 +45,7 @@ import { configRoutes } from "../src/routes/config.js";
 import { healthRoutes } from "../src/routes/health.js";
 import { runtimesRoutes } from "../src/routes/runtimes.js";
 import { scheduledTasksRoutes } from "../src/routes/scheduled-tasks.js";
+import { scheduledWorkflowsRoutes } from "../src/routes/scheduled-workflows.js";
 import { schedulesRoutes } from "../src/routes/schedules.js";
 import { sessionsRoutes } from "../src/routes/sessions.js";
 import { tasksRoutes } from "../src/routes/tasks.js";
@@ -109,6 +110,13 @@ function buildAppForTest(): Hono {
   );
   app.route("/api/workspaces", scheduledTasksApp);
 
+  const scheduledWorkflowsApp = new Hono();
+  scheduledWorkflowsApp.route(
+    "/:id/scheduled-workflows",
+    scheduledWorkflowsRoutes(() => stubWorkflowService()),
+  );
+  app.route("/api/workspaces", scheduledWorkflowsApp);
+
   const schedulesApp = new Hono();
   schedulesApp.route(
     "/:id/schedules",
@@ -161,12 +169,12 @@ describe("route manifest", () => {
     expect(missingFromApp, "in ROUTES but not registered (forgot to add handler?)").toEqual([]);
   });
 
-  it("listRoutes returns 82 entries (the current API surface)", () => {
+  it("listRoutes returns 85 entries (the current API surface)", () => {
     // Canary against silent surface drift — updating the manifest AND
     // the handler in a single commit keeps this assertion satisfied
     // and forces a deliberate ++N here, which surfaces in code review.
     // The running total is the only fact a reader needs here.
-    expect(listRoutes()).toHaveLength(82);
+    expect(listRoutes()).toHaveLength(85);
   });
 });
 

@@ -53,7 +53,13 @@
  *     this ordering prevents).
  */
 
-import type { ScheduleWire, TaskTargetData, TaskTargetPatch } from "@glyphs-ai/api";
+import type {
+  ScheduleWire,
+  TaskTargetData,
+  TaskTargetPatch,
+  WorkflowTargetData,
+  WorkflowTargetPatch,
+} from "@glyphs-ai/api";
 import {
   describeCron,
   type Schedule,
@@ -76,6 +82,10 @@ type ScheduleServiceResolver = (c: import("hono").Context) => ScheduleService;
 const ALLOWED_TASK_CREATE_KEYS = new Set(["name", "target", "trigger", "enabled"]);
 const ALLOWED_TASK_PATCH_KEYS = new Set(["name", "target", "trigger", "enabled"]);
 const ALLOWED_TASK_TARGET_KEYS = new Set(["agent", "brief", "details", "runtime"]);
+
+const ALLOWED_WORKFLOW_CREATE_KEYS = new Set(["name", "target", "trigger", "enabled"]);
+const ALLOWED_WORKFLOW_PATCH_KEYS = new Set(["name", "target", "trigger", "enabled"]);
+const ALLOWED_WORKFLOW_TARGET_KEYS = new Set(["coordinatorAgent", "brief", "details"]);
 
 interface ValidationFail {
   readonly ok: false;
@@ -244,6 +254,128 @@ function validateTrigger(raw: unknown): ValidationResult<ScheduleTrigger> {
   return { ok: true, value: { kind: "cron", expr: obj.expr, tz: obj.tz } };
 }
 
+/** Validate a raw value as a {@link WorkflowTargetData} for `POST /workflow`. */
+function validateWorkflowTargetData(raw: unknown): ValidationResult<WorkflowTargetData> {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, error: "target must be an object" };
+  }
+  const obj = raw as Record<string, unknown>;
+  if ("kind" in obj) {
+    return {
+      ok: false,
+      error: "target.kind must not be set on POST /schedules/workflow (kind is implied by the URL)",
+    };
+  }
+  for (const k of Object.keys(obj)) {
+    if (!ALLOWED_WORKFLOW_TARGET_KEYS.has(k)) {
+      return { ok: false, error: `target has unknown key "${k}"` };
+    }
+  }
+  const { coordinatorAgent, brief, details } = obj;
+  if (typeof coordinatorAgent !== "string" || coordinatorAgent.trim().length === 0) {
+    return { ok: false, error: "target.coordinatorAgent must be a non-empty string" };
+  }
+  if (typeof brief !== "string" || brief.trim().length === 0) {
+    return { ok: false, error: "target.brief must be a non-empty string" };
+  }
+  if (brief.includes("\n") || brief.includes("\r")) {
+    return {
+      ok: false,
+      error: "target.brief must be a single line — pass long content via target.details",
+    };
+  }
+  if (brief.trim().length > 200) {
+    return { ok: false, error: "target.brief must be at most 200 chars" };
+  }
+  if (details !== undefined && typeof details !== "string") {
+    return { ok: false, error: "target.details, when set, must be a string" };
+  }
+  return {
+    ok: true,
+    value: {
+      coordinatorAgent,
+      brief,
+      ...(details !== undefined ? { details } : {}),
+    },
+  };
+}
+
+/**
+ * Validate a raw value as a {@link WorkflowTargetPatch} for
+ * `PATCH /workflow/:sid`. RFC 7396 semantics: `null` on optional
+ * `details` deletes; `null` on required `coordinatorAgent`/`brief` is
+ * rejected with a clear 400.
+ */
+function validateWorkflowTargetPatch(raw: unknown): ValidationResult<WorkflowTargetPatch> {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, error: "target must be an object" };
+  }
+  const obj = raw as Record<string, unknown>;
+  if ("kind" in obj) {
+    return {
+      ok: false,
+      error:
+        "target.kind must not be set on PATCH /schedules/workflow/:sid (kind is implied by the URL)",
+    };
+  }
+  for (const k of Object.keys(obj)) {
+    if (!ALLOWED_WORKFLOW_TARGET_KEYS.has(k)) {
+      return { ok: false, error: `target has unknown key "${k}"` };
+    }
+  }
+  const patch: {
+    coordinatorAgent?: string;
+    brief?: string;
+    details?: string | null;
+  } = {};
+  if ("coordinatorAgent" in obj) {
+    const v = obj.coordinatorAgent;
+    if (v === null) {
+      return {
+        ok: false,
+        error: "target.coordinatorAgent cannot be null (required field; omit to keep)",
+      };
+    }
+    if (typeof v !== "string" || v.trim().length === 0) {
+      return { ok: false, error: "target.coordinatorAgent must be a non-empty string" };
+    }
+    patch.coordinatorAgent = v;
+  }
+  if ("brief" in obj) {
+    const v = obj.brief;
+    if (v === null) {
+      return { ok: false, error: "target.brief cannot be null (required field; omit to keep)" };
+    }
+    if (typeof v !== "string" || v.trim().length === 0) {
+      return { ok: false, error: "target.brief must be a non-empty string" };
+    }
+    if (v.includes("\n") || v.includes("\r")) {
+      return {
+        ok: false,
+        error: "target.brief must be a single line — pass long content via target.details",
+      };
+    }
+    if (v.trim().length > 200) {
+      return { ok: false, error: "target.brief must be at most 200 chars" };
+    }
+    patch.brief = v;
+  }
+  if ("details" in obj) {
+    const v = obj.details;
+    if (v === null) {
+      patch.details = null;
+    } else if (typeof v === "string") {
+      patch.details = v;
+    } else {
+      return {
+        ok: false,
+        error: "target.details must be a string (set), null (delete), or omitted (keep)",
+      };
+    }
+  }
+  return { ok: true, value: patch };
+}
+
 /**
  * Project the internal `Schedule` envelope to the flat wire shape
  * that dashboard / CLI consumers read. The schedule pkg is
@@ -262,6 +394,18 @@ function projectScheduleToWire(s: Schedule): ScheduleWire {
         brief: data.brief,
         ...(data.details !== undefined ? { details: data.details } : {}),
         ...(data.runtime !== undefined ? { runtime: data.runtime } : {}),
+      },
+    };
+  }
+  if (s.target.kind === "workflow") {
+    const data = s.target.data as WorkflowTargetData;
+    return {
+      ...s,
+      target: {
+        kind: "workflow",
+        coordinatorAgent: data.coordinatorAgent,
+        brief: data.brief,
+        ...(data.details !== undefined ? { details: data.details } : {}),
       },
     };
   }
@@ -519,6 +663,125 @@ export function schedulesRoutes(resolve: ScheduleServiceResolver): Hono {
       }
       return respondError(c, err, {
         route: "schedules.task.patch",
+        policy: schedulesErrorPolicy,
+      });
+    }
+  });
+
+  // ── POST /workflow — create a workflow-kind schedule ───────────────
+  app.post("/workflow", async (c) => {
+    const parsed = await parseJsonBody<Record<string, unknown>>(c);
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    const body = parsed.body;
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "request body must be an object" }, 400);
+    }
+    for (const k of Object.keys(body)) {
+      if (!ALLOWED_WORKFLOW_CREATE_KEYS.has(k)) {
+        return c.json({ error: `request body has unknown key "${k}"` }, 400);
+      }
+    }
+    const { name, target, trigger, enabled } = body;
+
+    if (typeof name !== "string" || name.trim().length === 0) {
+      return c.json({ error: "name must be a non-empty string" }, 400);
+    }
+    if (enabled !== undefined && typeof enabled !== "boolean") {
+      return c.json({ error: "enabled, when set, must be a boolean" }, 400);
+    }
+    const targetResult = validateWorkflowTargetData(target);
+    if (!targetResult.ok) return c.json({ error: targetResult.error }, 400);
+    const triggerResult = validateTrigger(trigger);
+    if (!triggerResult.ok) return c.json({ error: triggerResult.error }, 400);
+
+    try {
+      const created = await resolve(c).create({
+        name,
+        trigger: triggerResult.value,
+        target: { kind: "workflow", data: targetResult.value },
+        ...(enabled !== undefined ? { enabled } : {}),
+      });
+      logEvent(c, "schedule.create", {
+        scheduleId: created.id,
+        coordinatorAgent: targetResult.value.coordinatorAgent,
+      });
+      return c.json(projectScheduleToWire(created), 201);
+    } catch (err) {
+      return respondError(c, err, {
+        route: "schedules.workflow.create",
+        policy: schedulesErrorPolicy,
+      });
+    }
+  });
+
+  // ── PATCH /workflow/:sid — patch a workflow-kind schedule ──────────
+  app.patch("/workflow/:sid", async (c) => {
+    const sid = c.req.param("sid");
+    const parsed = await parseJsonBody<Record<string, unknown>>(c);
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    const body = parsed.body;
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "request body must be an object" }, 400);
+    }
+    for (const k of Object.keys(body)) {
+      if (!ALLOWED_WORKFLOW_PATCH_KEYS.has(k)) {
+        return c.json({ error: `request body has unknown key "${k}"` }, 400);
+      }
+    }
+
+    const patch: {
+      name?: string;
+      enabled?: boolean;
+      trigger?: ScheduleTrigger;
+      target?: WorkflowTargetPatch;
+    } = {};
+
+    if ("name" in body) {
+      const v = body.name;
+      if (typeof v !== "string" || v.trim().length === 0) {
+        return c.json({ error: "name must be a non-empty string" }, 400);
+      }
+      patch.name = v;
+    }
+    if ("enabled" in body) {
+      const v = body.enabled;
+      if (typeof v !== "boolean") {
+        return c.json({ error: "enabled must be a boolean" }, 400);
+      }
+      patch.enabled = v;
+    }
+    if ("trigger" in body) {
+      const r = validateTrigger(body.trigger);
+      if (!r.ok) return c.json({ error: r.error }, 400);
+      patch.trigger = r.value;
+    }
+    if ("target" in body) {
+      const r = validateWorkflowTargetPatch(body.target);
+      if (!r.ok) return c.json({ error: r.error }, 400);
+      patch.target = r.value;
+    }
+
+    try {
+      const updated = await resolve(c).patch(sid, {
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+        ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
+        ...(patch.target !== undefined ? { target: { patch: patch.target } } : {}),
+        expectedKind: "workflow",
+      });
+      logEvent(c, "schedule.patch", { scheduleId: sid });
+      return c.json(projectScheduleToWire(updated));
+    } catch (err) {
+      if (err instanceof ScheduleKindMismatchError) {
+        logEvent(c, "schedule.patch.kind_mismatch", {
+          scheduleId: sid,
+          expected: err.expected,
+          actual: err.actual,
+        });
+        return c.json(errorBody(new ScheduleNotFoundError(sid)), 404);
+      }
+      return respondError(c, err, {
+        route: "schedules.workflow.patch",
         policy: schedulesErrorPolicy,
       });
     }

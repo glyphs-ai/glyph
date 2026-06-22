@@ -31,6 +31,7 @@ import { configRoutes } from "./routes/config.js";
 import { healthRoutes } from "./routes/health.js";
 import { runtimesRoutes } from "./routes/runtimes.js";
 import { scheduledTasksRoutes } from "./routes/scheduled-tasks.js";
+import { scheduledWorkflowsRoutes } from "./routes/scheduled-workflows.js";
 import { schedulesRoutes } from "./routes/schedules.js";
 import { sessionsRoutes } from "./routes/sessions.js";
 import { tasksRoutes } from "./routes/tasks.js";
@@ -287,6 +288,20 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
     scheduledTasksRoutes((c) => c.get("workspaceContext").tasks),
   );
   app.route("/api/workspaces", scheduledTasksApp);
+
+  // `/scheduled-workflows` is the schedule-origin sibling of
+  // `/workflows`. Returns workflows launched by cron triggers,
+  // filtered by `metadata.scheduleId`.
+  const scheduledWorkflowsApp = new Hono<{ Variables: WorkspaceVars }>();
+  scheduledWorkflowsApp.use(
+    "/:id/scheduled-workflows/*",
+    workspaceContextMiddleware(application, logger),
+  );
+  scheduledWorkflowsApp.route(
+    "/:id/scheduled-workflows",
+    scheduledWorkflowsRoutes((c) => c.get("workspaceContext").workflows),
+  );
+  app.route("/api/workspaces", scheduledWorkflowsApp);
 
   // Schedule CRUD + run + preview. Sibling of `/scheduled-tasks` —
   // that route is read-only over the dispatched task list; this

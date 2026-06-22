@@ -9,6 +9,7 @@ import { composeWorkflowModule, type WorkflowService } from "@glyphs-ai/workflow
 import type { Workspace, WorkspaceService } from "@glyphs-ai/workspace";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
+import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";
 import { makeCoordNodeRunner } from "./wiring/workflow-coord-task-runner.js";
 import { makeHumanNodeRunner } from "./wiring/workflow-human-node-runner.js";
 import { makeWorkerNodeRunner } from "./wiring/workflow-worker-task-runner.js";
@@ -361,14 +362,14 @@ export class WorkspaceContextRegistry {
           catalog: catalogModule.service,
         }),
       );
-      await scheduleModule.service.recover();
 
-      // Workflow substrate composed LAST so its coord runner can
-      // bridge to a live `TaskService` (for dispatch) and the
-      // catalog (for `validate` agent existence). Build runners
-      // first — `composeWorkflowModule` requires them in its opts
-      // object — and capture the workflow service ref via the
-      // `getWorkflowService` thunk for the coord runner.
+      // Workflow substrate composed BEFORE recover() so the workflow
+      // kind handler is registered and recover()'s catchup path can
+      // dispatch workflow-kind schedules whose next fire is in the
+      // past at boot. Build runners first — `composeWorkflowModule`
+      // requires them in its opts object — and capture the workflow
+      // service ref via the `getWorkflowService` thunk for the coord
+      // runner.
       const coordRunner = makeCoordNodeRunner({
         tasks: taskModule.service,
         catalog: catalogModule.service,
@@ -399,6 +400,19 @@ export class WorkspaceContextRegistry {
       });
       workflowSvc = workflowModule.service;
       cleanup.push(() => workflowModule.close());
+
+      // Register workflow kind AFTER compose so the handler can
+      // reference the live WorkflowService for dispatch / hasInFlight
+      // / deleteForSchedule. Both kinds are now registered; recover()
+      // below will preflight all persisted rows and fire catchups.
+      scheduleModule.service.registerKind(
+        "workflow",
+        makeWorkflowKindHandler({
+          workflows: workflowModule.service,
+          catalog: catalogModule.service,
+        }),
+      );
+      await scheduleModule.service.recover();
     } catch (err) {
       await teardown();
       throw err;

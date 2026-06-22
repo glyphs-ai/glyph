@@ -30,6 +30,7 @@ export {
 } from "./application.js";
 export { listRoutes } from "./route-manifest.js";
 export { TaskScheduleTargetError } from "./wiring/schedule-task-handler.js";
+export { WorkflowScheduleTargetError } from "./wiring/schedule-workflow-handler.js";
 export {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,

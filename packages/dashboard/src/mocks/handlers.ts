@@ -12,7 +12,7 @@
  * match a handler above it.
  */
 
-import type { AgentEntry, Mcp, SkillEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry, Mcp, SkillEntry, TaskScheduleTargetWire } from "@glyphs-ai/contracts";
 import { type DefaultBodyType, HttpResponse, http } from "msw";
 import type {
   CreateScheduleBody,
@@ -265,7 +265,14 @@ export const handlers = [
     const agent = url.searchParams.get("agent");
     const enabled = url.searchParams.get("enabled");
     let rows = schedulesState.slice();
-    if (agent !== null) rows = rows.filter((s) => s.target.agent === agent);
+    if (agent !== null) {
+      rows = rows.filter((s) => {
+        if (s.target.kind === "task") return (s.target as TaskScheduleTargetWire).agent === agent;
+        if (s.target.kind === "workflow")
+          return (s.target as { coordinatorAgent: string }).coordinatorAgent === agent;
+        return false;
+      });
+    }
     if (enabled === "true") rows = rows.filter((s) => s.enabled);
     if (enabled === "false") rows = rows.filter((s) => !s.enabled);
     rows.sort((a, b) => (a.nextFireAt ?? "").localeCompare(b.nextFireAt ?? ""));
@@ -377,15 +384,14 @@ export const handlers = [
     const body = (await request.json()) as PatchScheduleBody;
     const current = schedulesState[idx]!;
     let nextTarget = current.target;
-    if (body.target !== undefined) {
-      // Deep-merge per RFC 7396: keep `kind` (URL discriminates),
-      // honour `null` on optional fields as delete, ignore absent.
-      const t = { ...current.target };
+    if (body.target !== undefined && current.target.kind === "task") {
+      const ct = current.target as TaskScheduleTargetWire;
+      const t = { ...ct };
       if (body.target.agent !== undefined) t.agent = body.target.agent;
       if (body.target.brief !== undefined) t.brief = body.target.brief;
-      if (body.target.details === null) delete t.details;
+      if (body.target.details === null) delete (t as { details?: string }).details;
       else if (body.target.details !== undefined) t.details = body.target.details;
-      if (body.target.runtime === null) delete t.runtime;
+      if (body.target.runtime === null) delete (t as { runtime?: string }).runtime;
       else if (body.target.runtime !== undefined) t.runtime = body.target.runtime;
       nextTarget = t;
     }
@@ -425,15 +431,18 @@ export const handlers = [
     synthFireSeq += 1;
     const dispatchId = `sched-${row.id}-run-${synthFireSeq}`;
     const firedAt = new Date().toISOString();
+    const taskTarget = row.target.kind === "task" ? (row.target as TaskScheduleTargetWire) : null;
+    const dispatchAgent = taskTarget?.agent ?? "";
+    const dispatchRuntime = taskTarget?.runtime;
     store.tasks.unshift({
       id: dispatchId,
-      agent: row.target.agent,
+      agent: dispatchAgent,
       brief: `${row.name} (manual run)`,
       origin: "schedule",
       status: "running",
       metadata: {
         workdir: `/mock/workspaces/designer/tasks/${dispatchId}`,
-        ...(row.target.runtime !== undefined ? { runtime: row.target.runtime } : {}),
+        ...(dispatchRuntime !== undefined ? { runtime: dispatchRuntime } : {}),
         scheduleId: row.id,
         firedAt,
       },

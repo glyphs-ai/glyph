@@ -56,12 +56,19 @@ export function EditScheduleModal({
   onClose,
   onPatched,
 }: EditScheduleModalProps) {
+  // The edit modal currently handles task-kind schedules. Extract target
+  // fields with fallbacks for other kinds (the modal is only opened for
+  // task schedules in the current UI).
+  const taskTarget: { agent: string; brief: string; details?: string; runtime?: string } =
+    schedule.target.kind === "task"
+      ? (schedule.target as { agent: string; brief: string; details?: string; runtime?: string })
+      : { agent: "", brief: "", details: undefined, runtime: undefined };
   const [state, setState] = useState<ScheduleFormState>(() => ({
     name: schedule.name,
-    agent: schedule.target.agent,
-    runtime: schedule.target.runtime ?? "",
-    brief: schedule.target.brief,
-    details: schedule.target.details ?? "",
+    agent: taskTarget.agent,
+    runtime: taskTarget.runtime ?? "",
+    brief: taskTarget.brief,
+    details: taskTarget.details ?? "",
     preset: { kind: "advanced", expr: schedule.trigger.expr },
     tz: schedule.trigger.tz,
   }));
@@ -81,10 +88,10 @@ export function EditScheduleModal({
     if (!open) return;
     setState({
       name: schedule.name,
-      agent: schedule.target.agent,
-      runtime: schedule.target.runtime ?? "",
-      brief: schedule.target.brief,
-      details: schedule.target.details ?? "",
+      agent: taskTarget.agent,
+      runtime: taskTarget.runtime ?? "",
+      brief: taskTarget.brief,
+      details: taskTarget.details ?? "",
       preset: { kind: "advanced", expr: schedule.trigger.expr },
       tz: schedule.trigger.tz,
     });
@@ -109,6 +116,7 @@ export function EditScheduleModal({
 
   // Build the sparse PATCH body. Trim-before-compare matches the
   // "no diff disables submit" gate to the actual wire payload.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: taskTarget is derived from schedule — adding it would cause infinite re-renders
   const patchBody = useMemo<PatchScheduleBody>(() => {
     const body: PatchScheduleBody = {};
     const trimmedName = state.name.trim();
@@ -118,12 +126,12 @@ export function EditScheduleModal({
     const trimmedDetails = state.details.trim();
 
     const target: NonNullable<PatchScheduleBody["target"]> = {};
-    if (state.agent !== schedule.target.agent) target.agent = state.agent;
-    if (trimmedBrief !== schedule.target.brief) target.brief = trimmedBrief;
-    if (trimmedDetails !== (schedule.target.details ?? "")) {
+    if (state.agent !== taskTarget.agent) target.agent = state.agent;
+    if (trimmedBrief !== taskTarget.brief) target.brief = trimmedBrief;
+    if (trimmedDetails !== (taskTarget.details ?? "")) {
       target.details = trimmedDetails === "" ? null : trimmedDetails;
     }
-    if (state.runtime !== (schedule.target.runtime ?? "")) {
+    if (state.runtime !== (taskTarget.runtime ?? "")) {
       target.runtime = state.runtime === "" ? null : state.runtime;
     }
     if (Object.keys(target).length > 0) body.target = target;

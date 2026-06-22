@@ -25,6 +25,7 @@ import {
   ALL_ENABLED,
   type EnabledFilter,
   sortByNextFire,
+  targetAgent,
 } from "../components/schedules/shared";
 import { useMounted } from "../hooks/useMounted";
 import { useUrlSearchValue } from "../hooks/useUrlState";
@@ -207,7 +208,10 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
 
   const filterAgentNames = useMemo(() => {
     const set = new Set<string>(agents.map((a) => a.agent.fqn));
-    for (const s of schedules) set.add(s.target.agent);
+    for (const s of schedules) {
+      const a = targetAgent(s.target);
+      if (a) set.add(a);
+    }
     return Array.from(set).sort();
   }, [agents, schedules]);
 
@@ -310,7 +314,8 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       setMasterDetailUrl({ scheduleId: created.id, fireTaskId: null });
       setRefreshToken((n) => n + 1);
       setCreateOpen(false);
-      const hiddenByAgent = agentFilter !== ALL_AGENTS && created.target.agent !== agentFilter;
+      const hiddenByAgent =
+        agentFilter !== ALL_AGENTS && targetAgent(created.target) !== agentFilter;
       const hiddenByEnabled =
         (enabledFilter === "true" && !created.enabled) ||
         (enabledFilter === "false" && created.enabled);

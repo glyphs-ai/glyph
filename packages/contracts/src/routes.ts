@@ -47,7 +47,13 @@ import type { Task, TaskStatus } from "@glyphs-ai/task";
 import type { HealthResponse } from "./health.js";
 import type { ResolveManifest } from "./plan-to-manifest.js";
 import type { RuntimeInfo } from "./runtimes.js";
-import type { ScheduleWireTarget, TaskTargetData, TaskTargetPatch } from "./schedules.js";
+import type {
+  ScheduleWireTarget,
+  TaskTargetData,
+  TaskTargetPatch,
+  WorkflowTargetData,
+  WorkflowTargetPatch,
+} from "./schedules.js";
 import type { ServerConfig } from "./server-config.js";
 import type {
   AddEdgeBody,
@@ -314,6 +320,40 @@ export interface TaskSchedulePatchBody {
   readonly name?: string;
   readonly target?: TaskTargetPatch;
   readonly trigger?: TaskScheduleCreateBody["trigger"];
+  readonly enabled?: boolean;
+}
+
+/**
+ * POST /api/workspaces/:id/schedules/workflow body — create a workflow-kind
+ * schedule. URL-discriminated by `target.kind` so the body carries no
+ * `kind` field. Mirrors `TaskScheduleCreateBody` shape but the target is
+ * `WorkflowTargetData` (coordinatorAgent + brief + optional details).
+ */
+export interface WorkflowScheduleCreateBody {
+  readonly name: string;
+  readonly target: WorkflowTargetData;
+  readonly trigger: {
+    readonly kind: "cron";
+    readonly expr: string;
+    readonly tz: string;
+  };
+  readonly enabled?: boolean;
+}
+
+/**
+ * PATCH /api/workspaces/:id/schedules/workflow/:sid body — RFC 7396
+ * deep-merge for `target`, wholesale-replace for `trigger`,
+ * scalar-set for `name` / `enabled`.
+ *
+ * - `coordinatorAgent` / `brief`: set if present; `null` rejected
+ *   (required fields — omit to keep existing).
+ * - `details`: string sets, `null` deletes, absent keeps.
+ * - `target.kind` MUST NOT be set (URL discriminates).
+ */
+export interface WorkflowSchedulePatchBody {
+  readonly name?: string;
+  readonly target?: WorkflowTargetPatch;
+  readonly trigger?: WorkflowScheduleCreateBody["trigger"];
   readonly enabled?: boolean;
 }
 
@@ -703,6 +743,40 @@ export const ROUTES = {
     { params: SchedulePathParams; body: TaskSchedulePatchBody },
     ScheduleWire
   >("PATCH", "/api/workspaces/:id/schedules/task/:sid"),
+  /**
+   * Create a workflow-kind schedule. URL-discriminated by `target.kind`
+   * so the body carries no `kind` field — the server narrows the body
+   * to `WorkflowTargetData` then calls
+   * `service.create({ name, trigger, target: { kind: "workflow", data }, enabled })`.
+   */
+  "schedules.workflow.create": defineRoute<
+    { params: WorkspacePathParams; body: WorkflowScheduleCreateBody },
+    ScheduleWire
+  >("POST", "/api/workspaces/:id/schedules/workflow"),
+  /**
+   * Patch a workflow-kind schedule with RFC 7396 deep-merge semantics
+   * on `target` (siblings preserved; `null` deletes optional fields),
+   * wholesale-replace on `trigger`, and scalar-set on
+   * `name` / `enabled`. URL-discriminated by `target.kind`: the
+   * server passes `expectedKind: "workflow"` to `service.patch`; if
+   * `:sid` exists but its `target.kind !== "workflow"` the service
+   * throws `ScheduleKindMismatchError` which the route projects to
+   * a generic 404 envelope (no kind-information leak).
+   */
+  "schedules.workflow.patch": defineRoute<
+    { params: SchedulePathParams; body: WorkflowSchedulePatchBody },
+    ScheduleWire
+  >("PATCH", "/api/workspaces/:id/schedules/workflow/:sid"),
+  /**
+   * Schedule-origin list of workflows launched by cron triggers.
+   * Mirrors `tasks.scheduled.list` but returns `WorkflowHeaderWire[]`.
+   * Constrained to schedule-launched workflows (metadata.scheduleId)
+   * server-side; callers cannot widen.
+   */
+  "workflows.scheduled.list": defineRoute<
+    { params: WorkspacePathParams; query: { readonly scheduleId?: string } },
+    readonly WorkflowHeaderWire[]
+  >("GET", "/api/workspaces/:id/scheduled-workflows"),
   "schedules.delete": defineRoute<{ params: SchedulePathParams }, ScheduleDeleteResponse>(
     "DELETE",
     "/api/workspaces/:id/schedules/:sid",

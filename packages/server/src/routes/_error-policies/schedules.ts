@@ -27,7 +27,7 @@
  * two policy files to predict status.
  */
 
-import { TaskScheduleTargetError } from "@glyphs-ai/api";
+import { TaskScheduleTargetError, WorkflowScheduleTargetError } from "@glyphs-ai/api";
 import { RuntimeHeadlessLaunchFailed } from "@glyphs-ai/runtime";
 import {
   InvalidCronExprError,
@@ -72,6 +72,9 @@ export const schedulesErrorPolicy: ErrorPolicy = {
     // Lives in `@glyphs-ai/api` because the kind handler is wired
     // there; reaches the policy via api's public surface.
     [TaskScheduleTargetError, 400],
+    // Workflow-kind-handler-side input validation (mirrors task
+    // handler pattern for the workflow target shape).
+    [WorkflowScheduleTargetError, 400],
     [ScheduleNotFoundError, 404],
     [ScheduleKindMismatchError, 404],
     [ScheduleEnabledError, 409],

@@ -11,7 +11,7 @@
 // `target` (siblings preserved; `null` deletes `details` / `runtime`)
 // and wholesale-replace on `trigger`.
 
-import type { PreviewScheduleResult, Schedule, TaskScheduleTargetWire } from "@glyphs-ai/contracts";
+import type { PreviewScheduleResult, Schedule, ScheduleWireTarget } from "@glyphs-ai/contracts";
 import {
   fetchJson,
   fetchJsonWithErrorBody,
@@ -24,14 +24,10 @@ import {
  * Wire-shape view of a schedule as the dashboard sees it. The server
  * projects the substrate's opaque `{ kind, data }` envelope to a
  * flat per-kind shape on the way out (`projectScheduleToWire`); the
- * dashboard only supports the task kind in v1, so we type `target`
- * narrowly as {@link TaskScheduleTargetWire} (`{ kind: "task",
- * agent, brief, details?, runtime? }`). When a second concrete
- * kind ships the dashboard needs an explicit switch — until then
- * a narrow type keeps the existing `schedule.target.agent` reads
- * compiling without per-call casts.
+ * dashboard supports both the task and workflow kinds, so we type
+ * `target` as the full wire union.
  */
-export type ScheduleView = Omit<Schedule, "target"> & { target: TaskScheduleTargetWire };
+export type ScheduleView = Omit<Schedule, "target"> & { target: ScheduleWireTarget };
 
 /**
  * Response shape for `GET /schedules/:scheduleId` — the entity plus the
@@ -119,6 +115,27 @@ export const patchSchedule = (scheduleId: string, body: PatchScheduleBody): Prom
     jsonInit("PATCH", body as object),
   );
 
+/** Body for `PATCH /schedules/workflow/:scheduleId`. */
+export interface PatchWorkflowScheduleBody {
+  name?: string;
+  enabled?: boolean;
+  trigger?: { kind: "cron"; expr: string; tz: string };
+  target?: {
+    coordinatorAgent?: string;
+    brief?: string;
+    details?: string | null;
+  };
+}
+
+export const patchWorkflowSchedule = (
+  scheduleId: string,
+  body: PatchWorkflowScheduleBody,
+): Promise<ScheduleView> =>
+  mutateJson<ScheduleView>(
+    `${workspacePrefix()}/schedules/workflow/${encodeURIComponent(scheduleId)}`,
+    jsonInit("PATCH", body as object),
+  );
+
 export const deleteSchedule = (scheduleId: string): Promise<{ deletedDispatchCount: number }> =>
   mutateJson<{ deletedDispatchCount: number }>(
     `${workspacePrefix()}/schedules/${encodeURIComponent(scheduleId)}`,
@@ -159,6 +176,29 @@ export interface CreateScheduleBody {
  */
 export const createSchedule = (body: CreateScheduleBody): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/task`, jsonInit("POST", body));
+
+/** Body for `POST /schedules/workflow`. */
+export interface CreateWorkflowScheduleBody {
+  name: string;
+  target: { coordinatorAgent: string; brief: string; details?: string };
+  trigger: { kind: "cron"; expr: string; tz: string };
+  enabled?: boolean;
+}
+
+/** Create a workflow-kind schedule. */
+export const createWorkflowSchedule = (body: CreateWorkflowScheduleBody): Promise<ScheduleView> =>
+  mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/workflow`, jsonInit("POST", body));
+
+/** List workflows launched by schedules, optionally filtered to one schedule. */
+export const listScheduledWorkflows = (opts: { scheduleId?: string }): Promise<unknown[]> => {
+  const qs = new URLSearchParams();
+  if (opts.scheduleId !== undefined) qs.set("scheduleId", opts.scheduleId);
+  const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
+  return fetchJson<unknown[]>(
+    `${workspacePrefix()}/scheduled-workflows${suffix}`,
+    "scheduled-workflows",
+  );
+};
 
 export interface PreviewCronArgs {
   expr: string;

@@ -1,5 +1,6 @@
 import type { ScheduleView } from "../../api";
 import { Modal } from "../Modal";
+import { targetAgent } from "./shared";
 
 export interface DeleteScheduleModalProps {
   target: ScheduleView;
@@ -39,7 +40,7 @@ export function DeleteScheduleModal({
           removed. This cannot be undone.
         </p>
         <p className="muted" style={{ fontSize: 12, margin: "6px 0 0 0" }}>
-          {target.trigger.expr} · {target.target.agent}
+          {target.trigger.expr} · {targetAgent(target.target)}
         </p>
       </div>
       <div className="modal__footer">
