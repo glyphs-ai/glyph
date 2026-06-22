@@ -1,14 +1,18 @@
 import type { CatalogService } from "@glyphs-ai/catalog";
 import type { WorkflowTargetData, WorkflowTargetPatch } from "@glyphs-ai/contracts";
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
+import { AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 
 /**
  * Sole module knowing about all of `@glyphs-ai/schedule`,
- * `@glyphs-ai/workflow`, AND `@glyphs-ai/catalog`. This is the only
- * edge in the cross-pkg import graph where the three meet — the
- * schedule pkg stays kind-agnostic; the workflow pkg stays unaware of
- * schedules' SQL; and the catalog pkg is consumed only here for
+ * `@glyphs-ai/workflow`, `@glyphs-ai/task`, AND `@glyphs-ai/catalog`.
+ * This is the only edge in the cross-pkg import graph where they meet —
+ * the schedule pkg stays kind-agnostic; the workflow pkg stays unaware
+ * of schedules' SQL; the task pkg is consumed only for the node-task
+ * cascade on schedule deletion (the workflow substrate's own
+ * `deleteWorkflow` drops workflow/node/edge rows but not the per-node
+ * backing tasks); and the catalog pkg is consumed only here for
  * coordinator-agent eligibility checking.
  *
  * Responsibilities (the kind-specific concerns the schedule pkg
@@ -26,14 +30,21 @@ import type { WorkflowService } from "@glyphs-ai/workflow";
  * patch-when-catalog-down invariant: a sparse "edit only brief" patch
  * must not fail because the catalog is unhealthy.
  *
- * Agent errors use workflow-scope classes directly so downstream error
- * policies share canonical matches with the `/workflows` create path.
+ * Error policy mirrors the task handler and the `/workflows` create
+ * path: catalog *resolution / infra* failure surfaces as the task
+ * pkg's `AgentResolutionFailedError` (→ 500, opaque body) so a
+ * transient catalog outage never masquerades as a 400 bad-request that
+ * leaks the underlying error string. Genuine validation failures
+ * (unknown coordinatorAgent, not coord-eligible, malformed brief) stay
+ * `WorkflowScheduleTargetError` (→ 400 with message).
  */
 export function makeWorkflowKindHandler(opts: {
   readonly workflows: WorkflowService;
+  readonly tasks: TaskService;
   readonly catalog: CatalogService;
 }): ScheduleKindHandler {
   const workflows = opts.workflows;
+  const tasks = opts.tasks;
   const catalog = opts.catalog;
 
   return {
@@ -78,9 +89,11 @@ export function makeWorkflowKindHandler(opts: {
         try {
           found = await catalog.getAgent(obj.coordinatorAgent as string);
         } catch (err) {
-          throw new WorkflowScheduleTargetError(
-            `Failed to resolve coordinator agent "${obj.coordinatorAgent}": ${err instanceof Error ? err.message : String(err)}`,
-          );
+          // Catalog unreachable / resolver crash — infrastructure, not
+          // bad caller input. Surface as the task pkg's resolution
+          // error (→ 500 opaque) rather than a 400 that would falsely
+          // blame the caller and echo the raw error message.
+          throw new AgentResolutionFailedError(obj.coordinatorAgent as string, err);
         }
         if (found === null) {
           throw new WorkflowScheduleTargetError(
@@ -164,7 +177,33 @@ export function makeWorkflowKindHandler(opts: {
       );
       let deletedCount = 0;
       for (const wf of terminal) {
-        await workflows.deleteWorkflow(wf.id);
+        // The workflow substrate's `deleteWorkflow` drops only its own
+        // workflow/node/edge rows — each node's backing task row + its
+        // workdir live in the TaskService and must be cascaded here, or
+        // they outlive the schedule (orphaned rows + disk). This mirrors
+        // the canonical `DELETE /workflows/:wfid` route's cascade and
+        // matches the task kind's purge-on-schedule-delete semantics.
+        const snapshot = await workflows.getDag(wf.id);
+        // Defense-in-depth against the post-finishWorkflow coord-task
+        // race: a workflow can read terminal while a node task is still
+        // wrapping up. Skip the whole workflow (no partial delete) and
+        // let a later sweep reclaim it — the same holdout the DELETE
+        // route applies, and the "never destroy in-flight" invariant the
+        // schedule cascade promises.
+        let hasInFlightNode = false;
+        for (const node of snapshot.nodes) {
+          if (await tasks.hasInFlightForWorkflowNode(node.id)) {
+            hasInFlightNode = true;
+            break;
+          }
+        }
+        if (hasInFlightNode) continue;
+        for (const node of snapshot.nodes) {
+          const linked = await tasks.findTaskByWorkflowNode(node.id);
+          if (linked === null) continue;
+          await tasks.delete(linked.id, { purge: true });
+        }
+        await workflows.deleteWorkflow(wf.id, { purgeDir: true });
         deletedCount++;
       }
       return { deletedCount };

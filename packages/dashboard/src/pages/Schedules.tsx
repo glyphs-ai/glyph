@@ -338,9 +338,10 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   const handleCreated = useCallback(
     (created: ScheduleView) => {
       setSchedules((prev) => sortByNextFire([created, ...prev]));
-      // Atomic write — clear any leftover fireTaskId from a prior
-      // selection while moving to the newly-created row.
-      setMasterDetailUrl({ scheduleId: created.id, fireTaskId: null });
+      // Atomic write — clear any leftover fireTaskId / fireWorkflowId
+      // from a prior selection while moving to the newly-created row, so
+      // a stale fire pane can't outlive the schedule it belonged to.
+      setMasterDetailUrl({ scheduleId: created.id, fireTaskId: null, fireWorkflowId: null });
       setRefreshToken((n) => n + 1);
       setCreateOpen(false);
       const hiddenByAgent =

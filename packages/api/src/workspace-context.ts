@@ -409,6 +409,7 @@ export class WorkspaceContextRegistry {
         "workflow",
         makeWorkflowKindHandler({
           workflows: workflowModule.service,
+          tasks: taskModule.service,
           catalog: catalogModule.service,
         }),
       );

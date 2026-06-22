@@ -1,7 +1,9 @@
+import type { WorkflowHeaderWire } from "@glyphs-ai/api";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import { Hono } from "hono";
 import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
 import { respondError } from "./_respond-error.js";
+import { projectWorkflowHeader } from "./_workflow-projection.js";
 
 /**
  * Resolver passed in by the mount point so route handlers pull the
@@ -26,7 +28,11 @@ export function scheduledWorkflowsRoutes(resolveWorkflowService: WorkflowService
     const scheduleId = c.req.query("scheduleId");
 
     try {
-      const all = await resolveWorkflowService(c).list();
+      const svc = resolveWorkflowService(c);
+      const [all, awaitingMap] = await Promise.all([
+        svc.list(),
+        svc.countAwaitingHumanByWorkflow(),
+      ]);
       // Filter to schedule-launched workflows (metadata.scheduleId set).
       // Optionally narrow to a specific scheduleId.
       const filtered = all.filter((wf) => {
@@ -34,7 +40,13 @@ export function scheduledWorkflowsRoutes(resolveWorkflowService: WorkflowService
         if (scheduleId !== undefined && wf.metadata.scheduleId !== scheduleId) return false;
         return true;
       });
-      return c.json(filtered);
+      // Project to wire headers — same entity→wire boundary every other
+      // workflow route uses. `iterationCount` is omitted (O(workflows)
+      // list semantics); `awaitingHumanCount` comes from the batch query.
+      const wire: readonly WorkflowHeaderWire[] = filtered.map((wf) =>
+        projectWorkflowHeader(wf, undefined, awaitingMap.get(wf.id) ?? 0),
+      );
+      return c.json(wire);
     } catch (err) {
       return respondError(c, err, {
         route: "scheduled-workflows.list",

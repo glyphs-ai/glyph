@@ -772,14 +772,8 @@ export async function scheduleListWorkflows(
       stdout: formatTable(
         ["id", "coordinatorAgent", "status", "scheduleId", "createdAt"],
         list.map((w) => {
-          const meta = (w as { metadata?: { scheduleId?: string } }).metadata;
-          return [
-            (w as { id?: string }).id ?? "",
-            (w as { coordinatorAgent?: string }).coordinatorAgent ?? "",
-            (w as { status?: string }).status ?? "",
-            meta?.scheduleId ?? "",
-            (w as { createdAt?: string }).createdAt ?? "",
-          ];
+          const scheduleId = typeof w.metadata.scheduleId === "string" ? w.metadata.scheduleId : "";
+          return [w.id, w.coordinatorAgent, w.status, scheduleId, w.createdAt];
         }),
       ),
     };
