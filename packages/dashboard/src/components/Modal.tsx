@@ -28,7 +28,7 @@ interface ModalProps {
    */
   header?: ReactNode;
   children: ReactNode;
-  size?: "default" | "large";
+  size?: "default" | "large" | "xlarge";
 }
 
 /**

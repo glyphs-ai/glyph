@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { categorizeWithContent, codeLanguage, type FileCategory } from "../../utils/file-type.js";
+import { stripFrontmatter, stripHtmlComments } from "../../utils/frontmatter.js";
 import { CodeEditor } from "../CodeEditor.js";
-import { MarkdownSummary } from "../tasks/TaskDetail/MarkdownSummary.js";
+import { FrontmatterTable } from "./FrontmatterTable.js";
 
 export interface FileViewerProps {
   relPath: string;
@@ -58,12 +61,20 @@ function RenderContent({ relPath, content, category }: RenderContentProps) {
   }, [content, category]);
 
   switch (category) {
-    case "markdown":
+    case "markdown": {
+      const { data, rawYaml, body } = stripFrontmatter(text);
+      const cleanBody = stripHtmlComments(body);
       return (
         <div className="file-viewer__markdown">
-          <MarkdownSummary source={text} />
+          {data ? (
+            <FrontmatterTable data={data} />
+          ) : rawYaml ? (
+            <pre className="file-viewer__frontmatter-raw">{rawYaml}</pre>
+          ) : null}
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanBody}</ReactMarkdown>
         </div>
       );
+    }
 
     case "code": {
       const lang = codeLanguage(relPath);

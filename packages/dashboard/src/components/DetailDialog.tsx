@@ -248,7 +248,7 @@ export function DetailDialog({ target, workspaceId, onClose, onSynced }: DetailD
       onClose={onClose}
       title={`${KIND_TITLE[target.kind]}: ${target.name}`}
       header={header}
-      size={inSync || showFileBrowser ? "large" : "default"}
+      size={showFileBrowser ? "xlarge" : inSync ? "large" : "default"}
     >
       <div className="modal__body modal__body--scroll detail-dialog">
         {loading && <p className="form-hint">Loading...</p>}

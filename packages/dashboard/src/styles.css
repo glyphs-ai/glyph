@@ -1660,6 +1660,11 @@ button {
   max-width: 95vw;
 }
 
+.modal--xlarge {
+  width: 95vw;
+  max-width: 95vw;
+}
+
 .modal::backdrop {
   background: rgba(15, 23, 42, 0.4);
 }
@@ -5862,6 +5867,97 @@ button {
 
 .file-viewer__markdown {
   padding: var(--space-2);
+}
+
+.file-viewer__markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--space-2) 0;
+  font-size: 0.85rem;
+}
+
+.file-viewer__markdown th,
+.file-viewer__markdown td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+}
+
+.file-viewer__markdown th {
+  background: var(--color-bg-raised);
+  font-weight: 600;
+}
+
+.file-viewer__frontmatter-raw {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--color-bg-raised);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+}
+
+/* ─── Frontmatter Table ──────────────────────────────────────── */
+
+.frontmatter-table {
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.frontmatter-table table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+.frontmatter-table th,
+.frontmatter-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.frontmatter-table th {
+  width: 140px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg-raised);
+  white-space: nowrap;
+}
+
+.frontmatter-table tr:last-child th,
+.frontmatter-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.frontmatter-table__list {
+  margin: 0;
+  padding-left: var(--space-3);
+  list-style: disc;
+}
+
+.frontmatter-table__list li {
+  margin: 2px 0;
+}
+
+.frontmatter-table__nested {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.frontmatter-table__nested th,
+.frontmatter-table__nested td {
+  padding: 2px var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.frontmatter-table__null {
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 .file-viewer__image {
