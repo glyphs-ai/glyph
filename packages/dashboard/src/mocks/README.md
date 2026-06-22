@@ -1,6 +1,6 @@
 # Mocks — designer mode infrastructure
 
-Read-only [Mock Service Worker](https://mswjs.io/) handlers that let
+Read-only and **mutable** [Mock Service Worker](https://mswjs.io/) handlers that let
 designers iterate on the dashboard without a live glyph backend.
 Enabled by `pnpm -F @glyphs-ai/dashboard dev:mock` (port 8788) or
 `dev:mock:e2e` (port 5180, dedicated to the designer
@@ -11,18 +11,20 @@ Playwright loop).
 ```
 mocks/
 ├── browser.ts            # Worker registration; consumed only via dynamic import
- handlers.ts           # http.* handlers for src/api/** fetches
- fixtures/
-     index.ts          # Barrel + artifactBodies map
-     workspaces.ts     # Workspace list (drives `/api/workspaces`)
-     agents.ts         # AgentEntry list
-     tasks.ts          # TaskRecord coverage matrix
-     schedules.ts      # Schedule rows + recent fires
-     sessions.ts       # Session list rows
-     workflows.ts      # Workflow list/detail/DAG fixtures
-     workflow-artifacts.ts # Workflow summary + per-node artifact fixtures
-     activities.ts     # Per-task activity timelines
-     artifacts/        # Bodies served via /tasks/:tid/artifact/:name
+├── clone.ts              # Deep-clone utility for fixture seeding
+├── handlers.ts           # http.* handlers for src/api/** fetches
+├── store.ts              # Mutable in-memory store seeded from fixtures
+└── fixtures/
+    ├── index.ts          # Barrel + artifactBodies map
+    ├── workspaces.ts     # Workspace list (drives `/api/workspaces`)
+    ├── agents.ts         # AgentEntry list
+    ├── tasks.ts          # TaskRecord coverage matrix
+    ├── schedules.ts      # Schedule rows + recent fires
+    ├── sessions.ts       # Session list rows
+    ├── workflows.ts      # Workflow list/detail/DAG fixtures
+    ├── workflow-artifacts.ts # Workflow summary + per-node artifact fixtures
+    ├── activities.ts     # Per-task activity timelines
+    └── artifacts/        # Bodies served via /tasks/:tid/artifact/:name
         ├── sample.html
         ├── sample.json
         ├── sample.md
@@ -51,13 +53,46 @@ asserts the guarantee against the built `dist/` output.
 
 ## Mutations
 
-POST/PATCH/DELETE are intentionally **mostly** not mocked. Implemented
-mutation surfaces are `/schedules` (POST, PATCH, DELETE, POST
-`/schedules/:id/run`) and `/workflows` (create and cancel), enough to
-exercise the dashboard's schedule and workflow flows. Other mutation
-routes still hit the catch-all, which returns HTTP 501 and logs the
-route to the browser console so designers can see which surface needs
-mock coverage next.
+The mock layer supports **in-memory mutations** for the following routes.
+All mutation state lives in `store.ts` and **resets on page reload** —
+designer mode is intentionally non-persistent (stale state is harder to
+debug than fresh state; "reload = reset").
+
+### Supported mutable routes
+
+| Route | Method | Behavior |
+|---|---|---|
+| `/tasks` | POST | Creates a new running task |
+| `/tasks/:id/cancel` | POST | Sets task status to "cancelled" |
+| `/sessions` | POST | Creates a new session |
+| `/catalog/agents` | POST | Installs a mock agent entry |
+| `/catalog/agents/:fqn` | DELETE | Removes agent from store |
+| `/catalog/skills` | POST | Installs a mock skill entry |
+| `/catalog/skills/:fqn` | DELETE | Removes skill from store |
+| `/catalog/mcps` | POST | Installs a mock MCP entry |
+| `/catalog/mcps/:fqn` | DELETE | Removes MCP from store |
+| `/catalog/agents/:fqn/sync/resolve` | POST | Returns "up-to-date" manifest |
+| `/catalog/agents/:fqn/sync` | POST | No-op success |
+| `/catalog/skills/:fqn/sync/resolve` | POST | Returns "up-to-date" manifest |
+| `/catalog/skills/:fqn/sync` | POST | No-op success |
+| `/schedules/task` | POST | Creates a schedule |
+| `/schedules/task/:id` | PATCH | Updates a schedule |
+| `/schedules/:id` | DELETE | Deletes a schedule |
+| `/schedules/:id/run` | POST | Triggers a manual run |
+| `/workflows` | POST | Creates a workflow |
+| `/workflows/:id/cancel` | POST | Cancels a workflow |
+
+All other POST/PATCH/DELETE routes hit the catch-all, which returns
+HTTP 501 and logs the route to the browser console.
+
+### State semantics
+
+- **Reload = reset.** Refreshing the page re-seeds the store from
+  fixtures. No localStorage persistence.
+- **No automatic transitions.** Tasks don't auto-transition from
+  running → succeeded. Mutations are explicit user actions only.
+- **Generated IDs** use `YYYYMMDD-<8 hex chars>` format matching real
+  server output.
 
 ## Regenerating the service worker
 

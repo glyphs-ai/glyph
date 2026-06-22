@@ -12,14 +12,16 @@
  * match a handler above it.
  */
 
+import type { AgentEntry, Mcp, SkillEntry } from "@glyphs-ai/contracts";
 import { type DefaultBodyType, HttpResponse, http } from "msw";
-
 import type {
   CreateScheduleBody,
   CreateWorkflowBody,
   PatchScheduleBody,
   ScheduleDetail,
   ScheduleView,
+  SessionView,
+  TaskRecord,
   WorkflowHeaderWire,
   WorkflowNodeWire,
 } from "../api/index.js";
@@ -27,15 +29,13 @@ import {
   artifactBodies,
   fixtureActiveWorkspaceId,
   fixtureActivities,
-  fixtureAgents,
   fixtureSchedules,
-  fixtureSessions,
-  fixtureTasks,
   fixtureWorkflowArtifacts,
   fixtureWorkflowDags,
   fixtureWorkflows,
   fixtureWorkspaces,
 } from "./fixtures/index.js";
+import { store } from "./store.js";
 
 const W = ":workspaceId";
 
@@ -51,14 +51,6 @@ function notFound(message: string): HttpResponse<DefaultBodyType> {
  * non-persistent (designer iteration ≠ a real backend).
  */
 const schedulesState: ScheduleDetail[] = fixtureSchedules.map((s) => ({ ...s }));
-
-/**
- * Ephemeral, in-memory copy of the task fixtures so synthetic
- * schedule-launched task rows (appended by POST /schedules/:scheduleId/run)
- * surface in the per-schedule "Recent fires" panel. Reset on refresh,
- * same lifetime as `schedulesState`.
- */
-const tasksState = fixtureTasks.map((t) => ({ ...t }));
 
 let synthFireSeq = 0;
 
@@ -124,34 +116,59 @@ function cryptoUuid(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${y}${hex(3)}-${hex(12)}`;
 }
 
+/**
+ * Derive a plausible FQN from an origin URL for mock install handlers.
+ * Extracts the last two path segments (namespace/short) or falls back
+ * to `mock-<kind>/<random>`.
+ */
+function deriveFqnFromOrigin(origin: string, kind: string): string {
+  try {
+    const parts = new URL(origin).pathname.split("/").filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+    }
+  } catch {
+    // Not a valid URL — fall through
+  }
+  // file: or unparseable origins
+  const segments = origin
+    .replace(/^file:/, "")
+    .split(/[/\\]/)
+    .filter(Boolean);
+  if (segments.length >= 2) {
+    return `${segments[segments.length - 2]}/${segments[segments.length - 1]}`;
+  }
+  return `mock-${kind}/${cryptoRandom8()}`;
+}
+
 export const handlers = [
   // ── catalog (workspace-scoped) ───────────────────────────────
   http.get(`/api/workspaces/${W}/catalog/overview`, () =>
     HttpResponse.json({
       counts: {
-        skills: 6,
-        agents: fixtureAgents.length,
-        mcps: 3,
-        blocked: fixtureAgents.filter((a) => a.status === "blocked").length,
+        skills: store.skills.length,
+        agents: store.agents.length,
+        mcps: store.mcps.length,
+        blocked: store.agents.filter((a) => a.status === "blocked").length,
         orphaned: 0,
       },
     }),
   ),
-  http.get(`/api/workspaces/${W}/catalog/agents`, () => HttpResponse.json(fixtureAgents)),
-  http.get(`/api/workspaces/${W}/catalog/skills`, () => HttpResponse.json([])),
-  http.get(`/api/workspaces/${W}/catalog/mcps`, () => HttpResponse.json([])),
+  http.get(`/api/workspaces/${W}/catalog/agents`, () => HttpResponse.json(store.agents)),
+  http.get(`/api/workspaces/${W}/catalog/skills`, () => HttpResponse.json(store.skills)),
+  http.get(`/api/workspaces/${W}/catalog/mcps`, () => HttpResponse.json(store.mcps)),
 
   // ── tasks (workspace-scoped) ─────────────────────────────────
   // `/tasks` is standalone-only; `/scheduled-tasks` carries
   // schedule-launched runs. Both routes share this fixture set with
   // origin-based filtering.
   http.get(`/api/workspaces/${W}/tasks`, () =>
-    HttpResponse.json(tasksState.filter((t) => t.origin === "standalone")),
+    HttpResponse.json(store.tasks.filter((t) => t.origin === "standalone")),
   ),
   http.get(`/api/workspaces/${W}/scheduled-tasks`, ({ request }) => {
     const url = new URL(request.url);
     const scheduleId = url.searchParams.get("scheduleId");
-    let rows = tasksState.filter((t) => t.origin === "schedule");
+    let rows = store.tasks.filter((t) => t.origin === "schedule");
     if (scheduleId !== null) {
       rows = rows.filter((t) => {
         const rowScheduleId = (t.metadata as Record<string, unknown> | undefined)?.scheduleId;
@@ -161,7 +178,7 @@ export const handlers = [
     return HttpResponse.json(rows);
   }),
   http.get(`/api/workspaces/${W}/tasks/:taskId`, ({ params }) => {
-    const task = tasksState.find((t) => t.id === params.taskId);
+    const task = store.tasks.find((t) => t.id === params.taskId);
     return task ? HttpResponse.json(task) : notFound("task not found");
   }),
   http.get(`/api/workspaces/${W}/tasks/:taskId/activity`, ({ params }) => {
@@ -171,7 +188,7 @@ export const handlers = [
     // Tasks without a hand-authored timeline still return a valid empty
     // payload — the dashboard's ActivityTab handles { activity: [] }
     // gracefully, but treats 404 as "runtime has no event log".
-    if (tasksState.some((t) => t.id === taskId)) {
+    if (store.tasks.some((t) => t.id === taskId)) {
       return HttpResponse.json({ activity: [], result: null, totalItems: 0 });
     }
     return new HttpResponse(null, { status: 404 });
@@ -186,9 +203,9 @@ export const handlers = [
   }),
 
   // ── sessions (workspace-scoped) ──────────────────────────────
-  http.get(`/api/workspaces/${W}/sessions`, () => HttpResponse.json(fixtureSessions)),
+  http.get(`/api/workspaces/${W}/sessions`, () => HttpResponse.json(store.sessions)),
   http.get(`/api/workspaces/${W}/sessions/:sessionId`, ({ params }) => {
-    const sess = fixtureSessions.find((s) => s.id === params.sessionId);
+    const sess = store.sessions.find((s) => s.id === params.sessionId);
     return sess ? HttpResponse.json(sess) : notFound("session not found");
   }),
 
@@ -408,7 +425,7 @@ export const handlers = [
     synthFireSeq += 1;
     const dispatchId = `sched-${row.id}-run-${synthFireSeq}`;
     const firedAt = new Date().toISOString();
-    tasksState.unshift({
+    store.tasks.unshift({
       id: dispatchId,
       agent: row.target.agent,
       brief: `${row.name} (manual run)`,
@@ -616,19 +633,280 @@ export const handlers = [
     });
   }),
 
+  // ── task mutations (workspace-scoped) ────────────────────────
+  http.post(`/api/workspaces/${W}/tasks`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    if (typeof body.agent !== "string" || body.agent.trim() === "") {
+      return HttpResponse.json(
+        { error: "agent must be a non-empty string", code: "VALIDATION" },
+        { status: 400 },
+      );
+    }
+    if (typeof body.brief !== "string" || body.brief.trim() === "") {
+      return HttpResponse.json(
+        { error: "brief must be a non-empty string", code: "VALIDATION" },
+        { status: 400 },
+      );
+    }
+    const now = new Date().toISOString();
+    const id = `${now.slice(0, 10).replace(/-/g, "")}-${cryptoRandom8()}`;
+    const task: TaskRecord = {
+      id,
+      agent: (body.agent as string).trim(),
+      brief: (body.brief as string).trim(),
+      ...(typeof body.details === "string" && body.details.trim() !== ""
+        ? { details: body.details }
+        : {}),
+      origin: "standalone",
+      status: "running",
+      metadata: {
+        workdir: `/mock/workspaces/designer/tasks/${id}`,
+        ...(typeof body.runtime === "string" ? { runtime: body.runtime } : {}),
+      },
+      createdAt: now,
+      startedAt: now,
+    };
+    store.tasks.unshift(task);
+    return HttpResponse.json(task, { status: 201 });
+  }),
+  http.post(`/api/workspaces/${W}/tasks/:taskId/cancel`, ({ params }) => {
+    const task = store.tasks.find((t) => t.id === params.taskId);
+    if (!task) return notFound("task not found");
+    if (task.status !== "running") {
+      return HttpResponse.json(
+        { error: `task is already ${task.status}`, code: "InvalidTransition" },
+        { status: 409 },
+      );
+    }
+    const now = new Date().toISOString();
+    task.status = "cancelled";
+    task.endedAt = now;
+    task.cancellation = { kind: "user", message: "Cancelled from the dashboard." };
+    return HttpResponse.json(task);
+  }),
+
+  // ── session mutations (workspace-scoped) ─────────────────────
+  http.post(`/api/workspaces/${W}/sessions`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    if (typeof body.agent !== "string" || body.agent.trim() === "") {
+      return HttpResponse.json(
+        { error: "agent must be a non-empty string", code: "VALIDATION" },
+        { status: 400 },
+      );
+    }
+    const now = new Date().toISOString();
+    const id = `sess-${cryptoRandom8()}`;
+    const session: SessionView = {
+      id,
+      workdir: `/mock/workspaces/designer/sessions/${id}`,
+      agent: (body.agent as string).trim(),
+      runtime: typeof body.runtime === "string" ? body.runtime : "copilot",
+      runtimeSessionId: null,
+      createdAt: now,
+      lastActiveAt: null,
+      preview: null,
+      lastLaunchMode: null,
+    };
+    store.sessions.unshift(session);
+    return HttpResponse.json(session, { status: 201 });
+  }),
+
+  // ── catalog mutations (workspace-scoped) ─────────────────────
+  // Install agent
+  http.post(`/api/workspaces/${W}/catalog/agents`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    if (typeof body.origin !== "string" || body.origin.trim() === "") {
+      return HttpResponse.json(
+        { error: "origin must be a non-empty string", code: "VALIDATION" },
+        { status: 400 },
+      );
+    }
+    const origin = (body.origin as string).trim();
+    const fqn = deriveFqnFromOrigin(origin, "agent");
+    const now = new Date().toISOString();
+    const entry: AgentEntry = {
+      agent: {
+        fqn,
+        origin,
+        description: `Installed from ${origin}`,
+        version: "1.0.0",
+        prereqsAck: true,
+        disabledByUser: false,
+        installedAt: now,
+        updatedAt: now,
+      },
+      status: "ready",
+      coordEligible: false,
+    };
+    store.agents.push(entry as AgentEntry);
+    return HttpResponse.json(
+      { installed: [{ kind: "agent", fqn, prereqsAck: true }], skipped: [], failed: [] },
+      { status: 201 },
+    );
+  }),
+  // Uninstall agent
+  http.delete(`/api/workspaces/${W}/catalog/agents/:fqn`, ({ params }) => {
+    const fqn = decodeURIComponent(String(params.fqn));
+    const idx = store.agents.findIndex((a) => a.agent.fqn === fqn);
+    if (idx === -1) return notFound("agent not found");
+    store.agents.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  // Install skill
+  http.post(`/api/workspaces/${W}/catalog/skills`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    if (typeof body.origin !== "string" || body.origin.trim() === "") {
+      return HttpResponse.json(
+        { error: "origin must be a non-empty string", code: "VALIDATION" },
+        { status: 400 },
+      );
+    }
+    const origin = (body.origin as string).trim();
+    const fqn = deriveFqnFromOrigin(origin, "skill");
+    const now = new Date().toISOString();
+    const entry: SkillEntry = {
+      skill: {
+        fqn,
+        origin,
+        description: `Installed from ${origin}`,
+        version: "1.0.0",
+        prereqsAck: true,
+        orphaned: false,
+        installedAt: now,
+        updatedAt: now,
+      },
+      status: "ready",
+    };
+    store.skills.push(entry as SkillEntry);
+    return HttpResponse.json(
+      { installed: [{ kind: "skill", fqn, prereqsAck: true }], skipped: [], failed: [] },
+      { status: 201 },
+    );
+  }),
+  // Uninstall skill
+  http.delete(`/api/workspaces/${W}/catalog/skills/:fqn`, ({ params }) => {
+    const fqn = decodeURIComponent(String(params.fqn));
+    const idx = store.skills.findIndex((s) => s.skill.fqn === fqn);
+    if (idx === -1) return notFound("skill not found");
+    store.skills.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  // Install mcp
+  http.post(`/api/workspaces/${W}/catalog/mcps`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    if (typeof body.origin !== "string" || body.origin.trim() === "") {
+      return HttpResponse.json(
+        { error: "origin must be a non-empty string", code: "VALIDATION" },
+        { status: 400 },
+      );
+    }
+    const origin = (body.origin as string).trim();
+    const fqn = deriveFqnFromOrigin(origin, "mcp");
+    const now = new Date().toISOString();
+    const entry: Mcp = {
+      fqn,
+      origin,
+      orphaned: false,
+      installedAt: now,
+      updatedAt: now,
+    };
+    store.mcps.push(entry as Mcp);
+    return HttpResponse.json(
+      { installed: [{ kind: "mcp", fqn }], skipped: [], failed: [] },
+      { status: 201 },
+    );
+  }),
+  // Uninstall mcp
+  http.delete(`/api/workspaces/${W}/catalog/mcps/:fqn`, ({ params }) => {
+    const fqn = decodeURIComponent(String(params.fqn));
+    const idx = store.mcps.findIndex((m) => m.fqn === fqn);
+    if (idx === -1) return notFound("mcp not found");
+    store.mcps.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+  // Sync resolve (agents)
+  http.post(`/api/workspaces/${W}/catalog/agents/:fqn/sync/resolve`, ({ params }) => {
+    const fqn = decodeURIComponent(String(params.fqn));
+    const entry = store.agents.find((a) => a.agent.fqn === fqn);
+    if (!entry) return notFound("agent not found");
+    return HttpResponse.json({
+      rootOrigin: entry.agent.origin,
+      rootFqn: fqn,
+      isSync: true,
+      upToDate: true,
+      orphans: [],
+      nodes: [
+        {
+          kind: "agent",
+          origin: entry.agent.origin,
+          fqn,
+          shortName: fqn.split("/").pop() ?? fqn,
+          scope: "public",
+          status: "up-to-date",
+          depFqns: [],
+        },
+      ],
+    });
+  }),
+  // Sync apply (agents)
+  http.post(`/api/workspaces/${W}/catalog/agents/:fqn/sync`, ({ params }) => {
+    const fqn = decodeURIComponent(String(params.fqn));
+    const entry = store.agents.find((a) => a.agent.fqn === fqn);
+    if (!entry) return notFound("agent not found");
+    return HttpResponse.json({
+      installed: [],
+      skipped: [{ kind: "agent", fqn, reason: "up-to-date" }],
+      failed: [],
+      orphansFlagged: [],
+    });
+  }),
+  // Sync resolve (skills)
+  http.post(`/api/workspaces/${W}/catalog/skills/:fqn/sync/resolve`, ({ params }) => {
+    const fqn = decodeURIComponent(String(params.fqn));
+    const entry = store.skills.find((s) => s.skill.fqn === fqn);
+    if (!entry) return notFound("skill not found");
+    return HttpResponse.json({
+      rootOrigin: entry.skill.origin,
+      rootFqn: fqn,
+      isSync: true,
+      upToDate: true,
+      orphans: [],
+      nodes: [
+        {
+          kind: "skill",
+          origin: entry.skill.origin,
+          fqn,
+          shortName: fqn.split("/").pop() ?? fqn,
+          scope: "public",
+          status: "up-to-date",
+          depFqns: [],
+        },
+      ],
+    });
+  }),
+  // Sync apply (skills)
+  http.post(`/api/workspaces/${W}/catalog/skills/:fqn/sync`, ({ params }) => {
+    const fqn = decodeURIComponent(String(params.fqn));
+    const entry = store.skills.find((s) => s.skill.fqn === fqn);
+    if (!entry) return notFound("skill not found");
+    return HttpResponse.json({
+      installed: [],
+      skipped: [{ kind: "skill", fqn, reason: "up-to-date" }],
+      failed: [],
+      orphansFlagged: [],
+    });
+  }),
+
   // ── catch-all: 501 mutations + pass-through unknown GETs ─────
   // GETs that no handler above matched fall through to MSW's
   // `onUnhandledRequest: "warn"` setting (configured in browser.ts),
   // which logs a console warning so designers see what's missing.
   http.all("/api/*", ({ request }) => {
     if (request.method !== "GET") {
-      console.warn(
-        `[mocks] ${request.method} ${request.url} — not mocked (only /schedules is implemented today; )`,
-      );
+      console.warn(`[mocks] ${request.method} ${request.url} — not mocked yet`);
       return HttpResponse.json(
         {
-          error:
-            "Mutation route not implemented in mock mode — only the /schedules slice is mocked today",
+          error: "Mutation route not implemented in mock mode",
         },
         { status: 501 },
       );
