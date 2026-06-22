@@ -43,7 +43,7 @@ export const TASK_ARTIFACT_SUBDIR = "artifact";
  * value containing LF / CR / non-printable-ASCII bytes at module load.
  */
 export const TASK_FRAMING_PROMPT_COPILOT =
-  "1. Read TASK.md in your current working directory. That is your assignment. 2. Use ./temp/ for intermediate steps and scratch files; nothing in ./temp/ is shown to the user. 3. Save meaningful output to ./artifact/. These files ARE shown to the user. Prefer a single self-contained HTML file (inline all CSS, JS, fonts, images as data URLs; no external links or CDN references) for reports and visualizations. The file must render correctly when opened directly from disk with no network access. 4. Execute the assignment, then exit.";
+  "1. Read TASK.md in your current working directory. That is your assignment. 2. Use ./temp/ for intermediate steps and scratch files; nothing in ./temp/ is shown to the user. 3. Save meaningful output to ./artifact/. These files ARE shown to the user. You MUST always produce at least one self-contained HTML file under ./artifact/ (inline all CSS, JS, fonts, images as data URLs; no external links or CDN references; must render correctly when opened directly from disk with no network access) as a human-readable report of your work. This HTML report is in addition to any other outputs your agent instructions or task brief require -- never skip it, never let other outputs replace it. 4. Execute the assignment, then exit.";
 
 /**
  * Throws when `s` is not safe to pass through `cmd.exe /c …` as a

@@ -30,7 +30,7 @@ export interface ArtifactsTabProps {
  *     We embed the sentinel sub-path so the lookup back to a wire
  *     `WorkflowArtifactWire` is just a Map hit.
  *   - `label`   — what the operator sees in the dropdown (filename).
- *   - `group`   — `<optgroup label>`: "Summary" or the per-node label.
+ *   - `group`   — `<optgroup label>`: "Workflow" or the per-node label.
  *   - `subPath` — sentinel-prefixed path passed to the server's
  *     `/artifacts/nodes/*` or `/artifacts/summary/*` byte route.
  *   - `nodeId`  — `null` for summary artifacts, the originating
@@ -360,7 +360,7 @@ function flattenEntries(
     out.push({
       value: artifactSubPath(a),
       label: filenameOf(a.path),
-      group: "Summary",
+      group: "Workflow",
       subPath: artifactSubPath(a),
       nodeId: null,
     });
