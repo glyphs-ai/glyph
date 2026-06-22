@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 interface FrontmatterTableProps {
   data: Record<string, unknown>;
 }
@@ -26,7 +28,7 @@ export function FrontmatterTable({ data }: FrontmatterTableProps) {
   );
 }
 
-function renderValue(value: unknown): React.ReactNode {
+function renderValue(value: unknown): ReactNode {
   if (value === null || value === undefined) {
     return <span className="frontmatter-table__null">null</span>;
   }
