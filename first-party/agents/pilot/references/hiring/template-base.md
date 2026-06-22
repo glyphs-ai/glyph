@@ -80,13 +80,13 @@ If `.status != "ok"`, see `references/error-codes.md` in the `official/cli` skil
 
 ## Iterating
 
-`file:` origins are mutable. To revise the agent:
+To revise a `file:` origin agent:
 
 1. Edit `<workspace>/local-agents/<name>/AGENTS.md`.
 2. Bump `version:` in the frontmatter (semver).
-3. Re-install:
+3. Sync to pick up changes:
    ```sh
-   glyph catalog agent install --file "$DIR" --json
+   glyph catalog agent sync <fqn>
    ```
 4. Probe again with a fresh probe task.
 5. If the probe passes, update `.pilot/hires.md` with the new version's outcome.

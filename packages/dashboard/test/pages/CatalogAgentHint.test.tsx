@@ -25,7 +25,6 @@ function makeAgent(fqn: string): AgentEntry {
       short,
       description: `${fqn} description`,
       version: "1.0.0",
-      mutable: true,
     },
     status: "ready",
     missingDeps: [],

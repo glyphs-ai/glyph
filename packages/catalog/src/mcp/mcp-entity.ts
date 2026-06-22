@@ -69,7 +69,7 @@ export class McpEntity {
   }
 
   /** Plain JSON projection. */
-  toJSON(): Omit<Mcp, "mutable" | "orphaned"> {
+  toJSON(): Omit<Mcp, "orphaned"> {
     return {
       fqn: this._fqn,
       origin: this._origin,

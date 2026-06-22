@@ -6,7 +6,6 @@ function makeAgent(partial: Partial<Agent> & Pick<Agent, "fqn" | "description">)
   return {
     origin: `https://github.com/glyphs-ai/glyph/tree/main/first-party/agents/${partial.fqn}`,
     version: "1.0.0",
-    mutable: false,
     prereqsAck: true,
     disabledByUser: false,
     installedAt: NOW,

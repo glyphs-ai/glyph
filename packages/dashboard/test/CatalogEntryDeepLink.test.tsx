@@ -27,17 +27,16 @@ function jsonResponse(body: unknown): Response {
   });
 }
 
-function makeAgent(fqn: string, mutable: boolean): AgentEntry {
+function makeAgent(fqn: string): AgentEntry {
   const [scope, short] = fqn.split("/");
   return {
     agent: {
       fqn,
       scope,
       short,
-      origin: mutable ? `file:/tmp/${short}` : `https://example.com/${fqn}`,
+      origin: `https://example.com/${fqn}`,
       description: `${fqn} description`,
       version: "1.0.0",
-      mutable,
     },
     status: "ready",
     missingDeps: [],
@@ -104,9 +103,7 @@ function renderCatalogAt(initialPath: string, agents: AgentEntry[]) {
 }
 
 describe("Catalog ?entry=<fqn> deep-link", () => {
-  it("auto-opens the matching agent's dialog on mount (immutable → DetailDialog)", async () => {
-    // Immutable agent → DetailDialog → GET /catalog/agents/:fqn fires
-    // as soon as the dialog mounts.
+  it("auto-opens the matching agent's dialog on mount", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.endsWith("/catalog/agents/official%2Fcoordinator")) {
@@ -116,7 +113,6 @@ describe("Catalog ?entry=<fqn> deep-link", () => {
             origin: "https://example.com/official/coordinator",
             description: "coordinator agent",
             version: "1.0.0",
-            mutable: false,
             prereqsAck: true,
             disabledByUser: false,
             installedAt: "2026-01-01T00:00:00Z",
@@ -130,8 +126,8 @@ describe("Catalog ?entry=<fqn> deep-link", () => {
     });
 
     renderCatalogAt("/workspaces/ws-1/catalog/agents?entry=official%2Fcoordinator", [
-      makeAgent("official/coordinator", false),
-      makeAgent("acme/qa", false),
+      makeAgent("official/coordinator"),
+      makeAgent("acme/qa"),
     ]);
 
     // The dialog appears: DetailDialog's hero renders "AGENT" + the FQN.
@@ -142,7 +138,7 @@ describe("Catalog ?entry=<fqn> deep-link", () => {
 
   it("is a silent no-op when ?entry= points at a stale / uninstalled FQN", async () => {
     renderCatalogAt("/workspaces/ws-1/catalog/agents?entry=ghost%2Fmissing", [
-      makeAgent("official/coordinator", false),
+      makeAgent("official/coordinator"),
     ]);
 
     // The catalog still renders cards.
@@ -167,7 +163,6 @@ describe("Catalog ?entry=<fqn> deep-link", () => {
             origin: "https://example.com/official/coordinator",
             description: "coordinator agent",
             version: "1.0.0",
-            mutable: false,
             prereqsAck: true,
             disabledByUser: false,
             installedAt: "2026-01-01T00:00:00Z",
@@ -181,7 +176,7 @@ describe("Catalog ?entry=<fqn> deep-link", () => {
     });
 
     renderCatalogAt("/workspaces/ws-1/catalog/agents?entry=official%2Fcoordinator", [
-      makeAgent("official/coordinator", false),
+      makeAgent("official/coordinator"),
     ]);
 
     await waitFor(() => {

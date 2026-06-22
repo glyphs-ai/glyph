@@ -63,7 +63,6 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "SkillFrontmatterError",
   "CyclicDependencyError",
   "HasDependentsError",
-  "ImmutableOriginError",
   "McpInvalidJsonError",
   "McpNameInvalidError",
   "SkillNameInvalidError",

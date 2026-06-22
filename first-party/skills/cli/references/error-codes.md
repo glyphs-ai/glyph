@@ -68,7 +68,6 @@ Both are stable wire contracts. The distinction matters only if you're maintaini
 | `McpOriginConflictError` | 409 | Two MCPs with same FQN, different origins | Pick one |
 | `HasDependentsError` | 409 | Trying to remove an entry someone depends on | Remove dependents first, or use `--force`-equivalent if exposed |
 | `CyclicDependencyError` | 400 | Install would create a cycle | Inspect the resolve plan; the chain is in the message |
-| `ImmutableOriginError` | 405 | `update` / `patch` on a non-`file:` origin entry | Re-install the upstream version instead of editing |
 | `OriginParseError` | 400 | Malformed origin URL | Check the URL format |
 | `FetchError` | 502 | Couldn't fetch the origin (404, network error, etc) | Check the URL is reachable; transient — safe to retry |
 | `NoEventsYet` | 404 | Runtime hasn't produced activity events yet | Wait, then retry |

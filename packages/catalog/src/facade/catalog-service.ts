@@ -20,14 +20,12 @@ import { type SkillFetcher, SkillService } from "../skill/skill-service.js";
 import type {
   Agent,
   AgentEntry,
-  AgentMetadataPatch,
   AgentResolveResult,
   Mcp,
   ResolvedMcp,
   ResolvedSkill,
   Skill,
   SkillEntry,
-  SkillMetadataPatch,
   SkillResolveResult,
 } from "../types.js";
 import type {
@@ -280,34 +278,6 @@ export class CatalogService {
 
   async enableAgent(fqn: string): Promise<Agent> {
     const updated = await this.rt.agent.enableByUser(fqn);
-    return projectAgentPojo(updated);
-  }
-
-  // ─── Content / metadata updates ──────────────────────
-
-  async updateSkillContent(fqn: string, content: string): Promise<Skill> {
-    const updated = await this.rt.skill.updateAnchor(fqn, content);
-    const ctx = await this.loadCascadeContext();
-    return projectSkillPojo(updated, ctx);
-  }
-
-  async updateAgentContent(fqn: string, content: string): Promise<Agent> {
-    const updated = await this.rt.agent.updateAnchor(fqn, content);
-    return projectAgentPojo(updated);
-  }
-
-  async updateMcpContent(name: string, content: string): Promise<void> {
-    await this.rt.mcp.updateContent(name, content);
-  }
-
-  async updateSkillMetadata(fqn: string, patch: SkillMetadataPatch): Promise<Skill> {
-    const updated = await this.rt.skill.updateMetadata(fqn, patch as Record<string, unknown>);
-    const ctx = await this.loadCascadeContext();
-    return projectSkillPojo(updated, ctx);
-  }
-
-  async updateAgentMetadata(fqn: string, patch: AgentMetadataPatch): Promise<Agent> {
-    const updated = await this.rt.agent.updateMetadata(fqn, patch as Record<string, unknown>);
     return projectAgentPojo(updated);
   }
 

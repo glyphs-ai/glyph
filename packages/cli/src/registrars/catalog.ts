@@ -1,13 +1,13 @@
 /**
  * `catalog` subtree registrar. Three resource families — skills,
  * agents, and MCPs — share the same shape of `list / show / install /
- * update / patch / rm / sync-resolve / sync / ack-prereqs / enable /
- * disable` commands. The flat wiring it replaces was 250+ lines of
+ * rm / sync-resolve / sync` commands, with kind-specific optional
+ * verbs layered on top. The flat wiring it replaces was 250+ lines of
  * near-identical Commander chains in `index.ts`; here we declare one
  * spec per kind and iterate.
  *
  * Cross-kind asymmetries:
- *   - MCP has no resolve / patch / ack-prereqs.
+ *   - MCP has no resolve / ack-prereqs.
  *   - Only agent has enable / disable.
  *   - `show --anchor` is present for skills/agents (with different
  *     filename strings — "SKILL.md" vs "AGENTS.md") but absent for MCPs.
@@ -34,31 +34,26 @@ import {
   catalogAgentEnable,
   catalogAgentInstall,
   catalogAgentList,
-  catalogAgentPatch,
   catalogAgentResolve,
   catalogAgentRm,
   catalogAgentShow,
   catalogAgentSync,
   catalogAgentSyncResolve,
-  catalogAgentUpdate,
   catalogMcpInstall,
   catalogMcpList,
   catalogMcpRm,
   catalogMcpShow,
   catalogMcpSync,
   catalogMcpSyncResolve,
-  catalogMcpUpdate,
   catalogOverview,
   catalogSkillAckPrereqs,
   catalogSkillInstall,
   catalogSkillList,
-  catalogSkillPatch,
   catalogSkillResolve,
   catalogSkillRm,
   catalogSkillShow,
   catalogSkillSync,
   catalogSkillSyncResolve,
-  catalogSkillUpdate,
 } from "../commands/catalog.js";
 import type { CommandResult } from "../result.js";
 import {
@@ -100,18 +95,6 @@ interface KindImpls {
     opts: WorkspaceFlagOpts,
   ) => Promise<CommandResult>;
   readonly install: (source: InstallSourceFlags, opts: WorkspaceFlagOpts) => Promise<CommandResult>;
-  readonly update: (
-    ident: string,
-    content: string | undefined,
-    contentFile: string | undefined,
-    opts: WorkspaceFlagOpts,
-  ) => Promise<CommandResult>;
-  readonly patch?: (
-    ident: string,
-    metadata: string | undefined,
-    metadataFile: string | undefined,
-    opts: WorkspaceFlagOpts,
-  ) => Promise<CommandResult>;
   readonly rm: (ident: string, opts: WorkspaceFlagOpts) => Promise<CommandResult>;
   readonly syncResolve: (ident: string, opts: WorkspaceFlagOpts) => Promise<CommandResult>;
   readonly sync: (
@@ -140,44 +123,12 @@ interface KindSpec {
     readonly list: string;
     readonly show: string;
     readonly install: string;
-    readonly update: string;
-    readonly patch?: string;
     readonly rm: string;
     readonly ackPrereqs?: string;
     readonly enable?: string;
     readonly disable?: string;
   };
   readonly impls: KindImpls;
-}
-
-/**
- * Build the `content` / `contentFile` patch fragment used by every
- * `update` impl. Mirrors the original index.ts call site exactly:
- * either property is included only when its CLI flag was set
- * (collapsed by `pickString`'s empty-string semantics).
- */
-function contentFragment(
-  content: string | undefined,
-  contentFile: string | undefined,
-): { content?: string; contentFile?: string } {
-  const out: { content?: string; contentFile?: string } = {};
-  if (content !== undefined) out.content = content;
-  if (contentFile !== undefined) out.contentFile = contentFile;
-  return out;
-}
-
-/**
- * Build the `metadata` / `metadataFile` patch fragment used by every
- * `patch` impl. Same precedence semantics as {@link contentFragment}.
- */
-function metadataFragment(
-  metadata: string | undefined,
-  metadataFile: string | undefined,
-): { metadata?: string; metadataFile?: string } {
-  const out: { metadata?: string; metadataFile?: string } = {};
-  if (metadata !== undefined) out.metadata = metadata;
-  if (metadataFile !== undefined) out.metadataFile = metadataFile;
-  return out;
 }
 
 /**
@@ -203,8 +154,6 @@ const KIND_SPECS: readonly KindSpec[] = [
       list: "List installed skills",
       show: "Show one skill's entry (or just the anchor with --anchor)",
       install: "Install a skill from a URL or absolute server path",
-      update: "Replace skill content",
-      patch: "Patch skill metadata",
       rm: "Remove a skill",
       ackPrereqs: "Acknowledge a skill's prereqs (lifts the prereqs-ack block)",
     },
@@ -213,10 +162,6 @@ const KIND_SPECS: readonly KindSpec[] = [
       resolve: (source, opts) => catalogSkillResolve({ ...opts, ...source }),
       show: (name, anchor, opts) => catalogSkillShow(name, { ...opts, anchor: anchor === true }),
       install: (source, opts) => catalogSkillInstall({ ...opts, ...source }),
-      update: (name, content, contentFile, opts) =>
-        catalogSkillUpdate(name, { ...opts, ...contentFragment(content, contentFile) }),
-      patch: (name, metadata, metadataFile, opts) =>
-        catalogSkillPatch(name, { ...opts, ...metadataFragment(metadata, metadataFile) }),
       rm: (name, opts) => catalogSkillRm(name, opts),
       syncResolve: (name, opts) => catalogSkillSyncResolve(name, opts),
       sync: (name, planToken, opts) => catalogSkillSync(name, planToken, opts),
@@ -233,8 +178,6 @@ const KIND_SPECS: readonly KindSpec[] = [
       list: "List installed agents",
       show: "Show one agent's entry (or just the anchor with --anchor)",
       install: "Install an agent from a URL or absolute server path",
-      update: "Replace agent content",
-      patch: "Patch agent metadata",
       rm: "Remove an agent",
       ackPrereqs: "Acknowledge an agent's prereqs (lifts the prereqs-ack block)",
       enable: "Re-enable a disabled agent",
@@ -245,10 +188,6 @@ const KIND_SPECS: readonly KindSpec[] = [
       resolve: (source, opts) => catalogAgentResolve({ ...opts, ...source }),
       show: (name, anchor, opts) => catalogAgentShow(name, { ...opts, anchor: anchor === true }),
       install: (source, opts) => catalogAgentInstall({ ...opts, ...source }),
-      update: (name, content, contentFile, opts) =>
-        catalogAgentUpdate(name, { ...opts, ...contentFragment(content, contentFile) }),
-      patch: (name, metadata, metadataFile, opts) =>
-        catalogAgentPatch(name, { ...opts, ...metadataFragment(metadata, metadataFile) }),
       rm: (name, opts) => catalogAgentRm(name, opts),
       syncResolve: (name, opts) => catalogAgentSyncResolve(name, opts),
       sync: (name, planToken, opts) => catalogAgentSync(name, planToken, opts),
@@ -267,15 +206,12 @@ const KIND_SPECS: readonly KindSpec[] = [
       show: "Show one MCP's content",
       install:
         "Install an MCP from a URL or absolute server path (fqn is derived from the JSON's `_meta.name`)",
-      update: "Replace MCP JSON content",
       rm: "Remove an MCP",
     },
     impls: {
       list: (opts) => catalogMcpList(opts),
       show: (fqn, _anchor, opts) => catalogMcpShow(fqn, opts),
       install: (source, opts) => catalogMcpInstall({ ...opts, ...source }),
-      update: (fqn, content, contentFile, opts) =>
-        catalogMcpUpdate(fqn, { ...opts, ...contentFragment(content, contentFile) }),
       rm: (fqn, opts) => catalogMcpRm(fqn, opts),
       syncResolve: (fqn, opts) => catalogMcpSyncResolve(fqn, opts),
       sync: (fqn, planToken, opts) => catalogMcpSync(fqn, planToken, opts),
@@ -346,37 +282,6 @@ export function registerCatalogCommands(program: Command, slot: Slot): void {
       .action(async (opts: Record<string, unknown>) => {
         slot.result = await spec.impls.install(installSourceFlags(opts), parseWorkspaceFlags(opts));
       });
-
-    withWorkspaceFlags(sub.command("update"))
-      .argument(spec.identPlaceholder, spec.identDesc)
-      .description(spec.descriptions.update)
-      .option("--content <text>", "Inline content")
-      .option("--content-file <path>", "Read content from file")
-      .action(async (ident: string, opts: Record<string, unknown>) => {
-        slot.result = await spec.impls.update(
-          ident,
-          pickString(opts, "content"),
-          pickString(opts, "contentFile"),
-          parseWorkspaceFlags(opts),
-        );
-      });
-
-    if (spec.impls.patch && spec.descriptions.patch !== undefined) {
-      const patch = spec.impls.patch;
-      withWorkspaceFlags(sub.command("patch"))
-        .argument(spec.identPlaceholder, spec.identDesc)
-        .description(spec.descriptions.patch)
-        .option("--metadata <json>", "Inline JSON object")
-        .option("--metadata-file <path>", "Read JSON object from file")
-        .action(async (ident: string, opts: Record<string, unknown>) => {
-          slot.result = await patch(
-            ident,
-            pickString(opts, "metadata"),
-            pickString(opts, "metadataFile"),
-            parseWorkspaceFlags(opts),
-          );
-        });
-    }
 
     withWorkspaceFlags(sub.command("rm"))
       .argument(spec.identPlaceholder, spec.identDesc)

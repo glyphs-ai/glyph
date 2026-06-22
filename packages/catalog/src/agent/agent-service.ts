@@ -1,9 +1,7 @@
-import matter from "gray-matter";
 import { normaliseOriginDeps, type OriginDeps } from "../_shared/dep-keys.js";
 import { CatalogError } from "../errors.js";
 import { type EntryFile, sameOrigin } from "../fetcher/index.js";
 import type { McpRepository } from "../mcp/mcp-repository.js";
-import { ImmutableOriginError, isOriginMutable } from "../origin-mutability.js";
 import type { SkillRepository } from "../skill/skill-repository.js";
 import { AgentEntity } from "./agent-entity.js";
 import { AGENT_DEP_SPECS, type AgentDepKind } from "./agent-frontmatter.js";
@@ -15,9 +13,6 @@ import {
   AgentPlanStaleError,
   AgentUnresolvedDepError,
 } from "./errors.js";
-
-/** FQN-immutable patch keys — never accepted by `updateMetadata`. */
-const FORBIDDEN_METADATA_PATCH_KEYS: ReadonlySet<string> = new Set(["name", "scope", "fqn"]);
 
 export interface AgentFetcher {
   fetchAnchor(origin: string): Promise<string>;
@@ -245,44 +240,6 @@ export class AgentService {
 
   async getAnchor(fqn: string): Promise<string> {
     return this.repo.getAnchor(fqn);
-  }
-
-  async updateAnchor(fqn: string, newAgentMd: string): Promise<AgentEntity> {
-    const existing = await this.repo.findById(fqn);
-    if (existing === undefined) throw new AgentNotFoundError(fqn);
-    if (!isOriginMutable(existing.origin)) throw new ImmutableOriginError(fqn, existing.origin);
-    const updated = existing.withAnchor(newAgentMd, `update:${fqn}`);
-    const files = new Map<string, Buffer>();
-    for await (const f of this.repo.streamFiles(fqn)) {
-      files.set(f.relPath, f.content);
-    }
-    files.set("AGENTS.md", Buffer.from(newAgentMd, "utf8"));
-    const resolvedDeps = await this.resolveDepOrigins(fqn, updated.depsRefs);
-    await this.repo.insert(updated, files, resolvedDeps);
-    return (await this.repo.findById(fqn)) ?? updated;
-  }
-
-  async updateMetadata(fqn: string, patch: Record<string, unknown>): Promise<AgentEntity> {
-    for (const k of Object.keys(patch)) {
-      if (FORBIDDEN_METADATA_PATCH_KEYS.has(k)) {
-        throw new AgentFrontmatterError(
-          `update:${fqn}`,
-          `cannot patch field "${k}" — fqn (scope/name) is immutable. ` +
-            "To rename, install under a new origin and delete the old entry.",
-        );
-      }
-    }
-    const existing = await this.repo.findById(fqn);
-    if (existing === undefined) throw new AgentNotFoundError(fqn);
-    if (!isOriginMutable(existing.origin)) throw new ImmutableOriginError(fqn, existing.origin);
-    const currentAnchor = await this.repo.getAnchor(fqn);
-    const file = matter(currentAnchor);
-    for (const [k, v] of Object.entries(patch)) {
-      if (v === undefined || v === null) delete file.data[k];
-      else file.data[k] = v;
-    }
-    const newAnchor = matter.stringify(file.content, file.data);
-    return this.updateAnchor(fqn, newAnchor);
   }
 
   async delete(fqn: string): Promise<void> {

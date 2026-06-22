@@ -74,8 +74,6 @@ export {
   writeMeta as writeMcpMeta,
 } from "./mcp/mcp-format.js";
 export { validateMcpName } from "./mcp/validate.js";
-// ─── Origin mutability ──────────────────────────────
-export { ImmutableOriginError, isOriginMutable } from "./origin-mutability.js";
 // ─── Drizzle schema (low-level row access for tests/migrations) ─
 export * as schema from "./schema.js";
 export {
@@ -103,7 +101,6 @@ export type {
   Agent,
   AgentEntry,
   AgentInstallBody,
-  AgentMetadataPatch,
   AgentResolveResult,
   BlockedDep,
   BlockedReason,
@@ -119,7 +116,6 @@ export type {
   Skill,
   SkillEntry,
   SkillInstallBody,
-  SkillMetadataPatch,
   SkillResolveResult,
 } from "./types.js";
 // ─── Install-body validators (HTTP boundary) ────────

@@ -234,8 +234,8 @@ export class SkillEntity {
     return this._state.updatedAt;
   }
 
-  toJSON(): Omit<Skill, "mutable" | "orphaned"> {
-    const out: Omit<Skill, "mutable" | "orphaned"> & {
+  toJSON(): Omit<Skill, "orphaned"> {
+    const out: Omit<Skill, "orphaned"> & {
       prereqs?: string;
       dependencies?: Skill["dependencies"];
     } = {

@@ -29,9 +29,8 @@ import { ResolveTree } from "./ResolveTree";
 /**
  * Read-only detail view for an installed catalog entry.
  *
- * Shown instead of `EditDialog` when the entry's origin is immutable
- * (currently any non-`file:` scheme — see {@link isOriginMutable} in
- * `@glyphs-ai/catalog`). Mutable entries still get the full edit form.
+ * All catalog entries use this view — there is no in-place edit mode.
+ * Users edit source files at the origin and sync into the catalog.
  *
  * Layout:
  *  - Hero header: kind icon tag + KIND label + big fqn (mono) +

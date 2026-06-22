@@ -78,13 +78,6 @@ export interface Skill {
   readonly version: string;
   readonly prereqs?: string;
   /**
-   * True iff the entry can be edited via PUT/PATCH: mutable iff origin
-   * starts with `file:`. Remote-sourced entries (GitHub / Azure DevOps
-   * URLs) are read-only mirrors — to pick up upstream changes, re-install
-   * via the same origin.
-   */
-  readonly mutable: boolean;
-  /**
    * True iff the user has acknowledged the entry's `prereqs` text
    * (or the entry has no prereqs declared). Persisted per-installation,
    * NOT in frontmatter — it's a local opt-in.
@@ -112,8 +105,6 @@ export interface Agent {
   readonly description: string;
   readonly version: string;
   readonly prereqs?: string;
-  /** See {@link Skill.mutable}. */
-  readonly mutable: boolean;
   /** See {@link Skill.prereqsAck}. */
   readonly prereqsAck: boolean;
   /**
@@ -142,8 +133,6 @@ export interface Mcp {
   /** Fully-qualified MCP spec name (`<namespace>/<short>`). */
   readonly fqn: string;
   readonly origin: string;
-  /** See {@link Skill.mutable}. */
-  readonly mutable: boolean;
   /** See {@link Skill.orphaned}. MCPs can be orphaned just like skills. */
   readonly orphaned: boolean;
   /** ISO 8601 UTC timestamp of first install. */
@@ -202,37 +191,6 @@ export interface SkillResolveResult {
   readonly skill: Skill;
   readonly skills: readonly ResolvedSkill[];
   readonly mcps: readonly ResolvedMcp[];
-}
-
-/**
- * Patch shape for {@link CatalogService.updateSkillMetadata}.
- *
- * The patch's `dependencies` field carries origin URI strings (the
- * same shape consumers paste into SKILL.md / AGENTS.md frontmatter)
- * because it's applied verbatim into the YAML block by
- * `applyFrontmatterPatch`. The DTO's read-side `dependencies` carries
- * `{ fqn }` objects derived from the dep tables.
- */
-export interface SkillMetadataPatch {
-  readonly description?: string;
-  readonly version?: string;
-  readonly prereqs?: string;
-  readonly dependencies?: {
-    readonly skills?: readonly string[];
-    readonly mcps?: readonly string[];
-  } | null;
-}
-
-/** Patch shape for {@link CatalogService.updateAgentMetadata}. */
-export interface AgentMetadataPatch {
-  readonly description?: string;
-  readonly version?: string;
-  readonly prereqs?: string | null;
-  readonly dependencies?: {
-    readonly skills?: readonly string[];
-    readonly mcps?: readonly string[];
-    readonly agents?: readonly string[];
-  } | null;
 }
 
 /**

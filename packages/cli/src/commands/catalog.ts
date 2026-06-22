@@ -2,9 +2,9 @@
  * `glyph catalog …` — wraps the workspace-scoped catalog HTTP surface.
  *
  * Three resource families behind one parent command:
- *  - `skill {list, resolve, show, install, update, patch, rm, sync-resolve, sync, ack-prereqs}`
- *  - `agent {list, resolve, show, install, update, patch, rm, sync-resolve, sync, ack-prereqs, enable, disable}`
- *  - `mcp   {list, show, install, update, rm, sync-resolve, sync}`
+ *  - `skill {list, resolve, show, install, rm, sync-resolve, sync, ack-prereqs}`
+ *  - `agent {list, resolve, show, install, rm, sync-resolve, sync, ack-prereqs, enable, disable}`
+ *  - `mcp   {list, show, install, rm, sync-resolve, sync}`
  *
  * Plus `catalog overview` for the per-workspace counts. Each exported
  * function maps 1:1 to a `ROUTES` manifest entry; counts are
@@ -12,7 +12,6 @@
  * evolve and the precise count is recoverable from this file.
  */
 
-import { readFile } from "node:fs/promises";
 import { makeClient, resolveWorkspace } from "../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../output.js";
 import type { CommandResult } from "../result.js";
@@ -90,72 +89,6 @@ export async function catalogOverview(opts: CatalogOverviewOpts = {}): Promise<C
   } catch (err) {
     return formatError(err);
   }
-}
-
-// ─── shared helpers ────────────────────────────────────────────────────
-
-/**
- * Resolve the `--content` payload. Precedence:
- *  1. `--content "literal"`  — inline string
- *  2. `--content-file <path>` — read the file as utf8
- * Errors when both or neither is supplied.
- */
-async function readContentPayload(opts: {
-  content?: string;
-  contentFile?: string;
-}): Promise<string | { error: string }> {
-  const both = opts.content !== undefined && opts.contentFile !== undefined;
-  const neither = opts.content === undefined && opts.contentFile === undefined;
-  if (both) return { error: "pass exactly one of --content or --content-file" };
-  if (neither) return { error: "missing --content <text> or --content-file <path>" };
-  if (opts.content !== undefined) return opts.content;
-  try {
-    return await readFile(opts.contentFile as string, "utf8");
-  } catch (err) {
-    return {
-      error: `--content-file read failed: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-}
-
-/**
- * Resolve the `--metadata` JSON object. Inline `--metadata '{...}'` or
- * `--metadata-file <path>`. Returns the parsed object; errors when not
- * a JSON object (arrays / scalars are rejected so the route never sees
- * a malformed PATCH body).
- */
-async function readMetadataPayload(opts: {
-  metadata?: string;
-  metadataFile?: string;
-}): Promise<Record<string, unknown> | { error: string }> {
-  const both = opts.metadata !== undefined && opts.metadataFile !== undefined;
-  const neither = opts.metadata === undefined && opts.metadataFile === undefined;
-  if (both) return { error: "pass exactly one of --metadata or --metadata-file" };
-  if (neither) return { error: "missing --metadata <json> or --metadata-file <path>" };
-  let raw: string;
-  if (opts.metadata !== undefined) {
-    raw = opts.metadata;
-  } else {
-    try {
-      raw = await readFile(opts.metadataFile as string, "utf8");
-    } catch (err) {
-      return {
-        error: `--metadata-file read failed: ${err instanceof Error ? err.message : String(err)}`,
-      };
-    }
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    return {
-      error: `--metadata JSON parse error: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { error: "--metadata must be a JSON object" };
-  }
-  return parsed as Record<string, unknown>;
 }
 
 // ─── skills ────────────────────────────────────────────────────────────
@@ -250,60 +183,6 @@ export async function catalogSkillInstall(opts: CatalogSkillInstallOpts): Promis
       body: { origin: built.origin },
     });
     return { exitCode: 0, stdout: formatJson(result) };
-  } catch (err) {
-    return formatError(err);
-  }
-}
-
-export interface CatalogSkillUpdateOpts extends CommonFlags {
-  readonly content?: string;
-  readonly contentFile?: string;
-}
-
-export async function catalogSkillUpdate(
-  name: string,
-  opts: CatalogSkillUpdateOpts,
-): Promise<CommandResult> {
-  if (typeof name !== "string" || name.trim() === "") {
-    return { exitCode: 2, stderr: "skill name is required\n" };
-  }
-  const content = await readContentPayload(opts);
-  if (typeof content !== "string") return { exitCode: 2, stderr: `${content.error}\n` };
-  const client = await makeClient(opts);
-  try {
-    const workspaceId = await resolveWorkspace(opts);
-    const skill = await client.call("catalog.skills.content.update", {
-      params: { id: workspaceId, name },
-      body: { content },
-    });
-    return { exitCode: 0, stdout: formatJson(skill) };
-  } catch (err) {
-    return formatError(err);
-  }
-}
-
-export interface CatalogSkillPatchOpts extends CommonFlags {
-  readonly metadata?: string;
-  readonly metadataFile?: string;
-}
-
-export async function catalogSkillPatch(
-  name: string,
-  opts: CatalogSkillPatchOpts,
-): Promise<CommandResult> {
-  if (typeof name !== "string" || name.trim() === "") {
-    return { exitCode: 2, stderr: "skill name is required\n" };
-  }
-  const metadata = await readMetadataPayload(opts);
-  if ("error" in metadata) return { exitCode: 2, stderr: `${metadata.error}\n` };
-  const client = await makeClient(opts);
-  try {
-    const workspaceId = await resolveWorkspace(opts);
-    const skill = await client.call("catalog.skills.metadata.update", {
-      params: { id: workspaceId, name },
-      body: metadata,
-    });
-    return { exitCode: 0, stdout: formatJson(skill) };
   } catch (err) {
     return formatError(err);
   }
@@ -510,60 +389,6 @@ export async function catalogAgentInstall(opts: CatalogAgentInstallOpts): Promis
   }
 }
 
-export interface CatalogAgentUpdateOpts extends CommonFlags {
-  readonly content?: string;
-  readonly contentFile?: string;
-}
-
-export async function catalogAgentUpdate(
-  name: string,
-  opts: CatalogAgentUpdateOpts,
-): Promise<CommandResult> {
-  if (typeof name !== "string" || name.trim() === "") {
-    return { exitCode: 2, stderr: "agent name is required\n" };
-  }
-  const content = await readContentPayload(opts);
-  if (typeof content !== "string") return { exitCode: 2, stderr: `${content.error}\n` };
-  const client = await makeClient(opts);
-  try {
-    const workspaceId = await resolveWorkspace(opts);
-    const agent = await client.call("catalog.agents.content.update", {
-      params: { id: workspaceId, name },
-      body: { content },
-    });
-    return { exitCode: 0, stdout: formatJson(agent) };
-  } catch (err) {
-    return formatError(err);
-  }
-}
-
-export interface CatalogAgentPatchOpts extends CommonFlags {
-  readonly metadata?: string;
-  readonly metadataFile?: string;
-}
-
-export async function catalogAgentPatch(
-  name: string,
-  opts: CatalogAgentPatchOpts,
-): Promise<CommandResult> {
-  if (typeof name !== "string" || name.trim() === "") {
-    return { exitCode: 2, stderr: "agent name is required\n" };
-  }
-  const metadata = await readMetadataPayload(opts);
-  if ("error" in metadata) return { exitCode: 2, stderr: `${metadata.error}\n` };
-  const client = await makeClient(opts);
-  try {
-    const workspaceId = await resolveWorkspace(opts);
-    const agent = await client.call("catalog.agents.metadata.update", {
-      params: { id: workspaceId, name },
-      body: metadata,
-    });
-    return { exitCode: 0, stdout: formatJson(agent) };
-  } catch (err) {
-    return formatError(err);
-  }
-}
-
 export type CatalogAgentRmOpts = CommonFlags;
 
 export async function catalogAgentRm(
@@ -722,8 +547,8 @@ export async function catalogMcpList(opts: CatalogMcpListOpts = {}): Promise<Com
     return {
       exitCode: 0,
       stdout: formatTable(
-        ["fqn", "origin", "mutable", "installedAt"],
-        list.map((m) => [m.fqn, m.origin, String(m.mutable), m.installedAt]),
+        ["fqn", "origin", "installedAt"],
+        list.map((m) => [m.fqn, m.origin, m.installedAt]),
       ),
     };
   } catch (err) {
@@ -772,33 +597,6 @@ export async function catalogMcpInstall(opts: CatalogMcpInstallOpts): Promise<Co
       body: { origin: built.origin },
     });
     return { exitCode: 0, stdout: formatJson(result) };
-  } catch (err) {
-    return formatError(err);
-  }
-}
-
-export interface CatalogMcpUpdateOpts extends CommonFlags {
-  readonly content?: string;
-  readonly contentFile?: string;
-}
-
-export async function catalogMcpUpdate(
-  fqn: string,
-  opts: CatalogMcpUpdateOpts,
-): Promise<CommandResult> {
-  if (typeof fqn !== "string" || fqn.trim() === "") {
-    return { exitCode: 2, stderr: "mcp fqn is required\n" };
-  }
-  const content = await readContentPayload(opts);
-  if (typeof content !== "string") return { exitCode: 2, stderr: `${content.error}\n` };
-  const client = await makeClient(opts);
-  try {
-    const workspaceId = await resolveWorkspace(opts);
-    await client.call("catalog.mcps.content.update", {
-      params: { id: workspaceId, name: fqn },
-      body: { content },
-    });
-    return { exitCode: 0, stdout: `mcp ${fqn} updated\n` };
   } catch (err) {
     return formatError(err);
   }

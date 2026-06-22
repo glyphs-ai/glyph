@@ -26,7 +26,6 @@ import {
   CyclicDependencyError,
   FetchError,
   HasDependentsError,
-  ImmutableOriginError,
   McpInvalidJsonError,
   McpNameInvalidError,
   McpNotFoundError,
@@ -60,9 +59,6 @@ export const catalogErrorPolicy: ErrorPolicy = {
     [SkillNotFoundError, 404],
     [AgentNotFoundError, 404],
     [McpNotFoundError, 404],
-
-    // 405 — mutation against a read-only origin.
-    [ImmutableOriginError, 405],
 
     // 409 — state conflict.
     [HasDependentsError, 409],

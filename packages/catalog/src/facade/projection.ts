@@ -8,7 +8,6 @@
 
 import type { AgentEntity } from "../agent/agent-entity.js";
 import type { McpEntity } from "../mcp/mcp-entity.js";
-import { isOriginMutable } from "../origin-mutability.js";
 import type { SkillEntity } from "../skill/skill-entity.js";
 import type {
   Agent,
@@ -64,7 +63,6 @@ export function newCascadeContext(
 export function projectSkillPojo(s: SkillEntity, ctx: CascadeContext): Skill {
   return {
     ...s.toJSON(),
-    mutable: isOriginMutable(s.origin),
     orphaned: !ctx.referencedSkillFqns.has(s.fqn),
   };
 }
@@ -72,14 +70,12 @@ export function projectSkillPojo(s: SkillEntity, ctx: CascadeContext): Skill {
 export function projectAgentPojo(a: AgentEntity): Agent {
   return {
     ...a.toJSON(),
-    mutable: isOriginMutable(a.origin),
   };
 }
 
 export function projectMcpMetadata(m: McpEntity, ctx: CascadeContext): Mcp {
   return {
     ...m.toJSON(),
-    mutable: isOriginMutable(m.origin),
     orphaned: !ctx.referencedMcpFqns.has(m.fqn),
   };
 }

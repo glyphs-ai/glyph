@@ -3,12 +3,7 @@ import { Hono } from "hono";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import {
-  readAgentInstallBody,
-  readContentBody,
-  readMetadataBody,
-  readPlanTokenBody,
-} from "./helpers.js";
+import { readAgentInstallBody, readPlanTokenBody } from "./helpers.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 
@@ -194,45 +189,6 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): Hono {
     } catch (err) {
       return respondError(c, err, {
         route: "catalog.agents.enable",
-        policy: catalogErrorPolicy,
-        meta: { fqn: name },
-      });
-    }
-  });
-
-  app.put("/:name{.+}", async (c) => {
-    const catalog = getCatalog(c);
-    const name = c.req.param("name");
-    const parsed = await readContentBody(c);
-    if ("error" in parsed) return c.json(parsed, 400);
-    try {
-      const agent = await catalog.updateAgentContent(name, parsed.content);
-      logEvent(c, "catalog: agent content updated", { kind: "agent", fqn: name });
-      return c.json(agent);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "catalog.agents.updateContent",
-        policy: catalogErrorPolicy,
-        meta: { fqn: name },
-      });
-    }
-  });
-
-  app.patch("/:name{.+}", async (c) => {
-    const catalog = getCatalog(c);
-    const name = c.req.param("name");
-    const parsed = await readMetadataBody(c);
-    if ("error" in parsed) return c.json(parsed, 400);
-    try {
-      const agent = await catalog.updateAgentMetadata(
-        name,
-        parsed.body as Parameters<typeof catalog.updateAgentMetadata>[1],
-      );
-      logEvent(c, "catalog: agent metadata updated", { kind: "agent", fqn: name });
-      return c.json(agent);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "catalog.agents.updateMetadata",
         policy: catalogErrorPolicy,
         meta: { fqn: name },
       });

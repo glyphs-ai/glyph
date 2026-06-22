@@ -16,7 +16,6 @@ export type {
   Agent,
   AgentEntry,
   AgentInstallBody,
-  AgentMetadataPatch,
   BlockedReason,
   CatalogConflict,
   CatalogInstallResult,
@@ -27,7 +26,6 @@ export type {
   Skill,
   SkillEntry,
   SkillInstallBody,
-  SkillMetadataPatch,
 } from "@glyphs-ai/catalog";
 export type { ActivityItem, TruncationInfo } from "@glyphs-ai/runtime";
 export type { PreviewScheduleResult, Schedule } from "@glyphs-ai/schedule";

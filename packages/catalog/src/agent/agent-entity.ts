@@ -259,8 +259,8 @@ export class AgentEntity {
     return this._state.updatedAt;
   }
 
-  toJSON(): Omit<Agent, "mutable"> {
-    const out: Omit<Agent, "mutable"> & {
+  toJSON(): Agent {
+    const out: Agent & {
       prereqs?: string;
       dependencies?: Agent["dependencies"];
     } = {
