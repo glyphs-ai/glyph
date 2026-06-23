@@ -1,8 +1,27 @@
+/**
+ * Shared helpers used by the platform-specific terminal spawners.
+ *
+ * This module packs several distinct functional groups into one file
+ * because each group is small (< 50 LOC) and they all serve the same
+ * consumer — the per-platform `spawn{Windows,MacOS,Linux}` functions.
+ * The section separators below delineate the groups for scan-ability:
+ *
+ *   1. Input validation — reject dangerous characters before quoting
+ *   2. Shell quoting — per-shell string escape (POSIX, cmd.exe, pwsh)
+ *   3. Env-prefix builders — inline `export`/`$env:` prefixes for
+ *      daemon-mode terminal emulators that ignore spawn-time env
+ *   4. Observation — detect early spawn failures via a timeout race
+ *   5. Spawn infrastructure — real `child_process.spawn` wrapper +
+ *      filesystem helpers (robust existence check, PATH lookup)
+ */
+
 import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
 import { existsSync, lstatSync } from "node:fs";
 import path from "node:path";
 import { InvalidLaunchCommandError } from "./errors.js";
 import type { LaunchCommand, SpawnHandle, SpawnOpts } from "./types.js";
+
+// ─── Input validation ───────────────────────────────────────────────
 
 /** Reject command fields with control characters that could break shell/AppleScript quoting. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: detecting control chars is the explicit purpose.
@@ -26,6 +45,8 @@ export function validateLaunchCommand(cmd: LaunchCommand): void {
   }
 }
 
+// ─── Observation ────────────────────────────────────────────────────
+
 /**
  * Race the spawn handle's earlyFailure signal against an observation timer.
  * Returns the failure if the child died fast, or null if it stayed alive
@@ -46,6 +67,8 @@ export async function waitForEarlyFailure(
     if (timer !== null) clearTimeout(timer);
   }
 }
+
+// ─── Shell quoting ──────────────────────────────────────────────────
 
 /** POSIX-portable single-quote escape for shell argv. Used by macOS + Linux. */
 export function shQuote(s: string): string {
@@ -93,6 +116,8 @@ export function escapeCmdArg(s: string): string {
 export function pwshQuote(s: string): string {
   return `'${s.replace(/'/g, "''")}'`;
 }
+
+// ─── Env-prefix builders ────────────────────────────────────────────
 
 /**
  * Filter an env bag down to `[key, string-value]` tuples after checking
@@ -171,6 +196,8 @@ export function pwshEnvPrefix(env: Readonly<Record<string, string>> | undefined)
   return `${entries.map(([k, v]) => `$env:${k} = ${pwshQuote(v)}`).join("; ")}; `;
 }
 
+// ─── Spawn infrastructure ───────────────────────────────────────────
+
 /**
  * Default dependencies backed by node:child_process and node:fs. The returned
  * SpawnHandle.earlyFailure resolves to a non-null reason if the child emits
@@ -237,7 +264,16 @@ export function existsLike(p: string): boolean {
   }
 }
 
-/** Best-effort PATH lookup using existsSync over PATH directories. */
+/**
+ * Best-effort PATH lookup using existsSync over PATH directories.
+ *
+ * Uses `existsSync` (not `existsLike`) deliberately: PATH-discovered
+ * binaries are invoked by name (not by full path), so the shell/OS
+ * resolves App Execution Aliases at exec time regardless of what our
+ * probe returns. The full-path `existsLike` probe is only needed for
+ * the `wt.exe` LOCALAPPDATA check in `platforms/windows.ts`, where we
+ * pass the resolved path directly to `deps.spawn`.
+ */
 export function whichSyncDefault(name: string): string | null {
   const PATH = process.env.PATH ?? "";
   const exts =

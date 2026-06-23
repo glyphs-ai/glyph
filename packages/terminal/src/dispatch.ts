@@ -1,3 +1,25 @@
+/**
+ * Terminal dispatch — platform-routing entry point for `spawnTerminal`.
+ *
+ * Two entry points serve the same logic with different dependency wiring:
+ *
+ *   - {@link spawnTerminalWith}: dependency-injected. Tests call this directly
+ *     to drive any platform branch with fake spawn/fs/PATH dependencies,
+ *     avoiding host-specific side effects entirely.
+ *
+ *   - {@link spawnTerminal}: production wrapper. Fills in the real
+ *     `node:child_process` spawn, `node:fs` existence checks, and
+ *     `process.platform` so callers get a zero-config one-shot function.
+ *
+ * Platform routing is a simple switch on `deps.platform`:
+ *   `win32` → Windows Terminal or cmd.exe fallback
+ *   `darwin` → Terminal.app via osascript
+ *   `linux` → first available emulator from a priority list
+ *
+ * Validation (control-char rejection, env-name portability) runs before
+ * dispatch so every platform receives a pre-validated `LaunchCommand`.
+ */
+
 import { existsLike, realSpawn, validateLaunchCommand, whichSyncDefault } from "./_shared.js";
 import { UnsupportedPlatformError } from "./errors.js";
 import { spawnLinux } from "./platforms/linux.js";
