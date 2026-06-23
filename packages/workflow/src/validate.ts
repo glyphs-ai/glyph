@@ -31,6 +31,7 @@ import type {
   WorkflowFailure,
   WorkflowNodeKind,
   WorkflowNodeStatus,
+  WorkflowOrigin,
   WorkflowStatus,
   WorkflowSubstrateFailureReason,
   WorkflowSuccess,
@@ -159,6 +160,21 @@ export function assertValidWorkflowNodeKind(kind: unknown): asserts kind is Work
   }
   if (kind !== "coordinator" && kind !== "worker" && kind !== "human") {
     throw new WorkflowNodeKindCorruptionError(kind);
+  }
+}
+
+// ─── Origin enum check ──────────────────────────────────────────────
+
+const VALID_ORIGINS: readonly WorkflowOrigin[] = ["standalone", "schedule"];
+
+/**
+ * Enum-membership check for `workflows.origin`. Throws
+ * {@link WorkflowEnumValueCorruptionError} on miss — used by
+ * `WorkflowEntity.fromRow` to reject corrupted rows.
+ */
+export function assertValidWorkflowOriginEnum(origin: unknown): asserts origin is WorkflowOrigin {
+  if (typeof origin !== "string" || !(VALID_ORIGINS as readonly string[]).includes(origin)) {
+    throw new WorkflowEnumValueCorruptionError("origin", String(origin), VALID_ORIGINS);
   }
 }
 

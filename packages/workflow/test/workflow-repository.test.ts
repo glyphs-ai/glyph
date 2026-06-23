@@ -22,6 +22,7 @@ function makeWf(over?: Partial<{ status: string; coordinatorAgent: string }>): W
     details: null,
     coordinatorAgent: over?.coordinatorAgent ?? "agent-1",
     status,
+    origin: "standalone",
     metadata: "{}",
     createdAt: NOW,
     startedAt: NOW,

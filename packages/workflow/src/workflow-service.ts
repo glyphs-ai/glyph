@@ -129,6 +129,13 @@ export interface CreateWorkflowOpts {
   readonly details?: string;
   readonly coordinatorAgent: string;
   /**
+   * Who launched this workflow. Defaults to `"standalone"` when omitted
+   * (direct dashboard / CLI / MCP call). The schedule-workflow handler
+   * passes `"schedule"` so the default `GET /workflows` endpoint
+   * can filter to standalone-only by construction.
+   */
+  readonly origin?: import("./types.js").WorkflowOrigin;
+  /**
    * Opaque caller-supplied metadata persisted onto the workflow row.
    * Forwarded verbatim to {@link WorkflowEntity.metadata}; defaults
    * to `{}` when omitted.
@@ -246,6 +253,15 @@ export interface ListWorkflowOpts {
   readonly coordinatorAgent?: string;
   readonly createdSince?: string;
   readonly idLike?: string;
+  /**
+   * Filter to workflows whose `origin` matches the given value, or any
+   * value in the given array. Accepts a single `WorkflowOrigin` or a
+   * readonly array; omit to disable the filter and return workflows of
+   * every origin.
+   */
+  readonly origin?:
+    | import("./types.js").WorkflowOrigin
+    | readonly import("./types.js").WorkflowOrigin[];
 }
 
 /**
@@ -545,6 +561,7 @@ export class WorkflowService {
           brief: opts.brief,
           details: opts.details,
           coordinatorAgent: validatedSpec.agent,
+          ...(opts.origin !== undefined ? { origin: opts.origin } : {}),
           ...(opts.metadata !== undefined ? { metadata: opts.metadata } : {}),
           nowIso,
         });

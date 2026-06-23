@@ -556,6 +556,7 @@ export const handlers = [
           ? { details: wfTarget.details }
           : {}),
         status: "running",
+        origin: "schedule",
         coordinatorAgent: wfTarget.coordinatorAgent,
         metadata: { scheduleId: row.id, firedAt },
         awaitingHumanCount: 0,
@@ -647,6 +648,7 @@ export const handlers = [
         ? { details: body.details }
         : {}),
       status: "running",
+      origin: "standalone",
       coordinatorAgent: body.coordinatorAgent,
       metadata: body.metadata ?? {},
       awaitingHumanCount: 0,

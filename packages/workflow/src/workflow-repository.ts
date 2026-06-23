@@ -70,6 +70,7 @@ export class WorkflowRepository {
     readonly coordinatorAgent?: string;
     readonly createdSince?: string;
     readonly idLike?: string;
+    readonly origin?: string | readonly string[];
   }): Promise<readonly WorkflowEntity[]> {
     const predicates = [];
     if (opts?.coordinatorAgent !== undefined) {
@@ -81,6 +82,10 @@ export class WorkflowRepository {
     if (opts?.idLike !== undefined && opts.idLike !== "") {
       const pattern = `%${escapeLike(opts.idLike)}%`;
       predicates.push(sql`${workflows.id} LIKE ${pattern} ESCAPE '\\'`);
+    }
+    if (opts?.origin !== undefined) {
+      const origins: string[] = Array.isArray(opts.origin) ? [...opts.origin] : [opts.origin];
+      if (origins.length > 0) predicates.push(inArray(workflows.origin, origins));
     }
     const where = predicates.length === 0 ? undefined : and(...predicates);
     const rows =

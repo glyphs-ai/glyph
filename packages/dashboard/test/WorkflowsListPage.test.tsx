@@ -39,6 +39,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHead
     id: "wf-default",
     brief: "Default workflow",
     status: "running",
+    origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
     awaitingHumanCount: 0,

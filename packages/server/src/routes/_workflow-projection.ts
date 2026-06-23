@@ -62,6 +62,7 @@ export function projectWorkflowHeader(
     ...(wf.details !== undefined ? { details: wf.details } : {}),
     coordinatorAgent: wf.coordinatorAgent,
     status: wf.status,
+    origin: wf.origin,
     metadata: wf.metadata,
     ...(iterationCount !== undefined ? { iterationCount } : {}),
     awaitingHumanCount,

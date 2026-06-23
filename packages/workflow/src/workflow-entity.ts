@@ -42,6 +42,7 @@ import type {
   WorkflowNodeRetryReason,
   WorkflowNodeSpecEnvelope,
   WorkflowNodeStatus,
+  WorkflowOrigin,
   WorkflowStatus,
   WorkflowSuccess,
 } from "./types.js";
@@ -50,6 +51,7 @@ import {
   assertValidWorkflowNodeId,
   assertValidWorkflowNodeKind,
   assertValidWorkflowNodeStatusEnum,
+  assertValidWorkflowOriginEnum,
   assertValidWorkflowStatusEnum,
   assertWorkflowCancellationShape,
   assertWorkflowFailureShape,
@@ -80,6 +82,7 @@ export class WorkflowEntity {
     readonly details: string | undefined,
     readonly coordinatorAgent: string,
     readonly status: WorkflowStatus,
+    readonly origin: WorkflowOrigin,
     readonly metadata: Readonly<Record<string, unknown>>,
     readonly createdAt: string,
     readonly startedAt: string | undefined,
@@ -103,6 +106,7 @@ export class WorkflowEntity {
   static fromRow(row: WorkflowRow): WorkflowEntity {
     assertValidWorkflowId(row.id);
     assertValidWorkflowStatusEnum(row.status);
+    assertValidWorkflowOriginEnum(row.origin);
     const metadata = parseMetadataJson(row.id, row.metadata);
     const success = parseTerminalPayload<WorkflowSuccess>(
       row.id,
@@ -163,6 +167,7 @@ export class WorkflowEntity {
       row.details ?? undefined,
       row.coordinatorAgent,
       row.status,
+      row.origin as WorkflowOrigin,
       metadata,
       row.createdAt,
       row.startedAt ?? undefined,
@@ -181,6 +186,7 @@ export class WorkflowEntity {
       details: this.details ?? null,
       coordinatorAgent: this.coordinatorAgent,
       status: this.status,
+      origin: this.origin,
       metadata: JSON.stringify(this.metadata),
       createdAt: this.createdAt,
       startedAt: this.startedAt ?? null,

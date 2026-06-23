@@ -22,6 +22,7 @@ function makeDag(nodes: WorkflowNodeWire[]): WorkflowDagWire {
       id: "wf-1",
       brief: "Wrapped header",
       status: "running",
+      origin: "standalone",
       coordinatorAgent: "official/engineer",
       metadata: {},
       awaitingHumanCount: 0,

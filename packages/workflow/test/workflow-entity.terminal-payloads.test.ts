@@ -11,6 +11,7 @@ function rowBase(over?: Partial<Parameters<typeof WorkflowEntity.fromRow>[0]>) {
     details: null,
     coordinatorAgent: "agent-1",
     status: "running" as const,
+    origin: "standalone",
     metadata: "{}",
     createdAt: NOW,
     startedAt: NOW,

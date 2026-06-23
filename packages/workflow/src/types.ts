@@ -34,6 +34,20 @@
  */
 export type WorkflowStatus = "running" | "succeeded" | "failed" | "cancelled";
 
+// ─── Origin discriminator ───────────────────────────────────────────
+
+/**
+ * Who launched this workflow. Mirrors `TaskOrigin` from
+ * `@glyphs-ai/task`. The discriminator partitions workflows into
+ * disjoint surfaces — `GET /workflows` returns only `"standalone"`,
+ * while `GET /scheduled-workflows` returns only `"schedule"`.
+ *
+ *   - `standalone` — created directly by a user via the dashboard,
+ *     CLI, or MCP call.
+ *   - `schedule` — created by the schedule-workflow handler.
+ */
+export type WorkflowOrigin = "standalone" | "schedule";
+
 // ─── Terminal payloads ──────────────────────────────────────────────
 
 /**

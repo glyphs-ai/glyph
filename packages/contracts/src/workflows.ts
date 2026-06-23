@@ -92,6 +92,13 @@ export type WorkflowNodeWireSpec =
 export type WorkflowStatusWire = "running" | "succeeded" | "failed" | "cancelled";
 
 /**
+ * Origin discriminator mirrored from `@glyphs-ai/workflow`'s
+ * `WorkflowOrigin`. Partitions workflows by who launched them so the
+ * default list endpoint can filter to standalone-only.
+ */
+export type WorkflowOriginWire = "standalone" | "schedule";
+
+/**
  * Workflow node lifecycle status, mirrored from `@glyphs-ai/workflow`'s
  * `WorkflowNodeStatus`. Duplicated as a literal-union string here so
  * the contracts package stays free of a runtime dep on
@@ -127,6 +134,7 @@ export interface WorkflowHeaderWire {
   readonly details?: string;
   readonly coordinatorAgent: string;
   readonly status: WorkflowStatusWire;
+  readonly origin: WorkflowOriginWire;
   readonly metadata: Readonly<Record<string, unknown>>;
   /**
    * Coordinator-chain depth at projection time. Present on

@@ -31,6 +31,7 @@ function makeWorkflow(): WorkflowHeaderWire {
     id: "wf-from-server",
     brief: "from-server",
     status: "running",
+    origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
     awaitingHumanCount: 0,
