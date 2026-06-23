@@ -59,7 +59,10 @@ export async function composeScheduleModule(opts: ScheduleModuleOptions): Promis
     sqlite.close();
     throw err;
   }
-  const repo = new ScheduleRepository({ db });
+  const repo = new ScheduleRepository({
+    db,
+    ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
+  });
   const service = new ScheduleService({
     repo,
     ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
