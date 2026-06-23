@@ -69,12 +69,10 @@ export function SchedulesFilters({
         </div>
 
         {showActivityFilters && (
-          <>
-            <span className="filter-row__divider" aria-hidden="true" />
-            <div
-              className="task-filters__group"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            >
+          <div
+            className="task-filters__group"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
               <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
                 Activity:
               </span>
@@ -91,8 +89,7 @@ export function SchedulesFilters({
                   </button>
                 ))}
               </div>
-            </div>
-          </>
+          </div>
         )}
       </div>
     </div>
