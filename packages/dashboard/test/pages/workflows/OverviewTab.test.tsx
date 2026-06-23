@@ -109,22 +109,6 @@ describe("OverviewTab — typed state strips", () => {
   });
 });
 
-describe("OverviewTab — Metadata card", () => {
-  it("renders metadata key/value rows when metadata is non-empty", () => {
-    render(<OverviewTab workflow={makeWf({ metadata: { source: "cli", retry: 2 } })} />);
-    const dl = screen.getByTestId("workflow-overview-metadata");
-    expect(dl.textContent).toContain("source");
-    expect(dl.textContent).toContain("cli");
-    expect(dl.textContent).toContain("retry");
-    expect(dl.textContent).toContain("2");
-  });
-
-  it("omits the Metadata card entirely when metadata is empty", () => {
-    render(<OverviewTab workflow={makeWf({ metadata: {} })} />);
-    expect(screen.queryByTestId("workflow-overview-metadata")).toBeNull();
-  });
-});
-
 describe("OverviewTab — awaiting CTA", () => {
   const humanNode: WorkflowNodeWire = {
     id: "node-human-1",

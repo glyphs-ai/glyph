@@ -43,8 +43,6 @@ export function OverviewTab({ workflow, dag, onGoToHumanNode }: OverviewTabProps
   const hasSummary = summaryText.length > 0;
   const detailsText = workflow.details?.trim() ?? "";
   const hasDetails = detailsText.length > 0;
-  const metadataEntries = Object.entries(workflow.metadata ?? {});
-  const hasMetadata = metadataEntries.length > 0;
 
   const strip = renderStateStrip({ workflow, hasSummary, dag, onGoToHumanNode });
 
@@ -65,21 +63,7 @@ export function OverviewTab({ workflow, dag, onGoToHumanNode }: OverviewTabProps
           </pre>
         </OverviewCard>
       )}
-      {hasMetadata && (
-        <OverviewCard title="Metadata" className="overview-card--metadata">
-          <dl className="workflow-overview__metadata" data-testid="workflow-overview-metadata">
-            {metadataEntries.map(([key, value]) => (
-              <div className="workflow-overview__meta-row" key={key}>
-                <dt>{key}</dt>
-                <dd>
-                  <code>{stringifyValue(value)}</code>
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </OverviewCard>
-      )}
-      {!hasSummary && !hasDetails && !hasMetadata && strip === null && (
+      {!hasSummary && !hasDetails && strip === null && (
         <p className="overview-tab__no-details muted" data-testid="workflow-overview-empty">
           No details available.
         </p>
@@ -249,13 +233,4 @@ function FailureStrip({ failure }: { failure: NonNullable<WorkflowHeaderWire["fa
       </p>
     </div>
   );
-}
-
-function stringifyValue(v: unknown): string {
-  if (typeof v === "string") return v;
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return String(v);
-  }
 }
