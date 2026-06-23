@@ -1,8 +1,7 @@
 /**
- * `ListTaskOpts.scheduleId` filters to tasks whose
- * `metadata.scheduleId` matches the given value. AND-composes with
- * the other filters — in particular with `origin`, which is the
- * common dashboard combination ("recent fires for this schedule").
+ * `ListTaskOpts.metadataEquals` filters to tasks whose top-level
+ * metadata key matches the given value. AND-composes with the other
+ * filters — in particular with `origin`.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -22,7 +21,7 @@ afterEach(() => {
   orm.close();
 });
 
-async function seed(id: string, origin: TaskOrigin, scheduleId: string | null): Promise<void> {
+async function seed(id: string, origin: TaskOrigin, refId: string | null): Promise<void> {
   await repo.save(
     TaskEntity.fromStored({
       id,
@@ -30,41 +29,47 @@ async function seed(id: string, origin: TaskOrigin, scheduleId: string | null): 
       brief: "b",
       origin,
       status: "running",
-      metadata: scheduleId === null ? {} : { scheduleId },
+      metadata: refId === null ? {} : { refId },
       createdAt: "2026-05-19T01:00:00.000Z",
       startedAt: "2026-05-19T01:00:00.000Z",
     }),
   );
 }
 
-describe("TaskRepository.list — scheduleId filter", () => {
+describe("TaskRepository.list — metadataEquals filter", () => {
   beforeEach(async () => {
-    await seed("20260519-aaaaaaaa", "schedule", "sched-A");
-    await seed("20260519-bbbbbbbb", "schedule", "sched-B");
+    await seed("20260519-aaaaaaaa", "workflow", "r1");
+    await seed("20260519-bbbbbbbb", "workflow", "r2");
     await seed("20260519-cccccccc", "standalone", null);
   });
 
-  it("scheduleId filter selects only tasks with the matching metadata.scheduleId", async () => {
-    const matching = await repo.list({ scheduleId: "sched-A" });
+  it("metadataEquals filter selects only tasks with the matching metadata key/value", async () => {
+    const matching = await repo.list({ metadataEquals: { key: "refId", value: "r1" } });
     expect(matching.map((t) => t.id)).toEqual(["20260519-aaaaaaaa"]);
   });
 
-  it("scheduleId combined with origin='schedule' returns the same matching set", async () => {
-    const matching = await repo.list({ scheduleId: "sched-A", origin: "schedule" });
+  it("metadataEquals combined with origin narrows the set (AND semantics)", async () => {
+    const matching = await repo.list({
+      metadataEquals: { key: "refId", value: "r1" },
+      origin: "workflow",
+    });
     expect(matching.map((t) => t.id)).toEqual(["20260519-aaaaaaaa"]);
   });
 
-  it("scheduleId combined with origin='standalone' returns empty (AND semantics)", async () => {
-    const matching = await repo.list({ scheduleId: "sched-A", origin: "standalone" });
+  it("metadataEquals combined with non-matching origin returns empty", async () => {
+    const matching = await repo.list({
+      metadataEquals: { key: "refId", value: "r1" },
+      origin: "standalone",
+    });
     expect(matching).toEqual([]);
   });
 
-  it("scheduleId with no matches returns empty", async () => {
-    const matching = await repo.list({ scheduleId: "sched-unknown" });
+  it("metadataEquals with no matches returns empty", async () => {
+    const matching = await repo.list({ metadataEquals: { key: "refId", value: "nonexistent" } });
     expect(matching).toEqual([]);
   });
 
-  it("omitting scheduleId returns rows of every origin (filter disabled)", async () => {
+  it("omitting metadataEquals returns rows of every origin (filter disabled)", async () => {
     const all = await repo.list();
     expect(all.map((t) => t.id).sort()).toEqual([
       "20260519-aaaaaaaa",

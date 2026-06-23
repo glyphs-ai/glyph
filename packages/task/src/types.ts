@@ -62,9 +62,9 @@ export const TERMINAL_TASK_STATUSES = [
 
 /**
  * Who launched this task. A first-class column on the row that lets
- * standalone, workflow-, and schedule-launched tasks share the
- * same T1 task table. New dispatches default to `'standalone'`
- * (a direct CLI / dashboard / MCP call).
+ * tasks from different origins share the same T1 task table. New
+ * dispatches default to `'standalone'` (a direct CLI / dashboard /
+ * MCP call).
  */
 export type TaskOrigin = "standalone" | "workflow" | "schedule";
 
@@ -214,19 +214,19 @@ export interface DispatchOpts {
   readonly runtime?: string;
   /**
    * Who launched this task. Defaults to `'standalone'` in the manager
-   * when omitted (a direct CLI / dashboard / MCP call). Workflow and
-   * scheduler call sites pass `'workflow'` / `'schedule'` so dashboards
-   * and CLI can filter standalone-only by default and reveal workflow-
-   * or schedule-launched tasks on demand.
+   * when omitted (a direct CLI / dashboard / MCP call). Integration
+   * call sites pass the appropriate origin so dashboards and CLI can
+   * filter standalone-only by default and reveal integration-launched
+   * tasks on demand.
    */
   readonly origin?: TaskOrigin;
   /**
    * Optional caller-supplied metadata to shallow-merge into the initial
    * Task.metadata bag. Kernel-supplied keys (workdir, runtime) take
    * precedence — user values for those keys are silently overridden.
-   * Used by the scheduler to inject {scheduleId, firedAt}; workflow
-   * call sites and other domain-aware orchestrators can add their
-   * own tags.
+   * Integration call sites inject their own tags (e.g. origin-specific
+   * ids); workflow call sites and other domain-aware orchestrators can
+   * add their own tags.
    */
   readonly metadata?: Readonly<Record<string, unknown>>;
   /**
@@ -244,8 +244,8 @@ export interface DispatchOpts {
    * `subprocessEnvBase` config; this bag does not interact with it.
    *
    * Domain-clean: the task pkg does not interpret these keys.
-   * Workflow, scheduler, and other domain-aware callers are the
-   * layers that know what each key means.
+   * Workflow and other domain-aware callers are the layers that know
+   * what each key means.
    */
   readonly subprocessEnv?: Readonly<Record<string, string>>;
   /**
@@ -302,9 +302,9 @@ export interface ListTaskOpts {
    */
   readonly origin?: TaskOrigin | readonly TaskOrigin[];
   /**
-   * Filter to tasks whose `metadata.scheduleId` matches the given value.
-   * Combined with the other filters via AND. Useful for the schedule
-   * detail page's "recent fires" panel.
+   * Filter to tasks whose top-level metadata key matches the given value.
+   * Combined with the other filters via AND. When the key matches a known
+   * partial expression index, the query engages it.
    */
-  readonly scheduleId?: string;
+  readonly metadataEquals?: { readonly key: string; readonly value: string };
 }

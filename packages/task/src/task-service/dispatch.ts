@@ -132,7 +132,7 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
   //    must not leave a ghost row on disk.
   //
   //    Spread order matters: caller-supplied `metadata` first, kernel
-  //    keys (workdir, runtime) override. Lets schedulers tag a task
+  //    keys (workdir, runtime) override. Lets callers tag a task
   //    at dispatch time without spoofing the runtime column
   //    (`task-repository.ts` promotes `metadata.runtime` to a
   //    first-class indexed column and folds it back on read —

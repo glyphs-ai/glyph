@@ -160,11 +160,19 @@ export function makeTaskKindHandler(opts: {
     },
 
     hasInFlightForSchedule(scheduleId) {
-      return tasks.hasInFlightForSchedule(scheduleId);
+      return tasks.hasInFlightByOriginMetadata({
+        origin: "schedule",
+        metadataKey: "scheduleId",
+        metadataValue: scheduleId,
+      });
     },
 
     deleteForSchedule(scheduleId) {
-      return tasks.deleteForSchedule(scheduleId);
+      return tasks.deleteTerminalByOriginMetadata({
+        origin: "schedule",
+        metadataKey: "scheduleId",
+        metadataValue: scheduleId,
+      });
     },
   };
 }

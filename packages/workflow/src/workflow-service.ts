@@ -130,9 +130,9 @@ export interface CreateWorkflowOpts {
   readonly coordinatorAgent: string;
   /**
    * Who launched this workflow. Defaults to `"standalone"` when omitted
-   * (direct dashboard / CLI / MCP call). The schedule-workflow handler
-   * passes `"schedule"` so the default `GET /workflows` endpoint
-   * can filter to standalone-only by construction.
+   * (direct dashboard / CLI / MCP call). Integration handlers pass
+   * their own origin so the default `GET /workflows` endpoint can
+   * filter to standalone-only by construction.
    */
   readonly origin?: import("./types.js").WorkflowOrigin;
   /**
@@ -467,10 +467,18 @@ export class WorkflowService {
     return this.repo.countAwaitingHumanByWorkflow();
   }
 
-  async aggregateRunningFireStatsByScheduleId(): Promise<
-    ReadonlyMap<string, { runningCount: number; awaitingCount: number }>
+  async aggregateByOriginMetadataKey(opts: {
+    readonly origin: string;
+    readonly metadataKey: string;
+    readonly metadataValues: readonly string[];
+    readonly statusIn?: readonly string[];
+  }): Promise<
+    ReadonlyMap<
+      string,
+      { readonly totalCount: number; readonly runningCount: number; readonly awaitingCount: number }
+    >
   > {
-    return this.repo.aggregateRunningFireStatsByScheduleId();
+    return this.repo.aggregateByOriginMetadataKey(opts);
   }
 
   async getDag(workflowId: string): Promise<WorkflowDagSnapshot> {

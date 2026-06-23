@@ -43,9 +43,9 @@ export async function shutdownService(ctx: TaskServiceCtx): Promise<void> {
 }
 
 /**
- * Test-only seam: await all in-flight background purges scheduled by
+ * Test-only seam: await all in-flight background purges enqueued by
  * `delete({ purge: true })`. Awaits the tail of `ctx.purgeQueue`,
- * which serialises every scheduled purge.
+ * which serialises every enqueued purge.
  */
 export async function drainPendingPurges(ctx: TaskServiceCtx): Promise<void> {
   await ctx.purgeQueue;

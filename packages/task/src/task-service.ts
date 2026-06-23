@@ -9,7 +9,7 @@
  *   - `agent-resolver.ts`  — catalog/runtime resolution + spawn
  *                             internals shared by dispatch
  *   - `mutations.ts`       — write-side (dispatch, cancel, delete,
- *                             deleteForSchedule, recoverOrphaned)
+ *                             deleteTerminalByOriginMetadata, recoverOrphaned)
  *   - `shutdown.ts`        — lifecycle hooks
  *
  * Shared state lives in a single `TaskServiceCtx` object built in
@@ -31,14 +31,13 @@ import { getTaskActivity, getTaskActivityStream } from "./task-service/activity-
 import {
   cancelTask,
   deleteTask,
-  deleteTasksForSchedule,
+  deleteTerminalByOriginMetadata,
   dispatchTask,
   recoverOrphaned,
 } from "./task-service/mutations.js";
 import {
   findTaskByWorkflowNode,
   getTask,
-  hasInFlightForSchedule,
   hasInFlightForWorkflowNode,
   listInFlightForWorkflowNode,
   listTasks,
@@ -91,8 +90,8 @@ export interface TaskServiceCtx {
   /** True once `shutdown()` has been called; gates exit-watcher's status decision. */
   shuttingDown: boolean;
   /**
-   * Serialised chain of background purges scheduled by
-   * `scheduleBackgroundPurge`. Tests await its tail via
+   * Serialised chain of background purges enqueued by
+   * `enqueueBackgroundPurge`. Tests await its tail via
    * `_drainPendingPurgesForTest`. A single chained promise (rather
    * than a parallel `Set<Promise>`) is used because fs.rm of a
    * copilot state dir on Windows pins a libuv worker for tens of
@@ -162,14 +161,17 @@ export class TaskService {
     return (await listTasks(this.ctx, opts)).map(toTask);
   }
 
-  async hasInFlightForSchedule(scheduleId: string): Promise<boolean> {
-    return hasInFlightForSchedule(this.ctx, scheduleId);
+  async hasInFlightByOriginMetadata(opts: {
+    readonly origin: string;
+    readonly metadataKey: string;
+    readonly metadataValue: string;
+  }): Promise<boolean> {
+    return this.ctx.repository.hasInFlightByOriginMetadata(opts);
   }
 
   /**
    * True if any non-terminal task originated from the workflow with
-   * `metadata.workflowNodeId === nodeId`. Narrow surface that mirrors
-   * {@link TaskService.hasInFlightForSchedule}; used by
+   * `metadata.workflowNodeId === nodeId`. Narrow surface used by
    * `@glyphs-ai/api/src/wiring/workflow-worker-task-runner.ts` to implement
    * `WorkflowNodeRunner.hasInFlightForNode` for worker nodes without
    * broadening {@link ListTaskOpts} with a generic metadata filter.
@@ -205,8 +207,21 @@ export class TaskService {
     return task === null ? null : toTask(task);
   }
 
-  async deleteForSchedule(scheduleId: string): Promise<{ deletedCount: number }> {
-    return deleteTasksForSchedule(this.ctx, scheduleId);
+  async deleteTerminalByOriginMetadata(opts: {
+    readonly origin: string;
+    readonly metadataKey: string;
+    readonly metadataValue: string;
+  }): Promise<{ deletedCount: number }> {
+    return deleteTerminalByOriginMetadata(this.ctx, opts);
+  }
+
+  async aggregateByOriginMetadataKey(opts: {
+    readonly origin: string;
+    readonly metadataKey: string;
+    readonly metadataValues: readonly string[];
+    readonly statusIn?: readonly string[];
+  }): Promise<ReadonlyMap<string, { readonly totalCount: number; readonly runningCount: number }>> {
+    return this.ctx.repository.aggregateByOriginMetadataKey(opts);
   }
 
   async get(id: string): Promise<Task | null> {
@@ -238,7 +253,7 @@ export class TaskService {
 
   /**
    * @internal Test-only: await all in-flight background purges
-   * scheduled by `delete({ purge: true })`. Underscore prefix marks
+   * enqueued by `delete({ purge: true })`. Underscore prefix marks
    * this as a test seam, not public API.
    */
   async _drainPendingPurgesForTest(): Promise<void> {
