@@ -27,7 +27,10 @@ export function SchedulesFilters({
 }: SchedulesFiltersProps) {
   return (
     <div className="task-filters">
-      <div className="task-filters__row task-filters__row--compact">
+      <div
+        className="task-filters__row task-filters__row--compact"
+        style={{ flexWrap: "wrap", gap: 14 }}
+      >
         <div className="task-filters__search-wrap">
           <SearchIcon />
           <input
@@ -40,13 +43,11 @@ export function SchedulesFilters({
             aria-label="Search schedules by name"
           />
         </div>
-      </div>
 
-      <div className="task-filters__row task-filters__row--compact">
         <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
           State:
         </span>
-        <div className="pills task-filters__pills">
+        <div className="pills task-filters__pills" style={{ gap: 6 }}>
           {SCHEDULE_STATE_FILTERS.map((filter) => (
             <button
               key={filter.value}
@@ -59,28 +60,29 @@ export function SchedulesFilters({
             </button>
           ))}
         </div>
-      </div>
 
-      {showActivityFilters ? (
-        <div className="task-filters__row task-filters__row--compact">
-          <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
-            Activity:
-          </span>
-          <div className="pills task-filters__pills">
-            {WORKFLOW_ACTIVITY_FILTERS.map((filter) => (
-              <button
-                key={filter.value}
-                type="button"
-                className={`pills__btn${activityFilter === filter.value ? " pills__btn--active" : ""}`}
-                onClick={() => onActivityFilterChange(filter.value)}
-                aria-pressed={activityFilter === filter.value}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
+        {showActivityFilters && (
+          <>
+            <span className="filter-row__divider" aria-hidden="true" />
+            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
+              Activity:
+            </span>
+            <div className="pills task-filters__pills" style={{ gap: 6 }}>
+              {WORKFLOW_ACTIVITY_FILTERS.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  className={`pills__btn${activityFilter === filter.value ? " pills__btn--active" : ""}`}
+                  onClick={() => onActivityFilterChange(filter.value)}
+                  aria-pressed={activityFilter === filter.value}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

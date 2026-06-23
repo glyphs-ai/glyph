@@ -15,6 +15,7 @@ import {
   type ServerConfig,
   type WorkflowHeaderWire,
 } from "../api";
+import { Segmented } from "../components/common/Segmented";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
 import { CreateScheduleModal } from "../components/schedules/CreateScheduleModal";
@@ -303,6 +304,24 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       }),
     );
   }, [schedules, kindFilter, query, stateFilter, activityFilter]);
+
+  const kindCounts = useMemo(
+    () => ({
+      task: schedules.filter((s) => s.target.kind === "task").length,
+      workflow: schedules.filter((s) => s.target.kind === "workflow").length,
+    }),
+    [schedules],
+  );
+
+  const segmentedOptions = useMemo(
+    () =>
+      SCHEDULE_KIND_FILTERS.map((f) => ({
+        value: f.value,
+        label: f.label,
+        count: kindCounts[f.value],
+      })),
+    [kindCounts],
+  );
 
   // Default-selection rule (mirror of TasksPage): auto-bind to the
   // top-most visible row when the URL doesn't pin one. Derived
@@ -686,6 +705,12 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   return (
     <>
       <HeaderActions>
+        <Segmented
+          options={segmentedOptions}
+          value={kindFilter}
+          onChange={handleKindChange}
+          ariaLabel="Schedule kind"
+        />
         <button
           type="button"
           className="btn btn--primary"
@@ -704,19 +729,6 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       </HeaderActions>
 
       <div className="tasks-page">
-        <div className="pills" style={{ marginBottom: 12 }}>
-          {SCHEDULE_KIND_FILTERS.map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              className={`pills__btn${kindFilter === tab.value ? " pills__btn--active" : ""}`}
-              onClick={() => handleKindChange(tab.value)}
-              aria-pressed={kindFilter === tab.value}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
         {error && <div className="alert alert--error">⚠️ {error}</div>}
         {deleteNotice && (
           <div

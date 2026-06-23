@@ -336,7 +336,11 @@ export function ScheduleListItem({
         aria-describedby={`${statusId} ${metaId}`}
         onClick={onSelect}
       >
-        <span id={statusId} className="task-list__item-head" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span
+          id={statusId}
+          className="task-list__item-head"
+          style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
+        >
           <span
             className={`badge ${
               schedule.enabled ? "badge--success" : "badge--warn"
