@@ -60,6 +60,7 @@ const DEFAULT_FIRE_TASK_POLL_INTERVAL_MS = 4000;
  *   - `?scheduleId=<scheduleId>` — master-detail selection
  *   - `?fireTaskId=<taskId>` — Mode B drill-down (task-kind schedule)
  *   - `?fireWorkflowId=<workflowId>` — Mode B drill-down (workflow-kind schedule)
+ *   - `?fireNodeId=<nodeId>` — node drill-down within a workflow fire
  */
 export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesPageProps) {
   const fireTaskPollIntervalMs =
@@ -71,6 +72,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   const [selectedIdRaw] = useUrlSearchValue("scheduleId", "");
   const [fireTaskIdRaw] = useUrlSearchValue("fireTaskId", "");
   const [fireWorkflowIdRaw] = useUrlSearchValue("fireWorkflowId", "");
+  const [fireNodeIdRaw] = useUrlSearchValue("fireNodeId", "");
 
   const enabledFilter = coerceEnabledFilter(enabledFilterRaw);
   const setEnabledFilter = useCallback(
@@ -80,9 +82,11 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   const selectedId = selectedIdRaw === "" ? null : selectedIdRaw;
   const fireTaskId = fireTaskIdRaw === "" ? null : fireTaskIdRaw;
   const fireWorkflowId = fireWorkflowIdRaw === "" ? null : fireWorkflowIdRaw;
+  const fireNodeId = fireNodeIdRaw === "" ? null : fireNodeIdRaw;
 
-  // Atomic URL writer: updates `scheduleId`, `fireTaskId`, and
-  // `fireWorkflowId` in a single `navigate()` call so two sequential
+  // Atomic URL writer: updates `scheduleId`, `fireTaskId`,
+  // `fireWorkflowId`, and `fireNodeId` in a single `navigate()` call so
+  // two sequential
   // single-key setters can't race via stale `location.search`
   // snapshots (see hooks/useUrlState.ts — each setter captures
   // `location.search` at hook-call time, so two back-to-back setValue
@@ -94,6 +98,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       scheduleId?: string | null;
       fireTaskId?: string | null;
       fireWorkflowId?: string | null;
+      fireNodeId?: string | null;
     }) => {
       const params = new URLSearchParams(location.search);
       if (next.scheduleId !== undefined) {
@@ -108,6 +113,10 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
         if (next.fireWorkflowId === null || next.fireWorkflowId === "")
           params.delete("fireWorkflowId");
         else params.set("fireWorkflowId", next.fireWorkflowId);
+      }
+      if (next.fireNodeId !== undefined) {
+        if (next.fireNodeId === null || next.fireNodeId === "") params.delete("fireNodeId");
+        else params.set("fireNodeId", next.fireNodeId);
       }
       const search = params.toString();
       navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
@@ -278,6 +287,8 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     effectiveSelectedId !== null && selectedKind === "task" ? fireTaskId : null;
   const effectiveFireWorkflowId =
     effectiveSelectedId !== null && selectedKind === "workflow" ? fireWorkflowId : null;
+  // `fireNodeId` is only valid when a workflow fire is active.
+  const effectiveFireNodeId = effectiveFireWorkflowId !== null ? fireNodeId : null;
 
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -292,7 +303,12 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       if (selectedId === deleteTarget.id) {
         // Atomic clear so a stale fireTaskId / fireWorkflowId can't
         // outlive the schedule it belonged to.
-        setMasterDetailUrl({ scheduleId: null, fireTaskId: null, fireWorkflowId: null });
+        setMasterDetailUrl({
+          scheduleId: null,
+          fireTaskId: null,
+          fireWorkflowId: null,
+          fireNodeId: null,
+        });
       }
       setSchedules((prev) => prev.filter((s) => s.id !== deleteTarget.id));
       setDeleteNotice({ name: deleteTarget.name, deletedDispatchCount });
@@ -341,7 +357,12 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       // Atomic write — clear any leftover fireTaskId / fireWorkflowId
       // from a prior selection while moving to the newly-created row, so
       // a stale fire pane can't outlive the schedule it belonged to.
-      setMasterDetailUrl({ scheduleId: created.id, fireTaskId: null, fireWorkflowId: null });
+      setMasterDetailUrl({
+        scheduleId: created.id,
+        fireTaskId: null,
+        fireWorkflowId: null,
+        fireNodeId: null,
+      });
       setRefreshToken((n) => n + 1);
       setCreateOpen(false);
       const hiddenByAgent =
@@ -360,7 +381,12 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   // pick a different schedule.
   const handleSelectSchedule = useCallback(
     (id: string | null) => {
-      setMasterDetailUrl({ scheduleId: id, fireTaskId: null, fireWorkflowId: null });
+      setMasterDetailUrl({
+        scheduleId: id,
+        fireTaskId: null,
+        fireWorkflowId: null,
+        fireNodeId: null,
+      });
     },
     [setMasterDetailUrl],
   );
@@ -467,12 +493,14 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
           scheduleId: effectiveSelectedId,
           fireTaskId: null,
           fireWorkflowId: fireId,
+          fireNodeId: null,
         });
       } else {
         setMasterDetailUrl({
           scheduleId: effectiveSelectedId,
           fireTaskId: fireId,
           fireWorkflowId: null,
+          fireNodeId: null,
         });
       }
     },
@@ -481,7 +509,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
 
   // Mode-B exit handler — drops both fire params, keeps the schedule.
   const handleBackFromFire = useCallback(() => {
-    setMasterDetailUrl({ fireTaskId: null, fireWorkflowId: null });
+    setMasterDetailUrl({ fireTaskId: null, fireWorkflowId: null, fireNodeId: null });
   }, [setMasterDetailUrl]);
 
   // Mode-B navigation — used by prev/next inside the fire detail panes.
@@ -490,13 +518,29 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     (nextFireId: string) => {
       if (!effectiveSelectedId) return;
       if (selectedKind === "workflow") {
-        setMasterDetailUrl({ scheduleId: effectiveSelectedId, fireWorkflowId: nextFireId });
+        setMasterDetailUrl({
+          scheduleId: effectiveSelectedId,
+          fireWorkflowId: nextFireId,
+          fireNodeId: null,
+        });
       } else {
         setMasterDetailUrl({ scheduleId: effectiveSelectedId, fireTaskId: nextFireId });
       }
     },
     [effectiveSelectedId, selectedKind, setMasterDetailUrl],
   );
+
+  // Node-level drill-down within a fire-workflow detail.
+  const handleSelectFireNode = useCallback(
+    (nodeId: string) => {
+      setMasterDetailUrl({ fireNodeId: nodeId });
+    },
+    [setMasterDetailUrl],
+  );
+
+  const handleBackFromFireNode = useCallback(() => {
+    setMasterDetailUrl({ fireNodeId: null });
+  }, [setMasterDetailUrl]);
 
   if (currentWorkspaceId === null) {
     return (
@@ -616,8 +660,11 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
                 scheduleId={effectiveSelectedId}
                 scheduleName={selectedSchedule?.name ?? "schedule"}
                 fireWorkflowId={effectiveFireWorkflowId}
+                fireNodeId={effectiveFireNodeId}
                 onBack={handleBackFromFire}
                 onNavigate={handleNavigateFire}
+                onSelectNode={handleSelectFireNode}
+                onBackFromNode={handleBackFromFireNode}
               />
             ) : effectiveSelectedId ? (
               <ScheduleDetail
