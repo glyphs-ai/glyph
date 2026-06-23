@@ -12,11 +12,14 @@
 import type { Command } from "commander";
 import {
   scheduleCreate,
+  scheduleCreateWorkflow,
   scheduleDisable,
   scheduleEnable,
   scheduleList,
   scheduleListTasks,
+  scheduleListWorkflows,
   schedulePatch,
+  schedulePatchWorkflow,
   schedulePreview,
   scheduleRm,
   scheduleRun,
@@ -72,6 +75,27 @@ export function registerScheduleCommands(program: Command, slot: Slot): void {
         cron: pickString(opts, "cron") ?? "",
         tz: pickString(opts, "tz") ?? "",
         ...optionalString(opts, "runtime"),
+        disabled: opts.disabled === true,
+      });
+    });
+  withWorkspaceFlags(scheduleCmd.command("create-workflow"))
+    .description("Create a new workflow-kind schedule")
+    .requiredOption("--name <text>", "Human-readable display name")
+    .requiredOption("--coord-agent <fqn>", "Coordinator agent to dispatch (must be coord-eligible)")
+    .requiredOption("--brief <text>", "Single-line workflow title (≤ 200 chars)")
+    .option("--details <text>", 'Optional multi-line workflow body ("" is treated as omitted)')
+    .requiredOption("--cron <expr>", "5-field cron expression")
+    .requiredOption("--tz <iana>", "IANA timezone (e.g. UTC, Asia/Shanghai)")
+    .option("--disabled", "Create in disabled state (default: enabled)", false)
+    .action(async (opts: Record<string, unknown>) => {
+      slot.result = await scheduleCreateWorkflow({
+        ...parseWorkspaceFlags(opts),
+        name: pickString(opts, "name") ?? "",
+        coordAgent: pickString(opts, "coordAgent") ?? "",
+        brief: pickString(opts, "brief") ?? "",
+        ...optionalString(opts, "details"),
+        cron: pickString(opts, "cron") ?? "",
+        tz: pickString(opts, "tz") ?? "",
         disabled: opts.disabled === true,
       });
     });
@@ -139,6 +163,33 @@ export function registerScheduleCommands(program: Command, slot: Slot): void {
         ...(opts.enabled !== undefined ? { enabled: Boolean(opts.enabled) } : {}),
       });
     });
+  withWorkspaceFlags(scheduleCmd.command("patch-workflow"))
+    .argument("<schedule-id>", "Schedule id")
+    .description(
+      "Partially update a workflow-kind schedule (any subset of name / cron / tz / coord-agent / brief / details / clear-details / enabled)",
+    )
+    .option("--name <text>", "New display name")
+    .option("--cron <expr>", "New cron expression")
+    .option("--tz <iana>", "New IANA timezone")
+    .option("--coord-agent <fqn>", "New coordinator agent FQN")
+    .option("--brief <text>", "New single-line brief (≤ 200 chars)")
+    .option("--details <text>", "New details body")
+    .option("--clear-details", "Remove existing details from the schedule's workflow target")
+    .option("--enabled", "Re-arm timer (equivalent to `enable` subcommand)")
+    .option("--no-enabled", "Cancel timer (equivalent to `disable` subcommand)")
+    .action(async (scheduleId: string, opts: Record<string, unknown>) => {
+      slot.result = await schedulePatchWorkflow(scheduleId, {
+        ...parseWorkspaceFlags(opts),
+        ...optionalString(opts, "name"),
+        ...optionalString(opts, "cron"),
+        ...optionalString(opts, "tz"),
+        ...optionalString(opts, "coordAgent"),
+        ...optionalString(opts, "brief"),
+        ...optionalString(opts, "details"),
+        ...(opts.clearDetails === true ? { clearDetails: true } : {}),
+        ...(opts.enabled !== undefined ? { enabled: Boolean(opts.enabled) } : {}),
+      });
+    });
   withWorkspaceFlags(scheduleCmd.command("rm"))
     .argument("<schedule-id>", "Schedule id")
     .description("Delete a schedule (refuses if enabled or has in-flight tasks)")
@@ -177,6 +228,16 @@ export function registerScheduleCommands(program: Command, slot: Slot): void {
         ...optionalString(opts, "runtime"),
         ...optionalString(opts, "createdSince"),
         ...optionalString(opts, "status"),
+      });
+    });
+
+  withWorkspaceFlags(scheduleCmd.command("list-workflows"))
+    .description("List workflows launched by this workspace's schedules")
+    .option("--schedule-id <id>", "Filter to one schedule's runs")
+    .action(async (opts: Record<string, unknown>) => {
+      slot.result = await scheduleListWorkflows({
+        ...parseWorkspaceFlags(opts),
+        ...optionalString(opts, "scheduleId"),
       });
     });
 }

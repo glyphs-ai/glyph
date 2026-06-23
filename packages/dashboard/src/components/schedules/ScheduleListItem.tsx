@@ -3,6 +3,7 @@ import type { ScheduleView } from "../../api";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { formatAbsolute, formatRelative } from "../../utils/time";
 import { MoreHorizontalIcon } from "../Icons";
+import { targetAgent, targetRuntime } from "./shared";
 
 /**
  * Why `closeMenu` takes a reason: the per-row `⋯` menu can close from
@@ -360,11 +361,13 @@ export function ScheduleListItem({
             {schedule.trigger.expr}
           </code>
           <span className="task-list__sep">·</span>
-          <span title={`Agent: ${schedule.target.agent}`}>{schedule.target.agent}</span>
-          {schedule.target.runtime ? (
+          <span title={targetAgent(schedule.target)}>{targetAgent(schedule.target)}</span>
+          {targetRuntime(schedule.target) ? (
             <>
               <span className="task-list__sep">·</span>
-              <span title={`Runtime: ${schedule.target.runtime}`}>{schedule.target.runtime}</span>
+              <span title={`Runtime: ${targetRuntime(schedule.target)}`}>
+                {targetRuntime(schedule.target)}
+              </span>
             </>
           ) : null}
           <span className="task-list__sep">·</span>

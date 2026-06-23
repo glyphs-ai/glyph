@@ -13,6 +13,7 @@ vi.mock("../src/api", async () => {
     ...actual,
     previewCron: vi.fn(),
     createSchedule: vi.fn(),
+    createWorkflowSchedule: vi.fn(),
   };
 });
 
@@ -21,12 +22,16 @@ import { CreateScheduleModal } from "../src/components/schedules/CreateScheduleM
 
 const mockPreviewCron = api.previewCron as unknown as ReturnType<typeof vi.fn>;
 const mockCreateSchedule = api.createSchedule as unknown as ReturnType<typeof vi.fn>;
+const mockCreateWorkflowSchedule = api.createWorkflowSchedule as unknown as ReturnType<
+  typeof vi.fn
+>;
 
-function makeAgent(fqn: string): AgentEntry {
+function makeAgent(fqn: string, coordEligible = false): AgentEntry {
   const [scope, short] = fqn.split("/");
   return {
     agent: { fqn, scope, short, version: "1.0.0" },
     status: "ready",
+    coordEligible,
   } as unknown as AgentEntry;
 }
 
@@ -47,7 +52,7 @@ function renderModal(overrides: Partial<React.ComponentProps<typeof CreateSchedu
   const utils = render(
     <CreateScheduleModal
       open={true}
-      agents={[makeAgent("official/engineer"), makeAgent("official/reviewer")]}
+      agents={[makeAgent("official/engineer", true), makeAgent("official/reviewer")]}
       runtimes={["copilot", "claude"]}
       existingTimezones={["Asia/Shanghai", "Europe/Berlin"]}
       onClose={onClose}
@@ -61,6 +66,7 @@ function renderModal(overrides: Partial<React.ComponentProps<typeof CreateSchedu
 beforeEach(() => {
   mockPreviewCron.mockReset();
   mockCreateSchedule.mockReset();
+  mockCreateWorkflowSchedule.mockReset();
   mockPreviewCron.mockResolvedValue({
     describe: "mock describe",
     nextRuns: [
@@ -72,6 +78,11 @@ beforeEach(() => {
     ],
   });
   mockCreateSchedule.mockResolvedValue(SAMPLE_CREATED);
+  mockCreateWorkflowSchedule.mockResolvedValue({
+    ...SAMPLE_CREATED,
+    id: "sched-wf-new",
+    target: { kind: "workflow", coordinatorAgent: "official/engineer", brief: "do it" },
+  });
 });
 
 afterEach(() => cleanup());
@@ -89,13 +100,57 @@ describe("CreateScheduleModal", () => {
     expect(submit.disabled).toBe(true);
   });
 
-  it("renders the disabled target-type selector with a single 'Task' option", async () => {
+  it("renders the target-type selector with Task + Workflow options, defaulting to Task", async () => {
     renderModal();
     const sel = screen.getByTestId("create-schedule-target-kind") as HTMLSelectElement;
-    expect(sel.disabled).toBe(true);
+    expect(sel.disabled).toBe(false);
     expect(sel.value).toBe("task");
-    expect(sel.options.length).toBe(1);
-    expect(sel.options[0]?.value).toBe("task");
+    expect(sel.options.length).toBe(2);
+    expect(Array.from(sel.options).map((o) => o.value)).toEqual(["task", "workflow"]);
+    // Task kind shows the runtime select + the plain "Agent" label.
+    expect(screen.getByTestId("create-schedule-runtime")).toBeTruthy();
+    expect(screen.getByText("Agent")).toBeTruthy();
+  });
+
+  it("switching to Workflow reseeds the coordinator agent, hides Runtime, and relabels Agent", async () => {
+    renderModal();
+    const sel = screen.getByTestId("create-schedule-target-kind") as HTMLSelectElement;
+    fireEvent.change(sel, { target: { value: "workflow" } });
+    expect(sel.value).toBe("workflow");
+    // Runtime select is gone for workflow kind.
+    expect(screen.queryByTestId("create-schedule-runtime")).toBeNull();
+    // Agent label switches to "Coordinator agent" and the dropdown is
+    // restricted to the coordinator-eligible subset (only engineer).
+    expect(screen.getByText("Coordinator agent")).toBeTruthy();
+    const agentSel = screen.getByTestId("create-schedule-agent") as HTMLSelectElement;
+    expect(Array.from(agentSel.options).map((o) => o.value)).toEqual(["official/engineer"]);
+    expect(agentSel.value).toBe("official/engineer");
+  });
+
+  it("submits a workflow schedule via createWorkflowSchedule (not createSchedule)", async () => {
+    const { onCreated } = renderModal();
+    fireEvent.change(screen.getByTestId("create-schedule-target-kind"), {
+      target: { value: "workflow" },
+    });
+    fireEvent.change(screen.getByTestId("create-schedule-name"), {
+      target: { value: "Nightly release" },
+    });
+    fireEvent.change(screen.getByTestId("create-schedule-brief"), {
+      target: { value: "Coordinate the release train" },
+    });
+    await flushDebounce();
+    fireEvent.click(screen.getByTestId("create-schedule-submit"));
+    await waitFor(() => expect(mockCreateWorkflowSchedule).toHaveBeenCalledTimes(1));
+    expect(mockCreateSchedule).not.toHaveBeenCalled();
+    const body = mockCreateWorkflowSchedule.mock.calls[0]![0];
+    expect(body).toMatchObject({
+      name: "Nightly release",
+      target: { coordinatorAgent: "official/engineer", brief: "Coordinate the release train" },
+      trigger: { kind: "cron", expr: "0 9 * * *" },
+    });
+    // Workflow body must NOT carry a runtime (workflow schedules have no runtime slot).
+    expect(body.target).not.toHaveProperty("runtime");
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
   });
 
   it("default 'Daily at 09:00' preset produces cron 0 9 * * * in the chip", async () => {

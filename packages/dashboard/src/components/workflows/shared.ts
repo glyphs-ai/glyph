@@ -5,6 +5,7 @@
  * `components/schedules/shared.ts` so each component file stays narrow.
  */
 
+import type { AgentEntry } from "@glyphs-ai/contracts";
 import type { WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
 
 /**
@@ -13,6 +14,19 @@ import type { WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
  * slot yet; once it does, the page can read from there instead.
  */
 export const WORKFLOW_POLL_INTERVAL_MS = 2000;
+
+/**
+ * Filter an agent list to the coordinator-eligible subset — agents
+ * whose server-computed `coordEligible` flag is true. The flag is
+ * derived from the agent's `dependencies.agents` dispatch menu, which
+ * is the workflow substrate's coordinator-capability invariant.
+ * Coordinator-only surfaces (the New workflow modal and the
+ * workflow-kind schedule form) share this predicate so they never
+ * re-derive — and silently drift from — the substrate rule.
+ */
+export function coordEligibleAgents(agents: readonly AgentEntry[]): AgentEntry[] {
+  return agents.filter((a) => a.coordEligible);
+}
 
 /**
  * Sort a list of workflows by `createdAt` descending so the most

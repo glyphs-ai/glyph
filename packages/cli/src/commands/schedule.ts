@@ -50,18 +50,24 @@ export async function scheduleList(opts: ScheduleListOpts = {}): Promise<Command
     return {
       exitCode: 0,
       stdout: formatTable(
-        ["id", "name", "agent", "cron", "tz", "enabled"],
+        ["id", "name", "kind", "agent", "cron", "tz", "enabled"],
         list.map((s) => {
-          // `ScheduleTargetWire` is a kind-discriminated union; the
-          // `task` arm carries `agent` flat. Cast through `unknown`
-          // for the task case so TypeScript accepts the property
-          // access — the union isn't narrowable on a `kind: string`
-          // supertype here.
-          const target = s.target as { kind: string; agent?: string };
+          const target = s.target as {
+            kind: string;
+            agent?: string;
+            coordinatorAgent?: string;
+          };
+          const agentCol =
+            target.kind === "task"
+              ? (target.agent ?? "")
+              : target.kind === "workflow"
+                ? (target.coordinatorAgent ?? "")
+                : "";
           return [
             s.id ?? "",
             s.name ?? "",
-            target.kind === "task" ? (target.agent ?? "") : "",
+            target.kind ?? "",
+            agentCol,
             s.trigger?.kind === "cron" ? (s.trigger.expr ?? "") : "",
             s.trigger?.kind === "cron" ? (s.trigger.tz ?? "") : "",
             String(s.enabled),
@@ -150,6 +156,78 @@ export async function scheduleCreate(opts: ScheduleCreateOpts): Promise<CommandR
   }
 }
 
+// ─── create-workflow ───────────────────────────────────────────────────
+export interface ScheduleCreateWorkflowOpts extends CommonFlags {
+  readonly name: string;
+  readonly coordAgent: string;
+  /** Short, single-line workflow title (≤ 200 chars). Required. */
+  readonly brief: string;
+  /** Optional long-form details. Multi-line allowed. */
+  readonly details?: string;
+  readonly cron: string;
+  readonly tz: string;
+  /** When true, the schedule is created in disabled state. Defaults to false (enabled). */
+  readonly disabled?: boolean;
+}
+
+export async function scheduleCreateWorkflow(
+  opts: ScheduleCreateWorkflowOpts,
+): Promise<CommandResult> {
+  if (typeof opts.name !== "string" || opts.name.trim() === "") {
+    return { exitCode: 2, stderr: "missing required --name <text>\n" };
+  }
+  if (typeof opts.coordAgent !== "string" || opts.coordAgent.trim() === "") {
+    return { exitCode: 2, stderr: "missing required --coord-agent <fqn>\n" };
+  }
+  if (typeof opts.brief !== "string" || opts.brief.trim() === "") {
+    return { exitCode: 2, stderr: "missing required --brief <text>\n" };
+  }
+  if (opts.brief.includes("\n") || opts.brief.includes("\r")) {
+    return {
+      exitCode: 2,
+      stderr:
+        "--brief must be a single line (no newline characters); pass long content via --details\n",
+    };
+  }
+  if (opts.brief.trim().length > 200) {
+    return { exitCode: 2, stderr: "--brief must be 200 characters or fewer\n" };
+  }
+  if (typeof opts.cron !== "string" || opts.cron.trim() === "") {
+    return { exitCode: 2, stderr: "missing required --cron <expr>\n" };
+  }
+  if (typeof opts.tz !== "string" || opts.tz.trim() === "") {
+    return { exitCode: 2, stderr: "missing required --tz <iana>\n" };
+  }
+  const client = await makeClient(opts);
+  try {
+    const workspaceId = await resolveWorkspace(opts);
+    const target: {
+      coordinatorAgent: string;
+      brief: string;
+      details?: string;
+    } = {
+      coordinatorAgent: opts.coordAgent,
+      brief: opts.brief.trim(),
+    };
+    if (opts.details !== undefined) target.details = opts.details;
+    const body = {
+      name: opts.name,
+      target,
+      trigger: { kind: "cron" as const, expr: opts.cron, tz: opts.tz },
+      enabled: !opts.disabled,
+    };
+    const created = await client.call("schedules.workflow.create", {
+      params: { id: workspaceId },
+      body,
+    });
+    const fmt = pickFormat(opts, "table");
+    const stdout = fmt === "json" ? formatJson(created) : formatRecord({ ...created });
+    return { exitCode: 0, stdout };
+  } catch (err) {
+    return formatError(err);
+  }
+}
+
 // ─── show ──────────────────────────────────────────────────────────────
 export type ScheduleShowOpts = CommonFlags;
 
@@ -213,7 +291,13 @@ async function patchEnabled(
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const updated = await client.call("schedules.task.patch", {
+    // Detect the schedule's kind so we route to the correct patch endpoint.
+    const found = await client.call("schedules.get", {
+      params: { id: workspaceId, sid: scheduleId },
+    });
+    const kind = found.target?.kind ?? "task";
+    const route = kind === "workflow" ? "schedules.workflow.patch" : "schedules.task.patch";
+    const updated = await client.call(route, {
       params: { id: workspaceId, sid: scheduleId },
       body: { enabled },
     });
@@ -487,6 +571,133 @@ export async function schedulePatch(
   }
 }
 
+// ─── patch-workflow (workflow-kind partial update) ──────────────────────
+export interface SchedulePatchWorkflowOpts extends CommonFlags {
+  readonly name?: string;
+  readonly cron?: string;
+  readonly tz?: string;
+  readonly coordAgent?: string;
+  readonly brief?: string;
+  readonly details?: string;
+  readonly clearDetails?: boolean;
+  readonly enabled?: boolean;
+}
+
+export async function schedulePatchWorkflow(
+  scheduleId: string,
+  opts: SchedulePatchWorkflowOpts = {},
+): Promise<CommandResult> {
+  if (typeof scheduleId !== "string" || scheduleId.trim() === "") {
+    return { exitCode: 2, stderr: "schedule id is required\n" };
+  }
+
+  if (opts.clearDetails === true && opts.details !== undefined) {
+    return {
+      exitCode: 2,
+      stderr: "--details and --clear-details are mutually exclusive\n",
+    };
+  }
+
+  if (opts.brief !== undefined) {
+    if (typeof opts.brief !== "string" || opts.brief.trim() === "") {
+      return { exitCode: 2, stderr: "--brief must be a non-empty string\n" };
+    }
+    if (opts.brief.includes("\n") || opts.brief.includes("\r")) {
+      return {
+        exitCode: 2,
+        stderr:
+          "--brief must be a single line (no newline characters); pass long content via --details\n",
+      };
+    }
+    if (opts.brief.trim().length > 200) {
+      return { exitCode: 2, stderr: "--brief must be 200 characters or fewer\n" };
+    }
+  }
+
+  const touchesTrigger = opts.cron !== undefined || opts.tz !== undefined;
+  const touchesTarget =
+    opts.coordAgent !== undefined ||
+    opts.brief !== undefined ||
+    opts.details !== undefined ||
+    opts.clearDetails === true;
+  const touchesAny =
+    opts.name !== undefined || touchesTrigger || touchesTarget || opts.enabled !== undefined;
+  if (!touchesAny) {
+    return {
+      exitCode: 2,
+      stderr:
+        "at least one of --name / --cron / --tz / --coord-agent / --brief / --details / --clear-details / --enabled is required\n",
+    };
+  }
+
+  const client = await makeClient(opts);
+  try {
+    const workspaceId = await resolveWorkspace(opts);
+
+    let current: Awaited<ReturnType<typeof client.call<"schedules.get">>> | undefined;
+    const needCurrentForTrigger =
+      touchesTrigger && !(opts.cron !== undefined && opts.tz !== undefined);
+    if (needCurrentForTrigger) {
+      current = await client.call("schedules.get", {
+        params: { id: workspaceId, sid: scheduleId },
+      });
+    }
+
+    const body: {
+      name?: string;
+      trigger?: { kind: "cron"; expr: string; tz: string };
+      target?: {
+        coordinatorAgent?: string;
+        brief?: string;
+        details?: string | null;
+      };
+      enabled?: boolean;
+    } = {};
+
+    if (opts.name !== undefined) body.name = opts.name;
+    if (opts.enabled !== undefined) body.enabled = opts.enabled;
+
+    if (touchesTrigger) {
+      const existingTrigger = current?.trigger;
+      if (existingTrigger !== undefined && existingTrigger.kind !== "cron") {
+        return {
+          exitCode: 2,
+          stderr: `--cron / --tz only supported when current trigger.kind === "cron" (got "${existingTrigger.kind}")\n`,
+        };
+      }
+      const expr = opts.cron ?? existingTrigger?.expr;
+      const tz = opts.tz ?? existingTrigger?.tz;
+      if (expr === undefined || tz === undefined) {
+        return { exitCode: 2, stderr: "internal: could not resolve cron/tz from server\n" };
+      }
+      body.trigger = { kind: "cron", expr, tz };
+    }
+
+    if (touchesTarget) {
+      const nextTarget: {
+        coordinatorAgent?: string;
+        brief?: string;
+        details?: string | null;
+      } = {};
+      if (opts.coordAgent !== undefined) nextTarget.coordinatorAgent = opts.coordAgent;
+      if (opts.brief !== undefined) nextTarget.brief = opts.brief.trim();
+      if (opts.clearDetails === true) nextTarget.details = null;
+      else if (opts.details !== undefined) nextTarget.details = opts.details;
+      body.target = nextTarget;
+    }
+
+    const updated = await client.call("schedules.workflow.patch", {
+      params: { id: workspaceId, sid: scheduleId },
+      body,
+    });
+    const fmt = pickFormat(opts, "table");
+    if (fmt === "json") return { exitCode: 0, stdout: formatJson(updated) };
+    return { exitCode: 0, stdout: `schedule ${scheduleId} patched\n` };
+  } catch (err) {
+    return formatError(err);
+  }
+}
+
 // ─── list-tasks (wraps scheduledTasks.list) ────────────────────────────
 export interface ScheduleListTasksOpts extends CommonFlags {
   readonly scheduleId?: string;
@@ -529,6 +740,40 @@ export async function scheduleListTasks(opts: ScheduleListTasksOpts = {}): Promi
             meta?.scheduleId ?? "",
             (t as { createdAt?: string }).createdAt ?? "",
           ];
+        }),
+      ),
+    };
+  } catch (err) {
+    return formatError(err);
+  }
+}
+
+// --- list-workflows (wraps scheduledWorkflows.list) ---------------------
+export interface ScheduleListWorkflowsOpts extends CommonFlags {
+  readonly scheduleId?: string;
+}
+
+export async function scheduleListWorkflows(
+  opts: ScheduleListWorkflowsOpts = {},
+): Promise<CommandResult> {
+  const client = await makeClient(opts);
+  try {
+    const workspaceId = await resolveWorkspace(opts);
+    const query: { scheduleId?: string } = {};
+    if (opts.scheduleId !== undefined) query.scheduleId = opts.scheduleId;
+    const list = await client.call("workflows.scheduled.list", {
+      params: { id: workspaceId },
+      query,
+    });
+    const fmt = pickFormat(opts, "table");
+    if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
+    return {
+      exitCode: 0,
+      stdout: formatTable(
+        ["id", "coordinatorAgent", "status", "scheduleId", "createdAt"],
+        list.map((w) => {
+          const scheduleId = typeof w.metadata.scheduleId === "string" ? w.metadata.scheduleId : "";
+          return [w.id, w.coordinatorAgent, w.status, scheduleId, w.createdAt];
         }),
       ),
     };

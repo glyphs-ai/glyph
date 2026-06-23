@@ -7,6 +7,7 @@ import {
 } from "../../api";
 import { formatAbsolute, formatRelative } from "../../utils/time";
 import { ScheduleRecentFires } from "./ScheduleRecentFires";
+import { targetAgent, targetBrief, targetDetails, targetRuntime } from "./shared";
 
 export interface ScheduleDetailProps {
   scheduleId: string;
@@ -159,12 +160,13 @@ export function ScheduleDetail({
             </div>
             <div className="task-list__item-meta muted">
               <span>
-                Agent: <strong style={{ fontWeight: 600 }}>{detail.target.agent}</strong>
+                {detail.target.kind === "workflow" ? "Coordinator: " : "Agent: "}
+                <strong style={{ fontWeight: 600 }}>{targetAgent(detail.target)}</strong>
               </span>
-              {detail.target.runtime ? (
+              {targetRuntime(detail.target) ? (
                 <>
                   <span className="task-list__sep">·</span>
-                  <span>Runtime: {detail.target.runtime}</span>
+                  <span>Runtime: {targetRuntime(detail.target)}</span>
                 </>
               ) : null}
             </div>
@@ -186,24 +188,25 @@ export function ScheduleDetail({
             className="muted"
             style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.45, margin: 0 }}
           >
-            {detail.target.brief}
+            {targetBrief(detail.target)}
           </p>
         </section>
 
-        {detail.target.details !== undefined && detail.target.details !== "" && (
+        {targetDetails(detail.target) && (
           <section aria-label="Details">
             <h3 style={{ fontSize: 14, fontWeight: 600, margin: "12px 0 8px 0" }}>Details</h3>
             <p
               className="muted"
               style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.45, margin: 0 }}
             >
-              {detail.target.details}
+              {targetDetails(detail.target)}
             </p>
           </section>
         )}
 
         <ScheduleRecentFires
           scheduleId={scheduleId}
+          kind={detail.target.kind}
           currentWorkspaceId={currentWorkspaceId}
           refreshToken={recentFiresToken}
           onSelectFire={onSelectFire}
