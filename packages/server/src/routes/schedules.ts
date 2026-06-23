@@ -469,7 +469,15 @@ export function schedulesRoutes(
         list.some((schedule) => schedule.target.kind === "workflow")
           ? await (async () => {
               const workflowService = resolveWorkflowService(c);
-              const aggregated = await workflowService.aggregateRunningFireStatsByScheduleId();
+              const workflowScheduleIds = list
+                .filter((s) => s.target.kind === "workflow")
+                .map((s) => s.id);
+              const aggregated = await workflowService.aggregateByOriginMetadataKey({
+                origin: "schedule",
+                metadataKey: "scheduleId",
+                metadataValues: workflowScheduleIds,
+                statusIn: ["running"],
+              });
               return collectWorkflowFireStats(aggregated);
             })()
           : undefined;
@@ -595,7 +603,12 @@ export function schedulesRoutes(
         | undefined;
       if (found.target.kind === "workflow" && resolveWorkflowService !== undefined) {
         const workflowService = resolveWorkflowService(c);
-        const aggregated = await workflowService.aggregateRunningFireStatsByScheduleId();
+        const aggregated = await workflowService.aggregateByOriginMetadataKey({
+          origin: "schedule",
+          metadataKey: "scheduleId",
+          metadataValues: [found.id],
+          statusIn: ["running"],
+        });
         workflowFireStats = collectWorkflowFireStats(aggregated);
       }
       // Enrich with derived cron `describe` so dashboards / CLI `show`

@@ -89,7 +89,7 @@ export function scheduledTasksRoutes(resolveTaskService: TaskServiceResolver): H
     if (runtime !== undefined) opts.runtime = runtime;
     if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
     if (statuses !== undefined) opts.statuses = statuses;
-    if (scheduleId !== undefined) opts.scheduleId = scheduleId;
+    if (scheduleId !== undefined) opts.metadataEquals = { key: "scheduleId", value: scheduleId };
 
     try {
       const list = await getManager(c).list(opts);

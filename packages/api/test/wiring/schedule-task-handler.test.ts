@@ -33,23 +33,30 @@ function stubDeps(
   tasks: TaskService;
   getAgent: ReturnType<typeof vi.fn>;
   dispatch: ReturnType<typeof vi.fn>;
-  hasInFlightForSchedule: ReturnType<typeof vi.fn>;
-  deleteForSchedule: ReturnType<typeof vi.fn>;
+  hasInFlightByOriginMetadata: ReturnType<typeof vi.fn>;
+  deleteTerminalByOriginMetadata: ReturnType<typeof vi.fn>;
 } {
   const getAgent = vi.fn(async (_fqn: string) => {
     if (opts.getAgentThrows !== undefined) throw opts.getAgentThrows;
     return opts.agent === undefined ? { name: "default-agent" } : opts.agent;
   });
   const dispatch = vi.fn(async () => opts.dispatchReturn ?? { id: "task-xyz" });
-  const hasInFlightForSchedule = vi.fn(async () => false);
-  const deleteForSchedule = vi.fn(async () => ({ deletedCount: 0 }));
+  const hasInFlightByOriginMetadata = vi.fn(async () => false);
+  const deleteTerminalByOriginMetadata = vi.fn(async () => ({ deletedCount: 0 }));
   const catalog = { getAgent } as unknown as CatalogService;
   const tasks = {
     dispatch,
-    hasInFlightForSchedule,
-    deleteForSchedule,
+    hasInFlightByOriginMetadata,
+    deleteTerminalByOriginMetadata,
   } as unknown as TaskService;
-  return { catalog, tasks, getAgent, dispatch, hasInFlightForSchedule, deleteForSchedule };
+  return {
+    catalog,
+    tasks,
+    getAgent,
+    dispatch,
+    hasInFlightByOriginMetadata,
+    deleteTerminalByOriginMetadata,
+  };
 }
 
 describe("makeTaskKindHandler.validate — shape checks", () => {
@@ -291,19 +298,27 @@ describe("makeTaskKindHandler.dispatch", () => {
 });
 
 describe("makeTaskKindHandler.hasInFlightForSchedule + deleteForSchedule", () => {
-  it("hasInFlightForSchedule passes through", async () => {
+  it("hasInFlightForSchedule delegates to hasInFlightByOriginMetadata", async () => {
     const deps = stubDeps();
-    deps.hasInFlightForSchedule.mockResolvedValueOnce(true);
+    deps.hasInFlightByOriginMetadata.mockResolvedValueOnce(true);
     const h = makeTaskKindHandler({ catalog: deps.catalog, tasks: deps.tasks });
     expect(await h.hasInFlightForSchedule("sched-abc")).toBe(true);
-    expect(deps.hasInFlightForSchedule).toHaveBeenCalledWith("sched-abc");
+    expect(deps.hasInFlightByOriginMetadata).toHaveBeenCalledWith({
+      origin: "schedule",
+      metadataKey: "scheduleId",
+      metadataValue: "sched-abc",
+    });
   });
 
-  it("deleteForSchedule passes through the count", async () => {
+  it("deleteForSchedule delegates to deleteTerminalByOriginMetadata", async () => {
     const deps = stubDeps();
-    deps.deleteForSchedule.mockResolvedValueOnce({ deletedCount: 17 });
+    deps.deleteTerminalByOriginMetadata.mockResolvedValueOnce({ deletedCount: 17 });
     const h = makeTaskKindHandler({ catalog: deps.catalog, tasks: deps.tasks });
     expect(await h.deleteForSchedule("sched-abc")).toEqual({ deletedCount: 17 });
-    expect(deps.deleteForSchedule).toHaveBeenCalledWith("sched-abc");
+    expect(deps.deleteTerminalByOriginMetadata).toHaveBeenCalledWith({
+      origin: "schedule",
+      metadataKey: "scheduleId",
+      metadataValue: "sched-abc",
+    });
   });
 });
