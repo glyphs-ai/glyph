@@ -7,10 +7,10 @@
  * The section separators below delineate the groups for scan-ability:
  *
  *   1. Input validation — reject dangerous characters before quoting
- *   2. Shell quoting — per-shell string escape (POSIX, cmd.exe, pwsh)
- *   3. Env-prefix builders — inline `export`/`$env:` prefixes for
+ *   2. Observation — detect early spawn failures via a timeout race
+ *   3. Shell quoting — per-shell string escape (POSIX, cmd.exe, pwsh)
+ *   4. Env-prefix builders — inline `export`/`$env:` prefixes for
  *      daemon-mode terminal emulators that ignore spawn-time env
- *   4. Observation — detect early spawn failures via a timeout race
  *   5. Spawn infrastructure — real `child_process.spawn` wrapper +
  *      filesystem helpers (robust existence check, PATH lookup)
  */
@@ -271,8 +271,8 @@ export function existsLike(p: string): boolean {
  * binaries are invoked by name (not by full path), so the shell/OS
  * resolves App Execution Aliases at exec time regardless of what our
  * probe returns. The full-path `existsLike` probe is only needed for
- * the `wt.exe` LOCALAPPDATA check in `platforms/windows.ts`, where we
- * pass the resolved path directly to `deps.spawn`.
+ * the `wt.exe` LOCALAPPDATA check in `spawnWindows`, where we pass
+ * the resolved path directly to `deps.spawn`.
  */
 export function whichSyncDefault(name: string): string | null {
   const PATH = process.env.PATH ?? "";
