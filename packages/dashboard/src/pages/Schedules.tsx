@@ -865,6 +865,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
           agents={agents}
           runtimes={runtimes}
           existingTimezones={existingTimezones}
+          initialKind={kindFilter}
           onClose={() => setCreateOpen(false)}
           onCreated={handleCreated}
         />

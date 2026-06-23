@@ -26,6 +26,8 @@ export interface CreateScheduleModalProps {
   runtimes: string[];
   /** Timezones already present on the workspace's existing schedules. Modal dedupes against UTC + browser local. */
   existingTimezones: string[];
+  /** Pre-select the target kind to match the page's current kind tab. */
+  initialKind?: ScheduleFormState["kind"];
   onClose: () => void;
   onCreated: (s: ScheduleView) => void;
 }
@@ -51,11 +53,12 @@ export function CreateScheduleModal({
   agents,
   runtimes,
   existingTimezones,
+  initialKind = "task",
   onClose,
   onCreated,
 }: CreateScheduleModalProps) {
   const [state, setState] = useState<ScheduleFormState>(() => ({
-    kind: "task",
+    kind: initialKind,
     name: "",
     agent: "",
     runtime: "",
