@@ -32,9 +32,9 @@ export const WORKFLOW_ACTIVITY_FILTERS: readonly {
   label: string;
 }[] = [
   { value: "all", label: "All" },
-  { value: "awaiting", label: "⏳ Awaiting" },
-  { value: "running", label: "🟢 Running" },
-  { value: "idle", label: "⚪ Idle" },
+  { value: "awaiting", label: "Awaiting" },
+  { value: "running", label: "Running" },
+  { value: "idle", label: "Idle" },
 ];
 
 /** Type guard: narrows ScheduleWireTarget to task kind. */
