@@ -2183,6 +2183,78 @@ button {
   cursor: not-allowed;
 }
 
+/* ─── Segmented control (macOS-style tab switcher) ─────────────── */
+
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  background: #eef0f3;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 5px 12px;
+  border-radius: 5px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: background-color 0.15s, box-shadow 0.15s, color 0.15s;
+}
+
+.segmented__btn:hover:not(.segmented__btn--active) {
+  color: var(--color-text);
+}
+
+.segmented__btn--active {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 1px rgba(0, 0, 0, 0.04);
+  color: var(--color-accent);
+  font-weight: 600;
+  cursor: default;
+}
+
+.segmented__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 9px;
+  background: #e0e4ea;
+  color: var(--color-text-muted);
+}
+
+.segmented__btn--active .segmented__count {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+/* ─── Filter row divider ───────────────────────────────────────── */
+
+.filter-row__divider {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: #d0d7de;
+  flex-shrink: 0;
+}
+
 /* ─── Sessions page ─────────────────────────────────────────────── */
 
 /* Sessions fills the page width so the activity column has room to breathe.

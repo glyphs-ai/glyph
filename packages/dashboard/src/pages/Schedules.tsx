@@ -2,15 +2,20 @@ import type { AgentEntry } from "@glyphs-ai/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  cancelTask,
+  cancelWorkflow,
   deleteSchedule,
   listRuntimes,
   listSchedules,
   patchSchedule,
+  patchWorkflowSchedule,
   runSchedule,
   type ScheduleDetail as ScheduleDetailType,
   type ScheduleView,
   type ServerConfig,
+  type WorkflowHeaderWire,
 } from "../api";
+import { Segmented } from "../components/common/Segmented";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
 import { CreateScheduleModal } from "../components/schedules/CreateScheduleModal";
@@ -22,12 +27,18 @@ import { ScheduleDetail } from "../components/schedules/ScheduleDetail";
 import { ScheduleList } from "../components/schedules/ScheduleList";
 import { SchedulesFilters } from "../components/schedules/SchedulesFilters";
 import {
-  ALL_AGENTS,
-  ALL_ENABLED,
-  type EnabledFilter,
+  DEFAULT_SCHEDULE_KIND,
+  DEFAULT_SCHEDULE_STATE_FILTER,
+  DEFAULT_WORKFLOW_ACTIVITY_FILTER,
+  matchesStateFilter,
+  matchesWorkflowActivityFilter,
+  SCHEDULE_KIND_FILTERS,
+  type ScheduleKindFilter,
+  type ScheduleStateFilter,
   sortByNextFire,
-  targetAgent,
+  type WorkflowActivityFilter,
 } from "../components/schedules/shared";
+import { CancelWorkflowModal } from "../components/workflows/WorkflowConfirmModals";
 import { useMounted } from "../hooks/useMounted";
 import { useUrlSearchValue } from "../hooks/useUrlState";
 
@@ -45,6 +56,7 @@ export interface SchedulesPageProps {
 }
 
 const DEFAULT_FIRE_TASK_POLL_INTERVAL_MS = 4000;
+const SEARCH_DEBOUNCE_MS = 200;
 
 /**
  * Schedules page — workspace-scoped cron-trigger surface. Master-detail:
@@ -53,10 +65,12 @@ const DEFAULT_FIRE_TASK_POLL_INTERVAL_MS = 4000;
  * surface (create / edit / enable-toggle / Run-now / delete) via the
  * modals in `components/schedules/`.
  *
- * URL-driven filters (mirrors Tasks page pattern):
+ * URL-driven filters:
  *
- *   - `?agent=<fqn>` — agent filter
- *   - `?enabled=true|false` — enabled-state filter
+ *   - `?kind=task|workflow` — active kind tab
+ *   - `?q=<nameFragment>` — case-insensitive name search
+ *   - `?state=all|enabled|paused` — enabled-state chips
+ *   - `?activity=all|awaiting|running|idle` — workflow activity chips
  *   - `?scheduleId=<scheduleId>` — master-detail selection
  *   - `?fireTaskId=<taskId>` — Mode B drill-down (task-kind schedule)
  *   - `?fireWorkflowId=<workflowId>` — Mode B drill-down (workflow-kind schedule)
@@ -67,40 +81,75 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     config?.tasks?.pollIntervalMs ?? DEFAULT_FIRE_TASK_POLL_INTERVAL_MS;
   const navigate = useNavigate();
   const location = useLocation();
-  const [agentFilter, setAgentFilter] = useUrlSearchValue("agent", ALL_AGENTS);
-  const [enabledFilterRaw, setEnabledFilterRaw] = useUrlSearchValue("enabled", ALL_ENABLED);
+  const [kindRaw] = useUrlSearchValue("kind", DEFAULT_SCHEDULE_KIND);
+  const [query, setQuery] = useUrlSearchValue("q", "");
+  const [stateFilterRaw, setStateFilterRaw] = useUrlSearchValue(
+    "state",
+    DEFAULT_SCHEDULE_STATE_FILTER,
+  );
+  const [activityFilterRaw, setActivityFilterRaw] = useUrlSearchValue(
+    "activity",
+    DEFAULT_WORKFLOW_ACTIVITY_FILTER,
+  );
   const [selectedIdRaw] = useUrlSearchValue("scheduleId", "");
   const [fireTaskIdRaw] = useUrlSearchValue("fireTaskId", "");
   const [fireWorkflowIdRaw] = useUrlSearchValue("fireWorkflowId", "");
   const [fireNodeIdRaw] = useUrlSearchValue("fireNodeId", "");
 
-  const enabledFilter = coerceEnabledFilter(enabledFilterRaw);
-  const setEnabledFilter = useCallback(
-    (v: EnabledFilter) => setEnabledFilterRaw(v),
-    [setEnabledFilterRaw],
+  const kindFilter = coerceScheduleKind(kindRaw);
+  const stateFilter = coerceStateFilter(stateFilterRaw);
+  const activityFilter = coerceActivityFilter(activityFilterRaw);
+  const setStateFilter = useCallback(
+    (next: ScheduleStateFilter) => setStateFilterRaw(next),
+    [setStateFilterRaw],
   );
+  const setActivityFilter = useCallback(
+    (next: WorkflowActivityFilter) => setActivityFilterRaw(next),
+    [setActivityFilterRaw],
+  );
+  const [searchDraft, setSearchDraft] = useState(query);
+  useEffect(() => {
+    setSearchDraft(query);
+  }, [query]);
+  useEffect(() => {
+    if (searchDraft === query) return;
+    const handle = window.setTimeout(() => setQuery(searchDraft), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [searchDraft, query, setQuery]);
+
   const selectedId = selectedIdRaw === "" ? null : selectedIdRaw;
   const fireTaskId = fireTaskIdRaw === "" ? null : fireTaskIdRaw;
   const fireWorkflowId = fireWorkflowIdRaw === "" ? null : fireWorkflowIdRaw;
   const fireNodeId = fireNodeIdRaw === "" ? null : fireNodeIdRaw;
 
-  // Atomic URL writer: updates `scheduleId`, `fireTaskId`,
-  // `fireWorkflowId`, and `fireNodeId` in a single `navigate()` call so
-  // two sequential
-  // single-key setters can't race via stale `location.search`
-  // snapshots (see hooks/useUrlState.ts — each setter captures
-  // `location.search` at hook-call time, so two back-to-back setValue
-  // calls in the same handler would both reseed from the same snapshot
-  // and the second would overwrite the first). Pass `undefined` to
-  // leave a key untouched, empty string (or null) to delete it.
-  const setMasterDetailUrl = useCallback(
+  const setPageUrl = useCallback(
     (next: {
+      kind?: ScheduleKindFilter;
+      q?: string;
+      state?: ScheduleStateFilter;
+      activity?: WorkflowActivityFilter;
       scheduleId?: string | null;
       fireTaskId?: string | null;
       fireWorkflowId?: string | null;
       fireNodeId?: string | null;
     }) => {
       const params = new URLSearchParams(location.search);
+      if (next.kind !== undefined) {
+        if (next.kind === DEFAULT_SCHEDULE_KIND) params.delete("kind");
+        else params.set("kind", next.kind);
+      }
+      if (next.q !== undefined) {
+        if (next.q === "") params.delete("q");
+        else params.set("q", next.q);
+      }
+      if (next.state !== undefined) {
+        if (next.state === DEFAULT_SCHEDULE_STATE_FILTER) params.delete("state");
+        else params.set("state", next.state);
+      }
+      if (next.activity !== undefined) {
+        if (next.activity === DEFAULT_WORKFLOW_ACTIVITY_FILTER) params.delete("activity");
+        else params.set("activity", next.activity);
+      }
       if (next.scheduleId !== undefined) {
         if (next.scheduleId === null || next.scheduleId === "") params.delete("scheduleId");
         else params.set("scheduleId", next.scheduleId);
@@ -124,6 +173,18 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       });
     },
     [navigate, location.pathname, location.search, location.hash],
+  );
+
+  const setMasterDetailUrl = useCallback(
+    (next: {
+      scheduleId?: string | null;
+      fireTaskId?: string | null;
+      fireWorkflowId?: string | null;
+      fireNodeId?: string | null;
+    }) => {
+      setPageUrl(next);
+    },
+    [setPageUrl],
   );
 
   const [schedules, setSchedules] = useState<ScheduleView[]>([]);
@@ -167,6 +228,9 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   // only on selected-target runs avoids over-fetching the recent-
   // fires panel when the user runs a non-selected schedule.
   const [recentFiresToken, setRecentFiresToken] = useState(0);
+  const [cancelWorkflowTarget, setCancelWorkflowTarget] = useState<WorkflowHeaderWire | null>(null);
+  const [cancelWorkflowBusy, setCancelWorkflowBusy] = useState(false);
+  const [cancelWorkflowError, setCancelWorkflowError] = useState<string | null>(null);
 
   // "New schedule" modal state + supporting fetches. `runtimes` is
   // fetched here (mirroring Sessions.tsx) because SchedulesPage doesn't
@@ -197,10 +261,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       return;
     }
     try {
-      const opts: Parameters<typeof listSchedules>[0] = {};
-      if (agentFilter !== ALL_AGENTS) opts.agent = agentFilter;
-      if (enabledFilter !== ALL_ENABLED) opts.enabled = enabledFilter === "true";
-      const next = await listSchedules(opts);
+      const next = await listSchedules();
       if (!mounted.current) return;
       setSchedules(sortByNextFire(next));
       setError(null);
@@ -210,7 +271,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     } finally {
       if (mounted.current) setLoaded(true);
     }
-  }, [currentWorkspaceId, agentFilter, enabledFilter]);
+  }, [currentWorkspaceId]);
 
   useEffect(() => {
     void refresh();
@@ -227,16 +288,40 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [refresh]);
 
-  const visible = schedules;
+  const visible = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return sortByNextFire(
+      schedules.filter((schedule) => {
+        if (schedule.target.kind !== kindFilter) return false;
+        if (normalizedQuery !== "" && !schedule.name.toLowerCase().includes(normalizedQuery)) {
+          return false;
+        }
+        if (!matchesStateFilter(schedule, stateFilter)) return false;
+        if (kindFilter === "workflow" && !matchesWorkflowActivityFilter(schedule, activityFilter)) {
+          return false;
+        }
+        return true;
+      }),
+    );
+  }, [schedules, kindFilter, query, stateFilter, activityFilter]);
 
-  const filterAgentNames = useMemo(() => {
-    const set = new Set<string>(agents.map((a) => a.agent.fqn));
-    for (const s of schedules) {
-      const a = targetAgent(s.target);
-      if (a) set.add(a);
-    }
-    return Array.from(set).sort();
-  }, [agents, schedules]);
+  const kindCounts = useMemo(
+    () => ({
+      task: schedules.filter((s) => s.target.kind === "task").length,
+      workflow: schedules.filter((s) => s.target.kind === "workflow").length,
+    }),
+    [schedules],
+  );
+
+  const segmentedOptions = useMemo(
+    () =>
+      SCHEDULE_KIND_FILTERS.map((f) => ({
+        value: f.value,
+        label: f.label,
+        count: kindCounts[f.value],
+      })),
+    [kindCounts],
+  );
 
   // Default-selection rule (mirror of TasksPage): auto-bind to the
   // top-most visible row when the URL doesn't pin one. Derived
@@ -354,10 +439,21 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   const handleCreated = useCallback(
     (created: ScheduleView) => {
       setSchedules((prev) => sortByNextFire([created, ...prev]));
-      // Atomic write — clear any leftover fireTaskId / fireWorkflowId
-      // from a prior selection while moving to the newly-created row, so
-      // a stale fire pane can't outlive the schedule it belonged to.
-      setMasterDetailUrl({
+      const createdKind: ScheduleKindFilter =
+        created.target.kind === "workflow" ? "workflow" : "task";
+      const normalizedQuery = query.trim().toLowerCase();
+      const hiddenByQuery =
+        normalizedQuery !== "" && !created.name.toLowerCase().includes(normalizedQuery);
+      const hiddenByState = !matchesStateFilter(created, stateFilter);
+      const hiddenByActivity =
+        createdKind === "workflow" && !matchesWorkflowActivityFilter(created, activityFilter);
+      setPageUrl({
+        ...(kindFilter !== createdKind ? { kind: createdKind } : {}),
+        ...(hiddenByQuery ? { q: "" } : {}),
+        ...(hiddenByState ? { state: DEFAULT_SCHEDULE_STATE_FILTER } : {}),
+        ...(kindFilter !== createdKind || hiddenByActivity
+          ? { activity: DEFAULT_WORKFLOW_ACTIVITY_FILTER }
+          : {}),
         scheduleId: created.id,
         fireTaskId: null,
         fireWorkflowId: null,
@@ -365,15 +461,8 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       });
       setRefreshToken((n) => n + 1);
       setCreateOpen(false);
-      const hiddenByAgent =
-        agentFilter !== ALL_AGENTS && targetAgent(created.target) !== agentFilter;
-      const hiddenByEnabled =
-        (enabledFilter === "true" && !created.enabled) ||
-        (enabledFilter === "false" && created.enabled);
-      if (hiddenByAgent) setAgentFilter(ALL_AGENTS);
-      if (hiddenByEnabled) setEnabledFilter(ALL_ENABLED);
     },
-    [agentFilter, enabledFilter, setMasterDetailUrl, setAgentFilter, setEnabledFilter],
+    [activityFilter, kindFilter, query, setPageUrl, stateFilter],
   );
 
   // Selection-from-list handler: atomically updates `?scheduleId=`
@@ -416,7 +505,8 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
         ),
       );
       try {
-        const updated = await patchSchedule(target.id, { enabled: !previousEnabled });
+        const patchFn = target.target.kind === "workflow" ? patchWorkflowSchedule : patchSchedule;
+        const updated = await patchFn(target.id, { enabled: !previousEnabled });
         if (!mounted.current) return;
         setSchedules((prev) =>
           sortByNextFire(prev.map((s) => (s.id === target.id ? { ...s, ...updated } : s))),
@@ -481,6 +571,46 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     [busyByScheduleId, effectiveSelectedId],
   );
 
+  const handleCancelTaskFire = useCallback(async (taskId: string) => {
+    setError(null);
+    try {
+      await cancelTask(taskId);
+      if (!mounted.current) return;
+      setRecentFiresToken((n) => n + 1);
+    } catch (e) {
+      if (!mounted.current) return;
+      setError(e instanceof Error ? e.message : String(e));
+      throw e;
+    }
+  }, []);
+
+  const handleCancelWorkflowFire = useCallback((workflow: WorkflowHeaderWire) => {
+    setCancelWorkflowError(null);
+    setCancelWorkflowTarget(workflow);
+  }, []);
+
+  const handleConfirmCancelWorkflowFire = useCallback(
+    async (message: string) => {
+      if (cancelWorkflowTarget === null) return;
+      setCancelWorkflowBusy(true);
+      setCancelWorkflowError(null);
+      try {
+        await cancelWorkflow(cancelWorkflowTarget.id, {
+          cancellation: { kind: "user", message },
+        });
+        if (!mounted.current) return;
+        setCancelWorkflowTarget(null);
+        setRecentFiresToken((n) => n + 1);
+      } catch (e) {
+        if (!mounted.current) return;
+        setCancelWorkflowError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (mounted.current) setCancelWorkflowBusy(false);
+      }
+    },
+    [cancelWorkflowTarget],
+  );
+
   // Mode-B entry handler — atomically writes the click target's fire id
   // alongside the pinned `scheduleId`, routing to `fireWorkflowId` for a
   // workflow-kind schedule and `fireTaskId` otherwise. The opposite
@@ -542,6 +672,22 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     setMasterDetailUrl({ fireNodeId: null });
   }, [setMasterDetailUrl]);
 
+  const handleKindChange = useCallback(
+    (nextKind: ScheduleKindFilter) => {
+      if (nextKind === kindFilter) return;
+      setPageUrl({
+        kind: nextKind,
+        state: DEFAULT_SCHEDULE_STATE_FILTER,
+        activity: DEFAULT_WORKFLOW_ACTIVITY_FILTER,
+        scheduleId: null,
+        fireTaskId: null,
+        fireWorkflowId: null,
+        fireNodeId: null,
+      });
+    },
+    [kindFilter, setPageUrl],
+  );
+
   if (currentWorkspaceId === null) {
     return (
       <div className="alert alert--error">
@@ -551,11 +697,20 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     );
   }
 
-  const filtersActive = agentFilter !== ALL_AGENTS || enabledFilter !== ALL_ENABLED;
+  const filtersActive =
+    query.trim() !== "" ||
+    stateFilter !== DEFAULT_SCHEDULE_STATE_FILTER ||
+    activityFilter !== DEFAULT_WORKFLOW_ACTIVITY_FILTER;
 
   return (
     <>
       <HeaderActions>
+        <Segmented
+          options={segmentedOptions}
+          value={kindFilter}
+          onChange={handleKindChange}
+          ariaLabel="Schedule kind"
+        />
         <button
           type="button"
           className="btn btn--primary"
@@ -599,10 +754,9 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
               <p className="empty__title">No schedules yet</p>
               <p className="empty__hint">
                 Click <strong>New schedule</strong> to set up a cron-triggered agent run — preview
-                the next fires before you save. Once a schedule exists, select it and use the{" "}
-                <strong>Edit</strong> button in the detail panel to change the schedule, target, or
-                runtime — or run <code>glyph schedule patch &lt;id&gt;</code> for the scripted
-                equivalent.
+                the next fires before you save. Once a schedule exists, use the row menu to edit,
+                pause, resume, or run it immediately — or run{" "}
+                <code>glyph schedule patch &lt;id&gt;</code> for the scripted equivalent.
               </p>
             </div>
           </div>
@@ -610,12 +764,13 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
           <div className="tasks-pane tasks-pane--with-detail">
             <div className="tasks-pane__list">
               <SchedulesFilters
-                agentFilter={agentFilter}
-                onAgentFilterChange={setAgentFilter}
-                enabledFilter={enabledFilter}
-                onEnabledFilterChange={setEnabledFilter}
-                agents={agents}
-                filterAgentNames={filterAgentNames}
+                searchDraft={searchDraft}
+                onSearchDraftChange={setSearchDraft}
+                stateFilter={stateFilter}
+                onStateFilterChange={setStateFilter}
+                activityFilter={activityFilter}
+                onActivityFilterChange={setActivityFilter}
+                showActivityFilters={kindFilter === "workflow"}
               />
               <div className="tasks-pane__list-scroll">
                 {!loaded ? (
@@ -675,6 +830,8 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
                 recentFiresToken={recentFiresToken}
                 enabledOverride={selectedSchedule?.enabled}
                 onSelectFire={handleSelectFire}
+                onCancelTaskFire={handleCancelTaskFire}
+                onCancelWorkflowFire={handleCancelWorkflowFire}
               />
             ) : visible.length === 0 ? null : (
               <aside className="tasks-pane__detail tasks-pane__detail--empty">
@@ -733,10 +890,34 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
           }}
         />
       )}
+
+      {cancelWorkflowTarget && (
+        <CancelWorkflowModal
+          target={cancelWorkflowTarget}
+          busy={cancelWorkflowBusy}
+          error={cancelWorkflowError}
+          onClose={() => {
+            if (cancelWorkflowBusy) return;
+            setCancelWorkflowTarget(null);
+            setCancelWorkflowError(null);
+          }}
+          onConfirm={handleConfirmCancelWorkflowFire}
+        />
+      )}
     </>
   );
 }
 
-function coerceEnabledFilter(raw: string): EnabledFilter {
-  return raw === "true" || raw === "false" ? raw : ALL_ENABLED;
+function coerceScheduleKind(raw: string): ScheduleKindFilter {
+  return raw === "workflow" ? "workflow" : "task";
+}
+
+function coerceStateFilter(raw: string): ScheduleStateFilter {
+  if (raw === "enabled" || raw === "paused") return raw;
+  return DEFAULT_SCHEDULE_STATE_FILTER;
+}
+
+function coerceActivityFilter(raw: string): WorkflowActivityFilter {
+  if (raw === "awaiting" || raw === "running" || raw === "idle") return raw;
+  return DEFAULT_WORKFLOW_ACTIVITY_FILTER;
 }

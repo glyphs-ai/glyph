@@ -32,7 +32,13 @@ import {
  * dashboard supports both the task and workflow kinds, so we type
  * `target` as the full wire union.
  */
-export type ScheduleView = Omit<Schedule, "target"> & { target: ScheduleWireTarget };
+export type ScheduleView = Omit<Schedule, "target"> & {
+  target: ScheduleWireTarget;
+  fireStats?: {
+    awaitingCount: number;
+    runningCount: number;
+  };
+};
 
 /**
  * Response shape for `GET /schedules/:scheduleId` — the entity plus the

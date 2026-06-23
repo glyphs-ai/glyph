@@ -1,81 +1,96 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
-import { ALL_AGENTS, ENABLED_FILTERS, type EnabledFilter } from "./shared";
+import { SearchIcon } from "../common/SearchIcon";
+import {
+  SCHEDULE_STATE_FILTERS,
+  type ScheduleStateFilter,
+  WORKFLOW_ACTIVITY_FILTERS,
+  type WorkflowActivityFilter,
+} from "./shared";
 
 export interface SchedulesFiltersProps {
-  agentFilter: string;
-  onAgentFilterChange: (v: string) => void;
-  enabledFilter: EnabledFilter;
-  onEnabledFilterChange: (v: EnabledFilter) => void;
-  agents: AgentEntry[];
-  filterAgentNames: string[];
+  searchDraft: string;
+  onSearchDraftChange: (v: string) => void;
+  stateFilter: ScheduleStateFilter;
+  onStateFilterChange: (v: ScheduleStateFilter) => void;
+  activityFilter: WorkflowActivityFilter;
+  onActivityFilterChange: (v: WorkflowActivityFilter) => void;
+  showActivityFilters: boolean;
 }
 
-/**
- * Filter strip rendered above the schedule list. Two affordances:
- * agent filter (FQN dropdown) + enabled toggle (All / Enabled /
- * Paused). Mirrors `TaskFilters` layout but skips search and time
- * preset — schedules are a small set and the `nextFireAt` ordering
- * already foregrounds the most relevant rows.
- *
- * Both affordances are trivially resettable by the user themselves
- * (pick "All agents" / click "All"), so no "Clear filters" button is
- * rendered — extra button noise without a real win.
- */
 export function SchedulesFilters({
-  agentFilter,
-  onAgentFilterChange,
-  enabledFilter,
-  onEnabledFilterChange,
-  filterAgentNames,
+  searchDraft,
+  onSearchDraftChange,
+  stateFilter,
+  onStateFilterChange,
+  activityFilter,
+  onActivityFilterChange,
+  showActivityFilters,
 }: SchedulesFiltersProps) {
   return (
     <div className="task-filters">
-      <div className="task-filters__row task-filters__row--compact">
-        <select
-          id="schedule-agent-filter"
-          aria-label="Filter by agent"
-          value={agentFilter}
-          onChange={(e) => onAgentFilterChange(e.target.value)}
-          className="select task-filters__select"
+      <div
+        className="task-filters__row task-filters__row--compact"
+        style={{ flexWrap: "wrap", gap: 14 }}
+      >
+        <div className="task-filters__search-wrap">
+          <SearchIcon />
+          <input
+            id="schedule-name-filter"
+            type="search"
+            value={searchDraft}
+            onChange={(e) => onSearchDraftChange(e.target.value)}
+            placeholder="Search by name…"
+            className="input task-filters__search"
+            aria-label="Search schedules by name"
+          />
+        </div>
+
+        {/* Group label + chips into a single flex child so flex-wrap keeps
+            them on the same line (or wraps them together as a unit). */}
+        <div
+          className="task-filters__group"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
         >
-          <option value={ALL_AGENTS}>All agents</option>
-          {filterAgentNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <fieldset
-          className="pills task-filters__pills"
-          style={{ border: 0, margin: 0, padding: 0 }}
-        >
-          <legend
-            style={{
-              position: "absolute",
-              width: 1,
-              height: 1,
-              padding: 0,
-              margin: -1,
-              overflow: "hidden",
-              clip: "rect(0, 0, 0, 0)",
-              whiteSpace: "nowrap",
-              border: 0,
-            }}
+          <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
+            State:
+          </span>
+          <div className="pills task-filters__pills" style={{ gap: 6 }}>
+            {SCHEDULE_STATE_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                className={`pills__btn${stateFilter === filter.value ? " pills__btn--active" : ""}`}
+                onClick={() => onStateFilterChange(filter.value)}
+                aria-pressed={stateFilter === filter.value}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {showActivityFilters && (
+          <div
+            className="task-filters__group"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
-            Filter by state
-          </legend>
-          {ENABLED_FILTERS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              className={`pills__btn${enabledFilter === p.value ? " pills__btn--active" : ""}`}
-              onClick={() => onEnabledFilterChange(p.value)}
-              aria-pressed={enabledFilter === p.value}
-            >
-              {p.label}
-            </button>
-          ))}
-        </fieldset>
+            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
+              Activity:
+            </span>
+            <div className="pills task-filters__pills" style={{ gap: 6 }}>
+              {WORKFLOW_ACTIVITY_FILTERS.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  className={`pills__btn${activityFilter === filter.value ? " pills__btn--active" : ""}`}
+                  onClick={() => onActivityFilterChange(filter.value)}
+                  aria-pressed={activityFilter === filter.value}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import {
   previewSchedule,
   type ScheduleDetail as ScheduleDetailType,
   type SchedulePreview,
+  type WorkflowHeaderWire,
 } from "../../api";
 import { formatAbsolute, formatRelative } from "../../utils/time";
 import { ScheduleRecentFires } from "./ScheduleRecentFires";
@@ -33,6 +34,8 @@ export interface ScheduleDetailProps {
   enabledOverride?: boolean;
   /** Swaps the right pane into Mode B (fire's task detail) via the parent's atomic URL writer. */
   onSelectFire: (taskId: string) => void;
+  onCancelTaskFire: (taskId: string) => Promise<void> | void;
+  onCancelWorkflowFire: (workflow: WorkflowHeaderWire) => Promise<void> | void;
 }
 
 const PREVIEW_COUNT = 1;
@@ -68,6 +71,8 @@ export function ScheduleDetail({
   recentFiresToken,
   enabledOverride,
   onSelectFire,
+  onCancelTaskFire,
+  onCancelWorkflowFire,
 }: ScheduleDetailProps) {
   const [detail, setDetail] = useState<ScheduleDetailType | null>(null);
   const [preview, setPreview] = useState<SchedulePreview | null>(null);
@@ -210,6 +215,8 @@ export function ScheduleDetail({
           currentWorkspaceId={currentWorkspaceId}
           refreshToken={recentFiresToken}
           onSelectFire={onSelectFire}
+          onCancelTaskFire={onCancelTaskFire}
+          onCancelWorkflowFire={onCancelWorkflowFire}
         />
       </div>
     </aside>

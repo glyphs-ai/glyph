@@ -145,7 +145,9 @@ function renderDetail() {
 function renderWorkflowDetail(extraQuery = "") {
   return render(
     <MemoryRouter
-      initialEntries={[`/workspaces/ws-1/runtime/schedules?scheduleId=sched-wf${extraQuery}`]}
+      initialEntries={[
+        `/workspaces/ws-1/runtime/schedules?kind=workflow&scheduleId=sched-wf${extraQuery}`,
+      ]}
     >
       <Routes>
         <Route

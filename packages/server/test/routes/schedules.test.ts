@@ -126,6 +126,61 @@ describe("schedulesRoutes — list", () => {
     expect(body.error).toMatch(/"true" or "false"/);
     expect(svc.list).not.toHaveBeenCalled();
   });
+
+  it("GET /?enabled=true filters by enabled only (regression)", async () => {
+    const list = vi.fn(async () => [sampleSchedule]);
+    const svc = stubService({ list });
+    const res = await schedulesRoutes(() => svc).request("/?enabled=true");
+    expect(res.status).toBe(200);
+    expect(list).toHaveBeenCalledWith({ enabled: true });
+  });
+
+  it("GET /?agent=foo filters by agent only (regression)", async () => {
+    const list = vi.fn(async () => []);
+    const svc = stubService({ list });
+    const res = await schedulesRoutes(() => svc).request("/?agent=foo");
+    expect(res.status).toBe(200);
+    expect(list).toHaveBeenCalledWith({
+      kind: "task",
+      dataEquals: { path: "$.agent", value: "foo" },
+    });
+  });
+
+  it("GET / returns fireStats only on workflow-kind rows, not task-kind", async () => {
+    const workflowSchedule: Schedule = {
+      id: "sched-wf",
+      name: "Nightly workflow",
+      target: {
+        kind: "workflow",
+        data: {
+          coordinatorAgent: "official/engineer",
+          brief: "Run nightly",
+        },
+      },
+      trigger: { kind: "cron", expr: "0 2 * * *", tz: "Asia/Shanghai" },
+      enabled: true,
+      createdAt: "2026-06-01T00:00:00.000Z",
+      updatedAt: "2026-06-01T00:00:00.000Z",
+    };
+    const list = vi.fn(async () => [sampleSchedule, workflowSchedule]);
+    const svc = stubService({ list });
+    const workflowService = {
+      aggregateRunningFireStatsByScheduleId: vi.fn(
+        async () => new Map([["sched-wf", { runningCount: 3, awaitingCount: 1 }]]),
+      ),
+    };
+    const res = await schedulesRoutes(
+      () => svc,
+      // biome-ignore lint/suspicious/noExplicitAny: test stub partial
+      () => workflowService as any,
+    ).request("/");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    const taskItem = body.find((r) => (r.target as Record<string, unknown>).kind === "task");
+    const wfItem = body.find((r) => (r.target as Record<string, unknown>).kind === "workflow");
+    expect(taskItem!.fireStats).toBeUndefined();
+    expect(wfItem!.fireStats).toEqual({ runningCount: 3, awaitingCount: 1 });
+  });
 });
 
 describe("schedulesRoutes — create", () => {

@@ -190,24 +190,64 @@ describe("SchedulesPage list", () => {
     });
   });
 
-  it("forwards the agent filter from ?agent= to listSchedules", async () => {
-    mockListSchedules.mockResolvedValue([]);
+  it("filters by kind=task (default) — only task-kind rows appear", async () => {
+    const rows: ScheduleView[] = [
+      makeSchedule({
+        id: "sched-t",
+        name: "Task schedule",
+        enabled: true,
+        trigger: { kind: "cron", expr: "0 1 * * *", tz: "UTC" },
+        target: { kind: "task", agent: "official/engineer", brief: "do" },
+        nextFireAt: "2026-06-01T01:00:00.000Z",
+      }),
+      makeSchedule({
+        id: "sched-w",
+        name: "Workflow schedule",
+        enabled: true,
+        trigger: { kind: "cron", expr: "0 2 * * *", tz: "UTC" },
+        target: { kind: "workflow", coordinatorAgent: "official/engineer", brief: "coord" },
+        nextFireAt: "2026-06-01T02:00:00.000Z",
+      }),
+    ];
+    mockListSchedules.mockResolvedValue(rows);
+    mockGetSchedule.mockResolvedValue(makeDetail(rows[0]!, "daily at 01:00"));
 
-    renderSchedules("/workspaces/ws-1/runtime/schedules?agent=official/engineer", agents);
+    renderSchedules("/workspaces/ws-1/runtime/schedules", agents);
 
     await waitFor(() => {
-      expect(mockListSchedules).toHaveBeenCalledWith({ agent: "official/engineer" });
+      expect(screen.getByTestId("schedule-row-sched-t")).toBeTruthy();
     });
+    expect(screen.queryByTestId("schedule-row-sched-w")).toBeNull();
   });
 
-  it("forwards ?enabled=false as { enabled: false } to listSchedules", async () => {
-    mockListSchedules.mockResolvedValue([]);
+  it("state chip filters by enabled — Paused shows only disabled schedules", async () => {
+    const rows: ScheduleView[] = [
+      makeSchedule({
+        id: "sched-on",
+        name: "Enabled one",
+        enabled: true,
+        trigger: { kind: "cron", expr: "0 1 * * *", tz: "UTC" },
+        target: { kind: "task", agent: "official/engineer", brief: "x" },
+        nextFireAt: "2026-06-01T01:00:00.000Z",
+      }),
+      makeSchedule({
+        id: "sched-off",
+        name: "Paused one",
+        enabled: false,
+        trigger: { kind: "cron", expr: "0 2 * * *", tz: "UTC" },
+        target: { kind: "task", agent: "official/engineer", brief: "y" },
+        nextFireAt: "2026-06-02T02:00:00.000Z",
+      }),
+    ];
+    mockListSchedules.mockResolvedValue(rows);
+    mockGetSchedule.mockResolvedValue(makeDetail(rows[1]!, "daily at 02:00"));
 
-    renderSchedules("/workspaces/ws-1/runtime/schedules?enabled=false", agents);
+    renderSchedules("/workspaces/ws-1/runtime/schedules?state=paused", agents);
 
     await waitFor(() => {
-      expect(mockListSchedules).toHaveBeenCalledWith({ enabled: false });
+      expect(screen.getByTestId("schedule-row-sched-off")).toBeTruthy();
     });
+    expect(screen.queryByTestId("schedule-row-sched-on")).toBeNull();
   });
 });
 
@@ -319,13 +359,13 @@ describe("SchedulesPage — New schedule CTA + zero-state copy", () => {
   // ── Create-while-filtered: if the active filters would hide the
   // freshly-created row, Schedules.tsx resets the filters so the
   // new row appears in the list. Pin that contract.
-  it("create-while-filtered resets the agent filter when the new row would be hidden", async () => {
+  it("create-while-filtered resets the state filter when the new row would be hidden", async () => {
     mockListSchedules.mockResolvedValue([]);
-    // Open with a filter that excludes the new agent.
-    renderSchedules("/workspaces/ws-1/runtime/schedules?agent=official/reviewer", agents);
+    // Open with state=paused filter active.
+    renderSchedules("/workspaces/ws-1/runtime/schedules?state=paused", agents);
     fireEvent.click(await screen.findByTestId("schedules-new-cta"));
     await waitFor(() => expect(screen.getByTestId("create-schedule-form")).toBeTruthy());
-    // Select the agent that's not the current filter.
+    // Fill the form.
     fireEvent.change(screen.getByTestId("create-schedule-agent"), {
       target: { value: "official/engineer" },
     });
@@ -336,8 +376,8 @@ describe("SchedulesPage — New schedule CTA + zero-state copy", () => {
     await new Promise((r) => setTimeout(r, 350));
     const submit = screen.getByTestId("create-schedule-submit") as HTMLButtonElement;
     await waitFor(() => expect(submit.disabled).toBe(false));
-    // Returned row matches the picked agent — handleCreated MUST
-    // reset the filter so the new row is visible.
+    // Returned row is enabled (true) — the "paused" state filter would hide it,
+    // so handleCreated MUST reset the filter.
     mockCreateSchedule.mockResolvedValueOnce({
       id: "sched-new",
       name: "A",
@@ -360,15 +400,9 @@ describe("SchedulesPage — New schedule CTA + zero-state copy", () => {
       describe: "every day at 09:00",
     });
     fireEvent.click(submit);
-    // After submit, the page state should have agentFilter reset (so
-    // listSchedules is called with `{}`). We assert by waiting for the
-    // listSchedules call without the agent option.
+    // After submit, the new row should appear (filter got reset).
     await waitFor(() => {
-      const calls = mockListSchedules.mock.calls;
-      const resetCallExists = calls.some(
-        (call) => call[0] !== undefined && Object.keys(call[0] ?? {}).length === 0,
-      );
-      expect(resetCallExists).toBe(true);
+      expect(screen.getByTestId("schedule-row-sched-new")).toBeTruthy();
     });
   });
 });

@@ -208,6 +208,64 @@ export class WorkflowRepository {
     return new Map(rows.map((r) => [r.workflowId, r.count]));
   }
 
+  /**
+   * Single-pass SQL aggregation returning per-schedule running/awaiting
+   * counts. A workflow contributes to `awaitingCount` iff it is
+   * `status='running'` AND has ≥1 human node with `status='running'`.
+   * We cross-check both because human-node status drift could otherwise
+   * inflate the count (e.g. orphan human nodes left behind after a
+   * workflow cancellation).
+   *
+   * Workflows with non-running status (cancelled/failed/succeeded) are
+   * excluded entirely. Schedules with zero running workflows are absent
+   * from the returned map.
+   */
+  async aggregateRunningFireStatsByScheduleId(): Promise<
+    ReadonlyMap<string, { runningCount: number; awaitingCount: number }>
+  > {
+    const scheduleIdExpr = sql<string>`json_extract(${workflows.metadata}, '$.scheduleId')`;
+
+    // Step 1: Get running workflows per schedule
+    const runningRows = this.db
+      .select({
+        scheduleId: scheduleIdExpr,
+        workflowId: workflows.id,
+      })
+      .from(workflows)
+      .where(
+        and(
+          eq(workflows.status, "running"),
+          eq(workflows.origin, "schedule"),
+          sql`json_extract(${workflows.metadata}, '$.scheduleId') IS NOT NULL`,
+        ),
+      )
+      .all();
+
+    if (runningRows.length === 0) return new Map();
+
+    // Step 2: Get workflows that have ≥1 running human node
+    const awaitingSet = new Set(
+      this.db
+        .selectDistinct({ workflowId: workflowNodes.workflowId })
+        .from(workflowNodes)
+        .where(and(eq(workflowNodes.kind, "human"), eq(workflowNodes.status, "running")))
+        .all()
+        .map((r) => r.workflowId),
+    );
+
+    // Step 3: Aggregate in JS (both sets are small per workspace)
+    const map = new Map<string, { runningCount: number; awaitingCount: number }>();
+    for (const row of runningRows) {
+      const current = map.get(row.scheduleId) ?? { runningCount: 0, awaitingCount: 0 };
+      current.runningCount += 1;
+      if (awaitingSet.has(row.workflowId)) {
+        current.awaitingCount += 1;
+      }
+      map.set(row.scheduleId, current);
+    }
+    return map;
+  }
+
   insertNode(tx: Db, entity: WorkflowNodeEntity): void {
     const row = entity.toRow();
     assertValidWorkflowNodeId(row.id);

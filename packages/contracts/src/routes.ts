@@ -391,6 +391,11 @@ export interface ScheduleGetResponse extends Omit<Schedule, "target"> {
  */
 export type ScheduleWire = Omit<Schedule, "target"> & {
   readonly target: ScheduleWireTarget;
+  /** Present only for workflow-kind schedules; omitted for task schedules. */
+  readonly fireStats?: {
+    readonly awaitingCount: number;
+    readonly runningCount: number;
+  };
 };
 
 /**
