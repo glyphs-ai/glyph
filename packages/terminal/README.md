@@ -72,6 +72,27 @@ insertion order, and only string-valued entries survive. `undefined`,
 `null`, and other non-string values are dropped defensively before
 quoting.
 
+## Layout
+
+```
+packages/terminal/
+├── package.json
+├── README.md
+├── tsconfig.json
+├── tsconfig.typecheck.json    Test-scope typecheck (includes test/**/*, noEmit)
+├── vitest.config.ts
+└── src/
+    ├── _shared.ts             Quoting, validation, spawn, fs helpers (private)
+    ├── dispatch.ts            spawnTerminalWith (DI entry) + spawnTerminal (production entry)
+    ├── errors.ts              Error classes (exported)
+    ├── index.ts               Public barrel
+    ├── types.ts               LaunchCommand, Launcher, SpawnTerminalResult, deps types
+    └── platforms/
+        ├── linux.ts           Linux emulator dispatch (12 candidates)
+        ├── macos.ts           macOS Terminal.app via osascript
+        └── windows.ts         Windows Terminal (wt.exe + pwsh) / cmd.exe fallback
+```
+
 ## API
 
 The example below shows a command produced by the Copilot runtime; other
@@ -91,6 +112,24 @@ const cmd: LaunchCommand = {
 const result = await spawnTerminal(cmd); // { launcher: "wt" | "cmd" | ... }
 ```
 
-Errors: `InvalidLaunchCommandError`, `NoTerminalFoundError`,
-`TerminalSpawnFailedError`, `UnsupportedPlatformError` — all named
-subclasses of `Error`.
+## Errors
+
+```
+InvalidLaunchCommandError       400 — cmd/args/cwd contains control chars,
+                                      or env name is not a portable identifier
+NoTerminalFoundError            500 — no supported emulator on PATH (Linux only)
+TerminalSpawnFailedError        500 — emulator spawned but died immediately
+UnsupportedPlatformError        500 — platform is not win32/darwin/linux
+```
+
+All extend `Error` directly (there is no `TerminalError` base class).
+The package surface is small enough that a single `try`/`catch` with
+`instanceof` checks covers every failure mode.
+
+## Testing
+
+```sh
+pnpm --filter @glyphs-ai/terminal test
+```
+
+Vitest runs in `forks` pool to match the rest of the monorepo.
