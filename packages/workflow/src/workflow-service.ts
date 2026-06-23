@@ -467,6 +467,12 @@ export class WorkflowService {
     return this.repo.countAwaitingHumanByWorkflow();
   }
 
+  async aggregateRunningFireStatsByScheduleId(): Promise<
+    ReadonlyMap<string, { runningCount: number; awaitingCount: number }>
+  > {
+    return this.repo.aggregateRunningFireStatsByScheduleId();
+  }
+
   async getDag(workflowId: string): Promise<WorkflowDagSnapshot> {
     const wf = await this.repo.readWorkflow(workflowId);
     if (wf === null) throw new WorkflowNotFoundError(workflowId);

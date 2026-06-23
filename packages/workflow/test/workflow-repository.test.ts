@@ -212,3 +212,112 @@ describe("WorkflowRepository — defense-in-depth id validation", () => {
     );
   });
 });
+
+describe("WorkflowRepository — aggregateRunningFireStatsByScheduleId", () => {
+  const WF_A1 = "20260607-a1a1a1a1";
+  const WF_A2 = "20260607-a2a2a2a2";
+  const WF_A3 = "20260607-a3a3a3a3";
+  const WF_B1 = "20260607-b1b1b1b1";
+  const HUMAN_1 = "550e8400-e29b-41d4-a716-446655440010";
+  const HUMAN_2 = "550e8400-e29b-41d4-a716-446655440011";
+  const HUMAN_3 = "550e8400-e29b-41d4-a716-446655440012";
+
+  let db: ReturnType<typeof openTestWorkflowDb>;
+  let repo: WorkflowRepository;
+
+  beforeEach(() => {
+    db = openTestWorkflowDb();
+    repo = new WorkflowRepository({ db: db.db });
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  function insertWf(
+    tx: Parameters<Parameters<typeof db.db.transaction>[0]>[0],
+    id: string,
+    opts: { status: string; scheduleId?: string },
+  ): void {
+    const metadata = opts.scheduleId ? JSON.stringify({ scheduleId: opts.scheduleId }) : "{}";
+    const status = opts.status;
+    repo.insertWorkflow(
+      tx,
+      WorkflowEntity.fromRow({
+        id,
+        brief: "b",
+        details: null,
+        coordinatorAgent: "agent-1",
+        status,
+        origin: "schedule",
+        metadata,
+        createdAt: NOW,
+        startedAt: NOW,
+        endedAt: status !== "running" ? NOW : null,
+        success: status === "succeeded" ? JSON.stringify({ output: null }) : null,
+        failure: status === "failed" ? JSON.stringify({ kind: "coordinator", message: "" }) : null,
+        cancellation: status === "cancelled" ? JSON.stringify({ kind: "user", message: "" }) : null,
+      }),
+    );
+  }
+
+  function insertHumanNode(
+    tx: Parameters<Parameters<typeof db.db.transaction>[0]>[0],
+    nodeId: string,
+    workflowId: string,
+    status: string,
+  ): void {
+    repo.insertNode(
+      tx,
+      WorkflowNodeEntity.fromRow({
+        id: nodeId,
+        workflowId,
+        kind: "human",
+        specJson: JSON.stringify({ prompt: "approve?" }),
+        phase: 1,
+        status,
+        metadata: "{}",
+        createdAt: NOW,
+        readyAt: null,
+        runningAt: status === "running" ? NOW : null,
+        endedAt: null,
+      }),
+    );
+  }
+
+  it("aggregates running workflows grouped by scheduleId with correct awaitingCount", async () => {
+    db.db.transaction((tx) => {
+      // Schedule A: 1 running workflow with 2 running human nodes
+      insertWf(tx, WF_A1, { status: "running", scheduleId: "sched-A" });
+      insertHumanNode(tx, HUMAN_1, WF_A1, "running");
+      insertHumanNode(tx, HUMAN_2, WF_A1, "running");
+
+      // Schedule A: 1 running workflow with 0 running human nodes
+      insertWf(tx, WF_A2, { status: "running", scheduleId: "sched-A" });
+
+      // Schedule A: 1 succeeded workflow (should be excluded)
+      insertWf(tx, WF_A3, { status: "succeeded", scheduleId: "sched-A" });
+
+      // Schedule B: 1 cancelled workflow (should be excluded)
+      insertWf(tx, WF_B1, { status: "cancelled", scheduleId: "sched-B" });
+    });
+
+    const result = await repo.aggregateRunningFireStatsByScheduleId();
+
+    expect(result.get("sched-A")).toEqual({ runningCount: 2, awaitingCount: 1 });
+    expect(result.has("sched-B")).toBe(false);
+    expect(result.has("sched-C")).toBe(false);
+  });
+
+  it("excludes workflows with running human nodes but non-running workflow status", async () => {
+    db.db.transaction((tx) => {
+      // Cancelled workflow with an orphan running human node
+      insertWf(tx, WF_B1, { status: "cancelled", scheduleId: "sched-B" });
+      insertHumanNode(tx, HUMAN_3, WF_B1, "running");
+    });
+
+    const result = await repo.aggregateRunningFireStatsByScheduleId();
+
+    expect(result.has("sched-B")).toBe(false);
+  });
+});

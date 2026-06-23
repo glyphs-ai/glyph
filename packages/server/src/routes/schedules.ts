@@ -386,25 +386,11 @@ function validateWorkflowTargetPatch(raw: unknown): ValidationResult<WorkflowTar
  * dashboard / CLI's `schedule.target.agent` reads keep working.
  */
 function collectWorkflowFireStats(
-  list: readonly {
-    readonly id: string;
-    readonly status: string;
-    readonly metadata: { readonly scheduleId?: string };
-  }[],
-  awaitingMap: ReadonlyMap<string, number>,
+  aggregated: ReadonlyMap<string, { runningCount: number; awaitingCount: number }>,
 ): ReadonlyMap<string, NonNullable<ScheduleWire["fireStats"]>> {
   const stats = new Map<string, NonNullable<ScheduleWire["fireStats"]>>();
-  for (const workflow of list) {
-    if (workflow.status !== "running") continue;
-    const scheduleId = workflow.metadata.scheduleId;
-    if (scheduleId === undefined) continue;
-    const current = stats.get(scheduleId) ?? { awaitingCount: 0, runningCount: 0 };
-    stats.set(
-      scheduleId,
-      (awaitingMap.get(workflow.id) ?? 0) > 0
-        ? { awaitingCount: current.awaitingCount + 1, runningCount: current.runningCount }
-        : { awaitingCount: current.awaitingCount, runningCount: current.runningCount + 1 },
-    );
+  for (const [scheduleId, { runningCount, awaitingCount }] of aggregated) {
+    stats.set(scheduleId, { runningCount, awaitingCount });
   }
   return stats;
 }
@@ -450,6 +436,10 @@ export function schedulesRoutes(
   const app = new Hono();
 
   // ── GET / — list with optional agent / enabled filters ────────────
+  // Query params `?agent=` and `?enabled=` are retained for CLI and
+  // direct-API consumers. The dashboard now filters client-side
+  // (kind tabs + search + chips) and does not send them, but they
+  // remain part of the public contract.
   app.get("/", async (c) => {
     const agent = c.req.query("agent");
     const enabledRaw = c.req.query("enabled");
@@ -479,11 +469,8 @@ export function schedulesRoutes(
         list.some((schedule) => schedule.target.kind === "workflow")
           ? await (async () => {
               const workflowService = resolveWorkflowService(c);
-              const [workflows, awaitingMap] = await Promise.all([
-                workflowService.list({ origin: "schedule" }),
-                workflowService.countAwaitingHumanByWorkflow(),
-              ]);
-              return collectWorkflowFireStats(workflows, awaitingMap);
+              const aggregated = await workflowService.aggregateRunningFireStatsByScheduleId();
+              return collectWorkflowFireStats(aggregated);
             })()
           : undefined;
       return c.json(list.map((schedule) => projectScheduleToWire(schedule, workflowFireStats)));
@@ -608,11 +595,8 @@ export function schedulesRoutes(
         | undefined;
       if (found.target.kind === "workflow" && resolveWorkflowService !== undefined) {
         const workflowService = resolveWorkflowService(c);
-        const [workflows, awaitingMap] = await Promise.all([
-          workflowService.list({ origin: "schedule" }),
-          workflowService.countAwaitingHumanByWorkflow(),
-        ]);
-        workflowFireStats = collectWorkflowFireStats(workflows, awaitingMap);
+        const aggregated = await workflowService.aggregateRunningFireStatsByScheduleId();
+        workflowFireStats = collectWorkflowFireStats(aggregated);
       }
       // Enrich with derived cron `describe` so dashboards / CLI `show`
       // can render the human-readable text without a second round-trip.
