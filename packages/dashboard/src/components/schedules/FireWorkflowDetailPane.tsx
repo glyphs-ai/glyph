@@ -1,6 +1,8 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { listScheduledWorkflows, type WorkflowHeaderWire } from "../../api";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { listScheduledWorkflows, type WorkflowHeaderWire, type WorkflowNodeWire } from "../../api";
 import { useWorkflowDetail } from "../../hooks/useWorkflowDetail";
+import { WorkflowNodeHumanPane } from "../../pages/workflows/WorkflowNodeHumanPane";
+import { WorkflowNodeTaskPane } from "../../pages/workflows/WorkflowNodeTaskPane";
 import { WorkflowView } from "../../pages/workflows/WorkflowView";
 import { FallbackBackRow, FireNavPill } from "./FireNav";
 
@@ -11,10 +13,16 @@ export interface FireWorkflowDetailPaneProps {
   scheduleName: string;
   /** Workflow id requested via `?fireWorkflowId=`. May be stale (aged out of top-10). */
   fireWorkflowId: string;
+  /** Node id requested via `?fireNodeId=`. Null when no node is selected. */
+  fireNodeId?: string | null;
   /** Called when the user clicks ← Back; parent clears `?fireWorkflowId=`. */
   onBack: () => void;
   /** Called when the user clicks ‹prev / next›; parent atomically sets `?fireWorkflowId=`. */
   onNavigate: (nextWorkflowId: string) => void;
+  /** Called when the user activates a node in the Graph tab. */
+  onSelectNode: (nodeId: string) => void;
+  /** Called when the user clicks ← Back from the node detail pane. */
+  onBackFromNode: () => void;
 }
 
 const MAX_ROWS = 10;
@@ -45,8 +53,11 @@ export function FireWorkflowDetailPane({
   scheduleId,
   scheduleName,
   fireWorkflowId,
+  fireNodeId,
   onBack,
   onNavigate,
+  onSelectNode,
+  onBackFromNode,
 }: FireWorkflowDetailPaneProps) {
   const [rows, setRows] = useState<WorkflowHeaderWire[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -151,8 +162,11 @@ export function FireWorkflowDetailPane({
     <FireWorkflowView
       key={fireWorkflowId}
       fireWorkflowId={fireWorkflowId}
+      fireNodeId={fireNodeId ?? null}
       scheduleName={scheduleName}
       onBack={onBack}
+      onSelectNode={onSelectNode}
+      onBackFromNode={onBackFromNode}
       headerTrailing={pill}
     />
   );
@@ -160,33 +174,45 @@ export function FireWorkflowDetailPane({
 
 interface FireWorkflowViewProps {
   fireWorkflowId: string;
+  fireNodeId: string | null;
   scheduleName: string;
   onBack: () => void;
+  onSelectNode: (nodeId: string) => void;
+  onBackFromNode: () => void;
   headerTrailing: ReactNode;
 }
 
 /**
- * Within a read-only fire snapshot the workflow's DAG nodes are not
- * drill-down targets (the Schedules page has no node-detail URL slot),
- * so node activation is intentionally inert. `WorkflowView` still
- * renders the Graph tab; clicking a node simply does nothing here.
- */
-const READONLY_NODE_SELECT = () => {};
-
-/**
  * Inner remount-keyed view that owns the {@link useWorkflowDetail}
- * hook. Renders the shared {@link FallbackBackRow} during the detail
- * fetch's loading / error window (since {@link WorkflowView} requires a
- * non-null workflow), then hands off to `WorkflowView` — which provides
- * its own `.tasks-pane__detail` aside — once the header resolves.
+ * hook. When `fireNodeId` is set, renders the node-detail pane instead
+ * of the workflow tabs. Otherwise renders `WorkflowView` with a live
+ * `onSelectNode` handler so the Graph tab's nodes are clickable.
  */
 function FireWorkflowView({
   fireWorkflowId,
+  fireNodeId,
   scheduleName,
   onBack,
+  onSelectNode,
+  onBackFromNode,
   headerTrailing,
 }: FireWorkflowViewProps) {
   const { workflow, dag, error, dagError } = useWorkflowDetail(fireWorkflowId);
+
+  const handleSelectNode = useCallback(
+    (node: WorkflowNodeWire) => {
+      if (node.spec.kind === "human") {
+        onSelectNode(node.id);
+      } else {
+        if (node.taskId === undefined) return;
+        onSelectNode(node.id);
+      }
+    },
+    [onSelectNode],
+  );
+
+  // Derive the node-level selection for the Graph tab highlight.
+  const selectedNodeId = fireNodeId;
 
   if (workflow === null) {
     return (
@@ -205,12 +231,49 @@ function FireWorkflowView({
     );
   }
 
+  // When a node is selected, render the appropriate node-detail pane.
+  if (fireNodeId !== null && dag !== null) {
+    const node = dag.nodes.find((n) => n.id === fireNodeId);
+    if (node !== undefined) {
+      if (node.spec.kind === "human") {
+        return (
+          <WorkflowNodeHumanPane
+            key={`${fireWorkflowId}:human:${fireNodeId}`}
+            workflow={workflow}
+            dag={dag}
+            nodeId={fireNodeId}
+            onBack={onBackFromNode}
+            onNavigate={onSelectNode}
+          />
+        );
+      }
+      if (node.taskId !== undefined) {
+        return (
+          <WorkflowNodeTaskPane
+            key={`${fireWorkflowId}:${fireNodeId}`}
+            workflow={workflow}
+            dag={dag}
+            nodeTaskId={node.taskId}
+            pollIntervalMs={4000}
+            onBack={onBackFromNode}
+            onNavigate={(nextTaskId: string) => {
+              // Find the node with this taskId and navigate to its node id.
+              const target = dag.nodes.find((n) => n.taskId === nextTaskId);
+              if (target) onSelectNode(target.id);
+            }}
+          />
+        );
+      }
+    }
+  }
+
   return (
     <WorkflowView
       workflow={workflow}
       dag={dag}
       dagError={dagError}
-      onSelectNode={READONLY_NODE_SELECT}
+      selectedNodeId={selectedNodeId}
+      onSelectNode={handleSelectNode}
       headerTrailing={headerTrailing}
     />
   );

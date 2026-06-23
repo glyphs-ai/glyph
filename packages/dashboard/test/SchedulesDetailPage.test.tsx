@@ -23,6 +23,8 @@ vi.mock("../src/api", async () => {
     listScheduledWorkflows: vi.fn(),
     getWorkflow: vi.fn(),
     getWorkflowDag: vi.fn(),
+    getTask: vi.fn(),
+    fetchTaskActivity: vi.fn(),
   };
 });
 
@@ -41,6 +43,8 @@ const mockListScheduledWorkflows = api.listScheduledWorkflows as unknown as Retu
 >;
 const mockGetWorkflow = api.getWorkflow as unknown as ReturnType<typeof vi.fn>;
 const mockGetWorkflowDag = api.getWorkflowDag as unknown as ReturnType<typeof vi.fn>;
+const mockGetTask = api.getTask as unknown as ReturnType<typeof vi.fn>;
+const mockFetchTaskActivity = api.fetchTaskActivity as unknown as ReturnType<typeof vi.fn>;
 
 function makeAgent(fqn: string): AgentEntry {
   const [scope, short] = fqn.split("/");
@@ -179,6 +183,8 @@ beforeEach(() => {
   mockListScheduledWorkflows.mockReset();
   mockGetWorkflow.mockReset();
   mockGetWorkflowDag.mockReset();
+  mockGetTask.mockReset();
+  mockFetchTaskActivity.mockReset();
   mockListSchedules.mockResolvedValue([SAMPLE_VIEW]);
   mockGetSchedule.mockResolvedValue(SAMPLE_DETAIL);
   mockPreviewSchedule.mockResolvedValue({
@@ -189,6 +195,8 @@ beforeEach(() => {
   mockListScheduledWorkflows.mockResolvedValue([]);
   mockGetWorkflow.mockResolvedValue(WF_FIRE);
   mockGetWorkflowDag.mockResolvedValue(WF_DAG);
+  mockGetTask.mockResolvedValue(null);
+  mockFetchTaskActivity.mockResolvedValue([]);
 });
 
 afterEach(() => cleanup());
@@ -462,5 +470,47 @@ describe("Schedule detail panel", () => {
     expect(await screen.findByTestId("fire-workflow-not-found")).toBeTruthy();
     // A stale id must never trigger a workflow detail fetch.
     expect(mockGetWorkflow).not.toHaveBeenCalled();
+  });
+
+  it("clicking a task-backed node in the fire-workflow Graph tab writes ?fireNodeId= and renders the node pane", async () => {
+    const taskNodeId = "00000000-0000-4000-8000-000000000099";
+    const dagWithTaskNode: WorkflowDagWire = {
+      workflow: WF_FIRE,
+      nodes: [
+        ...WF_DAG.nodes,
+        {
+          id: taskNodeId,
+          workflowId: "wf-fire-1",
+          status: "succeeded",
+          phase: 1,
+          spec: { kind: "worker", agent: "official/engineer", brief: "Do the thing" },
+          metadata: {},
+          taskId: "task-abc",
+          createdAt: "2026-05-28T02:01:00Z",
+          readyAt: "2026-05-28T02:01:00Z",
+          runningAt: "2026-05-28T02:01:01Z",
+          endedAt: "2026-05-28T02:03:00Z",
+        },
+      ],
+      edges: [],
+    };
+    mockListSchedules.mockResolvedValue([SAMPLE_WF_VIEW]);
+    mockGetSchedule.mockResolvedValue(SAMPLE_WF_DETAIL);
+    mockListScheduledWorkflows.mockResolvedValue([WF_FIRE]);
+    mockGetWorkflow.mockResolvedValue(WF_FIRE);
+    mockGetWorkflowDag.mockResolvedValue(dagWithTaskNode);
+    renderWorkflowDetail(`&fireWorkflowId=${WF_FIRE.id}`);
+    // Wait for the workflow detail to load.
+    await screen.findByTestId("workflow-detail");
+    // Switch to Graph tab.
+    fireEvent.click(screen.getByTestId("workflow-tab-graph"));
+    // Click the task-backed node.
+    const nodeBtn = await screen.findByTestId(`dag-node-${taskNodeId}`);
+    fireEvent.click(nodeBtn);
+    // The URL should now contain fireNodeId — verify by checking that
+    // the node task pane renders (replaces the workflow-detail view).
+    await waitFor(() => {
+      expect(screen.getByTestId("workflow-node-pane")).toBeTruthy();
+    });
   });
 });
