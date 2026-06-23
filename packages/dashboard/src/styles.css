@@ -5526,32 +5526,7 @@ button {
   outline-offset: 2px;
 }
 
-/* Overview tab — body lives in shared `.overview-tab` / `.overview-card*`
- * selectors (defined alongside Task's OverviewTab). The metadata `<dl>`
- * still wants per-row alignment + a mono value column, so we keep just
- * the metadata-related shape selectors. */
-.workflow-overview__metadata {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.workflow-overview__meta-row {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: var(--space-2);
-  font-size: 13px;
-}
-.workflow-overview__meta-row dt {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-.workflow-overview__meta-row dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  word-break: break-word;
-}
+
 
 /* Graph tab — container that hosts WorkflowDagView. Becomes a flex
  * column inside `.workflow-tabpanel > *` (which gives it
