@@ -2160,31 +2160,25 @@ describe("resolveArtifactPath", () => {
   });
 });
 
-// ───── deleteForSchedule (cascade-delete from schedule.delete) ─────────────────
+// ───── deleteTerminalByOriginMetadata (cascade-delete) ─────────────────
 //
-// ScheduleService.delete calls this to purge every TERMINAL task a
-// schedule produced when the user removes the trigger. Workdirs are
-// enqueued on the same serialised purgeQueue used by single-task
-// delete(id, { purge: true }), so we exercise drain semantics with
-// the test seam.
+// Integration packages call this via typed wrappers to purge every
+// TERMINAL task matching an origin+metadata pair. Workdirs are enqueued
+// on the same serialised purgeQueue used by single-task delete.
 
-describe("TaskService.deleteForSchedule (cascade-delete)", () => {
+describe("TaskService.deleteTerminalByOriginMetadata (cascade-delete)", () => {
   async function seedFiredTask(
     m: TaskService,
     repo: TaskRepository,
-    args: { scheduleId: string; status: "succeeded" | "failed" | "cancelled" },
+    args: { refId: string; status: "succeeded" | "failed" | "cancelled" },
   ): Promise<TaskEntity> {
-    // Dispatch a real task so the workdir actually exists, then overwrite
-    // its row with the desired terminal status + schedule metadata. Going
-    // through dispatch is necessary for the workdir to exist (the purge
-    // enqueues a recursive remove against it).
     const t = await m.dispatch(dispatchOf());
     const ended = "2026-05-08T02:00:00.000Z";
     const base = {
       ...t,
-      origin: "schedule" as const,
+      origin: "workflow" as const,
       status: args.status,
-      metadata: { ...t.metadata, scheduleId: args.scheduleId },
+      metadata: { ...t.metadata, refId: args.refId },
       endedAt: ended,
     };
     const overlay: Record<string, unknown> = {};
@@ -2196,53 +2190,50 @@ describe("TaskService.deleteForSchedule (cascade-delete)", () => {
     return reseeded;
   }
 
+  const OPTS = { origin: "workflow", metadataKey: "refId", metadataValue: "r1" } as const;
+
   it("returns { deletedCount: 0 } when no historical tasks match", async () => {
     const { m } = await makeManager();
-    expect(await m.deleteForSchedule("sched-empty")).toEqual({ deletedCount: 0 });
+    expect(await m.deleteTerminalByOriginMetadata(OPTS)).toEqual({ deletedCount: 0 });
   });
 
-  it("removes every terminal task for the schedule and enqueues workdir purge for each", async () => {
+  it("removes every terminal task matching origin+metadata and enqueues workdir purge", async () => {
     const rt = new StubRuntime();
     const { m, repo } = await makeManager({ runtime: rt });
-    const a = await seedFiredTask(m, repo, { scheduleId: "sched-1", status: "succeeded" });
-    const b = await seedFiredTask(m, repo, { scheduleId: "sched-1", status: "failed" });
-    const c = await seedFiredTask(m, repo, { scheduleId: "sched-other", status: "succeeded" });
+    const a = await seedFiredTask(m, repo, { refId: "r1", status: "succeeded" });
+    const b = await seedFiredTask(m, repo, { refId: "r1", status: "failed" });
+    const c = await seedFiredTask(m, repo, { refId: "r2", status: "succeeded" });
 
-    const result = await m.deleteForSchedule("sched-1");
+    const result = await m.deleteTerminalByOriginMetadata(OPTS);
     expect(result).toEqual({ deletedCount: 2 });
 
-    // DB rows for sched-1 are gone; sched-other survives.
     expect(await m.get(a.id)).toBeNull();
     expect(await m.get(b.id)).toBeNull();
     expect(await m.get(c.id)).not.toBeNull();
 
-    // Workdirs are removed in the background.
     await m._drainPendingPurgesForTest();
     expect(await safeStat(path.join(tasksDir, a.id))).toBeNull();
     expect(await safeStat(path.join(tasksDir, b.id))).toBeNull();
     expect(await safeStat(path.join(tasksDir, c.id))).not.toBeNull();
   });
 
-  it("does NOT delete running tasks even if their scheduleId matches (terminal-only filter)", async () => {
+  it("does NOT delete running tasks even if metadata matches (terminal-only filter)", async () => {
     const rt = new StubRuntime();
     const { m, repo } = await makeManager({ runtime: rt });
     const terminal = await seedFiredTask(m, repo, {
-      scheduleId: "sched-1",
+      refId: "r1",
       status: "succeeded",
     });
-    // A still-running task for the same schedule. Real dispatch leaves
-    // it as running until the runtime handle exits.
     const live = await m.dispatch(dispatchOf());
-    // Backdate it to look schedule-owned without exiting it.
     await repo.save(
       TaskEntity.fromStored({
         ...live,
-        origin: "schedule",
-        metadata: { ...live.metadata, scheduleId: "sched-1" },
+        origin: "workflow",
+        metadata: { ...live.metadata, refId: "r1" },
       } as never),
     );
 
-    const result = await m.deleteForSchedule("sched-1");
+    const result = await m.deleteTerminalByOriginMetadata(OPTS);
     expect(result).toEqual({ deletedCount: 1 });
 
     expect(await m.get(terminal.id)).toBeNull();

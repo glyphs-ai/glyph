@@ -33,9 +33,9 @@ export interface TaskCreateArgs {
   readonly metadata?: Readonly<Record<string, unknown>>;
   /**
    * Who launched this task. Defaults to `'standalone'` when omitted —
-   * a direct CLI / dashboard / MCP call. Workflow and schedule
-   * call sites pass the matching {@link TaskOrigin} so dashboard /
-   * CLI default views can hide non-standalone tasks.
+   * a direct CLI / dashboard / MCP call. Integration call sites pass
+   * the matching {@link TaskOrigin} so dashboard / CLI default views
+   * can hide non-standalone tasks.
    */
   readonly origin?: TaskOrigin;
   /** Override the task id (deterministic-test seam). */

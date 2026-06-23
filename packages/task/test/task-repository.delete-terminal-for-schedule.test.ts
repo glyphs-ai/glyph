@@ -1,14 +1,12 @@
 /**
- * `TaskRepository.deleteTerminalForSchedule(scheduleId)` is the SQL
- * side of the schedule-cascade-delete feature: when the user removes
- * a schedule, every TERMINAL task with `origin = 'schedule' AND
- * metadata.scheduleId = ?` is purged in a single statement so the
- * historical task rows don't outlive the trigger that produced them.
+ * `TaskRepository.deleteTerminalByOriginMetadata` is the SQL side of
+ * the cascade-delete feature: when an integration removes its resource,
+ * every TERMINAL task matching `origin + metadata key/value` is purged
+ * in a single statement so historical rows don't outlive the trigger.
  *
  * In-flight (non-terminal) tasks are deliberately untouched — the
  * service layer guarantees there are none via the
- * `hasInFlightForSchedule` guard (and re-checks for TOCTOU after the
- * cascade runs).
+ * `hasInFlightByOriginMetadata` guard.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -38,13 +36,13 @@ async function seed(args: {
   id: string;
   origin: TaskOrigin;
   status: TaskStatus;
-  scheduleId?: string;
+  refId?: string;
   success?: TaskSuccess;
   failure?: TaskFailure;
   cancellation?: TaskCancellation;
 }): Promise<void> {
   const metadata: Record<string, unknown> = {};
-  if (args.scheduleId !== undefined) metadata.scheduleId = args.scheduleId;
+  if (args.refId !== undefined) metadata.refId = args.refId;
   await repo.save(
     TaskEntity.fromStored({
       id: args.id,
@@ -63,97 +61,94 @@ async function seed(args: {
   );
 }
 
-describe("TaskRepository.deleteTerminalForSchedule", () => {
+const OPTS = { origin: "workflow", metadataKey: "refId", metadataValue: "r1" } as const;
+
+describe("TaskRepository.deleteTerminalByOriginMetadata", () => {
   it("returns an empty array and is a no-op when no tasks match", async () => {
-    expect(await repo.deleteTerminalForSchedule("sched-1")).toEqual([]);
+    expect(await repo.deleteTerminalByOriginMetadata(OPTS)).toEqual([]);
   });
 
-  it("removes every terminal status (succeeded / failed / cancelled) for the matching scheduleId", async () => {
+  it("removes every terminal status for matching origin+metadata", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
-      origin: "schedule",
+      origin: "workflow",
       status: "succeeded",
-      scheduleId: "sched-1",
+      refId: "r1",
       success: { output: "ok" },
     });
     await seed({
       id: "20260519-bbbbbbbb",
-      origin: "schedule",
+      origin: "workflow",
       status: "failed",
-      scheduleId: "sched-1",
+      refId: "r1",
       failure: { kind: "internal", message: "boom" },
     });
     await seed({
       id: "20260519-cccccccc",
-      origin: "schedule",
+      origin: "workflow",
       status: "cancelled",
-      scheduleId: "sched-1",
+      refId: "r1",
       cancellation: { kind: "user", message: "stop" },
     });
-    const deleted = await repo.deleteTerminalForSchedule("sched-1");
+    const deleted = await repo.deleteTerminalByOriginMetadata(OPTS);
     expect(deleted.map((t) => t.id).sort()).toEqual([
       "20260519-aaaaaaaa",
       "20260519-bbbbbbbb",
       "20260519-cccccccc",
     ]);
-    // Confirm the rows are actually gone from the DB.
     expect(await repo.read("20260519-aaaaaaaa")).toBeNull();
     expect(await repo.read("20260519-bbbbbbbb")).toBeNull();
     expect(await repo.read("20260519-cccccccc")).toBeNull();
   });
 
-  it("NEVER touches in-flight tasks — running rows are preserved even when matching scheduleId+origin", async () => {
+  it("NEVER touches in-flight tasks — running rows are preserved", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
-      origin: "schedule",
+      origin: "workflow",
       status: "succeeded",
-      scheduleId: "sched-1",
+      refId: "r1",
       success: { output: "ok" },
     });
     await seed({
       id: "20260519-bbbbbbbb",
-      origin: "schedule",
+      origin: "workflow",
       status: "running",
-      scheduleId: "sched-1",
+      refId: "r1",
     });
-    const deleted = await repo.deleteTerminalForSchedule("sched-1");
+    const deleted = await repo.deleteTerminalByOriginMetadata(OPTS);
     expect(deleted.map((t) => t.id)).toEqual(["20260519-aaaaaaaa"]);
-    // The running task still exists.
     expect(await repo.read("20260519-bbbbbbbb")).not.toBeNull();
   });
 
-  it("does NOT cross schedule boundaries — only tasks for the requested scheduleId are removed", async () => {
+  it("does NOT cross metadata boundaries — only matching metadataValue is removed", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
-      origin: "schedule",
+      origin: "workflow",
       status: "succeeded",
-      scheduleId: "sched-1",
+      refId: "r1",
       success: { output: "ok" },
     });
     await seed({
       id: "20260519-bbbbbbbb",
-      origin: "schedule",
+      origin: "workflow",
       status: "succeeded",
-      scheduleId: "sched-other",
+      refId: "r2",
       success: { output: "ok" },
     });
-    const deleted = await repo.deleteTerminalForSchedule("sched-1");
+    const deleted = await repo.deleteTerminalByOriginMetadata(OPTS);
     expect(deleted.map((t) => t.id)).toEqual(["20260519-aaaaaaaa"]);
     expect(await repo.read("20260519-bbbbbbbb")).not.toBeNull();
   });
 
-  it("origin guard discriminates — standalone tasks with a stray metadata.scheduleId are NOT touched", async () => {
-    // Defence-in-depth: a user who manually stuffed `scheduleId` into a
-    // standalone task's metadata must not have their work silently
-    // deleted when an unrelated schedule with the same id is removed.
+  it("origin guard discriminates — different-origin tasks are NOT touched", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
       origin: "standalone",
       status: "succeeded",
-      scheduleId: "sched-1",
+      refId: "r1",
       success: { output: "ok" },
     });
-    const deleted = await repo.deleteTerminalForSchedule("sched-1");
+    const deleted = await repo.deleteTerminalByOriginMetadata(OPTS);
     expect(deleted).toEqual([]);
     expect(await repo.read("20260519-aaaaaaaa")).not.toBeNull();
   });
@@ -161,12 +156,12 @@ describe("TaskRepository.deleteTerminalForSchedule", () => {
   it("is idempotent — running it twice after the first sweep is a no-op", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
-      origin: "schedule",
+      origin: "workflow",
       status: "succeeded",
-      scheduleId: "sched-1",
+      refId: "r1",
       success: { output: "ok" },
     });
-    await repo.deleteTerminalForSchedule("sched-1");
-    expect(await repo.deleteTerminalForSchedule("sched-1")).toEqual([]);
+    await repo.deleteTerminalByOriginMetadata(OPTS);
+    expect(await repo.deleteTerminalByOriginMetadata(OPTS)).toEqual([]);
   });
 });

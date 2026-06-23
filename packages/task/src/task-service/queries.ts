@@ -46,27 +46,10 @@ export async function listTasks(
 }
 
 /**
- * True if any non-terminal task with `origin='schedule'` and
- * `metadata.scheduleId === scheduleId` exists. Used by the
- * scheduler's concurrency=1 check and the delete-schedule guard.
- * Cheap thanks to the `tasks_schedule_id_idx` functional index.
- */
-export async function hasInFlightForSchedule(
-  ctx: TaskServiceCtx,
-  scheduleId: string,
-): Promise<boolean> {
-  return ctx.repository.hasInFlightForSchedule(scheduleId);
-}
-
-/**
  * True if any non-terminal task with `origin='workflow'` and
  * `metadata.workflowNodeId === nodeId` exists. Used by the workflow
  * worker runner's `hasInFlightForNode` implementation (see
- * `packages/api/src/wiring/workflow-worker-task-runner.ts`). Narrow
- * additive surface mirroring {@link hasInFlightForSchedule} —
- * deliberately NOT a generic `metadata` filter on `ListTaskOpts` so
- * the broadening stays contained to the one call site that needs
- * it.
+ * `packages/api/src/wiring/workflow-worker-task-runner.ts`).
  */
 export async function hasInFlightForWorkflowNode(
   ctx: TaskServiceCtx,

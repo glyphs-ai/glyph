@@ -1,6 +1,6 @@
 /**
  * Write-side `TaskService` commands. This module coordinates dispatch,
- * cancel, delete, schedule cleanup, orphan recovery, and background
+ * cancel, delete, origin-metadata cleanup, orphan recovery, and background
  * purge queueing; sibling modules own the leaf operations it calls.
  */
 
@@ -187,7 +187,7 @@ export async function cancelTask(ctx: TaskServiceCtx, id: string): Promise<TaskE
  *
  * Default ("archive") drops only the metadata row; the workdir stays
  * on disk so the user can inspect agent artifacts. `{ purge: true }`
- * also schedules a serialised background `runtime.deleteState` +
+ * also enqueues a serialised background `runtime.deleteState` +
  * `rm -rf workdir`. Background failures are warn-logged; orphan dirs
  * remain recoverable via the workspace's `sqlite3` CLI as the
  * recovery channel. Stays fire-and-forget because Windows `fs.rm` of
@@ -223,29 +223,26 @@ export async function deleteTask(
   await ctx.repository.delete(id);
 
   if (opts.purge === true) {
-    scheduleBackgroundPurge(ctx, id, existing, workdir);
+    enqueueBackgroundPurge(ctx, id, existing, workdir);
   }
 }
 
 /**
- * Cascade-delete every TERMINAL task with `origin='schedule'` and
- * `metadata.scheduleId === scheduleId`. Called by `ScheduleService.delete`
- * so historical fires don't outlive the schedule that produced them.
+ * Cascade-delete every TERMINAL task matching the given origin and
+ * metadata key/value. Origin-agnostic primitive; typed wrappers live
+ * in the respective integration package.
  *
  * Workdir cleanup mirrors `delete(id, { purge: true })`: each task's
- * workdir enqueues on the serialised `purgeQueue`. In-flight tasks
- * are never touched — the terminal filter inside
- * `deleteTerminalForSchedule` ignores them; the caller is responsible
- * for the no-in-flight precondition.
+ * workdir enqueues on the serialised `purgeQueue`.
  */
-export async function deleteTasksForSchedule(
+export async function deleteTerminalByOriginMetadata(
   ctx: TaskServiceCtx,
-  scheduleId: string,
+  opts: { readonly origin: string; readonly metadataKey: string; readonly metadataValue: string },
 ): Promise<{ deletedCount: number }> {
-  const deleted = await ctx.repository.deleteTerminalForSchedule(scheduleId);
+  const deleted = await ctx.repository.deleteTerminalByOriginMetadata(opts);
   for (const task of deleted) {
     const workdir = safeJoinUnderRoot(ctx.tasksDir, task.id);
-    scheduleBackgroundPurge(ctx, task.id, task, workdir);
+    enqueueBackgroundPurge(ctx, task.id, task, workdir);
   }
   return { deletedCount: deleted.length };
 }
@@ -293,7 +290,7 @@ export async function recoverOrphaned(ctx: TaskServiceCtx): Promise<void> {
  * for tens of seconds. Both continuations re-enqueue so a prior
  * failure never stalls the queue.
  */
-function scheduleBackgroundPurge(
+function enqueueBackgroundPurge(
   ctx: TaskServiceCtx,
   id: string,
   existing: TaskEntity,

@@ -84,13 +84,9 @@ export class TaskRepository {
         : [opts.origin as TaskOrigin];
       if (origins.length > 0) filters.push(inArray(tasks.origin, origins));
     }
-    if (opts.scheduleId !== undefined) {
-      // Functional predicate: `metadata` is a JSON text column, and
-      // `scheduleId` lives at `$.scheduleId`. The companion functional
-      // index `tasks_schedule_id_idx` makes this O(log n) when the
-      // optimiser can prove the WHERE shape lines up — combine with
-      // `origin='schedule'` in the same query to engage it.
-      filters.push(sql`json_extract(${tasks.metadata}, '$.scheduleId') = ${opts.scheduleId}`);
+    if (opts.metadataEquals !== undefined) {
+      const expr = resolveTaskMetadataExpr(opts.metadataEquals.key);
+      filters.push(sql`${expr} = ${opts.metadataEquals.value}`);
     }
     const query = this.db.select().from(tasks);
     const rows = filters.length > 0 ? query.where(and(...filters)).all() : query.all();
@@ -106,27 +102,29 @@ export class TaskRepository {
   }
 
   /**
-   * True if any task with `origin='schedule'` and
-   * `metadata.scheduleId === scheduleId` is non-terminal (i.e. status
-   * is not in {@link TERMINAL_TASK_STATUSES}). Backed by the
-   * `tasks_schedule_id_idx` functional index; the partial WHERE on
-   * the index matches the `origin = 'schedule'` predicate here, so
-   * the planner can satisfy the query from the index without a full
-   * table scan.
+   * True if any task with the given `origin` and matching top-level
+   * metadata key/value is non-terminal (status not in
+   * {@link TERMINAL_TASK_STATUSES}). Origin-agnostic primitive;
+   * integration packages wrap with typed APIs.
    *
-   * Non-terminal (rather than `status = 'running'`) is the right
-   * semantic for both the scheduler's concurrency=1 check and the
-   * schedule-delete guard.
+   * When `(origin, metadataKey)` matches a known partial expression
+   * index, the literal `json_extract` form is emitted so the planner
+   * engages the index without a full table scan.
    */
-  async hasInFlightForSchedule(scheduleId: string): Promise<boolean> {
+  async hasInFlightByOriginMetadata(opts: {
+    readonly origin: string;
+    readonly metadataKey: string;
+    readonly metadataValue: string;
+  }): Promise<boolean> {
+    const expr = resolveTaskMetadataExpr(opts.metadataKey);
     const row = this.db
       .select({ id: tasks.id })
       .from(tasks)
       .where(
         and(
-          eq(tasks.origin, "schedule"),
+          eq(tasks.origin, opts.origin),
           notInArray(tasks.status, [...TERMINAL_TASK_STATUSES]),
-          sql`json_extract(${tasks.metadata}, '$.scheduleId') = ${scheduleId}`,
+          sql`${expr} = ${opts.metadataValue}`,
         ),
       )
       .limit(1)
@@ -141,7 +139,7 @@ export class TaskRepository {
    * package's `hasInFlightForNode` reverse lookup for worker nodes
    * (see `packages/api/src/wiring/workflow-worker-task-runner.ts`).
    *
-   * Unlike {@link hasInFlightForSchedule} there is no functional
+   * Unlike indexed origin+key pairs, there is no functional
    * index on `metadata.workflowNodeId`; the planner falls back to
    * filtering by `origin='workflow'` first (still index-eligible
    * via the same row's `origin` column path) and applying the
@@ -253,37 +251,29 @@ export class TaskRepository {
   }
 
   /**
-   * Bulk-delete every TERMINAL task with `origin='schedule'` and
-   * `metadata.scheduleId === scheduleId`. Returns the deleted entities
-   * so the caller can enqueue per-task background work (e.g.
-   * `TaskService.scheduleBackgroundPurge`).
+   * Bulk-delete every TERMINAL task with the given `origin` and
+   * matching top-level metadata key/value. Returns deleted entities
+   * so the caller can enqueue per-task background work.
    *
    * Two-step (SELECT → DELETE) instead of `RETURNING` so that we can
    * map rows to entities BEFORE removing them: if a corrupted row
    * makes `rowToTask` throw, we warn-and-skip (matching `list()`'s
    * behaviour) and still drop the DB rows in the same SQL statement.
-   * `RETURNING` would leave us with the rows already gone but no
-   * recovery if mapping threw partway.
    *
    * The DELETE uses the SAME predicate as the SELECT (not an `IN (id,
    * id, …)` list) so we sidestep SQLite's bound-variable limit at
-   * large N — a schedule with thousands of historical fires is
-   * possible.
-   *
-   * Race window: between the SELECT and the DELETE another writer
-   * could have inserted or transitioned rows. In practice the caller
-   * (`ScheduleService.delete`) has already cancelled the schedule's
-   * timer and rejected the call if `hasInFlightForSchedule` returned
-   * true — so the only realistic insertion path is a concurrent
-   * manual `ScheduleService.run()`, which the caller separately
-   * defends against with a second `hasInFlightForSchedule` check
-   * after this method returns.
+   * large N.
    */
-  async deleteTerminalForSchedule(scheduleId: string): Promise<TaskEntity[]> {
+  async deleteTerminalByOriginMetadata(opts: {
+    readonly origin: string;
+    readonly metadataKey: string;
+    readonly metadataValue: string;
+  }): Promise<TaskEntity[]> {
+    const expr = resolveTaskMetadataExpr(opts.metadataKey);
     const predicate = and(
-      eq(tasks.origin, "schedule"),
+      eq(tasks.origin, opts.origin),
       inArray(tasks.status, [...TERMINAL_TASK_STATUSES]),
-      sql`json_extract(${tasks.metadata}, '$.scheduleId') = ${scheduleId}`,
+      sql`${expr} = ${opts.metadataValue}`,
     );
     const rows = this.db.select().from(tasks).where(predicate).all();
     if (rows.length === 0) return [];
@@ -294,13 +284,78 @@ export class TaskRepository {
       } catch (err) {
         this.logger.warn(
           { taskId: row.id ?? null, err },
-          "tasks: skipping corrupted task row during deleteTerminalForSchedule",
+          "tasks: skipping corrupted task row during deleteTerminalByOriginMetadata",
         );
       }
     }
     this.db.delete(tasks).where(predicate).run();
     return entities;
   }
+
+  /**
+   * Origin-agnostic aggregation primitive. Returns per-metadataValue
+   * counts for tasks matching the given `origin` and top-level
+   * `metadataKey`. Single `origin` per call, single key per call.
+   *
+   * When `(origin, metadataKey)` matches a known partial expression
+   * index, the literal `json_extract` form is used so the planner
+   * can engage the index.
+   */
+  async aggregateByOriginMetadataKey(opts: {
+    readonly origin: string;
+    readonly metadataKey: string;
+    readonly metadataValues: readonly string[];
+    readonly statusIn?: readonly string[];
+  }): Promise<ReadonlyMap<string, { readonly totalCount: number; readonly runningCount: number }>> {
+    if (opts.metadataValues.length === 0) return new Map();
+
+    const metadataExpr = resolveTaskMetadataExpr(opts.metadataKey);
+
+    const predicates: SQL[] = [
+      eq(tasks.origin, opts.origin),
+      inArray(metadataExpr, [...opts.metadataValues]),
+    ];
+    if (opts.statusIn !== undefined && opts.statusIn.length > 0) {
+      predicates.push(inArray(tasks.status, [...opts.statusIn]));
+    }
+
+    const matchedRows = this.db
+      .select({
+        metadataValue: metadataExpr,
+        status: tasks.status,
+      })
+      .from(tasks)
+      .where(and(...predicates))
+      .all();
+
+    const map = new Map<string, { totalCount: number; runningCount: number }>();
+    for (const row of matchedRows) {
+      const current = map.get(row.metadataValue) ?? { totalCount: 0, runningCount: 0 };
+      current.totalCount += 1;
+      if (row.status === "running") {
+        current.runningCount += 1;
+      }
+      map.set(row.metadataValue, current);
+    }
+    return map;
+  }
+}
+
+/**
+ * Known partial expression indexes on the `tasks` table. When the
+ * caller's metadataKey matches a known entry, the repository emits the
+ * literal SQL form so SQLite's query planner can prove syntactic
+ * equivalence with the index expression and engage it. For unindexed
+ * keys, falls back to dynamic path concatenation.
+ */
+const TASK_INDEXED_METADATA_KEYS: ReadonlyMap<string, ReturnType<typeof sql<string>>> = new Map([
+  ["scheduleId", sql<string>`json_extract(${tasks.metadata}, '$.scheduleId')`],
+]);
+
+function resolveTaskMetadataExpr(metadataKey: string) {
+  const indexed = TASK_INDEXED_METADATA_KEYS.get(metadataKey);
+  if (indexed) return indexed;
+  return sql<string>`json_extract(${tasks.metadata}, '$.' || ${metadataKey})`;
 }
 
 function taskToRowFields(task: TaskEntity): {

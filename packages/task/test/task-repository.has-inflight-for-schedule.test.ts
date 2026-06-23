@@ -1,14 +1,12 @@
 /**
- * `TaskService.hasInFlightForSchedule(scheduleId)` is the
- * concurrency=1 guard the scheduler uses to skip firing while a
- * previous fire of the same schedule is still running, AND the guard
- * the delete-schedule path uses to refuse delete while a fired task
- * is in flight.
+ * `TaskRepository.hasInFlightByOriginMetadata` is the origin-agnostic
+ * concurrency guard that integration packages use (via typed wrappers)
+ * to check whether a non-terminal task exists for a given origin and
+ * metadata key/value pair.
  *
- * Predicate is `origin = 'schedule' AND status NOT IN terminal statuses
- * AND metadata.scheduleId = ?`. The origin guard discriminates: a
- * standalone task that happens to carry `metadata.scheduleId` does
- * NOT count (no scheduler ever owns it).
+ * Predicate: `origin = ? AND status NOT IN terminal AND
+ * json_extract(metadata, '$.key') = ?`. The origin guard discriminates:
+ * a standalone task carrying the same metadata key does NOT match.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -38,13 +36,13 @@ async function seed(args: {
   id: string;
   origin: TaskOrigin;
   status: TaskStatus;
-  scheduleId?: string;
+  refId?: string;
   success?: TaskSuccess;
   failure?: TaskFailure;
   cancellation?: TaskCancellation;
 }): Promise<void> {
   const metadata: Record<string, unknown> = {};
-  if (args.scheduleId !== undefined) metadata.scheduleId = args.scheduleId;
+  if (args.refId !== undefined) metadata.refId = args.refId;
   await repo.save(
     TaskEntity.fromStored({
       id: args.id,
@@ -63,83 +61,82 @@ async function seed(args: {
   );
 }
 
-describe("TaskRepository.hasInFlightForSchedule", () => {
+const OPTS = { origin: "workflow", metadataKey: "refId", metadataValue: "r1" } as const;
+
+describe("TaskRepository.hasInFlightByOriginMetadata", () => {
   it("(a) returns false when no tasks exist", async () => {
-    expect(await repo.hasInFlightForSchedule("sched-1")).toBe(false);
+    expect(await repo.hasInFlightByOriginMetadata(OPTS)).toBe(false);
   });
 
-  it("(b) returns true for a running schedule-origin task with the matching scheduleId", async () => {
+  it("(b) returns true for a running task with matching origin and metadata", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
-      origin: "schedule",
+      origin: "workflow",
       status: "running",
-      scheduleId: "sched-1",
+      refId: "r1",
     });
-    expect(await repo.hasInFlightForSchedule("sched-1")).toBe(true);
+    expect(await repo.hasInFlightByOriginMetadata(OPTS)).toBe(true);
   });
 
-  it("(c) returns false when all matching tasks are terminal (succeeded/failed/cancelled)", async () => {
+  it("(c) returns false when all matching tasks are terminal", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
-      origin: "schedule",
+      origin: "workflow",
       status: "succeeded",
-      scheduleId: "sched-1",
+      refId: "r1",
       success: { output: "ok" },
     });
     await seed({
       id: "20260519-bbbbbbbb",
-      origin: "schedule",
+      origin: "workflow",
       status: "failed",
-      scheduleId: "sched-1",
+      refId: "r1",
       failure: { kind: "internal", message: "boom" },
     });
     await seed({
       id: "20260519-cccccccc",
-      origin: "schedule",
+      origin: "workflow",
       status: "cancelled",
-      scheduleId: "sched-1",
+      refId: "r1",
       cancellation: { kind: "user", message: "stop" },
     });
-    expect(await repo.hasInFlightForSchedule("sched-1")).toBe(false);
+    expect(await repo.hasInFlightByOriginMetadata(OPTS)).toBe(false);
   });
 
-  it("(d) returns false when only DIFFERENT scheduleIds have running tasks", async () => {
+  it("(d) returns false when only DIFFERENT metadata values have running tasks", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
-      origin: "schedule",
+      origin: "workflow",
       status: "running",
-      scheduleId: "sched-other",
+      refId: "r2",
     });
-    expect(await repo.hasInFlightForSchedule("sched-1")).toBe(false);
+    expect(await repo.hasInFlightByOriginMetadata(OPTS)).toBe(false);
   });
 
-  it("(e) returns false when a standalone task carries metadata.scheduleId (origin guard discriminates)", async () => {
+  it("(e) returns false when a different-origin task carries matching metadata (origin guard discriminates)", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
       origin: "standalone",
       status: "running",
-      scheduleId: "sched-1",
+      refId: "r1",
     });
-    // The origin guard is what makes this safe: a user who happens to
-    // stuff `scheduleId` into a standalone task's metadata does NOT
-    // confuse the scheduler's concurrency check.
-    expect(await repo.hasInFlightForSchedule("sched-1")).toBe(false);
+    expect(await repo.hasInFlightByOriginMetadata(OPTS)).toBe(false);
   });
 
-  it("mixed: returns true if at least one running schedule-origin task matches, even alongside terminal ones", async () => {
+  it("mixed: returns true if at least one running task matches", async () => {
     await seed({
       id: "20260519-aaaaaaaa",
-      origin: "schedule",
+      origin: "workflow",
       status: "succeeded",
-      scheduleId: "sched-1",
+      refId: "r1",
       success: { output: "old" },
     });
     await seed({
       id: "20260519-bbbbbbbb",
-      origin: "schedule",
+      origin: "workflow",
       status: "running",
-      scheduleId: "sched-1",
+      refId: "r1",
     });
-    expect(await repo.hasInFlightForSchedule("sched-1")).toBe(true);
+    expect(await repo.hasInFlightByOriginMetadata(OPTS)).toBe(true);
   });
 });
