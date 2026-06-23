@@ -41,6 +41,14 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     folderMillis: 3,
     hash: "c3be965b5a18fd45a7511f77dc4179b9a91a8745730f0aac09ecb221391bfc86",
   },
+  {
+    sql: [
+      "CREATE INDEX IF NOT EXISTS `workflows_schedule_id_idx`\n  ON `workflows` (json_extract(`metadata`, '$.scheduleId'))\n  WHERE `origin` = 'schedule';\n"
+    ],
+    bps: true,
+    folderMillis: 4,
+    hash: "18681abac79f1ed7164bd6caa36b4720aa1263671f3ecfcc19f4e72bc4dcb8d1",
+  },
 ];
 
 /**

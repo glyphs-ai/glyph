@@ -209,59 +209,90 @@ export class WorkflowRepository {
   }
 
   /**
-   * Single-pass SQL aggregation returning per-schedule running/awaiting
-   * counts. A workflow contributes to `awaitingCount` iff it is
-   * `status='running'` AND has ≥1 human node with `status='running'`.
-   * We cross-check both because human-node status drift could otherwise
-   * inflate the count (e.g. orphan human nodes left behind after a
-   * workflow cancellation).
+   * Origin-agnostic aggregation primitive. Returns per-metadataValue
+   * counts for workflows matching the given `origin` and top-level
+   * `metadataKey`. Single `origin` per call, single key per call.
    *
-   * Workflows with non-running status (cancelled/failed/succeeded) are
-   * excluded entirely. Schedules with zero running workflows are absent
-   * from the returned map.
+   * `statusIn`, when supplied, restricts to workflows with one of the
+   * given statuses. When omitted, all statuses are included.
+   *
+   * `awaitingCount` = number of matched workflows that have ≥1 running
+   * human-kind node.
    */
-  async aggregateRunningFireStatsByScheduleId(): Promise<
-    ReadonlyMap<string, { runningCount: number; awaitingCount: number }>
+  async aggregateByOriginMetadataKey(opts: {
+    readonly origin: string;
+    readonly metadataKey: string;
+    readonly metadataValues: readonly string[];
+    readonly statusIn?: readonly string[];
+  }): Promise<
+    ReadonlyMap<
+      string,
+      { readonly totalCount: number; readonly runningCount: number; readonly awaitingCount: number }
+    >
   > {
-    const scheduleIdExpr = sql<string>`json_extract(${workflows.metadata}, '$.scheduleId')`;
+    if (opts.metadataValues.length === 0) return new Map();
 
-    // Step 1: Get running workflows per schedule
-    const runningRows = this.db
+    // When the (origin, metadataKey) pair matches a known partial
+    // expression index, emit the literal json_extract form so SQLite's
+    // query planner engages the index. Dynamic `'$.' || ?` prevents
+    // index usage because the planner matches expressions syntactically.
+    const metadataExpr = resolveWorkflowMetadataExpr(opts.origin, opts.metadataKey);
+
+    const predicates = [
+      eq(workflows.origin, opts.origin),
+      inArray(metadataExpr, [...opts.metadataValues]),
+    ];
+    if (opts.statusIn !== undefined && opts.statusIn.length > 0) {
+      predicates.push(inArray(workflows.status, [...opts.statusIn]));
+    }
+
+    const matchedRows = this.db
       .select({
-        scheduleId: scheduleIdExpr,
+        metadataValue: metadataExpr,
         workflowId: workflows.id,
+        status: workflows.status,
       })
       .from(workflows)
-      .where(
-        and(
-          eq(workflows.status, "running"),
-          eq(workflows.origin, "schedule"),
-          sql`json_extract(${workflows.metadata}, '$.scheduleId') IS NOT NULL`,
-        ),
-      )
+      .where(and(...predicates))
       .all();
 
-    if (runningRows.length === 0) return new Map();
+    if (matchedRows.length === 0) return new Map();
 
-    // Step 2: Get workflows that have ≥1 running human node
+    // Determine which matched workflows have ≥1 running human node
+    const matchedIds = matchedRows.map((r) => r.workflowId);
     const awaitingSet = new Set(
       this.db
         .selectDistinct({ workflowId: workflowNodes.workflowId })
         .from(workflowNodes)
-        .where(and(eq(workflowNodes.kind, "human"), eq(workflowNodes.status, "running")))
+        .where(
+          and(
+            inArray(workflowNodes.workflowId, matchedIds),
+            eq(workflowNodes.kind, "human"),
+            eq(workflowNodes.status, "running"),
+          ),
+        )
         .all()
         .map((r) => r.workflowId),
     );
 
-    // Step 3: Aggregate in JS (both sets are small per workspace)
-    const map = new Map<string, { runningCount: number; awaitingCount: number }>();
-    for (const row of runningRows) {
-      const current = map.get(row.scheduleId) ?? { runningCount: 0, awaitingCount: 0 };
-      current.runningCount += 1;
-      if (awaitingSet.has(row.workflowId)) {
-        current.awaitingCount += 1;
+    const map = new Map<
+      string,
+      { totalCount: number; runningCount: number; awaitingCount: number }
+    >();
+    for (const row of matchedRows) {
+      const current = map.get(row.metadataValue) ?? {
+        totalCount: 0,
+        runningCount: 0,
+        awaitingCount: 0,
+      };
+      current.totalCount += 1;
+      if (row.status === "running") {
+        current.runningCount += 1;
+        if (awaitingSet.has(row.workflowId)) {
+          current.awaitingCount += 1;
+        }
       }
-      map.set(row.scheduleId, current);
+      map.set(row.metadataValue, current);
     }
     return map;
   }
@@ -643,6 +674,35 @@ export class WorkflowRepository {
  */
 function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, "\\$&");
+}
+
+/**
+ * Known partial expression indexes on the `workflows` table. Each entry
+ * maps an `(origin, metadataKey)` pair to the literal `json_extract`
+ * expression that the DDL uses. When the caller's arguments match a
+ * known entry, the repository emits the literal SQL form so SQLite's
+ * query planner can prove syntactic equivalence with the index expression
+ * and use the index. For unindexed pairs, falls back to dynamic path
+ * concatenation (`'$.' || ?`).
+ */
+const WORKFLOW_INDEXED_METADATA: ReadonlyArray<{
+  origin: string;
+  metadataKey: string;
+  expr: ReturnType<typeof sql<string>>;
+}> = [
+  {
+    origin: "schedule",
+    metadataKey: "scheduleId",
+    expr: sql<string>`json_extract(${workflows.metadata}, '$.scheduleId')`,
+  },
+];
+
+function resolveWorkflowMetadataExpr(origin: string, metadataKey: string) {
+  const indexed = WORKFLOW_INDEXED_METADATA.find(
+    (e) => e.origin === origin && e.metadataKey === metadataKey,
+  );
+  if (indexed) return indexed.expr;
+  return sql<string>`json_extract(${workflows.metadata}, '$.' || ${metadataKey})`;
 }
 
 // Re-export row helpers so the service layer keeps a single import root.
