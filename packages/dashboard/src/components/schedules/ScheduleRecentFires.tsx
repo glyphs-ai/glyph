@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   listScheduledTasks,
@@ -6,58 +6,27 @@ import {
   type TaskRecord,
   type WorkflowHeaderWire,
 } from "../../api";
+import { useClickOutside } from "../../hooks/useClickOutside";
 import { formatAbsolute, formatClockTime, formatDuration, formatRelative } from "../../utils/time";
+import { MoreHorizontalIcon } from "../Icons";
 import { StatusBadge } from "../tasks/StatusBadge";
 import { STATUS_TONE } from "../tasks/shared";
 import { WorkflowStatusBadge } from "../workflows/WorkflowStatusBadge";
 
 export interface ScheduleRecentFiresProps {
-  /** Schedule id used to scope the `?scheduleId=` query. */
   scheduleId: string;
-  /**
-   * Target kind of the selected schedule. Drives which fire history
-   * the panel fetches: `"task"` reads `listScheduledTasks`, `"workflow"`
-   * reads `listScheduledWorkflows`. Any other kind renders a stub —
-   * forward-compatible with substrate kinds the dashboard can't yet
-   * project.
-   */
   kind: string;
-  /** UUID of the workspace currently in scope — used to build deep-link URLs. */
   currentWorkspaceId: string;
-  /**
-   * Bumps each time the parent wants to force a refresh (e.g. after
-   * the user clicked "Run now" and a new running fire was created on
-   * the server side). Polling on top would be overkill for v1 — the
-   * page already auto-refreshes on tab visibility.
-   */
   refreshToken: number;
-  /**
-   * Callback fired when the user clicks a recent-fire row. The parent
-   * page swaps the detail-pane into Mode B (the fire's detail) by
-   * writing `?fireTaskId=<id>` (task kind) or `?fireWorkflowId=<id>`
-   * (workflow kind) to the URL atomically with `?scheduleId=`. Falls
-   * back to a deep-link to the Tasks / Workflows page when not provided
-   * (early-mount or out-of-tree consumers).
-   */
   onSelectFire?: (fireId: string) => void;
+  onCancelTaskFire?: (taskId: string) => Promise<void> | void;
+  onCancelWorkflowFire?: (workflow: WorkflowHeaderWire) => Promise<void> | void;
 }
 
 const MAX_ROWS = 10;
 
-/**
- * "Recent fires" panel rendered inside the schedule detail panel.
- * Lists the latest 10 schedule-launched runs scoped to the current
- * schedule id; clicking a row swaps the right-pane into Mode B (the
- * fire's full detail) by calling `onSelectFire` — no navigation, the
- * schedule list stays visible. When `onSelectFire` isn't wired the row
- * falls back to a deep-link into the Tasks / Workflows page.
- *
- * The fire history is kind-discriminated: task-kind schedules surface
- * their `TaskRecord` fires; workflow-kind schedules surface their
- * `WorkflowHeaderWire` fires. The two bodies own their own fetch +
- * render so each stays correctly typed (no union narrowing at the row
- * boundary).
- */
+type CloseReason = "escape" | "menuitem" | "outside";
+
 export function ScheduleRecentFires(props: ScheduleRecentFiresProps) {
   return (
     <section className="schedule-detail__recent" aria-label="Recent fires">
@@ -80,11 +49,12 @@ function TaskFiresBody({
   currentWorkspaceId,
   refreshToken,
   onSelectFire,
+  onCancelTaskFire,
 }: ScheduleRecentFiresProps) {
   const [rows, setRows] = useState<TaskRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is intentionally part of the re-fetch trigger set; parent bumps it after a run-now to surface the synthetic task row
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is intentionally part of the re-fetch trigger set
   useEffect(() => {
     let cancelled = false;
     setError(null);
@@ -105,28 +75,18 @@ function TaskFiresBody({
   }, [scheduleId, refreshToken]);
 
   if (error) return <div className="alert alert--error">⚠️ {error}</div>;
-  if (rows === null)
-    return (
-      <p className="muted" style={{ fontSize: 12 }}>
-        Loading…
-      </p>
-    );
-  if (rows.length === 0)
-    return (
-      <p className="muted" style={{ fontSize: 12 }}>
-        This schedule hasn't fired yet.
-      </p>
-    );
+  if (rows === null) return <MutedLoading />;
+  if (rows.length === 0) return <MutedEmpty />;
   return (
     <ul className="task-list" style={{ borderTop: "1px solid var(--color-border)" }}>
-      {rows.map((t) => (
-        <li key={t.id}>
-          <ScheduleFireRow
-            task={t}
-            currentWorkspaceId={currentWorkspaceId}
-            onSelectFire={onSelectFire}
-          />
-        </li>
+      {rows.map((task) => (
+        <TaskFireRow
+          key={task.id}
+          task={task}
+          currentWorkspaceId={currentWorkspaceId}
+          onSelectFire={onSelectFire}
+          onCancelTaskFire={onCancelTaskFire}
+        />
       ))}
     </ul>
   );
@@ -137,11 +97,12 @@ function WorkflowFiresBody({
   currentWorkspaceId,
   refreshToken,
   onSelectFire,
+  onCancelWorkflowFire,
 }: ScheduleRecentFiresProps) {
   const [rows, setRows] = useState<WorkflowHeaderWire[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is intentionally part of the re-fetch trigger set; parent bumps it after a run-now to surface the synthetic workflow row
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is intentionally part of the re-fetch trigger set
   useEffect(() => {
     let cancelled = false;
     setError(null);
@@ -162,59 +123,54 @@ function WorkflowFiresBody({
   }, [scheduleId, refreshToken]);
 
   if (error) return <div className="alert alert--error">⚠️ {error}</div>;
-  if (rows === null)
-    return (
-      <p className="muted" style={{ fontSize: 12 }}>
-        Loading…
-      </p>
-    );
-  if (rows.length === 0)
-    return (
-      <p className="muted" style={{ fontSize: 12 }}>
-        This schedule hasn't fired yet.
-      </p>
-    );
+  if (rows === null) return <MutedLoading />;
+  if (rows.length === 0) return <MutedEmpty />;
   return (
     <ul className="task-list" style={{ borderTop: "1px solid var(--color-border)" }}>
-      {rows.map((w) => (
-        <li key={w.id}>
-          <ScheduleWorkflowFireRow
-            workflow={w}
-            currentWorkspaceId={currentWorkspaceId}
-            onSelectFire={onSelectFire}
-          />
-        </li>
+      {rows.map((workflow) => (
+        <WorkflowFireRow
+          key={workflow.id}
+          workflow={workflow}
+          currentWorkspaceId={currentWorkspaceId}
+          onSelectFire={onSelectFire}
+          onCancelWorkflowFire={onCancelWorkflowFire}
+        />
       ))}
     </ul>
   );
 }
 
-interface ScheduleFireRowProps {
+function MutedLoading() {
+  return (
+    <p className="muted" style={{ fontSize: 12 }}>
+      Loading…
+    </p>
+  );
+}
+
+function MutedEmpty() {
+  return (
+    <p className="muted" style={{ fontSize: 12 }}>
+      This schedule hasn't fired yet.
+    </p>
+  );
+}
+
+interface TaskFireRowProps {
   task: TaskRecord;
   currentWorkspaceId: string;
   onSelectFire?: (taskId: string) => void;
+  onCancelTaskFire?: (taskId: string) => Promise<void> | void;
 }
 
-/**
- * Single recent-fire row. When `onSelectFire` is set the row is a
- * real `<button>` so keyboard and click semantics come for free; when
- * it isn't (early-mount or out-of-tree consumers) the row falls back
- * to a `<Link>` to the Tasks page so deep-linking still works.
- *
- * Layout is the **dense single-row** variant of `.task-list__item`:
- * a CSS-Grid row with columns `[status badge] [wall-clock] [duration]
- * [task id]`. The brief / agent / runtime aren't surfaced because
- * they are constant across every row of a single schedule's fires
- * (this list is already scoped to one schedule) — surfacing them
- * would only burn vertical space. Duration is computed from
- * `startedAt` → `endedAt`; for status='running' the missing endedAt
- * is filled with `Date.now()` by `formatDuration`, yielding a static
- * "elapsed so far" reading (refreshes whenever the row re-renders;
- * intentionally not live-ticking).
- */
-function ScheduleFireRow({ task, currentWorkspaceId, onSelectFire }: ScheduleFireRowProps) {
+function TaskFireRow({
+  task,
+  currentWorkspaceId,
+  onSelectFire,
+  onCancelTaskFire,
+}: TaskFireRowProps) {
   const durationLabel = formatDuration(task.startedAt, task.endedAt ?? null);
-  const meta = (
+  const content = (
     <>
       <StatusBadge
         status={task.status}
@@ -236,58 +192,63 @@ function ScheduleFireRow({ task, currentWorkspaceId, onSelectFire }: ScheduleFir
     </>
   );
 
-  if (onSelectFire) {
-    return (
-      <button
-        type="button"
-        className="task-list__item task-list__item--button task-list__item--row"
-        onClick={() => onSelectFire(task.id)}
-        data-testid={`schedule-fire-row-${task.id}`}
-        title="Open this fire's task detail"
-        aria-label={`Open fire task ${task.id}`}
-      >
-        {meta}
-      </button>
-    );
-  }
   return (
-    <Link
-      to={`/workspaces/${encodeURIComponent(currentWorkspaceId)}/runtime/tasks?taskId=${encodeURIComponent(
-        task.id,
-      )}`}
-      className="task-list__item task-list__item--button task-list__item--row"
-      data-testid={`schedule-fire-row-${task.id}`}
-      aria-label={`Open fire task ${task.id} in Tasks page`}
-    >
-      {meta}
-    </Link>
+    <li className="task-list__item">
+      {onSelectFire ? (
+        <button
+          type="button"
+          className="task-list__item-select task-list__item--row"
+          onClick={() => onSelectFire(task.id)}
+          data-testid={`schedule-fire-row-${task.id}`}
+          title="Open this fire's task detail"
+          aria-label={`Open fire task ${task.id}`}
+        >
+          {content}
+        </button>
+      ) : (
+        <Link
+          to={`/workspaces/${encodeURIComponent(currentWorkspaceId)}/runtime/tasks?taskId=${encodeURIComponent(
+            task.id,
+          )}`}
+          className="task-list__item-select task-list__item--row"
+          data-testid={`schedule-fire-row-${task.id}`}
+          aria-label={`Open fire task ${task.id} in Tasks page`}
+        >
+          {content}
+        </Link>
+      )}
+      <FireRowMenu
+        fireId={task.id}
+        fireLabel={`task ${task.id}`}
+        onOpen={onSelectFire ? () => onSelectFire(task.id) : undefined}
+        onCancel={
+          onCancelTaskFire !== undefined ? async () => onCancelTaskFire(task.id) : undefined
+        }
+        cancelDisabled={isTerminalStatus(task.status)}
+        cancelLabel={isTerminalStatus(task.status) ? "Cancel — already terminal" : "Cancel"}
+      />
+    </li>
   );
 }
 
-interface ScheduleWorkflowFireRowProps {
+interface WorkflowFireRowProps {
   workflow: WorkflowHeaderWire;
   currentWorkspaceId: string;
   onSelectFire?: (workflowId: string) => void;
+  onCancelWorkflowFire?: (workflow: WorkflowHeaderWire) => Promise<void> | void;
 }
 
-/**
- * Workflow-kind recent-fire row. Mirrors {@link ScheduleFireRow}'s
- * dense single-row layout (`[status badge] [wall-clock] [duration]
- * [workflow id]`) but reads workflow facts: the {@link WorkflowStatusBadge}
- * for the workflow's lifecycle status and the workflow id as the row
- * code. Duration is only computed once the workflow has a `startedAt`
- * (a queued-but-not-started workflow has none, so it shows an em dash).
- */
-function ScheduleWorkflowFireRow({
+function WorkflowFireRow({
   workflow,
   currentWorkspaceId,
   onSelectFire,
-}: ScheduleWorkflowFireRowProps) {
+  onCancelWorkflowFire,
+}: WorkflowFireRowProps) {
   const durationLabel =
     workflow.startedAt !== undefined
       ? formatDuration(workflow.startedAt, workflow.endedAt ?? null)
       : "—";
-  const meta = (
+  const content = (
     <>
       <WorkflowStatusBadge status={workflow.status} />
       <span
@@ -305,30 +266,305 @@ function ScheduleWorkflowFireRow({
     </>
   );
 
-  if (onSelectFire) {
-    return (
-      <button
-        type="button"
-        className="task-list__item task-list__item--button task-list__item--row"
-        onClick={() => onSelectFire(workflow.id)}
-        data-testid={`schedule-fire-row-${workflow.id}`}
-        title="Open this fire's workflow detail"
-        aria-label={`Open fire workflow ${workflow.id}`}
-      >
-        {meta}
-      </button>
-    );
-  }
   return (
-    <Link
-      to={`/workspaces/${encodeURIComponent(currentWorkspaceId)}/runtime/workflows?workflowId=${encodeURIComponent(
-        workflow.id,
-      )}`}
-      className="task-list__item task-list__item--button task-list__item--row"
-      data-testid={`schedule-fire-row-${workflow.id}`}
-      aria-label={`Open fire workflow ${workflow.id} in Workflows page`}
-    >
-      {meta}
-    </Link>
+    <li className="task-list__item">
+      {onSelectFire ? (
+        <button
+          type="button"
+          className="task-list__item-select task-list__item--row"
+          onClick={() => onSelectFire(workflow.id)}
+          data-testid={`schedule-fire-row-${workflow.id}`}
+          title="Open this fire's workflow detail"
+          aria-label={`Open fire workflow ${workflow.id}`}
+        >
+          {content}
+        </button>
+      ) : (
+        <Link
+          to={`/workspaces/${encodeURIComponent(
+            currentWorkspaceId,
+          )}/runtime/workflows?workflowId=${encodeURIComponent(workflow.id)}`}
+          className="task-list__item-select task-list__item--row"
+          data-testid={`schedule-fire-row-${workflow.id}`}
+          aria-label={`Open fire workflow ${workflow.id} in Workflows page`}
+        >
+          {content}
+        </Link>
+      )}
+      <FireRowMenu
+        fireId={workflow.id}
+        fireLabel={`workflow ${workflow.id}`}
+        onOpen={onSelectFire ? () => onSelectFire(workflow.id) : undefined}
+        onCancel={
+          onCancelWorkflowFire !== undefined
+            ? async () => onCancelWorkflowFire(workflow)
+            : undefined
+        }
+        cancelDisabled={isTerminalStatus(workflow.status)}
+        cancelLabel={isTerminalStatus(workflow.status) ? "Cancel — already terminal" : "Cancel"}
+      />
+    </li>
   );
+}
+
+interface FireRowMenuProps {
+  fireId: string;
+  fireLabel: string;
+  onOpen?: () => void;
+  onCancel?: () => Promise<void>;
+  cancelDisabled: boolean;
+  cancelLabel: string;
+}
+
+function FireRowMenu({
+  fireId,
+  fireLabel,
+  onOpen,
+  onCancel,
+  cancelDisabled,
+  cancelLabel,
+}: FireRowMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [placement, setPlacement] = useState<"below" | "above">("below");
+  const [maxHeightPx, setMaxHeightPx] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const refs = useMemo(() => [triggerRef, panelRef], []);
+
+  const closeMenu = useCallback((reason: CloseReason) => {
+    setOpen(false);
+    if (reason === "escape" || reason === "menuitem") {
+      triggerRef.current?.focus();
+      return;
+    }
+    setTimeout(() => {
+      if (document.activeElement === document.body) {
+        triggerRef.current?.focus();
+      }
+    }, 0);
+  }, []);
+
+  useClickOutside(refs, () => closeMenu("outside"), open);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trigger = triggerRef.current;
+    const panel = panelRef.current;
+    if (!trigger || !panel) return;
+
+    const MARGIN = 8;
+    const findScrollContainer = (el: HTMLElement | null): HTMLElement | null => {
+      let node: HTMLElement | null = el?.parentElement ?? null;
+      while (node && node !== document.body) {
+        const overflowY = window.getComputedStyle(node).overflowY;
+        if (overflowY === "auto" || overflowY === "scroll") return node;
+        node = node.parentElement;
+      }
+      return null;
+    };
+
+    const container = findScrollContainer(trigger);
+    let cachedPanelHeight: number | null = null;
+
+    const measure = () => {
+      const triggerRect = trigger.getBoundingClientRect();
+      const containerRect = container?.getBoundingClientRect();
+      const viewportTop = containerRect?.top ?? 0;
+      const nextRowTrigger =
+        trigger
+          .closest("li")
+          ?.nextElementSibling?.querySelector<HTMLElement>(".task-list__item-menu-trigger") ?? null;
+      const containerBottom = containerRect?.bottom ?? window.innerHeight;
+      const viewportBottom = nextRowTrigger
+        ? Math.min(containerBottom, nextRowTrigger.getBoundingClientRect().top)
+        : containerBottom;
+
+      if (cachedPanelHeight == null) {
+        const prevMaxHeight = panel.style.maxHeight;
+        panel.style.maxHeight = "";
+        cachedPanelHeight = panel.getBoundingClientRect().height;
+        panel.style.maxHeight = prevMaxHeight;
+      }
+
+      const panelHeight = cachedPanelHeight;
+      const spaceBelow = viewportBottom - triggerRect.bottom;
+      const spaceAbove = triggerRect.top - viewportTop;
+
+      if (spaceBelow >= panelHeight + MARGIN) {
+        setPlacement("below");
+        setMaxHeightPx(null);
+      } else if (spaceAbove >= panelHeight + MARGIN) {
+        setPlacement("above");
+        setMaxHeightPx(null);
+      } else if (spaceAbove > spaceBelow) {
+        setPlacement("above");
+        setMaxHeightPx(Math.max(0, spaceAbove - MARGIN));
+      } else {
+        setPlacement("below");
+        setMaxHeightPx(Math.max(0, spaceBelow - MARGIN));
+      }
+    };
+
+    measure();
+
+    let raf = 0;
+    const onScrollOrResize = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        measure();
+      });
+    };
+    const scrollTarget: EventTarget = container ?? window;
+    scrollTarget.addEventListener("scroll", onScrollOrResize, { passive: true });
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      scrollTarget.removeEventListener("scroll", onScrollOrResize);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeMenu("escape");
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, closeMenu]);
+
+  useEffect(() => {
+    if (!open) return;
+    const first = panelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    first?.focus();
+  }, [open]);
+
+  const handlePanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const items = panelRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+    if (!items || items.length === 0) return;
+    e.preventDefault();
+    const arr = Array.from(items);
+    const active = document.activeElement as HTMLElement | null;
+    const idx = active ? arr.indexOf(active as HTMLButtonElement) : -1;
+    const next =
+      e.key === "ArrowDown"
+        ? arr[(idx + 1 + arr.length) % arr.length]
+        : arr[(idx - 1 + arr.length) % arr.length];
+    next?.focus();
+  };
+
+  const handleCopyId = async () => {
+    try {
+      await navigator.clipboard.writeText(fireId);
+    } catch {
+      // Clipboard access is optional.
+    }
+    closeMenu("menuitem");
+  };
+
+  const handleCancel = async () => {
+    if (busy || cancelDisabled || onCancel === undefined) return;
+    closeMenu("menuitem");
+    setBusy(true);
+    try {
+      await onCancel();
+    } catch {
+      // Parent surfaces the error.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="task-list__item-menu">
+      <button
+        ref={triggerRef}
+        type="button"
+        className="btn btn--ghost btn--icon task-list__item-menu-trigger"
+        aria-label={`Actions for ${fireLabel}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Actions"
+        data-testid={`schedule-fire-row-menu-trigger-${fireId}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setOpen((current) => !current);
+        }}
+      >
+        <MoreHorizontalIcon />
+      </button>
+      {open ? (
+        <div
+          ref={panelRef}
+          className={`task-list__item-menu-panel task-list__item-menu-panel--${placement}`}
+          role="menu"
+          data-testid={`schedule-fire-row-menu-${fireId}`}
+          style={
+            maxHeightPx != null
+              ? ({ "--menu-max-height": `${maxHeightPx}px` } as React.CSSProperties)
+              : undefined
+          }
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={handlePanelKeyDown}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className="task-list__item-menu-option"
+            disabled={onOpen === undefined}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpen === undefined) return;
+              closeMenu("menuitem");
+              onOpen();
+            }}
+          >
+            Open
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="task-list__item-menu-option"
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleCopyId();
+            }}
+          >
+            Copy ID
+          </button>
+          <hr
+            style={{
+              height: 1,
+              background: "var(--color-border)",
+              margin: "4px 0",
+              border: "none",
+            }}
+          />
+          <button
+            type="button"
+            role="menuitem"
+            className="task-list__item-menu-option task-list__item-menu-option--danger"
+            disabled={busy || cancelDisabled || onCancel === undefined}
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleCancel();
+            }}
+          >
+            {busy ? "Cancelling…" : cancelLabel}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function isTerminalStatus(status: string): boolean {
+  return status === "succeeded" || status === "failed" || status === "cancelled";
 }

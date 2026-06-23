@@ -311,7 +311,10 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   schedulesApp.use("/:id/schedules/*", workspaceContextMiddleware(application, logger));
   schedulesApp.route(
     "/:id/schedules",
-    schedulesRoutes((c) => c.get("workspaceContext").schedules),
+    schedulesRoutes(
+      (c) => c.get("workspaceContext").schedules,
+      (c) => c.get("workspaceContext").workflows,
+    ),
   );
   app.route("/api/workspaces", schedulesApp);
 

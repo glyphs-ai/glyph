@@ -69,6 +69,7 @@ import {
   type ScheduleService,
   type ScheduleTrigger,
 } from "@glyphs-ai/schedule";
+import type { WorkflowService } from "@glyphs-ai/workflow";
 // `ScheduleError` is used by both the `/:sid/preview` n-bound check
 // and the new `/preview-cron` n-bound check for a typed
 // envelope on rejection.
@@ -78,6 +79,7 @@ import { respondError } from "./_respond-error.js";
 import { errorBody, logEvent, parseJsonBody } from "./_shared.js";
 
 type ScheduleServiceResolver = (c: import("hono").Context) => ScheduleService;
+type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
 
 const ALLOWED_TASK_CREATE_KEYS = new Set(["name", "target", "trigger", "enabled"]);
 const ALLOWED_TASK_PATCH_KEYS = new Set(["name", "target", "trigger", "enabled"]);
@@ -383,7 +385,34 @@ function validateWorkflowTargetPatch(raw: unknown): ValidationResult<WorkflowTar
  * the wire shape stays flat (`{ kind: "task", agent, ... }`) so the
  * dashboard / CLI's `schedule.target.agent` reads keep working.
  */
-function projectScheduleToWire(s: Schedule): ScheduleWire {
+function collectWorkflowFireStats(
+  list: readonly {
+    readonly id: string;
+    readonly status: string;
+    readonly metadata: { readonly scheduleId?: string };
+  }[],
+  awaitingMap: ReadonlyMap<string, number>,
+): ReadonlyMap<string, NonNullable<ScheduleWire["fireStats"]>> {
+  const stats = new Map<string, NonNullable<ScheduleWire["fireStats"]>>();
+  for (const workflow of list) {
+    if (workflow.status !== "running") continue;
+    const scheduleId = workflow.metadata.scheduleId;
+    if (scheduleId === undefined) continue;
+    const current = stats.get(scheduleId) ?? { awaitingCount: 0, runningCount: 0 };
+    stats.set(
+      scheduleId,
+      (awaitingMap.get(workflow.id) ?? 0) > 0
+        ? { awaitingCount: current.awaitingCount + 1, runningCount: current.runningCount }
+        : { awaitingCount: current.awaitingCount, runningCount: current.runningCount + 1 },
+    );
+  }
+  return stats;
+}
+
+function projectScheduleToWire(
+  s: Schedule,
+  workflowFireStats?: ReadonlyMap<string, NonNullable<ScheduleWire["fireStats"]>>,
+): ScheduleWire {
   if (s.target.kind === "task") {
     const data = s.target.data as TaskTargetData;
     return {
@@ -399,6 +428,7 @@ function projectScheduleToWire(s: Schedule): ScheduleWire {
   }
   if (s.target.kind === "workflow") {
     const data = s.target.data as WorkflowTargetData;
+    const fireStats = workflowFireStats?.get(s.id);
     return {
       ...s,
       target: {
@@ -407,12 +437,16 @@ function projectScheduleToWire(s: Schedule): ScheduleWire {
         brief: data.brief,
         ...(data.details !== undefined ? { details: data.details } : {}),
       },
+      ...(fireStats !== undefined ? { fireStats } : {}),
     };
   }
   return s;
 }
 
-export function schedulesRoutes(resolve: ScheduleServiceResolver): Hono {
+export function schedulesRoutes(
+  resolve: ScheduleServiceResolver,
+  resolveWorkflowService?: WorkflowServiceResolver,
+): Hono {
   const app = new Hono();
 
   // ── GET / — list with optional agent / enabled filters ────────────
@@ -440,7 +474,19 @@ export function schedulesRoutes(resolve: ScheduleServiceResolver): Hono {
           : {}),
         ...(enabled !== undefined ? { enabled } : {}),
       });
-      return c.json(list.map(projectScheduleToWire));
+      const workflowFireStats =
+        resolveWorkflowService !== undefined &&
+        list.some((schedule) => schedule.target.kind === "workflow")
+          ? await (async () => {
+              const workflowService = resolveWorkflowService(c);
+              const [workflows, awaitingMap] = await Promise.all([
+                workflowService.list({ origin: "schedule" }),
+                workflowService.countAwaitingHumanByWorkflow(),
+              ]);
+              return collectWorkflowFireStats(workflows, awaitingMap);
+            })()
+          : undefined;
+      return c.json(list.map((schedule) => projectScheduleToWire(schedule, workflowFireStats)));
     } catch (err) {
       return respondError(c, err, {
         route: "schedules.list",
@@ -555,12 +601,25 @@ export function schedulesRoutes(resolve: ScheduleServiceResolver): Hono {
         const notFound = new ScheduleNotFoundError(sid);
         return c.json(errorBody(notFound), 404);
       }
+      // Compute fireStats for workflow-kind schedules (spec: MUST on
+      // both list and single-get endpoints).
+      let workflowFireStats:
+        | ReadonlyMap<string, NonNullable<ScheduleWire["fireStats"]>>
+        | undefined;
+      if (found.target.kind === "workflow" && resolveWorkflowService !== undefined) {
+        const workflowService = resolveWorkflowService(c);
+        const [workflows, awaitingMap] = await Promise.all([
+          workflowService.list({ origin: "schedule" }),
+          workflowService.countAwaitingHumanByWorkflow(),
+        ]);
+        workflowFireStats = collectWorkflowFireStats(workflows, awaitingMap);
+      }
       // Enrich with derived cron `describe` so dashboards / CLI `show`
       // can render the human-readable text without a second round-trip.
       // NOT persisted on the entity — `trigger.expr` is the single
       // source of truth.
       return c.json({
-        ...projectScheduleToWire(found),
+        ...projectScheduleToWire(found, workflowFireStats),
         describe: describeCron(found.trigger.expr),
       });
     } catch (err) {

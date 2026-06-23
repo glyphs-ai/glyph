@@ -1,8 +1,6 @@
 /**
  * Shared constants + small helpers for the Schedules page family
- * (`pages/Schedules.tsx`, `components/schedules/*.tsx`). Lifted from
- * the Tasks `shared.ts` pattern (mission A) so each component
- * file stays narrow.
+ * (`pages/Schedules.tsx`, `components/schedules/*.tsx`).
  */
 
 import type {
@@ -12,18 +10,31 @@ import type {
 } from "@glyphs-ai/contracts";
 import type { ScheduleView } from "../../api";
 
-/** Sentinel for the "All" option in the agent filter dropdown. */
-export const ALL_AGENTS = "__all__";
+export const DEFAULT_SCHEDULE_KIND = "task";
+export type ScheduleKindFilter = "task" | "workflow";
+export const SCHEDULE_KIND_FILTERS: readonly { value: ScheduleKindFilter; label: string }[] = [
+  { value: "task", label: "Tasks" },
+  { value: "workflow", label: "Workflows" },
+];
 
-/** Sentinel for the "All" option in the enabled-state filter. */
-export const ALL_ENABLED = "__all__";
+export const DEFAULT_SCHEDULE_STATE_FILTER = "all";
+export type ScheduleStateFilter = "all" | "enabled" | "paused";
+export const SCHEDULE_STATE_FILTERS: readonly { value: ScheduleStateFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "enabled", label: "Enabled" },
+  { value: "paused", label: "Paused" },
+];
 
-export type EnabledFilter = "__all__" | "true" | "false";
-
-export const ENABLED_FILTERS: { value: EnabledFilter; label: string }[] = [
-  { value: ALL_ENABLED, label: "All" },
-  { value: "true", label: "Enabled" },
-  { value: "false", label: "Paused" },
+export const DEFAULT_WORKFLOW_ACTIVITY_FILTER = "all";
+export type WorkflowActivityFilter = "all" | "awaiting" | "running" | "idle";
+export const WORKFLOW_ACTIVITY_FILTERS: readonly {
+  value: WorkflowActivityFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "All" },
+  { value: "awaiting", label: "⏳ Awaiting" },
+  { value: "running", label: "🟢 Running" },
+  { value: "idle", label: "⚪ Idle" },
 ];
 
 /** Type guard: narrows ScheduleWireTarget to task kind. */
@@ -61,11 +72,30 @@ export function targetDetails(t: ScheduleWireTarget): string | undefined {
   return undefined;
 }
 
+export function matchesStateFilter(
+  schedule: ScheduleView,
+  stateFilter: ScheduleStateFilter,
+): boolean {
+  if (stateFilter === "enabled") return schedule.enabled;
+  if (stateFilter === "paused") return !schedule.enabled;
+  return true;
+}
+
+export function matchesWorkflowActivityFilter(
+  schedule: ScheduleView,
+  activityFilter: WorkflowActivityFilter,
+): boolean {
+  if (schedule.target.kind !== "workflow" || activityFilter === "all") return true;
+  const awaitingCount = schedule.fireStats?.awaitingCount ?? 0;
+  const runningCount = schedule.fireStats?.runningCount ?? 0;
+  if (activityFilter === "awaiting") return awaitingCount > 0;
+  if (activityFilter === "running") return runningCount > 0;
+  return schedule.enabled && awaitingCount === 0 && runningCount === 0;
+}
+
 /**
  * Sort a list of schedules by `nextFireAt` ascending, pushing entries
- * with no `nextFireAt` (e.g. invalid expression) to the bottom. The
- * server already sorts this way; the dashboard re-applies it after
- * client-side filters so the list stays stable.
+ * with no `nextFireAt` to the bottom.
  */
 export function sortByNextFire(rows: ScheduleView[]): ScheduleView[] {
   return rows.slice().sort((a, b) => {

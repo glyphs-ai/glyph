@@ -350,8 +350,19 @@ export function ScheduleListItem({
           id={headlineId}
           className="task-list__item-headline task-list__item-headline--clamp"
           title={schedule.name}
+          style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
         >
-          {schedule.name}
+          <span>{schedule.name}</span>
+          {schedule.target.kind === "workflow" && (schedule.fireStats?.awaitingCount ?? 0) > 0 ? (
+            <span className="badge badge--warn" title="Awaiting workflows">
+              ⏳{schedule.fireStats?.awaitingCount}
+            </span>
+          ) : null}
+          {schedule.target.kind === "workflow" && (schedule.fireStats?.runningCount ?? 0) > 0 ? (
+            <span className="badge badge--info" title="Running workflows">
+              🟢{schedule.fireStats?.runningCount}
+            </span>
+          ) : null}
         </span>
         <span id={metaId} className="task-list__item-meta muted">
           <code
