@@ -112,6 +112,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     details:
       "Replace the session middleware with OAuth, then run a sweep to confirm no caller relies on cookie state. Coordinator should choose between scoped tests and a full suite once the migration patch lands.",
     status: "running",
+    origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
     awaitingHumanCount: 0,
@@ -125,6 +126,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     details:
       "Coordinator dispatched a human node asking for approval on the multi-region rollout plan before proceeding.",
     status: "running",
+    origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
     awaitingHumanCount: 1,
@@ -138,6 +140,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     details:
       "Move all `console.log` calls in packages/catalog to the structured logger and add one happy-path test per repository module.",
     status: "succeeded",
+    origin: "standalone",
     coordinatorAgent: "official/reviewer",
     metadata: {},
     awaitingHumanCount: 0,
@@ -151,6 +154,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     brief: "Bump @glyphs-ai/contracts to 0.42 and update downstream callers",
     details: "Bump the version, run typecheck, then surface any breaking imports.",
     status: "failed",
+    origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
     awaitingHumanCount: 0,
@@ -165,6 +169,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     details:
       "Coordinator turned out to be on the wrong agent; cancelled before phase 2 was scheduled.",
     status: "cancelled",
+    origin: "standalone",
     coordinatorAgent: "official/designer",
     metadata: {},
     awaitingHumanCount: 0,
@@ -185,6 +190,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     details:
       "Fan out build → test → package across the release agents, gather artifacts, and post a go/no-go summary to the release channel.",
     status: "succeeded",
+    origin: "schedule",
     coordinatorAgent: "official/engineer",
     metadata: { scheduleId: "sched-release-workflow", firedAt: "2026-05-27T18:00:00.000Z" },
     awaitingHumanCount: 0,
@@ -199,6 +205,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
     details:
       "Fan out build → test → package across the release agents, gather artifacts, and post a go/no-go summary to the release channel.",
     status: "running",
+    origin: "schedule",
     coordinatorAgent: "official/engineer",
     metadata: { scheduleId: "sched-release-workflow", firedAt: "2026-05-27T22:00:00.000Z" },
     awaitingHumanCount: 0,

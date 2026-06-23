@@ -89,6 +89,7 @@ const WF_FIRE: WorkflowHeaderWire = {
   id: "wf-fire-1",
   brief: "Coordinate the release train.",
   status: "succeeded",
+  origin: "schedule",
   coordinatorAgent: "official/engineer",
   metadata: { scheduleId: "sched-wf" },
   awaitingHumanCount: 0,

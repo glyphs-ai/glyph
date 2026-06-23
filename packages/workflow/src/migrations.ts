@@ -32,6 +32,15 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     folderMillis: 2,
     hash: "13000ce98cc3e4ca0edb012b7c26dc89a424d0bd4baeeff39e17b0fa0f6dfb2a",
   },
+  {
+    sql: [
+      "ALTER TABLE `workflows` ADD `origin` text DEFAULT 'standalone' NOT NULL;",
+      "\nCREATE INDEX `workflows_origin_idx` ON `workflows` (`origin`);"
+    ],
+    bps: true,
+    folderMillis: 3,
+    hash: "c3be965b5a18fd45a7511f77dc4179b9a91a8745730f0aac09ecb221391bfc86",
+  },
 ];
 
 /**

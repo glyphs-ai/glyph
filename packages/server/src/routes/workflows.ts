@@ -503,7 +503,8 @@ export function workflowsRoutes(
       coordinatorAgent?: string;
       createdSince?: string;
       idLike?: string;
-    } = {};
+      origin?: readonly ("standalone" | "schedule")[];
+    } = { origin: ["standalone"] };
     if (q !== undefined && q !== "") opts.idLike = q;
     if (coordinatorAgent !== undefined && coordinatorAgent !== "") {
       opts.coordinatorAgent = coordinatorAgent;
@@ -511,7 +512,7 @@ export function workflowsRoutes(
     if (createdSinceResult.value !== undefined) opts.createdSince = createdSinceResult.value;
     try {
       const [list, awaitingMap] = await Promise.all([
-        resolve(c).list(Object.keys(opts).length === 0 ? undefined : opts),
+        resolve(c).list(opts),
         resolve(c).countAwaitingHumanByWorkflow(),
       ]);
       // `iterationCount` is omitted from list rows to keep the

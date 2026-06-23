@@ -21,6 +21,7 @@ function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire
     id: "wf-1",
     brief: "Test",
     status: "succeeded",
+    origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
     awaitingHumanCount: 0,

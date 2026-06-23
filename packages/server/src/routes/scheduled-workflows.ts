@@ -30,16 +30,12 @@ export function scheduledWorkflowsRoutes(resolveWorkflowService: WorkflowService
     try {
       const svc = resolveWorkflowService(c);
       const [all, awaitingMap] = await Promise.all([
-        svc.list(),
+        svc.list({ origin: "schedule" }),
         svc.countAwaitingHumanByWorkflow(),
       ]);
-      // Filter to schedule-launched workflows (metadata.scheduleId set).
-      // Optionally narrow to a specific scheduleId.
-      const filtered = all.filter((wf) => {
-        if (wf.metadata.scheduleId === undefined) return false;
-        if (scheduleId !== undefined && wf.metadata.scheduleId !== scheduleId) return false;
-        return true;
-      });
+      // Optionally narrow to a specific scheduleId via metadata.
+      const filtered =
+        scheduleId !== undefined ? all.filter((wf) => wf.metadata.scheduleId === scheduleId) : all;
       // Project to wire headers — same entity→wire boundary every other
       // workflow route uses. `iterationCount` is omitted (O(workflows)
       // list semantics); `awaitingHumanCount` comes from the batch query.

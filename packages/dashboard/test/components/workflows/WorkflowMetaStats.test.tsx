@@ -12,6 +12,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHead
     id: "wf-meta",
     brief: "meta test",
     status: "running",
+    origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
     awaitingHumanCount: 0,

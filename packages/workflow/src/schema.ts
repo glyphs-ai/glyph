@@ -45,6 +45,7 @@ export const workflows = sqliteTable(
     endedAt: text("ended_at"),
     failure: text("failure"),
     metadata: text("metadata").notNull().default("{}"),
+    origin: text("origin").notNull().default("standalone"),
     startedAt: text("started_at"),
     status: text("status").notNull(),
     success: text("success"),
@@ -52,6 +53,7 @@ export const workflows = sqliteTable(
   (t) => [
     index("workflows_status_idx").on(t.status),
     index("workflows_coordinator_agent_idx").on(t.coordinatorAgent),
+    index("workflows_origin_idx").on(t.origin),
   ],
 );
 

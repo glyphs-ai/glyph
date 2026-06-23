@@ -20,7 +20,6 @@ import { scheduledWorkflowsRoutes } from "../../src/routes/scheduled-workflows.j
 // anything else, so fixtures must use the real grammar.
 const WF_A = "20260601-0000000a";
 const WF_B = "20260601-0000000b";
-const WF_STANDALONE = "20260601-0000000c";
 const WF_NEWEST = "20260603-0000000d";
 const WF_MID = "20260602-0000000e";
 const WF_OLDEST = "20260601-0000000f";
@@ -36,6 +35,7 @@ function makeWf(
     details: null,
     coordinatorAgent: "official/engineer",
     status: (opts.status ?? "running") as never,
+    origin: opts.scheduleId !== undefined ? "schedule" : "standalone",
     metadata: JSON.stringify(metadata),
     createdAt: opts.createdAt ?? "2026-06-01T00:00:00.000Z",
     startedAt: null,
@@ -58,10 +58,12 @@ function stubService(
 }
 
 describe("scheduledWorkflowsRoutes", () => {
-  it("GET / returns only schedule-launched workflows (metadata.scheduleId set)", async () => {
+  it("GET / returns schedule-origin workflows via origin filter", async () => {
+    // The route passes `{ origin: "schedule" }` to the service; the
+    // service returns only schedule-origin rows. The route applies no
+    // additional origin filtering — that responsibility is delegated.
     const list = vi.fn(async () => [
       makeWf(WF_A, { scheduleId: "sched-abc" }),
-      makeWf(WF_STANDALONE), // no scheduleId — must be filtered out
       makeWf(WF_B, { scheduleId: "sched-xyz" }),
     ]);
     const svc = stubService({ list });
@@ -69,6 +71,7 @@ describe("scheduledWorkflowsRoutes", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.map((w: { id: string }) => w.id)).toEqual([WF_A, WF_B]);
+    expect(list).toHaveBeenCalledWith({ origin: "schedule" });
   });
 
   it("GET /?scheduleId=<id> narrows to that schedule", async () => {
@@ -127,7 +130,7 @@ describe("scheduledWorkflowsRoutes", () => {
   });
 
   it("returns [] when no workflows were launched by a schedule", async () => {
-    const list = vi.fn(async () => [makeWf(WF_STANDALONE)]);
+    const list = vi.fn(async () => []);
     const svc = stubService({ list });
     const res = await scheduledWorkflowsRoutes(() => svc).request("/");
     expect(res.status).toBe(200);

@@ -34,6 +34,7 @@ export function workflowEntityFor(args: {
   readonly brief: string;
   readonly details: string | undefined;
   readonly coordinatorAgent: string;
+  readonly origin?: import("./types.js").WorkflowOrigin;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly nowIso: string;
 }): WorkflowEntity {
@@ -43,6 +44,7 @@ export function workflowEntityFor(args: {
     details: args.details ?? null,
     coordinatorAgent: args.coordinatorAgent,
     status: "running",
+    origin: args.origin ?? "standalone",
     metadata: JSON.stringify(args.metadata ?? {}),
     createdAt: args.nowIso,
     startedAt: args.nowIso,

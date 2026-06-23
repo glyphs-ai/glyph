@@ -58,6 +58,7 @@ function makeHeader(
     details: null,
     coordinatorAgent: "coord-agent",
     status,
+    origin: "standalone",
     metadata: "{}",
     createdAt: "2026-06-07T00:00:00.000Z",
     startedAt: "2026-06-07T00:00:00.000Z",
@@ -160,7 +161,7 @@ describe("workflowsRoutes — list", () => {
     expect(body[0]).not.toHaveProperty("iterationCount");
     expect(body[0]?.status).toBe("running");
     expect(body[0]?.awaitingHumanCount).toBe(0);
-    expect(svc.list).toHaveBeenCalledWith(undefined);
+    expect(svc.list).toHaveBeenCalledWith({ origin: ["standalone"] });
   });
 
   it("GET /?q=… forwards to substrate as idLike", async () => {
@@ -168,7 +169,7 @@ describe("workflowsRoutes — list", () => {
     const svc = stubService({ list });
     const res = await mountRoutes(svc).request("/?q=abc123");
     expect(res.status).toBe(200);
-    expect(list).toHaveBeenCalledWith({ idLike: "abc123" });
+    expect(list).toHaveBeenCalledWith({ idLike: "abc123", origin: ["standalone"] });
   });
 
   it("GET /?coordinatorAgent=… forwards verbatim", async () => {
@@ -176,7 +177,7 @@ describe("workflowsRoutes — list", () => {
     const svc = stubService({ list });
     const res = await mountRoutes(svc).request("/?coordinatorAgent=agent-alpha");
     expect(res.status).toBe(200);
-    expect(list).toHaveBeenCalledWith({ coordinatorAgent: "agent-alpha" });
+    expect(list).toHaveBeenCalledWith({ coordinatorAgent: "agent-alpha", origin: ["standalone"] });
   });
 
   it("GET /?createdSince=… forwards a parseable ISO timestamp", async () => {
@@ -186,7 +187,10 @@ describe("workflowsRoutes — list", () => {
       `/?createdSince=${encodeURIComponent("2026-06-07T00:00:00.000Z")}`,
     );
     expect(res.status).toBe(200);
-    expect(list).toHaveBeenCalledWith({ createdSince: "2026-06-07T00:00:00.000Z" });
+    expect(list).toHaveBeenCalledWith({
+      createdSince: "2026-06-07T00:00:00.000Z",
+      origin: ["standalone"],
+    });
   });
 
   it("GET /?createdSince=bogus returns 400 and does NOT call the service", async () => {
@@ -207,6 +211,7 @@ describe("workflowsRoutes — list", () => {
       idLike: "abc",
       coordinatorAgent: "agent-alpha",
       createdSince: "2026-06-07T00:00:00.000Z",
+      origin: ["standalone"],
     });
   });
 
@@ -218,7 +223,7 @@ describe("workflowsRoutes — list", () => {
     const svc = stubService({ list });
     const res = await mountRoutes(svc).request("/?status=running");
     expect(res.status).toBe(200);
-    expect(list).toHaveBeenCalledWith(undefined);
+    expect(list).toHaveBeenCalledWith({ origin: ["standalone"] });
   });
 });
 

@@ -160,18 +160,19 @@ export function makeWorkflowKindHandler(opts: {
         coordinatorAgent: t.coordinatorAgent,
         brief: t.brief,
         ...(t.details !== undefined ? { details: t.details } : {}),
+        origin: "schedule",
         metadata: { scheduleId, firedAt },
       });
       return { id: result.workflowId };
     },
 
     async hasInFlightForSchedule(scheduleId) {
-      const all = await workflows.list();
+      const all = await workflows.list({ origin: "schedule" });
       return all.some((wf) => wf.status === "running" && wf.metadata.scheduleId === scheduleId);
     },
 
     async deleteForSchedule(scheduleId) {
-      const all = await workflows.list();
+      const all = await workflows.list({ origin: "schedule" });
       const terminal = all.filter(
         (wf) => wf.status !== "running" && wf.metadata.scheduleId === scheduleId,
       );
