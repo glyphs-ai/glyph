@@ -1,4 +1,4 @@
-const PORTABLE_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+import { PORTABLE_ENV_NAME_RE } from "./_constants.js";
 
 /** POSIX-portable single-quote escape for shell argv. Used by macOS + Linux. */
 export function shQuote(s: string): string {

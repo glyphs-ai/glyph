@@ -1,10 +1,10 @@
+import { PORTABLE_ENV_NAME_RE } from "./_constants.js";
 import { InvalidLaunchCommandError } from "./errors.js";
 import type { LaunchCommand } from "./types.js";
 
 /** Reject command fields with control characters that could break shell/AppleScript quoting. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: detecting control chars is the explicit purpose.
 const CONTROL_CHARS_RE = /[\x00-\x1f]/;
-const PORTABLE_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export function validateLaunchCommand(cmd: LaunchCommand): void {
   if (CONTROL_CHARS_RE.test(cmd.cwd)) {
