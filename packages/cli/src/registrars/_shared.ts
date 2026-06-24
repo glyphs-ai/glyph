@@ -23,30 +23,28 @@ export interface Slot {
 }
 
 export interface ConnectFlagOpts {
-  server?: string;
-  output?: string;
-  json?: boolean;
+  readonly server?: string;
+  readonly output?: string;
+  readonly json?: boolean;
 }
 
 export interface WorkspaceFlagOpts extends ConnectFlagOpts {
-  workspaceId?: string;
+  readonly workspaceId?: string;
 }
 
 export function parseConnectFlags(opts: Record<string, unknown>): ConnectFlagOpts {
-  const out: ConnectFlagOpts = {};
-  const server = pickString(opts, "server");
-  if (server !== undefined) out.server = server;
-  const output = pickString(opts, "output");
-  if (output !== undefined) out.output = output;
-  if (opts.json === true) out.json = true;
-  return out;
+  return {
+    ...optionalString(opts, "server"),
+    ...optionalString(opts, "output"),
+    ...(opts.json === true ? { json: true } : {}),
+  };
 }
 
 export function parseWorkspaceFlags(opts: Record<string, unknown>): WorkspaceFlagOpts {
-  const out: WorkspaceFlagOpts = parseConnectFlags(opts);
-  const workspaceId = pickString(opts, "workspaceId");
-  if (workspaceId !== undefined) out.workspaceId = workspaceId;
-  return out;
+  return {
+    ...parseConnectFlags(opts),
+    ...optionalString(opts, "workspaceId"),
+  };
 }
 
 /**

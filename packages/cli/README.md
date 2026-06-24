@@ -28,12 +28,20 @@ compile rather than 404-ing at runtime.
 packages/cli/src/
   bin.ts            Bundled binary entry: calls `run(process.argv)` and exits.
   index.ts          Exports `run(argv)`; builds the commander tree.
-  commands/         Handler functions invoked by the commander tree
-                    (one file per top-level command or command group).
-  registrars/       Commander subtree builders for the five bulk
-                    subtrees (`catalog`, `schedule`, `session`, `task`,
-                    `workflow`) plus `_shared.ts` (flag-parsing +
-                    connect-flag helpers).
+  commands/         Handler functions invoked by the commander tree --
+                    one file per top-level command or group. The three
+                    largest groups are split facade + sibling subdir
+                    (`catalog.ts` + `catalog/`, `schedule.ts` +
+                    `schedule/`, `workflow.ts` + `workflow/`) per
+                    docs/pkg-template.md; the facade re-exports its
+                    concern modules and is the only import surface.
+  registrars/       Commander subtree builders -- one per top-level
+                    command or group: `lifecycle` (serve / start / stop /
+                    restart / status / logs), `config`, `health`,
+                    `runtime`, and the six workspace-scoped subtrees
+                    (`workspace`, `session`, `schedule`, `task`,
+                    `workflow`, `catalog`) -- plus `_shared.ts`
+                    (connect / workspace flag parsing + helpers).
   api-client.ts     Typed HTTP client over the `ROUTES` manifest.
   connect.ts        Resolve `baseUrl` + `workspaceId` from flags, env,
                     and `<GLYPH_HOME>/runtime.json`.
@@ -193,6 +201,14 @@ Lifecycle commands that bind a local server (`serve`, `start`,
 `restart`) take their own `--host` and `--port` flags (defaults
 `127.0.0.1` and `8787`); those are bind flags on the server process,
 not connect flags on the client.
+
+`<GLYPH_HOME>` -- referenced above and in the paths throughout this
+section -- is the on-disk anchor for lifecycle state. It defaults to
+`~/.glyph` and is set by the `GLYPH_HOME` environment variable. It
+determines where `runtime.json` and the rolled server logs (`logs/`)
+are written by `glyph start` and read back by `serve`, `start`, `stop`,
+`restart`, `status`, and `logs` -- the same `runtime.json` the
+URL-resolution fallback (step 3 above) depends on.
 
 ## Testing
 

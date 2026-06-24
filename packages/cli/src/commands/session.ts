@@ -9,18 +9,11 @@
 
 import { makeClient, resolveWorkspace } from "../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../output.js";
+import type { WorkspaceFlagOpts } from "../registrars/_shared.js";
 import type { CommandResult } from "../result.js";
 
-interface CommonFlags {
-  readonly server?: string;
-  readonly home?: string;
-  readonly workspaceId?: string;
-  readonly output?: string;
-  readonly json?: boolean;
-}
-
 // ─── list ──────────────────────────────────────────────────────────────
-export interface SessionListOpts extends CommonFlags {
+export interface SessionListOpts extends WorkspaceFlagOpts {
   readonly agent?: string;
   readonly createdSince?: string;
   readonly activeSince?: string;
@@ -55,7 +48,7 @@ export async function sessionList(opts: SessionListOpts = {}): Promise<CommandRe
 }
 
 // ─── new ───────────────────────────────────────────────────────────────
-export interface SessionNewOpts extends CommonFlags {
+export interface SessionNewOpts extends WorkspaceFlagOpts {
   readonly agent: string;
   readonly runtime?: string;
 }
@@ -79,7 +72,7 @@ export async function sessionNew(opts: SessionNewOpts): Promise<CommandResult> {
 }
 
 // ─── show ──────────────────────────────────────────────────────────────
-export type SessionShowOpts = CommonFlags;
+export type SessionShowOpts = WorkspaceFlagOpts;
 
 export async function sessionShow(
   sessionId: string,
@@ -103,7 +96,7 @@ export async function sessionShow(
 }
 
 // ─── rm ────────────────────────────────────────────────────────────────
-export interface SessionRmOpts extends CommonFlags {
+export interface SessionRmOpts extends WorkspaceFlagOpts {
   readonly purge?: boolean;
 }
 
@@ -127,7 +120,7 @@ export async function sessionRm(
 }
 
 // ─── spawn ─────────────────────────────────────────────────────────────
-export interface SessionSpawnOpts extends CommonFlags {
+export interface SessionSpawnOpts extends WorkspaceFlagOpts {
   readonly remote?: boolean;
 }
 
