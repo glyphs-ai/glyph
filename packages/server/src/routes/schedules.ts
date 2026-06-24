@@ -76,7 +76,13 @@ import type { WorkflowService } from "@glyphs-ai/workflow";
 import { Hono } from "hono";
 import { schedulesErrorPolicy } from "./_error-policies/schedules.js";
 import { respondError } from "./_respond-error.js";
-import { errorBody, logEvent, parseJsonBody } from "./_shared.js";
+import {
+  errorBody,
+  logEvent,
+  parseJsonBody,
+  type ValidationFail,
+  type ValidationResult,
+} from "./_shared.js";
 
 type ScheduleServiceResolver = (c: import("hono").Context) => ScheduleService;
 type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
@@ -89,15 +95,18 @@ const ALLOWED_WORKFLOW_CREATE_KEYS = new Set(["name", "target", "trigger", "enab
 const ALLOWED_WORKFLOW_PATCH_KEYS = new Set(["name", "target", "trigger", "enabled"]);
 const ALLOWED_WORKFLOW_TARGET_KEYS = new Set(["coordinatorAgent", "brief", "details"]);
 
-interface ValidationFail {
-  readonly ok: false;
-  readonly error: string;
+/**
+ * Reject a schedule-target body that sets `kind`: the target's kind is
+ * implied by the URL segment (`/task` vs `/workflow`), so honouring a
+ * body `kind` would let the caller contradict the route. Returns a
+ * {@link ValidationFail} to propagate, or `null` when the body is clean.
+ */
+function forbidUrlImpliedKind(
+  obj: Record<string, unknown>,
+  message: string,
+): ValidationFail | null {
+  return "kind" in obj ? { ok: false, error: message } : null;
 }
-interface ValidationOk<T> {
-  readonly ok: true;
-  readonly value: T;
-}
-type ValidationResult<T> = ValidationOk<T> | ValidationFail;
 
 /** Validate a raw value as a {@link TaskTargetData} for `POST /task`. */
 function validateTaskTargetData(raw: unknown): ValidationResult<TaskTargetData> {
@@ -107,12 +116,11 @@ function validateTaskTargetData(raw: unknown): ValidationResult<TaskTargetData> 
   const obj = raw as Record<string, unknown>;
   // `kind` is URL-implied; reject if the caller sends it to avoid
   // contradictions with the URL discriminator.
-  if ("kind" in obj) {
-    return {
-      ok: false,
-      error: "target.kind must not be set on POST /schedules/task (kind is implied by the URL)",
-    };
-  }
+  const kindFail = forbidUrlImpliedKind(
+    obj,
+    "target.kind must not be set on POST /schedules/task (kind is implied by the URL)",
+  );
+  if (kindFail) return kindFail;
   for (const k of Object.keys(obj)) {
     if (!ALLOWED_TASK_TARGET_KEYS.has(k)) {
       return { ok: false, error: `target has unknown key "${k}"` };
@@ -162,13 +170,11 @@ function validateTaskTargetPatch(raw: unknown): ValidationResult<TaskTargetPatch
     return { ok: false, error: "target must be an object" };
   }
   const obj = raw as Record<string, unknown>;
-  if ("kind" in obj) {
-    return {
-      ok: false,
-      error:
-        "target.kind must not be set on PATCH /schedules/task/:sid (kind is implied by the URL)",
-    };
-  }
+  const kindFail = forbidUrlImpliedKind(
+    obj,
+    "target.kind must not be set on PATCH /schedules/task/:sid (kind is implied by the URL)",
+  );
+  if (kindFail) return kindFail;
   for (const k of Object.keys(obj)) {
     if (!ALLOWED_TASK_TARGET_KEYS.has(k)) {
       return { ok: false, error: `target has unknown key "${k}"` };
@@ -262,12 +268,11 @@ function validateWorkflowTargetData(raw: unknown): ValidationResult<WorkflowTarg
     return { ok: false, error: "target must be an object" };
   }
   const obj = raw as Record<string, unknown>;
-  if ("kind" in obj) {
-    return {
-      ok: false,
-      error: "target.kind must not be set on POST /schedules/workflow (kind is implied by the URL)",
-    };
-  }
+  const kindFail = forbidUrlImpliedKind(
+    obj,
+    "target.kind must not be set on POST /schedules/workflow (kind is implied by the URL)",
+  );
+  if (kindFail) return kindFail;
   for (const k of Object.keys(obj)) {
     if (!ALLOWED_WORKFLOW_TARGET_KEYS.has(k)) {
       return { ok: false, error: `target has unknown key "${k}"` };
@@ -313,13 +318,11 @@ function validateWorkflowTargetPatch(raw: unknown): ValidationResult<WorkflowTar
     return { ok: false, error: "target must be an object" };
   }
   const obj = raw as Record<string, unknown>;
-  if ("kind" in obj) {
-    return {
-      ok: false,
-      error:
-        "target.kind must not be set on PATCH /schedules/workflow/:sid (kind is implied by the URL)",
-    };
-  }
+  const kindFail = forbidUrlImpliedKind(
+    obj,
+    "target.kind must not be set on PATCH /schedules/workflow/:sid (kind is implied by the URL)",
+  );
+  if (kindFail) return kindFail;
   for (const k of Object.keys(obj)) {
     if (!ALLOWED_WORKFLOW_TARGET_KEYS.has(k)) {
       return { ok: false, error: `target has unknown key "${k}"` };

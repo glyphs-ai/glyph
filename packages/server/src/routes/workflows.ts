@@ -116,7 +116,7 @@ import { Hono } from "hono";
 import { contentTypeFor, mimeBucketFor } from "../util/mime-bucket.js";
 import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
 import { respondError } from "./_respond-error.js";
-import { errorBody, logEvent, parseJsonBody } from "./_shared.js";
+import { errorBody, logEvent, parseJsonBody, type ValidationResult } from "./_shared.js";
 import {
   countAwaitingHuman,
   iterationCountForNodes,
@@ -132,16 +132,6 @@ type WorkflowWorkspaceDirResolver = (c: import("hono").Context) => string;
 const ALLOWED_CREATE_KEYS = new Set(["brief", "details", "coordinatorAgent", "metadata"]);
 const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker", "human"];
 const KNOWN_FINISH_KINDS: readonly ("succeeded" | "failed")[] = ["succeeded", "failed"];
-
-interface ValidationFail {
-  readonly ok: false;
-  readonly error: string;
-}
-interface ValidationOk<T> {
-  readonly ok: true;
-  readonly value: T;
-}
-type ValidationResult<T> = ValidationOk<T> | ValidationFail;
 
 function validateCreatedSinceQuery(raw: string | undefined): ValidationResult<string | undefined> {
   if (raw === undefined) return { ok: true, value: undefined };
