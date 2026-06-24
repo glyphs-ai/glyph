@@ -16,7 +16,7 @@
     "schedules",
     "workflows"
   ],
-  "_devPortNote": "The PORT=41817 in scripts.dev MUST stay in lock-step with the proxy target in packages/dashboard/vite.config.ts. If they drift, dev /api/* requests silently ECONNREFUSED.",
+  "_devPortNote": "The PORT=41817 in scripts.dev MUST stay in lock-step with the proxy target in packages/dashboard/vite.config.ts; test/dev-port-pin.test.ts enforces it. If they drift, dev /api/* requests silently ECONNREFUSED.",
   "engines": {
     "node": ">=22"
   },
