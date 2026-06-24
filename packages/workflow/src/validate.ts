@@ -33,7 +33,6 @@ import type {
   WorkflowNodeStatus,
   WorkflowOrigin,
   WorkflowStatus,
-  WorkflowSubstrateFailureReason,
   WorkflowSuccess,
 } from "./types.js";
 
@@ -181,8 +180,11 @@ export function assertValidWorkflowOriginEnum(origin: unknown): asserts origin i
 // ─── Terminal-payload shape validators ──────────────────────────────
 
 const FAILURE_KINDS = new Set(["coordinator", "substrate"]);
-const SUBSTRATE_FAILURE_REASONS: ReadonlySet<WorkflowSubstrateFailureReason> =
-  new Set<WorkflowSubstrateFailureReason>(["STUCK_RETRY_LIMIT"]);
+// Mirror of the `WorkflowFailure` substrate-arm `reason` literal union
+// (kept as a plain string set here — the union is declared inline on
+// `WorkflowFailure` in `types.ts` and the canonical const lives in
+// `_stuck-recovery.ts`).
+const SUBSTRATE_FAILURE_REASONS: ReadonlySet<string> = new Set<string>(["STUCK_RETRY_LIMIT"]);
 const CANCELLATION_KINDS = new Set(["user"]);
 
 /**
@@ -219,10 +221,7 @@ export function assertWorkflowFailureShape(id: string, value: WorkflowFailure): 
     throw new WorkflowError(`Workflow "${id}" corrupted: failure.message must be a string`);
   }
   if (v.kind === "substrate") {
-    if (
-      typeof v.reason !== "string" ||
-      !(SUBSTRATE_FAILURE_REASONS as ReadonlySet<string>).has(v.reason)
-    ) {
+    if (typeof v.reason !== "string" || !SUBSTRATE_FAILURE_REASONS.has(v.reason)) {
       throw new WorkflowError(
         `Workflow "${id}" corrupted: failure.reason must be one of: ${[...SUBSTRATE_FAILURE_REASONS].join(", ")}`,
       );
@@ -247,5 +246,28 @@ export function assertWorkflowCancellationShape(id: string, value: WorkflowCance
   }
   if (typeof v.message !== "string") {
     throw new WorkflowError(`Workflow "${id}" corrupted: cancellation.message must be a string`);
+  }
+}
+
+// ─── Node-spec shape validators ─────────────────────────────────────
+
+/**
+ * Coordinator-kind specs persist their controlling agent's FQN as
+ * `spec.agent`. The substrate's denormalization (`workflows.
+ * coordinator_agent`) reads this opaquely; the field is a non-empty
+ * string by contract. Throws `WorkflowError` when the contract is
+ * violated.
+ */
+export function assertCoordinatorSpecAgent(spec: unknown): asserts spec is { agent: string } {
+  if (
+    spec === null ||
+    typeof spec !== "object" ||
+    !("agent" in (spec as Record<string, unknown>)) ||
+    typeof (spec as { agent: unknown }).agent !== "string" ||
+    (spec as { agent: string }).agent.length === 0
+  ) {
+    throw new WorkflowError(
+      `Coordinator-kind spec must have a non-empty string "agent" field, got ${JSON.stringify(spec)}`,
+    );
   }
 }

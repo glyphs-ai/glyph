@@ -167,10 +167,29 @@ Canonical names:
   `schedule/src/_helpers.ts`.
 - `_shared.ts` — pure helpers shared across multiple files within
   the same pkg or subdir. Used by `terminal/src/_shared.ts`.
+- `_<topic>.ts` — a package-private module grouping one cohesive
+  slice of internal logic that is too big to inline in the service
+  but is not part of the public surface. Named for the concern, not a
+  generic "helpers" bucket. Examples: `workflow/src/_dag.ts` (DAG
+  topology + readiness), `workflow/src/_engine.ts` (the in-memory tick
+  loop), `workflow/src/_dispatch.ts` (per-kind runner dispatch), and
+  `workflow/src/_stuck-recovery.ts` (the stuck-coord retry cap). These
+  let a large facade (`workflow-service.ts`) delegate to focused
+  modules while keeping them out of the barrel.
 - `_<topic>/` — package-private subdir grouping related helpers
   (e.g. `catalog/src/_shared/` groups DI plumbing helpers).
 
-Files starting with `_` are NEVER re-exported from `index.ts`.
+Files starting with `_` are not re-exported from `index.ts` **as
+modules** — the barrel never does `export * from "./_x.js"`, and a `_`
+file never becomes a second public entry point. A `_<topic>.ts` MAY,
+however, own a small number of genuinely-public *value consts* (e.g.
+an operational cap such as `workflow/src/_stuck-recovery.ts`'s
+`STUCK_RETRY_MAX_ATTEMPTS` / `STUCK_RETRY_LIMIT`) that the barrel
+re-exports by name; the module's functions and types stay internal.
+Prefer `types.ts` for broadly-public types — reach for a named const
+re-export from a `_` module only when the const is inseparable from
+the internal concern that owns it.
+
 Tests for `_` files live alongside the helper they cover
 (`test/_helpers.test.ts` is a valid layout per § "Test layout
 convention" rule 2).
@@ -775,13 +794,27 @@ export function xxxDir(root: string, id: string): string {
 }
 
 export function safeJoinUnderRoot(root: string, ...parts: string[]): string {
-  // ... implementation; see packages/session/src/paths.ts for the canonical version
+  // ... implementation; see packages/task/src/paths.ts for the canonical version
 }
 ```
 
 The service imports from `paths.ts` instead of doing `path.join` inline.
-Existing examples: `packages/session/src/paths.ts`,
-`packages/task/src/paths.ts`.
+Existing examples: `packages/task/src/paths.ts`,
+`packages/workflow/src/paths.ts`. (`session` keeps the same guard in
+`packages/session/src/session-service/_helpers.ts` rather than a
+dedicated `paths.ts`, since its path math lives next to the service
+split.)
+
+**Known duplication (intentional, for now).** `safeJoinUnderRoot` is
+copied near-verbatim across each filesystem-owning BC (`task/src/paths.ts`,
+`workflow/src/paths.ts`, and `session/src/session-service/_helpers.ts`)
+rather than shared from a common module. This is deliberate: the guard
+is a few lines of security-critical path math, each BC owns its own root
+invariant, and a shared helper would create a cross-BC import that the
+tier rules (see `docs/architecture.md`) would otherwise forbid at this
+layer. If a fourth substrate appears, or the guard grows non-trivial,
+revisit extracting it into a tier-0 utility — until then, keep the
+copies in lockstep and do not reach across BCs.
 
 ### Multi-entity BCs → subfolder per entity + `facade/`
 
