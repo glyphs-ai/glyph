@@ -70,12 +70,13 @@ resolve to the lowest UUID).
 ```sql
 -- $GLYPH_HOME/global.db
 CREATE TABLE workspaces (
-  id              TEXT PRIMARY KEY,
-  workspace_dir   TEXT NOT NULL UNIQUE,
+  id              TEXT PRIMARY KEY NOT NULL,
+  workspace_dir   TEXT NOT NULL,
   name            TEXT NOT NULL,
   created_at      TEXT NOT NULL,
-  last_opened_at  TEXT NULL
+  last_opened_at  TEXT
 );
+CREATE UNIQUE INDEX workspaces_workspace_dir_unique ON workspaces (workspace_dir);
 ```
 
 The workspace with the greatest `last_opened_at` is what
@@ -92,33 +93,23 @@ Per-workspace metadata (`name`, `createdAt`) lives in the same
 
 ```
 WorkspaceError
+├── InputValidationError               400 — register() opts failed the zod schema
 ├── WorkspaceNameInvalidError          400 — name failed validation
 └── RegistryError                      500 — registry-level failure (base)
     ├── WorkspaceIdInvalidError        400 — id is not a valid UUID
+    ├── WorkspacePathInvalidError      400 — workspaceDir empty / relative / non-string
     ├── WorkspaceNotRegisteredError    404 — id has no entry in the registry
     ├── WorkspaceIdConflictError       409 — register({id}) collision
     └── WorkspacePathConflictError     409 — workspaceDir already registered
-
-// Separate hierarchy — extends Error directly, NOT WorkspaceError:
-InputValidationError                   400 — register() opts failed the zod schema
-                                             (missing/wrong-typed field, or
-                                              workspaceDir not absolute; only
-                                              register validates opts through zod
-                                              today — open/rename/unregister go
-                                              through the assertValid* helpers and
-                                              throw the typed WorkspaceError
-                                              subclasses above)
 ```
 
-A `catch (e) { if (e instanceof WorkspaceError) … }` block will miss
-`InputValidationError`; add a second `else if (e instanceof InputValidationError) …`
-arm if you need to surface zod shape failures distinctly from typed
-domain errors.
+A single `catch (e) { if (e instanceof WorkspaceError) … }` block
+catches all workspace-package failures, including input-validation
+errors from the zod shape check.
 
-`get(id)` returns `null` for unknown ids AND malformed ids
-alike — reads do not validate the id. Only write methods
-(`register`, `open`, `rename`, `unregister`) validate and throw
-`WorkspaceIdInvalidError`.
+`get(id)` throws `WorkspaceIdInvalidError` for malformed ids and
+returns `null` only for valid-but-unknown ids. All methods validate
+their id parameter consistently.
 
 Concurrency: `register`'s pre-flight conflict checks are best-effort
 UX. Two concurrent registers can race past them; the UNIQUE / PRIMARY

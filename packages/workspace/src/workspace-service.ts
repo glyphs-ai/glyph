@@ -8,6 +8,7 @@ import {
 } from "./errors.js";
 import { workspaceLayout } from "./layout.js";
 import type {
+  ListWorkspacesOpts,
   RegisterWorkspaceOpts,
   RegisterWorkspaceResult,
   RenameWorkspaceOpts,
@@ -28,6 +29,35 @@ const silentLogger: Logger = pino({ level: "silent" });
 
 function entityToWorkspace(entity: WorkspaceEntity): Workspace {
   return { ...entity, lastOpenedAt: entity.lastOpenedAt ?? entity.createdAt };
+}
+
+/**
+ * Translates SQLite UNIQUE / PRIMARY KEY constraint violations into
+ * typed domain errors. The pre-flight conflict checks in `register`
+ * are best-effort UX; this backstop is deterministic and race-free.
+ */
+async function translateSqliteConstraintError(
+  err: unknown,
+  ctx: { id: string; workspaceDir: string; repo: WorkspaceRepository },
+): Promise<never> {
+  const e = err as { code?: string; message?: string };
+  if (typeof e.code === "string" && e.code.startsWith("SQLITE_CONSTRAINT")) {
+    const msg = e.message ?? "";
+    if (msg.includes("workspaces.id") || e.code.endsWith("PRIMARYKEY")) {
+      throw new WorkspaceIdConflictError(ctx.id);
+    }
+    if (msg.includes("workspaces.workspace_dir")) {
+      let conflictingId = "<unknown>";
+      try {
+        const existing = await ctx.repo.findByPath(ctx.workspaceDir);
+        if (existing) conflictingId = existing.id;
+      } catch {
+        // Best-effort lookup; sentinel id stands in.
+      }
+      throw new WorkspacePathConflictError(ctx.workspaceDir, conflictingId);
+    }
+  }
+  throw err;
 }
 
 export interface WorkspaceServiceOpts {
@@ -108,11 +138,12 @@ export class WorkspaceService {
   // ─── Reads ─────────────────────────────────────────────
 
   async get(id: string): Promise<Workspace | null> {
+    assertValidWorkspaceId(id);
     const entity = await this.repo.findById(id);
     return entity ? entityToWorkspace(entity) : null;
   }
 
-  async list(): Promise<Workspace[]> {
+  async list(_opts: ListWorkspacesOpts = {}): Promise<Workspace[]> {
     const entities = await this.repo.findAllByLastOpened();
     return entities.map(entityToWorkspace);
   }
@@ -170,38 +201,11 @@ export class WorkspaceService {
           lastOpenedAt: now,
         });
       } catch (err) {
-        // Map UNIQUE / PRIMARY KEY violations to typed domain errors.
-        // The pre-checks above are best-effort UX; between the check
-        // and the insert two concurrent registers can race, and only
-        // the constraint catches it deterministically. better-sqlite3
-        // surfaces these as Errors with `code` like
-        // `SQLITE_CONSTRAINT_PRIMARYKEY` / `SQLITE_CONSTRAINT_UNIQUE`
-        // and a message naming the column.
-        const e = err as { code?: string; message?: string };
-        if (typeof e.code === "string" && e.code.startsWith("SQLITE_CONSTRAINT")) {
-          const msg = e.message ?? "";
-          if (msg.includes("workspaces.id") || e.code.endsWith("PRIMARYKEY")) {
-            throw new WorkspaceIdConflictError(opts.id);
-          }
-          if (msg.includes("workspaces.workspace_dir")) {
-            // We don't know the conflicting id without a re-read; do
-            // one targeted lookup so the typed error carries it. If
-            // the re-read itself throws (db closed, lock timeout),
-            // fall back to a sentinel id so the typed error still
-            // surfaces — losing the lookup is preferable to masking
-            // the original constraint violation behind a follow-up
-            // error.
-            let conflictingId = "<unknown>";
-            try {
-              const existing = await this.repo.findByPath(workspaceDir);
-              if (existing) conflictingId = existing.id;
-            } catch {
-              // Best-effort lookup; sentinel id stands in.
-            }
-            throw new WorkspacePathConflictError(workspaceDir, conflictingId);
-          }
-        }
-        throw err;
+        await translateSqliteConstraintError(err, {
+          id: opts.id,
+          workspaceDir,
+          repo: this.repo,
+        });
       }
 
       this.logger.debug({ command: "register", id: opts.id }, "command handled");

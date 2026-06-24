@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { WorkspaceIdInvalidError, WorkspaceNameInvalidError } from "../src/index.js";
+import {
+  WorkspaceIdInvalidError,
+  WorkspaceNameInvalidError,
+  WorkspacePathInvalidError,
+} from "../src/index.js";
 import {
   assertValidWorkspaceId,
   assertValidWorkspaceName,
@@ -61,19 +65,18 @@ describe("validators: workspace name", () => {
 });
 
 describe("validators: workspace dir", () => {
-  it("resolves relative paths to absolute", () => {
-    const out = normalizeWorkspaceDir("relative/dir");
-    expect(out).toMatch(/[\\/]relative[\\/]dir$/);
-  });
-
   it("keeps absolute paths intact (modulo path.resolve)", () => {
     const out = normalizeWorkspaceDir("/tmp/x");
     expect(out).toMatch(/[\\/]tmp[\\/]x$/);
   });
 
-  it("throws on empty / non-string input", () => {
-    expect(() => normalizeWorkspaceDir("")).toThrow(TypeError);
-    expect(() => normalizeWorkspaceDir("   ")).toThrow(TypeError);
-    expect(() => normalizeWorkspaceDir(null)).toThrow(TypeError);
+  it("throws WorkspacePathInvalidError on empty / non-string input", () => {
+    expect(() => normalizeWorkspaceDir("")).toThrow(WorkspacePathInvalidError);
+    expect(() => normalizeWorkspaceDir("   ")).toThrow(WorkspacePathInvalidError);
+    expect(() => normalizeWorkspaceDir(null)).toThrow(WorkspacePathInvalidError);
+  });
+
+  it("throws WorkspacePathInvalidError on relative paths", () => {
+    expect(() => normalizeWorkspaceDir("relative/dir")).toThrow(WorkspacePathInvalidError);
   });
 });
