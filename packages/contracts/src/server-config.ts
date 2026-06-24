@@ -23,17 +23,17 @@
  */
 export interface ServerConfig {
   /** User-level glyph root (resolves `GLYPH_HOME`). */
-  glyphHome: string;
+  readonly glyphHome: string;
   /** Currently-selected workspace id (UUID) from the registry, or null. */
-  currentWorkspaceId: string | null;
+  readonly currentWorkspaceId: string | null;
   /** Host the server is bound to (e.g. `127.0.0.1` or `0.0.0.0`). */
-  host: string;
+  readonly host: string;
   /** Port the server is listening on. */
-  port: number;
+  readonly port: number;
   /** Native path separator on the server's OS (`\\` on Windows, `/` elsewhere). */
-  pathSeparator: string;
+  readonly pathSeparator: string;
   /** Tunables consumed by the dashboard's task list view. */
-  tasks: {
+  readonly tasks: {
     /**
      * How often the dashboard re-fetches the task list while at least
      * one task is `running` or `not_started`. Stops polling when every
@@ -41,6 +41,6 @@ export interface ServerConfig {
      * without shipping a new dashboard build (and so we don't hard-code
      * a UX-shaping constant inside React).
      */
-    pollIntervalMs: number;
+    readonly pollIntervalMs: number;
   };
 }
