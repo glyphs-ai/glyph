@@ -205,31 +205,12 @@ blobs. What glyph adds:
 
 ## Architecture
 
-The repo is a [pnpm](https://pnpm.io/workspaces) monorepo of 13 production
-TypeScript packages (plus a `_template` scaffold and an `e2e` tests package)
-with a strict layering: pure value types at the bottom,
-file-system primitives next, entity managers above (workspace / catalog /
-session / task / schedule / workflow), then the runtime adapter, then the HTTP server,
-then the React dashboard. See [`docs/architecture.md`](./docs/architecture.md)
-for the design contract — repository pattern, atomic-write seam, REST URL
-scheme, and the rationale behind the package boundaries.
-
-The conceptual model — how we think about agentic systems and why
-glyph is shaped the way it is — lives in the **paper
-[*What we believe about agentic systems*](https://glyphs-ai.github.io/glyph/)**.
-It's a short read; if its premises resonate with you, the rest of the
-codebase will make sense more quickly.
-
-Each package's own README documents its public API surface; the most
-important ones for downstream consumers are
-[`@glyphs-ai/catalog`](./packages/catalog),
-[`@glyphs-ai/workspace`](./packages/workspace),
-[`@glyphs-ai/task`](./packages/task),
-[`@glyphs-ai/session`](./packages/session),
-[`@glyphs-ai/workflow`](./packages/workflow),
-[`@glyphs-ai/schedule`](./packages/schedule),
-[`@glyphs-ai/runtime`](./packages/runtime), and
-[`@glyphs-ai/server`](./packages/server).
+Glyph is a pnpm monorepo with strict tier-based layering. The design
+contract — repository pattern, atomic-write seam, REST URL scheme,
+package boundaries — lives in [`docs/architecture.md`](./docs/architecture.md).
+The conceptual model behind why glyph is shaped this way lives in the
+paper [*What we believe about agentic systems*](https://glyphs-ai.github.io/glyph/);
+it's a short read.
 
 ## First-party catalog
 
@@ -243,39 +224,9 @@ the same way as first-party entries (any reachable GitHub URL).
 
 ## Development
 
-Requires Node ≥ 22, pnpm ≥ 10.
-
-```sh
-git clone https://github.com/glyphs-ai/glyph.git
-cd glyph
-pnpm install
-pnpm build       # tsc emit (run first; downstream packages import upstream .d.ts)
-pnpm typecheck   # tsc --noEmit across all packages
-pnpm test        # vitest across all packages
-pnpm lint        # biome check
-```
-
-Run the dev server (hot-reloading API + Vite-served dashboard):
-
-```sh
-pnpm dev
-# Dashboard dev server on http://127.0.0.1:8787 (proxies /api → 41817)
-# API on http://127.0.0.1:41817
-```
-
-In dev the two processes are split: Vite serves the dashboard on `8787`
-(the same port the bundled production build uses, so dashboard URLs don't
-shift between dev and prod) and proxies `/api/*` to the glyph backend on
-`41817`. That pairing is pinned by
-`packages/server/test/dev-port-pin.test.ts`; see
-[`packages/dashboard/README.md`](./packages/dashboard/README.md) for the
-full per-mode port table.
-
-For everything beyond the basics — repository pattern, atomic-write
-guarantees, how to add a new runtime adapter — see
-[`docs/architecture.md`](./docs/architecture.md). New contributors should
-start with [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md); the release
-procedure lives in [`docs/RELEASING.md`](./docs/RELEASING.md).
+See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) for the local setup,
+daily loop, and "adding things" pointer map. The release procedure lives
+in [`docs/RELEASING.md`](./docs/RELEASING.md).
 
 ## License
 
