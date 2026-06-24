@@ -102,7 +102,7 @@ If you've read this far and found yourself nodding, we'd like to know you exist.
 
 Two things you can do:
 
-- Read the [glyph source](https://github.com/glyphs-ai/glyph). It's moderate (~50k lines of production TypeScript across 14 packages, ~85k including tests). The paradigm here is concrete enough in code to argue with.
+- Read the [glyph source](https://github.com/glyphs-ai/glyph). It's moderate (~50k lines of production TypeScript across 13 production packages plus a `_template` scaffold and an `e2e` tests package, ~85k including tests). The paradigm here is concrete enough in code to argue with.
 - Open an issue or a discussion on the repo. We're particularly interested in places where you think the paradigm breaks down — where a real-world need pushes back on the minimalism. We've made bets; we're curious which ones we'll regret.
 
 This paper will evolve. The substrate will evolve. The AI will evolve, faster than either. We'd rather not bet alone.
