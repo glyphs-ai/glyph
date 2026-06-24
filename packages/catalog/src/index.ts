@@ -28,28 +28,6 @@ export {
   type CatalogModuleOptions,
   composeCatalogModule,
 } from "./compose.js";
-// ─── Wire DTOs (HTTP-shaped projections) ────────────
-export type {
-  Agent,
-  AgentEntry,
-  AgentInstallBody,
-  AgentResolveResult,
-  BlockedDep,
-  BlockedReason,
-  CatalogKind,
-  DependencyKind,
-  DependencyRef,
-  EntryStatus,
-  Mcp,
-  McpInstallBody,
-  MissingDep,
-  ResolvedMcp,
-  ResolvedSkill,
-  Skill,
-  SkillEntry,
-  SkillInstallBody,
-  SkillResolveResult,
-} from "./dto.js";
 // ─── Errors ─────────────────────────────────────────
 export { CatalogError } from "./errors.js";
 // ─── Facade ─────────────────────────────────────────
@@ -118,6 +96,28 @@ export {
   validateScope,
   validateShortName,
 } from "./skill/validate.js";
+// ─── Wire DTOs (HTTP-shaped projections) ────────────
+export type {
+  Agent,
+  AgentEntry,
+  AgentInstallBody,
+  AgentResolveResult,
+  BlockedDep,
+  BlockedReason,
+  CatalogKind,
+  DependencyKind,
+  DependencyRef,
+  EntryStatus,
+  Mcp,
+  McpInstallBody,
+  MissingDep,
+  ResolvedMcp,
+  ResolvedSkill,
+  Skill,
+  SkillEntry,
+  SkillInstallBody,
+  SkillResolveResult,
+} from "./types.js";
 // ─── Install-body validators (HTTP boundary) ────────
 export {
   validateAgentInstallInput,

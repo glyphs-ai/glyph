@@ -6,8 +6,8 @@ import {
   normaliseFqnDeps,
   type OriginDeps,
 } from "../_shared/dep-keys.js";
-import type { Skill } from "../dto.js";
 import { safeNormalize } from "../fetcher/index.js";
+import type { Skill } from "../types.js";
 import {
   parse,
   SKILL_DEP_SPECS,

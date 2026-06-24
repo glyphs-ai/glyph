@@ -1,5 +1,5 @@
-import type { CatalogKind } from "../dto.js";
 import { CatalogError } from "../errors.js";
+import type { CatalogKind } from "../types.js";
 
 /**
  * Thrown when deleting an entity that other entities still depend on.

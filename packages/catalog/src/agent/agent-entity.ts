@@ -6,8 +6,8 @@ import {
   normaliseFqnDeps,
   type OriginDeps,
 } from "../_shared/dep-keys.js";
-import type { Agent } from "../dto.js";
 import { safeNormalize } from "../fetcher/index.js";
+import type { Agent } from "../types.js";
 import {
   AGENT_DEP_SPECS,
   type AgentDepKind,

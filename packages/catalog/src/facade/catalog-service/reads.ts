@@ -1,5 +1,9 @@
 import type { AgentEntity } from "../../agent/agent-entity.js";
 import { AgentNotFoundError } from "../../agent/errors.js";
+import type { McpEntity } from "../../mcp/mcp-entity.js";
+import * as McpFormat from "../../mcp/mcp-format.js";
+import { SkillNotFoundError } from "../../skill/errors.js";
+import type { SkillEntity } from "../../skill/skill-entity.js";
 import type {
   Agent,
   AgentEntry,
@@ -10,11 +14,7 @@ import type {
   Skill,
   SkillEntry,
   SkillResolveResult,
-} from "../../dto.js";
-import type { McpEntity } from "../../mcp/mcp-entity.js";
-import * as McpFormat from "../../mcp/mcp-format.js";
-import { SkillNotFoundError } from "../../skill/errors.js";
-import type { SkillEntity } from "../../skill/skill-entity.js";
+} from "../../types.js";
 import {
   buildAgentEntry,
   buildSkillEntry,

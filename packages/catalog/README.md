@@ -56,7 +56,7 @@ What this package **does not** do:
 ```
 packages/catalog/src/
   schema.ts                Drizzle tables (private; only types exported)
-  dto.ts                   Cross-entity DTOs (Agent / Skill / Mcp + entries + resolve results)
+  types.ts                 Cross-entity DTOs (Agent / Skill / Mcp + entries + resolve results)
   validate.ts              FQN / name / install-body validators
   agent/                   Per-entity service + errors + entity class
   skill/

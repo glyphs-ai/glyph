@@ -204,7 +204,8 @@ types. The exceptions are:
 
 This rule prevents the "where do I find the `Workspace` interface" drift
 that plagued glyph before (DTOs scattered across `service.ts`,
-`schema.ts`, separate `dto.ts`).
+`schema.ts`, and ad-hoc helper files). Every pkg — single-entity or
+multi-entity — uses the same filename: `types.ts`.
 
 ## Type placement (which package owns this type?)
 
@@ -792,7 +793,7 @@ convention is the same — `<entity>-<role>.ts` even inside a subfolder**:
 ```
 src/
   schema.ts                 cross-entity table definitions
-  dto.ts                    cross-entity DTOs (bare nouns: Agent / Skill / Mcp)
+  types.ts                  cross-entity DTOs (bare nouns: Agent / Skill / Mcp) — same filename as single-entity BCs
   index.ts                  public barrel
 
   agent/

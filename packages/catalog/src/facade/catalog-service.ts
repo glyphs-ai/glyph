@@ -4,6 +4,13 @@ import pino, { type Logger } from "pino";
 
 import { AgentRepository } from "../agent/agent-repository.js";
 import { AgentService } from "../agent/agent-service.js";
+import { defaultFetcherRegistry } from "../fetcher/index.js";
+import * as McpFormat from "../mcp/mcp-format.js";
+import { McpRepository } from "../mcp/mcp-repository.js";
+import { type McpFetcher, McpService } from "../mcp/mcp-service.js";
+import type * as schema from "../schema.js";
+import { SkillRepository } from "../skill/skill-repository.js";
+import { type SkillFetcher, SkillService } from "../skill/skill-service.js";
 import type {
   Agent,
   AgentEntry,
@@ -12,14 +19,7 @@ import type {
   Skill,
   SkillEntry,
   SkillResolveResult,
-} from "../dto.js";
-import { defaultFetcherRegistry } from "../fetcher/index.js";
-import * as McpFormat from "../mcp/mcp-format.js";
-import { McpRepository } from "../mcp/mcp-repository.js";
-import { type McpFetcher, McpService } from "../mcp/mcp-service.js";
-import type * as schema from "../schema.js";
-import { SkillRepository } from "../skill/skill-repository.js";
-import { type SkillFetcher, SkillService } from "../skill/skill-service.js";
+} from "../types.js";
 import * as installOps from "./catalog-service/install.js";
 import * as reads from "./catalog-service/reads.js";
 import * as resolveOps from "./catalog-service/resolve.js";

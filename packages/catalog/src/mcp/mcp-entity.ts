@@ -1,5 +1,5 @@
-import type { Mcp } from "../dto.js";
 import { safeNormalize } from "../fetcher/index.js";
+import type { Mcp } from "../types.js";
 import * as McpFormat from "./mcp-format.js";
 import { validateMcpName } from "./validate.js";
 
