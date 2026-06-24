@@ -75,7 +75,6 @@
  * Any other prefix yields 400.
  */
 
-import { createReadStream } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -114,6 +113,7 @@ import {
 } from "@glyphs-ai/workflow";
 import { Hono } from "hono";
 import { contentTypeFor, mimeBucketFor } from "../util/mime-bucket.js";
+import { streamFileAsResponse } from "../util/stream-file.js";
 import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
 import { respondError } from "./_respond-error.js";
 import { errorBody, logEvent, parseJsonBody, type ValidationResult } from "./_shared.js";
@@ -809,30 +809,9 @@ export function workflowsRoutes(
       return c.json({ error: "artifact not found" }, 404);
     }
 
-    const basename = path.basename(absPath);
-    const contentType = contentTypeFor(basename);
-    const node = createReadStream(absPath);
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        node.on("data", (chunk) => {
-          const buf =
-            typeof chunk === "string" ? new TextEncoder().encode(chunk) : new Uint8Array(chunk);
-          controller.enqueue(buf);
-        });
-        node.on("end", () => controller.close());
-        node.on("error", (err) => controller.error(err));
-      },
-      cancel() {
-        node.destroy();
-      },
-    });
-    return new Response(body, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${encodeURIComponent(basename)}"`,
-        "Cache-Control": cacheControl,
-      },
+    return streamFileAsResponse(absPath, {
+      contentType: contentTypeFor(path.basename(absPath)),
+      cacheControl,
     });
   });
 

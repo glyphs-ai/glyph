@@ -1,4 +1,3 @@
-import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import type { TaskDispatchBody } from "@glyphs-ai/api";
@@ -10,6 +9,7 @@ import {
 } from "@glyphs-ai/task";
 import { Hono } from "hono";
 import { contentTypeFor } from "../util/mime-bucket.js";
+import { streamFileAsResponse } from "../util/stream-file.js";
 import { tasksErrorPolicy } from "./_error-policies/tasks.js";
 import { respondError } from "./_respond-error.js";
 import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared.js";
@@ -329,32 +329,9 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
       return c.json({ error: "artifact not found", code: "NotFound" }, 404);
     }
 
-    const basename = path.basename(absPath);
-    const contentType = contentTypeFor(basename);
-    // Hono's ReadableStream body adapter accepts any web ReadableStream;
-    // wrap the Node stream so we get back-pressure on slow clients.
-    const node = createReadStream(absPath);
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        node.on("data", (chunk) => {
-          const buf =
-            typeof chunk === "string" ? new TextEncoder().encode(chunk) : new Uint8Array(chunk);
-          controller.enqueue(buf);
-        });
-        node.on("end", () => controller.close());
-        node.on("error", (err) => controller.error(err));
-      },
-      cancel() {
-        node.destroy();
-      },
-    });
-    return new Response(body, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${encodeURIComponent(basename)}"`,
-        "Cache-Control": "private, max-age=60",
-      },
+    return streamFileAsResponse(absPath, {
+      contentType: contentTypeFor(path.basename(absPath)),
+      cacheControl: "private, max-age=60",
     });
   });
 
