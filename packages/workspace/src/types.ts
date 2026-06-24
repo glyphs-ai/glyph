@@ -39,3 +39,8 @@ export interface RenameWorkspaceOpts {
 export interface UnregisterWorkspaceOpts {
   readonly purge?: boolean;
 }
+
+/** Options for `WorkspaceService.list()`. Empty today; provides a
+ *  non-breaking extension point for future `limit` / `cursor` params. */
+// biome-ignore lint/suspicious/noEmptyInterface: intentional extension point
+export interface ListWorkspacesOpts {}

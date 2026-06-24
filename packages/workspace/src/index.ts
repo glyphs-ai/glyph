@@ -21,6 +21,7 @@ export {
   WorkspaceNameInvalidError,
   WorkspaceNotRegisteredError,
   WorkspacePathConflictError,
+  WorkspacePathInvalidError,
 } from "./errors.js";
 export {
   globalDbPath,
@@ -29,6 +30,7 @@ export {
   workspacesParentDir,
 } from "./layout.js";
 export type {
+  ListWorkspacesOpts,
   RegisterWorkspaceOpts,
   RegisterWorkspaceResult,
   RenameWorkspaceOpts,

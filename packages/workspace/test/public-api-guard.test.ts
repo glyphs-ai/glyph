@@ -45,6 +45,7 @@ import {
   composeWorkspaceModule,
   globalDbPath,
   InputValidationError,
+  type ListWorkspacesOpts,
   type RegisterWorkspaceOpts,
   type RegisterWorkspaceResult,
   RegistryError,
@@ -60,6 +61,7 @@ import {
   WorkspaceNameInvalidError,
   WorkspaceNotRegisteredError,
   WorkspacePathConflictError,
+  WorkspacePathInvalidError,
   type WorkspaceService,
   type WorkspaceServiceOpts,
   workspaceLayout,
@@ -81,14 +83,15 @@ describe("@glyphs-ai/workspace public API guard", () => {
       new WorkspaceNameInvalidError("", "must be non-empty"),
       new WorkspaceNotRegisteredError("00000000-0000-4000-8000-000000000000"),
       pathConflict,
-      // InputValidationError extends Error directly (NOT WorkspaceError) —
-      // the public barrel re-exports it; lock that contract here.
+      new WorkspacePathInvalidError("", "must be non-empty"),
+      // InputValidationError extends WorkspaceError — a single
+      // instanceof filter catches all workspace-package failures.
       new InputValidationError("register", [{ path: ["name"], message: "required" }]),
     ];
     expectTypeOf(errs[0]!).toExtend<Error>();
     expectTypeOf(pathConflict).toHaveProperty("workspaceDir");
     expectTypeOf(pathConflict).toHaveProperty("existingWorkspaceId");
-    expectTypeOf(new InputValidationError("scope", [])).toExtend<Error>();
+    expectTypeOf(new InputValidationError("scope", [])).toExtend<WorkspaceError>();
   });
 
   it("preserves the public DTO + layout shapes", () => {
@@ -127,6 +130,8 @@ describe("@glyphs-ai/workspace public API guard", () => {
     expectTypeOf<WorkspaceServiceOpts>().toHaveProperty("logger");
     expectTypeOf<WorkspaceService["get"]>().parameters.toEqualTypeOf<[string]>();
     expectTypeOf<WorkspaceService["get"]>().returns.resolves.toEqualTypeOf<Workspace | null>();
+    expectTypeOf<WorkspaceService["list"]>().parameters.toEqualTypeOf<[ListWorkspacesOpts?]>();
+    expectTypeOf<WorkspaceService["list"]>().returns.resolves.toEqualTypeOf<Workspace[]>();
     expectTypeOf<WorkspaceService["register"]>().parameters.toEqualTypeOf<
       [RegisterWorkspaceOpts]
     >();

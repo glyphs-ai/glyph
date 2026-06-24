@@ -5,11 +5,6 @@
  * registry/domain error?" check; specific subclasses below carry
  * typed context (the offending id / name / workspaceDir).
  *
- * Note: `InputValidationError` (defined in `validate.ts`, also
- * exported from the public barrel) is a separate hierarchy that
- * extends `Error` directly — `instanceof WorkspaceError` will NOT
- * catch it.
- *
  * `RegistryError` is a sub-base for errors originating in the registry
  * table itself (id / workspaceDir conflicts, missing rows, raw
  * constraint violations). Name validation is independent of the registry and
@@ -80,5 +75,17 @@ export class WorkspaceNotRegisteredError extends RegistryError {
 
   constructor(public readonly workspaceId: string) {
     super(`no workspace with id "${workspaceId}" is registered`);
+  }
+}
+
+/** workspaceDir is empty, not a string, or not an absolute path. */
+export class WorkspacePathInvalidError extends RegistryError {
+  override readonly name = "WorkspacePathInvalidError";
+
+  constructor(
+    public readonly workspaceDir: unknown,
+    public readonly reason: string,
+  ) {
+    super(`invalid workspaceDir "${String(workspaceDir)}": ${reason}`);
   }
 }
