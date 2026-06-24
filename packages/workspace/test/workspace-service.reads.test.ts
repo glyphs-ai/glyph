@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { WorkspaceIdInvalidError } from "../src/index.js";
 import {
   setupWorkspaceTestSubsystem,
   teardownWorkspaceTestSubsystem,
@@ -43,8 +44,17 @@ describe("WorkspaceService reads", () => {
     expect(await sys.service.get(UUID_A)).toBeNull();
   });
 
-  it("get returns null for a malformed id (no throw)", async () => {
-    expect(await sys.service.get("not-a-uuid")).toBeNull();
+  it("get throws WorkspaceIdInvalidError for a malformed id", async () => {
+    await expect(sys.service.get("not-a-uuid")).rejects.toBeInstanceOf(WorkspaceIdInvalidError);
+  });
+
+  it("get with malformed id throws WorkspaceError (consistent with writes)", async () => {
+    // Regression guard: reads and writes now both validate the id
+    // and throw WorkspaceError subclasses for malformed input.
+    const malformedIds = ["not-a-uuid", "", "123", "null"];
+    for (const id of malformedIds) {
+      await expect(sys.service.get(id)).rejects.toBeInstanceOf(WorkspaceIdInvalidError);
+    }
   });
 
   it("list returns workspaces ordered by lastOpenedAt DESC", async () => {

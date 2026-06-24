@@ -9,6 +9,7 @@ import {
   WorkspaceIdInvalidError,
   WorkspaceNameInvalidError,
   WorkspacePathConflictError,
+  WorkspacePathInvalidError,
 } from "../src/index.js";
 import {
   setupWorkspaceTestSubsystem,
@@ -97,23 +98,44 @@ describe("WorkspaceService.register", () => {
       // workspaceDir omitted — fails RegisterWorkspaceOptsSchema's shape
     } as unknown as Parameters<typeof sys.service.register>[0]);
     await expect(promise).rejects.toBeInstanceOf(InputValidationError);
-    // Lock in the documented asymmetry: InputValidationError does NOT
-    // extend WorkspaceError, so an `instanceof WorkspaceError` filter
-    // (per the README catch-block recipe) must miss it.
-    await expect(promise).rejects.not.toBeInstanceOf(WorkspaceError);
+    // InputValidationError extends WorkspaceError so a single
+    // instanceof filter catches all workspace-package failures.
+    await expect(promise).rejects.toBeInstanceOf(WorkspaceError);
   });
 
   it("throws InputValidationError when workspaceDir is empty", async () => {
-    // Exercises RegisterWorkspaceOptsSchema's `z.string().min(1)` branch —
-    // distinct from the missing-field path above.
     await expect(
       sys.service.register({ id: UUID_A, workspaceDir: "", name: "Project" }),
     ).rejects.toBeInstanceOf(InputValidationError);
   });
 
-  it("throws InputValidationError when workspaceDir is relative", async () => {
+  it("throws WorkspacePathInvalidError when workspaceDir is relative", async () => {
     await expect(
       sys.service.register({ id: UUID_A, workspaceDir: "relative/p", name: "Project" }),
-    ).rejects.toBeInstanceOf(InputValidationError);
+    ).rejects.toBeInstanceOf(WorkspacePathInvalidError);
+  });
+
+  it("every input-validation failure is instanceof WorkspaceError", async () => {
+    // Regression guard: the HTTP error-mapping layer uses a single
+    // `instanceof WorkspaceError` filter to catch all 4xx-class
+    // workspace failures. Every validation rejection path must satisfy it.
+    const cases: Array<{ opts: Parameters<typeof sys.service.register>[0] }> = [
+      { opts: { id: UUID_A, name: "P" } as never },
+      { opts: { id: UUID_A, workspaceDir: "", name: "P" } },
+      {
+        opts: { id: UUID_A, workspaceDir: "rel/path", name: "P" },
+      },
+      { opts: { id: "bad", workspaceDir: "/tmp/x", name: "P" } },
+      { opts: { id: UUID_A, workspaceDir: "/tmp/x", name: "" } },
+      {
+        opts: { id: UUID_A, workspaceDir: "/tmp/x", name: "a".repeat(65) },
+      },
+    ];
+    for (const { opts } of cases) {
+      await expect(sys.service.register(opts)).rejects.toBeInstanceOf(WorkspaceError);
+      // Safety: also ensure we don't get a pass because the error is
+      // never thrown at all.
+      await expect(sys.service.register(opts)).rejects.toThrow();
+    }
   });
 });
