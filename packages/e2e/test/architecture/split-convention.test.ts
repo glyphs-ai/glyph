@@ -1,6 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { walkDirs } from "../_helpers/walk.js";
 
 /**
  * Structural enforcement of the "facade + sibling subdir" split
@@ -159,23 +160,6 @@ function classifyDir(absPath: string): ClassifiedDir {
   };
 }
 
-function walkSrcDirs(srcRoot: string, acc: string[]): void {
-  let entries: import("node:fs").Dirent<string>[];
-  try {
-    entries = readdirSync(srcRoot, { withFileTypes: true, encoding: "utf8" });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    if (SKIP_DIR_NAMES.has(entry.name)) continue;
-    if (entry.name.startsWith("_")) continue;
-    const abs = path.join(srcRoot, entry.name);
-    acc.push(abs);
-    walkSrcDirs(abs, acc);
-  }
-}
-
 function collectAllSrcDirs(): ClassifiedDir[] {
   const out: ClassifiedDir[] = [];
   const pkgs = readdirSync(PACKAGES_DIR, { withFileTypes: true, encoding: "utf8" });
@@ -190,7 +174,9 @@ function collectAllSrcDirs(): ClassifiedDir[] {
     }
     if (!s.isDirectory()) continue;
     const found: string[] = [];
-    walkSrcDirs(srcRoot, found);
+    for (const abs of walkDirs(srcRoot, { skipDirs: SKIP_DIR_NAMES, skipUnderscore: true })) {
+      found.push(abs);
+    }
     for (const abs of found) out.push(classifyDir(abs));
   }
   return out;
@@ -296,7 +282,12 @@ describe("facade + sibling subdir splits must not contain a barrel index.ts", ()
       // same skip rules as the top-level classifier) and check
       // whether any of them is itself classified as SPLIT.
       const descendants: string[] = [];
-      walkSrcDirs(split.absPath, descendants);
+      for (const abs of walkDirs(split.absPath, {
+        skipDirs: SKIP_DIR_NAMES,
+        skipUnderscore: true,
+      })) {
+        descendants.push(abs);
+      }
       for (const descAbs of descendants) {
         const classification = classifyDir(descAbs);
         if (classification.kind === "SPLIT") {
