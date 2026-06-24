@@ -18,9 +18,9 @@ import type { TaskEntity } from "../task-entity.js";
 import { DEFAULT_RUNTIME, pickRuntimeSessionId, type TaskServiceCtx } from "../task-service.js";
 import type { DispatchOpts } from "../types.js";
 import { assertValidTaskId, generateTaskId } from "../validate.js";
-import { applyTerminal } from "./_helpers.js";
 import { pickRuntime, resolveDispatchAgent } from "./agent-resolver.js";
 import { runDispatch } from "./dispatch.js";
+import { applyTerminal } from "./terminal.js";
 
 const MAX_CREATE_RETRIES = 5;
 

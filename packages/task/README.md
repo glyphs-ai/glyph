@@ -30,10 +30,11 @@ packages/task/src/
                            mutations.ts (cancel/delete/recover write-side),
                            queries.ts (read-side), activity-stream.ts (runtime
                            activity surface), shutdown.ts (lifecycle hooks),
-                           _helpers.ts (shared private utilities: LiveTask,
-                           applyTerminal, decideTerminal, safeRm).
+                           terminal.ts (applyTerminal, decideTerminal,
+                           collectSuccessPayload terminal-transition orchestrator),
+                           _helpers.ts (shared private utilities: LiveTask, safeRm).
   task-meta.ts             readTaskRuntimeMetadata (runtime hook)
-  framing.ts               TASK_FRAMING_PROMPT_COPILOT + formatTaskMd helpers +
+  framing.ts               DEFAULT_TASK_FRAMING_PROMPT + formatTaskMd helpers +
                            TASK_FILENAME / TASK_TEMP_SUBDIR / TASK_ARTIFACT_SUBDIR
                            on-disk contract constants + assertFramingPromptIsSafe
   paths.ts                 safeJoinUnderRoot path-traversal guard
@@ -97,8 +98,8 @@ await service.list();                                       // Task[]
 await service.list({ statuses: ["running"], agent: "writer" });
 await service.get(task.id);                                 // Task | null
 await service.liveCount();                                  // number — in-flight + live
-await service.hasInFlightForSchedule(scheduleId);           // boolean
-await service.deleteForSchedule(scheduleId);                // { deletedCount }
+await service.hasInFlightByOriginMetadata({ origin: "schedule", metadataKey: "scheduleId", metadataValue: scheduleId });
+await service.deleteTerminalByOriginMetadata({ origin: "schedule", metadataKey: "scheduleId", metadataValue: scheduleId });
 await service.cancel(task.id);                              // best-effort SIGTERM
 await service.delete(task.id, { purge: false });
 const abs = await service.resolveArtifactPath(task.id, "report.html");
@@ -129,7 +130,8 @@ import {
   TASK_FILENAME,            // "TASK.md"
   TASK_TEMP_SUBDIR,         // "temp"
   TASK_ARTIFACT_SUBDIR,     // "artifact"
-  TASK_FRAMING_PROMPT_COPILOT,
+  TASK_FRAMING_PROMPT_COPILOT,  // deprecated alias for DEFAULT_TASK_FRAMING_PROMPT
+  DEFAULT_TASK_FRAMING_PROMPT,
   assertFramingPromptIsSafe,
   formatTaskMd,             // render `# <brief>\n\n<details>\n`
   // workdir + path helpers

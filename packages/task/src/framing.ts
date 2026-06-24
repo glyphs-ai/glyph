@@ -33,7 +33,7 @@ export const TASK_TEMP_SUBDIR = "temp";
 export const TASK_ARTIFACT_SUBDIR = "artifact";
 
 /**
- * Single-line ASCII framing prompt for the copilot runtime.
+ * Single-line ASCII framing prompt sent to the runtime at spawn time.
  *
  * Kept on ONE line so `cmd.exe` never sees an LF inside the `/c`
  * payload (see module docstring for the cmd.exe argv-LF interaction).
@@ -42,8 +42,11 @@ export const TASK_ARTIFACT_SUBDIR = "artifact";
  * invariant guard ({@link assertFramingPromptIsSafe}) will reject any
  * value containing LF / CR / non-printable-ASCII bytes at module load.
  */
-export const TASK_FRAMING_PROMPT_COPILOT =
+export const DEFAULT_TASK_FRAMING_PROMPT =
   "1. Read TASK.md in your current working directory. That is your assignment. 2. Use ./temp/ for intermediate steps and scratch files; nothing in ./temp/ is shown to the user. 3. Save meaningful output to ./artifact/. These files ARE shown to the user. You MUST always produce at least one self-contained HTML file under ./artifact/ (inline all CSS, JS, fonts, images as data URLs; no external links or CDN references; must render correctly when opened directly from disk with no network access) as a human-readable report of your work. This HTML report is in addition to any other outputs your agent instructions or task brief require -- never skip it, never let other outputs replace it. 4. Execute the assignment, then exit.";
+
+/** @deprecated Use {@link DEFAULT_TASK_FRAMING_PROMPT} instead. */
+export const TASK_FRAMING_PROMPT_COPILOT: string = DEFAULT_TASK_FRAMING_PROMPT;
 
 /**
  * Throws when `s` is not safe to pass through `cmd.exe /c …` as a
@@ -68,7 +71,7 @@ export function assertFramingPromptIsSafe(s: string): void {
 // constant to span multiple lines or include non-ASCII bytes. Fires
 // at module-import time so the failure is loud and the test suite
 // catches it on every run.
-assertFramingPromptIsSafe(TASK_FRAMING_PROMPT_COPILOT);
+assertFramingPromptIsSafe(DEFAULT_TASK_FRAMING_PROMPT);
 
 /**
  * Render the user-supplied `brief` (+ optional `details`) into the

@@ -23,6 +23,7 @@ export {
 } from "./errors.js";
 export {
   assertFramingPromptIsSafe,
+  DEFAULT_TASK_FRAMING_PROMPT,
   formatTaskMd,
   TASK_ARTIFACT_SUBDIR,
   TASK_FILENAME,

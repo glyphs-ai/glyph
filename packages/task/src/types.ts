@@ -251,7 +251,7 @@ export interface DispatchOpts {
   /**
    * Optional override for the framing prompt the runtime receives as
    * the spawn-time `prompt` argv. Defaults to
-   * {@link TASK_FRAMING_PROMPT_COPILOT} ("read TASK.md, save artifacts
+   * {@link DEFAULT_TASK_FRAMING_PROMPT} ("read TASK.md, save artifacts
    * to ./artifact/, prefer self-contained HTML"). The
    * {@link assertFramingPromptIsSafe} invariant runs on whichever
    * prompt is actually used (default OR override) so any unsafe
