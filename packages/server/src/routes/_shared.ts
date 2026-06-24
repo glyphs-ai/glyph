@@ -28,6 +28,22 @@ export function unknownBodyKey(
 }
 
 /**
+ * Discriminated result of a request-body / query validator: a typed
+ * `value` on success or a 400-ready `error` string on failure. Lifted
+ * here so the schedules and workflows route files share one definition
+ * instead of each redeclaring the same triple.
+ */
+export interface ValidationFail {
+  readonly ok: false;
+  readonly error: string;
+}
+export interface ValidationOk<T> {
+  readonly ok: true;
+  readonly value: T;
+}
+export type ValidationResult<T> = ValidationOk<T> | ValidationFail;
+
+/**
  * Allow-list of error class `name`s whose `.message` is safe to surface in
  * an HTTP response body. Each entry is a typed error from a glyph
  * package whose message is intentionally user-facing (no host paths, no
