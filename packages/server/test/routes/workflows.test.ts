@@ -250,7 +250,7 @@ describe("workflowsRoutes — create", () => {
     });
   });
 
-  it("POST / forwards details + metadata when present", async () => {
+  it("POST / forwards details when present", async () => {
     const createWorkflow = vi.fn(async () => ({ workflowId: WID, initialCoordNodeId: COORD_NID }));
     const svc = stubService({ createWorkflow });
     const res = await mountRoutes(svc).request("/", {
@@ -260,7 +260,6 @@ describe("workflowsRoutes — create", () => {
         brief: "ship feature X",
         details: "background prose",
         coordinatorAgent: "coord-agent",
-        metadata: { priority: "high" },
       }),
     });
     expect(res.status).toBe(201);
@@ -268,7 +267,6 @@ describe("workflowsRoutes — create", () => {
       brief: "ship feature X",
       coordinatorAgent: "coord-agent",
       details: "background prose",
-      metadata: { priority: "high" },
     });
   });
 
@@ -296,6 +294,22 @@ describe("workflowsRoutes — create", () => {
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/bogus/);
+  });
+
+  it("POST / with a metadata key returns 400 (no longer a caller-facing input)", async () => {
+    const svc = stubService({});
+    const res = await mountRoutes(svc).request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        brief: "x",
+        coordinatorAgent: "y",
+        metadata: {},
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/metadata/);
+    expect(svc.createWorkflow).not.toHaveBeenCalled();
   });
 
   it("POST / with non-object body returns 400", async () => {

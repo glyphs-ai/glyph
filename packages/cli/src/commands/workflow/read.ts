@@ -75,13 +75,6 @@ export interface WorkflowCreateOpts extends WorkspaceFlagOpts {
    * registrar, the command is a thin pass-through).
    */
   readonly details?: string;
-  /**
-   * Opaque metadata object persisted verbatim onto the workflow row.
-   * Maps to `CreateWorkflowBody.metadata`. The registrar resolves
-   * `--metadata-file <path>` (file read + JSON parse + object-shape
-   * validation) into this field before the call.
-   */
-  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export async function workflowCreate(opts: WorkflowCreateOpts): Promise<CommandResult> {
@@ -98,7 +91,6 @@ export async function workflowCreate(opts: WorkflowCreateOpts): Promise<CommandR
       brief: opts.brief,
       coordinatorAgent: opts.coordAgent,
       ...(opts.details !== undefined ? { details: opts.details } : {}),
-      ...(opts.metadata !== undefined ? { metadata: opts.metadata } : {}),
     };
     const created = await client.call("workflows.create", { params: { id: workspaceId }, body });
     return { exitCode: 0, stdout: renderHeader(created, opts) };
