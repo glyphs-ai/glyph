@@ -276,14 +276,12 @@ export interface WorkflowDagWire {
 
 /**
  * Request body for `POST /workspaces/:id/workflows`. Mirrors
- * `WorkflowService.createWorkflow` args. `metadata` is opaque and
- * forwarded verbatim to the substrate.
+ * `WorkflowService.createWorkflow` args.
  */
 export interface CreateWorkflowBody {
   readonly brief: string;
   readonly details?: string;
   readonly coordinatorAgent: string;
-  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 /**
