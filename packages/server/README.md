@@ -67,6 +67,7 @@ not a task sub-layer.
 /api/workspaces/:id/workflows/:wfid/nodes                POST                     add node
 /api/workspaces/:id/workflows/:wfid/subgraph             POST                     add nodes and edges atomically
 /api/workspaces/:id/workflows/:wfid/nodes/:nid/cancel    POST                     cancel worker-kind node
+/api/workspaces/:id/workflows/:wfid/nodes/:nid/respond   POST                     answer a waiting human-kind node
 /api/workspaces/:id/workflows/:wfid/finish               POST                     mark workflow terminal
 /api/workspaces/:id/workflows/:wfid/edges/:from/:to      DELETE                   delete not-started edge
 /api/workspaces/:id/workflows/:wfid/nodes/:nid           DELETE                   delete not-started node

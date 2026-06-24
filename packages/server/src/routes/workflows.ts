@@ -24,6 +24,7 @@
  *   - `GET    /:wfid`                     — header only (with `iterationCount`)
  *   - `DELETE /:wfid`                     — delete a terminal workflow (`?purge=1` for hard delete)
  *   - `GET    /:wfid/dag`                 — full snapshot (header + nodes + edges) with taskId enrichment
+ *   - `GET    /:wfid/nodes/:nid`          - single node (taskId enriched) without the full dag
  *   - `POST   /:wfid/cancel`              — external cancel; returns updated header
  *   - `GET    /:wfid/artifacts`           — list workflow-summary + per-node artifacts
  *   - `GET    /:wfid/artifacts/:encoded`  — static bytes for one artifact
@@ -31,6 +32,7 @@
  *   - `POST   /:wfid/edges`               — add a single edge
  *   - `POST   /:wfid/subgraph`            — batch insert N nodes + M edges
  *   - `POST   /:wfid/nodes/:nid/cancel`   — cancel a worker-kind node
+ *   - `POST   /:wfid/nodes/:nid/respond`  - answer a waiting human-kind node
  *   - `POST   /:wfid/finish`              — flip workflow terminal
  *   - `DELETE /:wfid/nodes/:nid`          — delete a not_started node
  *   - `DELETE /:wfid/edges/:from/:to`     — delete a not_started edge
