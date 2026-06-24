@@ -1,6 +1,6 @@
 {
   "name": "@glyphs-ai/glyph",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "glyph — orchestrate agentic systems built on the MetaAgents format spec",
   "license": "MIT",
   "repository": {
