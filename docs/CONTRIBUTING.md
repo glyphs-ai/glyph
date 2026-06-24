@@ -74,7 +74,6 @@ pnpm build && pnpm typecheck && pnpm test && pnpm lint
 | A new CLI command          | [`architecture.md` -> Adding a new CLI command](./architecture.md#adding-a-new-cli-command). |
 | A new runtime adapter      | [`architecture.md` -> Adding a new runtime](./architecture.md#adding-a-new-runtime). |
 | A first-party agent / skill / MCP | [`../first-party/README.md`](../first-party/README.md).            |
-| A new domain term          | define it in [`glossary.md`](./glossary.md).                               |
 
 ## Tier layering
 
@@ -95,14 +94,5 @@ from `contracts` only, never from `api` or a deeper tier.
   issue it closes.
 - **Preserve the wire shape.** A refactor that moves code must not change
   observable HTTP behaviour unless that is the explicit point of the PR.
-
-### Checklist before requesting review
-
-- [ ] `pnpm build && pnpm typecheck && pnpm test && pnpm lint` all pass.
-- [ ] New behaviour has tests in the same PR (`packages/<pkg>/test/`).
-- [ ] Docs / READMEs updated if the change is user- or contributor-facing.
-- [ ] Tier layering respected (no upward imports; `tier-invisibility`
-      test green).
-- [ ] No secrets, tokens, or absolute host paths committed.
 
 Releases are maintainer-only; see [`RELEASING.md`](./RELEASING.md).

@@ -1,6 +1,6 @@
 # `@glyphs-ai/contracts`
 
-> **Diverges from [`pkg-template.md`](../../docs/pkg-template.md) in:** it is types-only (wire shapes, route catalog, pure-function path helpers). No schema / service / repository / drizzle, and no runtime code.
+> **Tier:** T2 (Application). See the [tier model](../../docs/architecture.md#tier-model).
 
 **Tier T2 (sibling of `@glyphs-ai/api`).** The strict-isolation entrypoint for
 glyph's external surfaces: pure types (wire shapes, route catalog, domain

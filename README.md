@@ -25,7 +25,7 @@ today's language — we're still learning its alphabet.
 
 ## Quickstart
 
-Requires Node 22+ and npm.
+Requires Node 22+.
 
 ```sh
 npm install -g @glyphs-ai/glyph

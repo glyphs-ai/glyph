@@ -846,7 +846,5 @@ hand-rolls a `fetch`.
   - [`@glyphs-ai/api`](../packages/api/README.md)
   - [`@glyphs-ai/server`](../packages/server/README.md)
 - [`docs/CONTRIBUTING.md`](./CONTRIBUTING.md) — local setup, the daily
-  loop, the "adding things" pointer map, and the PR checklist.
-- [`docs/glossary.md`](./glossary.md) — one-line definitions of glyph's
-  domain vocabulary (node kinds, substrate, wire, origin, tier, wsid, …).
+  loop, and the "adding things" pointer map.
 - [`docs/RELEASING.md`](./RELEASING.md) — maintainer release procedure.

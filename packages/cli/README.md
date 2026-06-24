@@ -1,6 +1,6 @@
 # @glyphs-ai/cli
 
-> **Diverges from [`pkg-template.md`](../../docs/pkg-template.md) in:** it is a surface. `src/` is command registrars over the HTTP client, not an entity service / repository / drizzle module.
+> **Tier:** T_top (Surfaces). See the [tier model](../../docs/architecture.md#tier-model).
 
 Command-line interface for glyph (lifecycle commands + HTTP API
 client).

@@ -1,8 +1,6 @@
 # @glyphs-ai/server
 
 > **Tier:** T3 (Host). See the [tier model](../../docs/architecture.md#tier-model).
->
-> **Diverges from [`pkg-template.md`](../../docs/pkg-template.md) in:** it is a transport adapter. `src/` is Hono routes plus middleware, with no schema / service / repository / drizzle of its own.
 
 The HTTP API surface -- a [Hono](https://hono.dev) app that mounts the
 workspace registry plus workspace-scoped catalog, session, task,

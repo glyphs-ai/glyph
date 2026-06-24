@@ -6,6 +6,26 @@ package in glyph follows. Examples in-tree: `@glyphs-ai/workspace`,
 `@glyphs-ai/schedule`, `@glyphs-ai/workflow` (`@glyphs-ai/schedule` is the
 cleanest recent example of the template applied to a new package).
 
+## Known exceptions
+
+Not every package in the repo is a BC-owning service. The following
+packages intentionally diverge from this template; none of them carry
+their own schema / service / repository / drizzle module:
+
+| Package                  | Role                                                                       |
+| ------------------------ | -------------------------------------------------------------------------- |
+| `@glyphs-ai/contracts`   | Types-only: wire shapes, route catalog, pure path helpers. No runtime.     |
+| `@glyphs-ai/runtime`     | Runtime adapter registry (`copilot`, ...).                                 |
+| `@glyphs-ai/terminal`    | Thin PTY / shell wrapper: spawn / quoting / platform primitives.           |
+| `@glyphs-ai/api`         | Composition root that wires T0 / T1 modules into per-workspace contexts.   |
+| `@glyphs-ai/server`      | Transport adapter: Hono routes + middleware over the api composition.     |
+| `@glyphs-ai/cli`         | Surface: command registrars over the typed HTTP client.                    |
+| `@glyphs-ai/dashboard`   | Surface: browser SPA (Vite + React); tests use MSW.                       |
+| `@glyphs-ai/e2e`         | Tests-only: no `src/`, no published API.                                   |
+
+Each package's README states its tier; consult that and this table
+rather than asking each README to restate its divergence.
+
 ## Scaffold a new service package
 
 ```bash
