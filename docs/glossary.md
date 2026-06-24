@@ -52,11 +52,16 @@ tier; see [`architecture.md` -> Tier model](./architecture.md#tier-model).
 
 ### origin
 
-The writer's identity tag stamped on a Task or Workflow row - e.g.
-`schedule`, `cli`, `mcp` - recording which subsystem created it. Paired
-with **metadata_key** for the indexed-lookup cascade (a schedule delete
-prunes terminal rows that carry its `(origin, metadataKey)` pair; in
-flight rows block the delete).
+The writer's identity tag stamped on a Task or Workflow row, recording
+which subsystem created it - one of `standalone`, `workflow`, or
+`schedule` for a Task (`packages/task/src/types.ts`), and only
+`standalone` or `schedule` for a Workflow
+(`packages/workflow/src/types.ts`). Paired with **metadata_key** for the
+indexed-lookup cascade (a schedule delete prunes terminal rows that
+carry its `(origin, metadataKey)` pair; in flight rows block the
+delete). Distinct from a catalog entry's `origin`, which is the source
+URI (GitHub tree, Azure DevOps, or `file:`) identifying a skill / agent
+/ MCP (`packages/catalog/src/validate.ts`) - a separate concept.
 
 ### runtimeSessionId
 
