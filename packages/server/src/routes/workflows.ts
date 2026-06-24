@@ -176,7 +176,6 @@ export function workflowsRoutes(
         brief: body.brief,
         coordinatorAgent: body.coordinatorAgent,
         ...(body.details !== undefined ? { details: body.details } : {}),
-        ...(body.metadata !== undefined ? { metadata: body.metadata } : {}),
       });
       // A freshly seeded workflow has exactly one coord node, so
       // `iterationCount` is 1 (silent-retry coords are counted too —

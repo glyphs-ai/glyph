@@ -13,7 +13,7 @@ import type {
 import type { NodeRef, WorkflowNodeKind } from "@glyphs-ai/workflow";
 import type { ValidationResult } from "../_shared.js";
 
-const ALLOWED_CREATE_KEYS = new Set(["brief", "details", "coordinatorAgent", "metadata"]);
+const ALLOWED_CREATE_KEYS = new Set(["brief", "details", "coordinatorAgent"]);
 const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker", "human"];
 const KNOWN_FINISH_KINDS: readonly ("succeeded" | "failed")[] = ["succeeded", "failed"];
 
@@ -43,7 +43,7 @@ export function validateCreateBody(raw: unknown): ValidationResult<CreateWorkflo
       return { ok: false, error: `request body has unknown key "${k}"` };
     }
   }
-  const { brief, details, coordinatorAgent, metadata } = obj;
+  const { brief, details, coordinatorAgent } = obj;
   if (typeof brief !== "string" || brief.trim().length === 0) {
     return { ok: false, error: "brief must be a non-empty string" };
   }
@@ -53,20 +53,12 @@ export function validateCreateBody(raw: unknown): ValidationResult<CreateWorkflo
   if (details !== undefined && typeof details !== "string") {
     return { ok: false, error: "details, when set, must be a string" };
   }
-  if (metadata !== undefined) {
-    if (metadata === null || typeof metadata !== "object" || Array.isArray(metadata)) {
-      return { ok: false, error: "metadata, when set, must be a JSON object" };
-    }
-  }
   return {
     ok: true,
     value: {
       brief,
       coordinatorAgent,
       ...(details !== undefined ? { details } : {}),
-      ...(metadata !== undefined
-        ? { metadata: metadata as Readonly<Record<string, unknown>> }
-        : {}),
     },
   };
 }
