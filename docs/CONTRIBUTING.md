@@ -75,15 +75,6 @@ pnpm build && pnpm typecheck && pnpm test && pnpm lint
 | A new runtime adapter      | [`architecture.md` -> Adding a new runtime](./architecture.md#adding-a-new-runtime). |
 | A first-party agent / skill / MCP | [`../first-party/README.md`](../first-party/README.md).            |
 
-## Tier layering
-
-Packages are organized into a 5-tier model (see
-[`architecture.md` -> Tier model](./architecture.md#tier-model)). Imports
-flow downward only; the fence is enforced by
-`packages/e2e/test/architecture/tier-invisibility.test.ts`. Wire DTOs that
-cross HTTP live in `@glyphs-ai/contracts`; `dashboard` and `cli` import
-from `contracts` only, never from `api` or a deeper tier.
-
 ## Pull requests
 
 - **Branch** off `main` with a descriptive `<type>/<slug>` name.

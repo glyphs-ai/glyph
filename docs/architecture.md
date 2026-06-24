@@ -195,85 +195,21 @@ through the same T1 execution-mode pipeline.
 
 ## Service + repository pattern
 
-Every entity package follows the same shape: a single
-**`<Entity>Service`** class that owns reads + writes, backed by a
-package-private **Drizzle repository** that the service constructs.
-Tests open the service against `dbFile: ":memory:"` via the package's
-`composeXxxModule` helper, so the schema goes through the real
-drizzle-kit migrator on every test boot.
+Every entity package follows the same shape: a **3-layer Row / Entity /
+DTO** split, with `<Entity>Service` orchestrating reads + writes against
+a package-private Drizzle repository. The repository returns `*Entity`;
+the service returns the wire DTO. The full contract (layer table,
+projection-helper rules, when Entity becomes a class) lives in
+[`docs/pkg-template.md` → Repository contract](./pkg-template.md#repository-contract);
+the rationale for this specific shape is in the same doc under
+[Why this shape](./pkg-template.md#why-this-shape).
 
-### Per-package src layout
-
-```
-packages/<pkg>/src/
-  schema.ts                 Drizzle table def + `*Row` / `New*Row` types (package-private)
-  <entity>-entity.ts        `<Entity>Entity` — pkg-owned domain shape; interface or class
-  <entity>-repository.ts    `<Entity>Repository` — Drizzle CRUD; returns Entity
-  <entity>-service.ts       `<Entity>Service` — orchestration; returns DTO
-  types.ts                  bare-noun DTO (`Workspace`, `Session`, ...) + opts shapes
-  errors.ts                 typed error classes
-  validate.ts               id regex + zod input schemas
-  compose.ts                `compose<Entity>Module({ dbFile })` composition root
-  testing.ts                in-memory test fixture (via `/testing` subpath)
-  index.ts                  public barrel
-drizzle/                    generated SQL migrations (committed)
-drizzle.config.ts           drizzle-kit codegen config
-```
-
-### The three layers
-
-glyph uses an **explicit 3-layer split** (Row / Entity / DTO) across
-every entity pkg. The pkg-template enforces it; see
-[`docs/pkg-template.md`](./pkg-template.md) for the full rationale.
-
-| Layer | Where | Suffix | Visibility | Role |
-|---|---|---|---|---|
-| **Row** | `schema.ts` | `*Row` | pkg-private | Drizzle `$inferSelect` shape; tracks the SQLite table |
-| **Entity** | `<entity>-entity.ts` | `*Entity` | pkg-private (NOT re-exported from `index.ts`) | Pkg-owned domain shape; `interface` for anemic BCs, `class` for rich (state machine / invariants) |
-| **DTO** | `types.ts` | bare noun (no suffix) | exported from `index.ts` | Wire shape; what `<Entity>Service` returns; stable contract for HTTP / CLI / other pkgs |
-
-Repository public methods return **Entity**. Service public methods
-return **DTO**. The row → entity boundary lives inside the repository
-file; the entity → DTO boundary lives inside the service file. When
-either projection is structurally trivial it's an inline TypeScript
-assignment (no helper function); when it's non-trivial — composite
-sources, normalisation, async fetches — it grows into a module-private
-helper at the same boundary.
-
-```ts
-// e.g. packages/workspace/src/workspace-service.ts
-export class WorkspaceService {
-  // Reads — service projects Entity → DTO inline (1-line normalisation).
-  getById(id: string): Promise<Workspace | null>;
-  list(): Promise<Workspace[]>;
-  getLastOpened(): Promise<Workspace | null>;
-  getLastOpenedId(): Promise<string | null>;
-
-  // Writes — Stripe-style hybrid: primary key positional, options in bag.
-  register(input: { id, workspaceDir, name }): Promise<{ id: string }>;
-  open(id: string): Promise<void>;
-  rename(id: string, opts: { newName: string }): Promise<void>;
-  unregister(id: string, opts?: { purge?: boolean }): Promise<void>;
-}
-```
-
-### Three properties of the pattern
-
-1. **Repositories are persistence-only.** They never parse
-   frontmatter, build dependency graphs, mkdir, spawn subprocesses,
-   or call other pkgs. The repository's job is "given an id, return
-   the stored `Entity` (or undefined)." Side effects, validation,
-   cross-pkg coordination, FSM transitions all live in the service.
-2. **`*Row` never leaves the repository.** No `export * as schema`
-   from `index.ts`; the Drizzle inferred type is implementation
-   detail. Swapping ORMs only touches `schema.ts` +
-   `<entity>-repository.ts`.
-3. **`*Entity` classes are pkg-private.** Rich BCs (catalog/task)
-   keep their FSM class internal; the public projection is the
-   bare-noun DTO. Anemic BCs (workspace/session) use a plain
-   `interface` for Entity instead of a class.
-
-
+In-tree examples: anemic BCs (`workspace`, `session`) use a plain
+`interface` for Entity; rich BCs (`catalog`, `task`) use a class with
+FSM transitions and invariant validation. Tests open the service
+against `dbFile: ":memory:"` via the package's `compose<Entity>Module`
+helper, so the schema goes through the real drizzle-kit migrator on
+every test boot.
 
 ## Atomic IO seam
 
