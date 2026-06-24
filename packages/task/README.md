@@ -130,7 +130,6 @@ import {
   TASK_FILENAME,            // "TASK.md"
   TASK_TEMP_SUBDIR,         // "temp"
   TASK_ARTIFACT_SUBDIR,     // "artifact"
-  TASK_FRAMING_PROMPT_COPILOT,  // deprecated alias for DEFAULT_TASK_FRAMING_PROMPT
   DEFAULT_TASK_FRAMING_PROMPT,
   assertFramingPromptIsSafe,
   formatTaskMd,             // render `# <brief>\n\n<details>\n`

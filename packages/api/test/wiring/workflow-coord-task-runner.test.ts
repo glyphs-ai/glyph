@@ -414,7 +414,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
         workflowNodeId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       },
       // Coord-kind framing prompt — replaces the default
-      // `TASK_FRAMING_PROMPT_COPILOT`. Asserted as
+      // `DEFAULT_TASK_FRAMING_PROMPT`. Asserted as
       // `expect.stringContaining` so the test pins the agent-
       // visible contract (the three env-key banner items)
       // rather than the exact phrasing — a copy edit doesn't

@@ -300,7 +300,7 @@ export function makeWorkerNodeRunner(
         // contract.
         //
         // No `prompt` override: workers use `@glyphs-ai/task`'s default
-        // `TASK_FRAMING_PROMPT_COPILOT`. Worker briefs are self-
+        // `DEFAULT_TASK_FRAMING_PROMPT`. Worker briefs are self-
         // contained TASK.md bodies; the default framing's "read
         // TASK.md, then exit" instruction is exactly right.
         subprocessEnv: {

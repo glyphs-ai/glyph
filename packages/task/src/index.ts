@@ -27,7 +27,6 @@ export {
   formatTaskMd,
   TASK_ARTIFACT_SUBDIR,
   TASK_FILENAME,
-  TASK_FRAMING_PROMPT_COPILOT,
   TASK_TEMP_SUBDIR,
 } from "./framing.js";
 export { safeJoinUnderRoot, tasksRoot } from "./paths.js";

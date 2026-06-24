@@ -337,7 +337,7 @@ describe("makeWorkerNodeRunner — dispatch", () => {
     expect(firstCall).toBeDefined();
     if (firstCall !== undefined) {
       // No prompt override — worker dispatch must NOT include the
-      // key; the task pkg's default `TASK_FRAMING_PROMPT_COPILOT`
+      // key; the task pkg's default `DEFAULT_TASK_FRAMING_PROMPT`
       // applies. (Conditional-spread style would otherwise
       // serialize `prompt: undefined`.)
       expect(Object.keys(firstCall)).not.toContain("prompt");
