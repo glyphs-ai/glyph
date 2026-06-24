@@ -1,9 +1,10 @@
 # @glyphs-ai/dashboard
 
 The glyph dashboard SPA — React + Vite + react-router. The bundled
-production build is served by `@glyphs-ai/server` on the same port the
-dev server uses (8787), so dashboard URLs / muscle memory don't shift
-between dev and prod.
+production build is served by `@glyphs-ai/server` on the same port Vite
+hosts the dev UI on (8787), so dashboard URLs / muscle memory don't shift
+between dev and prod. That 8787 is Vite's own port in dev; the glyph
+backend runs separately on `:41817` and Vite proxies `/api/*` to it.
 
 ## Modes
 
@@ -45,7 +46,14 @@ the prod-bundle exclusion guarantee.
 
 ### Ports
 
-- `8787` — `dev` (matches the prod-bundled server port).
+- `8787` — `dev`, the port Vite serves the dashboard UI on. It is the
+  prod-bundled server's port re-used in dev (so URLs don't shift between
+  dev and prod), not the backend's: Vite proxies `/api/*` from here to
+  the glyph server on `:41817`.
+- `41817` — the glyph backend that `dev` proxies `/api/*` to, set by
+  `cross-env PORT=41817` in `packages/server`'s `dev` script. Keep it in
+  lock-step with the proxy target in `vite.config.ts`, or dev `/api`
+  calls ECONNREFUSED.
 - `8788` — `dev:mock` (deliberately `dev port + 1` so the collision is
   obvious; `--strictPort` makes collisions fail loudly instead of
   silently re-binding).
