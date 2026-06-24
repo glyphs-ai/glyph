@@ -4366,6 +4366,37 @@ button {
   min-height: 0;
 }
 
+/* Sessions is a single-column list page (no master-detail pane). The
+   same column-flex + height: 100% trick as .tasks-page lets the body
+   fill the content viewport, so the empty / loading card centers in the
+   remaining height instead of floating at the top. .content is flex: 1
+   inside .main (a column flex parent with a definite height), so
+   height: 100% here resolves against the content area's height. */
+.sessions-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.sessions-page > .page-toolbar,
+.sessions-page > .alert {
+  flex: 0 0 auto;
+}
+.sessions-page__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+/* In the empty / loading states the body's only child is the .empty
+   card; margin: auto absorbs the free space on every side so it sits
+   centered. The populated .session-list is not an .empty, so it keeps
+   its natural top-aligned flow and scrolls. */
+.sessions-page__body > .empty {
+  margin: auto;
+}
+
 /* The detail panel's last child (the active tab body  OverviewTab,
    ActivityTab, ArtifactsTab, or the loading placeholder) takes the
    remaining vertical space and scrolls internally so the head + tabs

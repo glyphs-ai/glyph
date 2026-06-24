@@ -18,15 +18,16 @@ import { SessionsPage } from "../src/pages/Sessions";
 import { TasksPage } from "../src/pages/Tasks";
 
 /**
- * Lock-in coverage for the empty-state collapse shared by the Tasks,
- * Sessions, and Agents master-detail pages.
- * The brief calls out three pages — Tasks, Sessions, Agents — that share
- * the master-detail / single-pane layout pattern. When the workspace is
- * genuinely empty (not a filter-narrowed result), each page must collapse
- * to a single full-width empty state with a wired CTA. When the workspace
- * has items but the filter narrows the visible set to zero, the existing
- * split layout (or filter-empty fallback on Sessions) must keep
- * surfacing.
+ * Lock-in coverage for the empty-state handling across the Tasks,
+ * Sessions, and Agents pages.
+ *
+ * Tasks keeps its master-detail layout even when the workspace is empty:
+ * the filter rail stays mounted and the right detail pane carries the
+ * "No tasks yet" zero-state (with a wired Dispatch CTA). Sessions and
+ * Agents render their single-pane / collapsed zero-state with a wired
+ * CTA. In every case, when the workspace has items but a filter narrows
+ * the visible set to zero, the filter chrome stays visible and a
+ * filter-empty state surfaces instead of the zero-state.
  */
 
 vi.mock("../src/api", async () => {
@@ -162,22 +163,25 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("Tasks page empty-state collapse", () => {
-  it("renders a single full-width zero-state when the workspace has no tasks (no detail placeholder)", async () => {
+describe("Tasks page empty-state layout", () => {
+  it("shows the zero-state in the detail pane while keeping the filter rail mounted when the workspace has no tasks", async () => {
     mockListTasks.mockResolvedValue([] as TaskRecord[]);
     renderTasks("/workspaces/ws-1/runtime/tasks", [makeAgent("official/engineer")]);
 
-    // The single zero-state shows up once `loaded` flips.
+    // The detail-pane zero-state shows up once `loaded` flips.
     const zero = await screen.findByTestId("tasks-empty-zero");
     expect(zero).toBeTruthy();
     // The CTA button is wired and labelled.
     expect(screen.getByTestId("tasks-empty-zero-cta")).toBeTruthy();
-    // The right-pane detail placeholder MUST NOT also render — that's the
-    // whole point of the collapse.
+    // The filter rail stays mounted (its inline "No tasks yet" list hint
+    // renders), so the layout is rail + detail, not a full-width collapse.
+    expect(screen.getByText(/Dispatch a task to get started/i)).toBeTruthy();
+    // The calm "No task selected" placeholder must NOT render — the
+    // detail pane carries the richer zero-state instead.
     expect(screen.queryByText(/No task selected/i)).toBeNull();
   });
 
-  it("collapses the right-pane placeholder when the filter narrows to zero", async () => {
+  it("keeps the rail visible and shows the detail placeholder when the filter narrows to zero", async () => {
     // Workspace has 1 task; filter narrows to zero via ?q=nomatch.
     mockListTasks.mockResolvedValue([makeTask("official/engineer", "succeeded", "task-A")]);
     renderTasks("/workspaces/ws-1/runtime/tasks?q=nomatch", [makeAgent("official/engineer")]);
@@ -189,16 +193,15 @@ describe("Tasks page empty-state collapse", () => {
     await waitFor(() => {
       expect(screen.getAllByText(/No matches/i).length).toBeGreaterThan(0);
     });
-    // The zero-state CTA must NOT render — the workspace isn't empty.
+    // The zero-state CTA must NOT render — the workspace isn't empty,
+    // it's just filtered down to zero rows.
     expect(screen.queryByTestId("tasks-empty-zero")).toBeNull();
-    // The right-pane "No task selected" placeholder is dropped when the
-    // filter narrows the visible list to zero. The left "No matches"
-    // card already carries the full message; rendering both side-by-side
-    // was redundant noise.
-    // This guards against rendering two empty states side-by-side.
-    expect(screen.queryByText(/No task selected/i)).toBeNull();
-    // And exactly one "No matches" empty card surfaces (the list-side
-    // one), confirming the right placeholder didn't echo it.
+    // The rail stays mounted and the right detail pane now shows the calm
+    // "No task selected" placeholder (rail + placeholder, never a
+    // full-width collapse).
+    expect(screen.getByText(/No task selected/i)).toBeTruthy();
+    // The "No matches" copy surfaces exactly once, in the list rail; the
+    // detail placeholder uses different wording so it doesn't echo it.
     expect(screen.getAllByText(/No matches/i)).toHaveLength(1);
   });
 
