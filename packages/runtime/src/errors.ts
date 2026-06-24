@@ -17,24 +17,24 @@ export class UnknownRuntimeError extends Error {
  *
  * The user-facing `.message` intentionally carries only the runtime kind —
  * not `sessionId` or the underlying `cause.message`. The kind is sufficient
- * for a UI surface ("Copilot session refresh failed; check server logs"),
+ * for a UI surface ("Copilot session readMetadata failed; check server logs"),
  * while the path / fs error string would leak host paths and Node `fs`
  * codes through the JSON response. Operators can still recover the full
  * diagnostic via `err.sessionId`, `err.cause`, and the server-side
  * `console.error` log emitted at the route boundary.
  *
- * The exported name and `.message` template (`runtime "<kind>" refresh
- * failed`) are part of the public error surface: the server allowlists
- * the `.name` string when sanitising route-boundary error payloads.
+ * The exported name and `.message` template are part of the public error
+ * surface: the server allowlists the `.name` string when sanitising
+ * route-boundary error payloads.
  */
-export class RuntimeRefreshFailed extends Error {
+export class RuntimeReadMetadataFailed extends Error {
   constructor(
     public readonly kind: string,
     public readonly sessionId: string,
     cause: Error,
   ) {
-    super(`runtime "${kind}" refresh failed`);
-    this.name = "RuntimeRefreshFailed";
+    super(`runtime "${kind}" readMetadata failed`);
+    this.name = "RuntimeReadMetadataFailed";
     this.cause = cause;
   }
 }
@@ -43,7 +43,7 @@ export class RuntimeRefreshFailed extends Error {
  * Wraps a failure that happened inside `Runtime.deleteState`. The original
  * cause is attached as `this.cause`.
  *
- * `.message` carries only the runtime kind. See `RuntimeRefreshFailed` for
+ * `.message` carries only the runtime kind. See `RuntimeReadMetadataFailed` for
  * the same rationale (don't leak host paths through the wire string).
  */
 export class RuntimeStateDeletionFailed extends Error {
@@ -63,7 +63,7 @@ export class RuntimeStateDeletionFailed extends Error {
  *
  * `.message` carries only the runtime kind. The workdir + cause stay on
  * the instance (`err.workdir`, `err.cause`) for server-side logging but
- * are kept out of the wire string. See `RuntimeRefreshFailed` for the
+ * are kept out of the wire string. See `RuntimeReadMetadataFailed` for the
  * same rationale.
  */
 export class RuntimeProvisionFailed extends Error {
@@ -88,7 +88,7 @@ export class RuntimeProvisionFailed extends Error {
  * returned `RuntimeHandle.exit` instead — that's a normal task outcome, not
  * a headless-launch failure.
  *
- * `.message` carries only the runtime kind. See `RuntimeRefreshFailed` for
+ * `.message` carries only the runtime kind. See `RuntimeReadMetadataFailed` for
  * the same rationale.
  */
 export class RuntimeHeadlessLaunchFailed extends Error {

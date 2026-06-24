@@ -37,12 +37,13 @@ packages/runtime/src/
   copilot/
     copilot-runtime.ts           CopilotRuntime - the canonical adapter
     activity.ts                  ActivityItem translation from Copilot event log
-    ids.ts                       Copilot session-id allocators + parsers + safeCopilotId guard
+    ids.ts                       Copilot session-id allocators + parsers
     interactive-launch.ts        buildCopilotLaunchCommand (--session-id, --yolo)
     launch-headless.ts           launchCopilotHeadless + mergeEnv + .mcp.json polyfill
     preflight.ts                 assertCopilotSdkResolvable (server-boot SDK presence check)
     provision.ts                 Bake AGENTS.md + .mcp.json into workdir
     state.ts                     workspace.yaml reader (CopilotWorkspaceMetadata)
+    streaming.ts                 Live-tail streaming helpers (streamFromBuffer, streamFromDisk)
     trust.ts                     Copilot trustedFolders preflight
     errors.ts                    Copilot-specific subclasses
   index.ts                       public barrel

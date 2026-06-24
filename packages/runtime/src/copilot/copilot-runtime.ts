@@ -2,13 +2,11 @@ import { randomUUID } from "node:crypto";
 import { open, readFile, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
-import type { SessionEvent } from "@github/copilot-sdk";
 import {
   RuntimeDoesNotSupportRemoteError,
   RuntimeProvisionFailed,
   RuntimeReadActivityInvalidArgs,
-  RuntimeRefreshFailed,
+  RuntimeReadMetadataFailed,
   RuntimeStateDeletionFailed,
 } from "../errors.js";
 import type { PlaceholderContext } from "../placeholders.js";
@@ -29,11 +27,7 @@ import type {
   StreamActivityOpts,
   TruncationInfo,
 } from "../types.js";
-import {
-  CopilotActivityStreamParser,
-  deriveCopilotResult,
-  parseCopilotActivity,
-} from "./activity.js";
+import { deriveCopilotResult, parseCopilotActivity } from "./activity.js";
 import { generateCopilotSessionId, safeCopilotId } from "./ids.js";
 import { buildCopilotLaunchCommand } from "./interactive-launch.js";
 import {
@@ -43,6 +37,12 @@ import {
 } from "./launch-headless.js";
 import { provisionCopilotWorkdir } from "./provision.js";
 import { readCopilotWorkspaceYaml } from "./state.js";
+import {
+  COPILOT_RAW_READ_CAP_BYTES,
+  serializeEventBuffer,
+  streamFromBuffer,
+  streamFromDisk,
+} from "./streaming.js";
 import { ensureDirTrusted } from "./trust.js";
 
 const DEFAULT_COPILOT_STATE_DIR = path.join(homedir(), ".copilot", "session-state");
@@ -320,7 +320,7 @@ export class CopilotRuntime implements Runtime {
         lastActiveAt: meta.lastActiveAt,
       };
     } catch (err) {
-      throw new RuntimeRefreshFailed(this.kind, id, err as Error);
+      throw new RuntimeReadMetadataFailed(this.kind, id, err as Error);
     }
   }
 
@@ -590,202 +590,11 @@ export class CopilotRuntime implements Runtime {
     // `subscribers` Set and we yield each event as ActivityItem(s).
     const memBuffer = this.sessionBuffers.get(id);
     if (memBuffer !== undefined) {
-      yield* this.streamFromBuffer(memBuffer, opts);
+      yield* streamFromBuffer(memBuffer, opts);
       return;
     }
 
     // Fallback: orphan-recovered session — tail events.jsonl from disk.
-    yield* this.streamFromDisk(id, opts);
+    yield* streamFromDisk(this.copilotStateDir, id, opts);
   }
-
-  private async *streamFromBuffer(
-    buffer: EventBuffer,
-    opts: StreamActivityOpts,
-  ): AsyncIterable<ActivityItem> {
-    // Seed parser state from already-buffered events so live
-    // tool.execution_complete events can update earlier tool_call items
-    // and seqs continue after multi-item source events. We still do NOT
-    // replay history to this subscriber.
-    const parser = new CopilotActivityStreamParser();
-    for (const event of buffer.events) {
-      parser.parseLine(JSON.stringify(event));
-    }
-
-    // Queue + notify pattern: pending events are pushed into `queue`
-    // by the SDK callback; the generator drains the queue on each
-    // wakeup. Avoids races between "subscriber attached" and
-    // "events arrived" — the subscriber runs synchronously on push,
-    // so any event after registration is captured.
-    const queue: SessionEvent[] = [];
-    let wake: (() => void) | undefined;
-    const subscriber = (event: SessionEvent) => {
-      queue.push(event);
-      wake?.();
-    };
-    buffer.subscribers.add(subscriber);
-    try {
-      while (true) {
-        if (opts.signal?.aborted) return;
-        // Drain anything currently queued.
-        while (queue.length > 0) {
-          if (opts.signal?.aborted) return;
-          const event = queue.shift() as SessionEvent;
-          const result = parser.parseLine(JSON.stringify(event));
-          for (const item of result.items) {
-            yield item;
-          }
-        }
-        // Buffer hit terminal state and there's nothing left to yield.
-        if (buffer.finished) return;
-        if (opts.signal?.aborted) return;
-        // Wait for either a new event or an abort signal.
-        await new Promise<void>((resolve) => {
-          if (opts.signal?.aborted) {
-            resolve();
-            return;
-          }
-          let settled = false;
-          const settle = () => {
-            if (settled) return;
-            settled = true;
-            opts.signal?.removeEventListener("abort", settle);
-            resolve();
-          };
-          wake = settle;
-          opts.signal?.addEventListener("abort", settle, { once: true });
-        });
-        wake = undefined;
-      }
-    } finally {
-      buffer.subscribers.delete(subscriber);
-    }
-  }
-
-  /**
-   * Tail `events.jsonl` from disk for orphan-recovered sessions with
-   * no in-memory buffer.
-   *
-   * Cost note: when the caller doesn't pass `opts.after`, we re-read
-   * the existing file once to derive the starting `seq`, since
-   * `seq` is the cumulative count of items across the whole log and
-   * we have no stored counter (the no-state design). For a freshly-
-   * recovered session the dashboard pattern is to call
-   * `readActivity()` first to get the existing content, then
-   * subscribe to `streamActivity({ after: <last-seen-seq> })` —
-   * passing `after` skips the re-read entirely.
-   */
-  private async *streamFromDisk(id: string, opts: StreamActivityOpts): AsyncIterable<ActivityItem> {
-    const eventsPath = path.join(this.copilotStateDir, id, "events.jsonl");
-
-    // Establish starting offset: end-of-file at subscription time
-    // (we do NOT replay history). Caller gets that via a one-shot
-    // readActivity() call beforehand.
-    let offset: number;
-    let parser: CopilotActivityStreamParser;
-    try {
-      const st = await stat(eventsPath);
-      offset = st.size;
-      // Resume at the seq the caller asked for (if any). When omitted,
-      // we use the count of items in the existing content as the
-      // starting seq so subsequent items continue the sequence. An
-      // empty file short-circuits to seq 0 to avoid a wasted read.
-      let startSeq: number;
-      if (typeof opts.after === "number") {
-        startSeq = opts.after + 1;
-      } else if (st.size === 0) {
-        startSeq = 0;
-      } else {
-        startSeq = parseCopilotActivity(await readFile(eventsPath, "utf8")).length;
-      }
-      parser = new CopilotActivityStreamParser(startSeq);
-    } catch {
-      // File doesn't exist yet (task hasn't started writing). Start
-      // from offset 0, seq 0; we'll catch up when it appears.
-      offset = 0;
-      parser = new CopilotActivityStreamParser(typeof opts.after === "number" ? opts.after + 1 : 0);
-    }
-
-    let buffer = "";
-
-    while (true) {
-      if (opts.signal?.aborted) return;
-
-      let st: Awaited<ReturnType<typeof stat>>;
-      try {
-        st = await stat(eventsPath);
-      } catch (err) {
-        const code = (err as NodeJS.ErrnoException).code;
-        if (code === "ENOENT" || code === "ENOTDIR") {
-          // File gone — task purged or workdir removed.
-          return;
-        }
-        throw err;
-      }
-
-      if (st.size > offset) {
-        const fh = await open(eventsPath, "r");
-        try {
-          const len = st.size - offset;
-          const buf = Buffer.alloc(len);
-          await fh.read(buf, 0, len, offset);
-          buffer += buf.toString("utf8");
-          offset = st.size;
-        } finally {
-          await fh.close();
-        }
-
-        // Process complete lines; keep partial trailing line in buffer.
-        while (true) {
-          const newlineIdx = buffer.indexOf("\n");
-          if (newlineIdx === -1) break;
-          const line = buffer.slice(0, newlineIdx);
-          buffer = buffer.slice(newlineIdx + 1);
-          const result = parser.parseLine(line);
-          for (const item of result.items) {
-            if (opts.signal?.aborted) return;
-            yield item;
-          }
-        }
-      } else if (st.size < offset) {
-        // File was truncated / rewritten (rare — task purge in flight,
-        // or external rotation). Treat as end-of-stream.
-        return;
-      }
-
-      // No new bytes — wait then poll again. The signal abort wins
-      // over the timer.
-      try {
-        await delay(COPILOT_TAIL_POLL_MS, undefined, { signal: opts.signal });
-      } catch {
-        return;
-      }
-    }
-  }
-}
-
-/**
- * Maximum bytes we'll read from `events.jsonl` in one
- * {@link CopilotRuntime.readActivity} call. Sized to comfortably
- * fit a long autonomous run (hundreds of turns) without risking
- * OOM. When exceeded, we tail-read the last N bytes and mark the
- * response truncated.
- */
-const COPILOT_RAW_READ_CAP_BYTES = 4 * 1024 * 1024;
-
-/**
- * Poll interval for {@link CopilotRuntime.streamActivity}. 250ms
- * is the upper bound on perceived dashboard latency for live-tail;
- * faster than this risks burning CPU on idle streams.
- */
-const COPILOT_TAIL_POLL_MS = 250;
-
-/**
- * Serialize an {@link EventBuffer} back to the JSONL shape that
- * {@link parseCopilotActivity} expects. Lets the buffer-backed and
- * disk-backed `readActivity` paths share the exact same parser.
- *
- * One event per line, no trailing newline (parser tolerates either).
- */
-function serializeEventBuffer(buffer: EventBuffer): string {
-  return buffer.events.map((event) => JSON.stringify(event)).join("\n");
 }

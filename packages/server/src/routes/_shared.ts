@@ -89,7 +89,7 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "InvalidMcpJson",
   "RuntimeHeadlessLaunchFailed",
   "RuntimeProvisionFailed",
-  "RuntimeRefreshFailed",
+  "RuntimeReadMetadataFailed",
   "RuntimeStateDeletionFailed",
   "UnknownRuntimeError",
   "TrustRegistrationFailed",
