@@ -24,6 +24,7 @@ import {
   SessionNotFoundError,
   SessionService,
   type SessionServiceOpts,
+  SpawnFnNotInjectedError,
 } from "../src/index.js";
 import type { AgentResolverPort } from "../src/ports.js";
 import { SessionRepository } from "../src/session-repository.js";
@@ -1134,7 +1135,7 @@ describe("spawnInteractive()", () => {
     }
   });
 
-  it("throws when spawnFn was not injected at compose time", async () => {
+  it("throws SpawnFnNotInjectedError with stable name when spawnFn was not injected at compose time", async () => {
     const rt = new StubRuntime();
     const m = await buildManager({
       agentResolver: stubAgentResolver({ agents: { demo: fakeAgentResolve("demo") } }),
@@ -1143,6 +1144,11 @@ describe("spawnInteractive()", () => {
       // spawnFn intentionally omitted
     });
     const s = await m.create({ agent: "demo" });
-    await expect(m.spawnInteractive(s.id)).rejects.toThrow(/no spawnFn/);
+    await expect(m.spawnInteractive(s.id)).rejects.toThrow(SpawnFnNotInjectedError);
+    try {
+      await m.spawnInteractive(s.id);
+    } catch (err) {
+      expect((err as SpawnFnNotInjectedError).name).toBe("SpawnFnNotInjectedError");
+    }
   });
 });

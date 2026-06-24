@@ -31,6 +31,8 @@ export {
   InvalidSessionIdError,
   SessionIdAllocationFailedError,
   SessionNotFoundError,
+  SessionPathEscapeError,
+  SpawnFnNotInjectedError,
 } from "./errors.js";
 export type { SpawnFn } from "./ports.js";
 export { SessionService } from "./session-service.js";

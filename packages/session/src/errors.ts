@@ -84,3 +84,41 @@ export class AgentResolutionFailedError extends SessionError {
     });
   }
 }
+
+/**
+ * Thrown by `safeJoinUnderRoot` when a candidate path escapes or equals
+ * the expected root directory. Defense-in-depth: caller has already
+ * validated the session id format, so this guards against unexpected
+ * path-traversal vectors (symlinks, encoding tricks, etc.).
+ */
+export class SessionPathEscapeError extends SessionError {
+  override readonly name = "SessionPathEscapeError";
+
+  constructor(
+    public readonly candidate: string,
+    public readonly root: string,
+    reason: "escapes" | "equals",
+  ) {
+    super(
+      reason === "escapes"
+        ? `refused: candidate path escapes root (${candidate} not under ${root})`
+        : "refused: candidate path equals root",
+    );
+  }
+}
+
+/**
+ * Thrown by `SessionService.spawnInteractive` when no `SpawnFn` was
+ * injected at compose time. Indicates a misconfiguration of the
+ * composition root, not a runtime spawn failure.
+ */
+export class SpawnFnNotInjectedError extends SessionError {
+  override readonly name = "SpawnFnNotInjectedError";
+
+  constructor() {
+    super(
+      "SessionService.spawnInteractive: no spawnFn was injected at compose time " +
+        "(composeSessionModule must pass `spawnFn`)",
+    );
+  }
+}

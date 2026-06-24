@@ -14,7 +14,6 @@ export interface FindAllSessionOpts {
 }
 
 export interface UpdateSessionPatch {
-  readonly runtimeSessionId?: string | null;
   readonly lastLaunchMode?: "local" | "remote" | null;
 }
 
@@ -91,12 +90,8 @@ export class SessionRepository {
   async update(id: string, patch: UpdateSessionPatch): Promise<void> {
     if (!SESSION_ID_RE.test(id)) throw new InvalidSessionIdError(id);
     const changes: {
-      runtimeSessionId?: string | null;
       lastLaunchMode?: "local" | "remote" | null;
     } = {};
-    if (patch.runtimeSessionId !== undefined) {
-      changes.runtimeSessionId = patch.runtimeSessionId;
-    }
     if (patch.lastLaunchMode !== undefined) {
       changes.lastLaunchMode = patch.lastLaunchMode;
     }
