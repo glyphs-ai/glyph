@@ -114,6 +114,7 @@ const EXPECTED_CATEGORY_DIRS_AT_CONVENTION_INTRODUCTION = new Set<string>([
  */
 const REQUIRED_SPLITS = new Set<string>([
   "packages/task/src/task-service",
+  "packages/dashboard/src/App",
   "packages/dashboard/src/components/tasks/TaskDetail",
   "packages/catalog/src/facade/catalog-service",
   "packages/catalog/src/facade/resolve-pipeline",
