@@ -44,6 +44,7 @@ import {
   assertFramingPromptIsSafe,
   type BlockedReason,
   CorruptedTaskError,
+  DEFAULT_TASK_FRAMING_PROMPT,
   DispatchKernelEnvCollisionError,
   type DispatchOpts,
   EntryNotReadyError,
@@ -53,7 +54,6 @@ import {
   readTaskRuntimeMetadata,
   TASK_ARTIFACT_SUBDIR,
   TASK_FILENAME,
-  TASK_FRAMING_PROMPT_COPILOT,
   TASK_TEMP_SUBDIR,
   type Task,
   TaskNotFoundError,
@@ -538,7 +538,7 @@ describe("dispatch — happy path", () => {
     expect(rt.dispatchCalls).toHaveLength(1);
     // The user's task body lives in `<workdir>/TASK.md`; the runtime
     // receives only the fixed framing prompt.
-    expect(rt.dispatchCalls[0]!.prompt).toBe(TASK_FRAMING_PROMPT_COPILOT);
+    expect(rt.dispatchCalls[0]!.prompt).toBe(DEFAULT_TASK_FRAMING_PROMPT);
 
     const meta = readTaskRuntimeMetadata(t);
     expect(meta.workdir).toBe(path.join(tasksDir, t.id));
@@ -630,7 +630,7 @@ describe("dispatch — TASK.md + workdir contract", () => {
     expect(rt.dispatchCalls).toHaveLength(1);
     const sentPrompt = rt.dispatchCalls[0]!.prompt;
     // Exactly the fixed copilot framing prompt — no user bytes leak in.
-    expect(sentPrompt).toBe(TASK_FRAMING_PROMPT_COPILOT);
+    expect(sentPrompt).toBe(DEFAULT_TASK_FRAMING_PROMPT);
     expect(sentPrompt.includes("\n")).toBe(false);
     expect(sentPrompt.includes("\r")).toBe(false);
     expect(/[^\x20-\x7E]/.test(sentPrompt)).toBe(false);
@@ -659,7 +659,7 @@ describe("framing prompt invariant guard", () => {
   });
 
   it("the production copilot framing prompt itself passes the guard", () => {
-    expect(() => assertFramingPromptIsSafe(TASK_FRAMING_PROMPT_COPILOT)).not.toThrow();
+    expect(() => assertFramingPromptIsSafe(DEFAULT_TASK_FRAMING_PROMPT)).not.toThrow();
   });
 });
 
@@ -1751,7 +1751,7 @@ describe("dispatch — caller-supplied prompt override", () => {
 
     expect(rt.dispatchCalls[0]!.prompt).toBe(customFraming);
     // The default framing prompt is NOT used when a custom one is supplied.
-    expect(rt.dispatchCalls[0]!.prompt).not.toBe(TASK_FRAMING_PROMPT_COPILOT);
+    expect(rt.dispatchCalls[0]!.prompt).not.toBe(DEFAULT_TASK_FRAMING_PROMPT);
   });
 
   it("falls back to the default framing prompt when prompt is omitted", async () => {
@@ -1760,7 +1760,7 @@ describe("dispatch — caller-supplied prompt override", () => {
 
     await m.dispatch(dispatchOf({ agent: "demo", brief: "default framing" }));
 
-    expect(rt.dispatchCalls[0]!.prompt).toBe(TASK_FRAMING_PROMPT_COPILOT);
+    expect(rt.dispatchCalls[0]!.prompt).toBe(DEFAULT_TASK_FRAMING_PROMPT);
   });
 
   it("rejects an unsafe prompt override (multi-line) pre-spawn", async () => {

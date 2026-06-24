@@ -30,13 +30,13 @@ export interface BlockedReason {
 }
 
 /**
- * Empty (index-only). `summariseReason` reads `.length` only —
- * structural-typing accepts any object, so catalog's wider
- * `{ kind: DependencyKind, name: string }` satisfies this without
- * having to list those fields here.
+ * Structural port for missing dependencies. The only consumer
+ * (`summariseReason`) reads `missingDeps.length` — i.e. the count of
+ * the containing array, never individual element fields. `unknown`
+ * accepts catalog's wider `{ kind, name }` shape without having to
+ * list those fields here.
  */
-// biome-ignore lint/complexity/noBannedTypes: see jsdoc above — accepting "any object" is the structural-port contract.
-export type MissingDep = {};
+export type MissingDep = unknown;
 
 /** summariseReason reads `d.fqn`. Catalog's wider `{ kind, fqn }` satisfies. */
 export interface BlockedDep {

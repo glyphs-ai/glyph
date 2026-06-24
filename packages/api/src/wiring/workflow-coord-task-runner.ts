@@ -87,7 +87,7 @@ export const DEFAULT_COORD_MAX_POLL_ERRORS = 3;
 
 /**
  * Framing prompt the spawned coordinator task subprocess receives in
- * place of `@glyphs-ai/task`'s default `TASK_FRAMING_PROMPT_COPILOT`.
+ * place of `@glyphs-ai/task`'s default `DEFAULT_TASK_FRAMING_PROMPT`.
  *
  * The override exists because a coordinator needs a different opening
  * banner than a normal task: it must name the three workflow env keys
@@ -122,7 +122,7 @@ const COORD_FRAMING_PROMPT_COPILOT =
   "finish the workflow as failed rather than retrying indefinitely.";
 
 // Build-time safety check. Mirrors the module-load
-// `assertFramingPromptIsSafe(TASK_FRAMING_PROMPT_COPILOT)` in
+// `assertFramingPromptIsSafe(DEFAULT_TASK_FRAMING_PROMPT)` in
 // `@glyphs-ai/task`'s `framing.ts`. The task pkg also re-runs the
 // same invariant on every actual dispatch against the override
 // argument — this is the additional build-time guard on the
@@ -354,7 +354,7 @@ export function makeCoordNodeRunner(
         // Override the default framing prompt so the spawned coord
         // task receives the coord-kind opener defined at the top of
         // this file. Replaces `@glyphs-ai/task`'s
-        // `TASK_FRAMING_PROMPT_COPILOT` for this dispatch only. The
+        // `DEFAULT_TASK_FRAMING_PROMPT` for this dispatch only. The
         // default's safety is invariant-checked by `framing.ts` at
         // module load; the override is checked at module load above
         // + re-checked on every dispatch by the task pkg's

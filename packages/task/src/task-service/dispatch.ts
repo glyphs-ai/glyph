@@ -11,16 +11,17 @@ import type { ResolvedAgent, Runtime, RuntimeHandle } from "@glyphs-ai/runtime";
 import { DispatchKernelEnvCollisionError, ManagerShuttingDownError } from "../errors.js";
 import {
   assertFramingPromptIsSafe,
+  DEFAULT_TASK_FRAMING_PROMPT,
   formatTaskMd,
   TASK_ARTIFACT_SUBDIR,
   TASK_FILENAME,
-  TASK_FRAMING_PROMPT_COPILOT,
   TASK_TEMP_SUBDIR,
 } from "../framing.js";
 import { TaskEntity } from "../task-entity.js";
 import type { TaskServiceCtx } from "../task-service.js";
 import type { TaskOrigin } from "../types.js";
-import { applyTerminal, decideTerminal, type LiveTask, safeRm } from "./_helpers.js";
+import { type LiveTask, safeRm } from "./_helpers.js";
+import { applyTerminal, decideTerminal } from "./terminal.js";
 
 /**
  * Kernel env keys that {@link runDispatch} always sets on the spawned
@@ -68,7 +69,7 @@ interface RunDispatchArgs {
   readonly subprocessEnv?: Readonly<Record<string, string>>;
   /**
    * Caller-supplied override for the framing prompt the runtime
-   * receives. Defaults to {@link TASK_FRAMING_PROMPT_COPILOT}.
+   * receives. Defaults to {@link DEFAULT_TASK_FRAMING_PROMPT}.
    * {@link assertFramingPromptIsSafe} runs on whichever value is
    * actually used. See {@link DispatchOpts.prompt}.
    */
@@ -112,13 +113,13 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
   }
 
   // 3c. Choose + validate the framing prompt. Default is the
-  //     module-level `TASK_FRAMING_PROMPT_COPILOT`; callers (e.g.
+  //     module-level `DEFAULT_TASK_FRAMING_PROMPT`; callers (e.g.
   //     workflow task runner) may supply their own kind-specific
   //     framing. The safety invariant ({@link assertFramingPromptIsSafe})
   //     runs on the value actually used so an unsafe override
   //     throws pre-spawn too. The startup-time guard on the default
   //     in `framing.ts` catches unsafe edits to the default at import time.
-  const framingPrompt = args.prompt ?? TASK_FRAMING_PROMPT_COPILOT;
+  const framingPrompt = args.prompt ?? DEFAULT_TASK_FRAMING_PROMPT;
   try {
     assertFramingPromptIsSafe(framingPrompt);
   } catch (err) {
@@ -186,7 +187,7 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
       workdir,
       agent: resolveResult,
       catalog: ctx.contentSource,
-      // Framing prompt: either the default `TASK_FRAMING_PROMPT_COPILOT`
+      // Framing prompt: either the default `DEFAULT_TASK_FRAMING_PROMPT`
       // or a caller-supplied override (e.g. the workflow task runner's
       // own short framing). `assertFramingPromptIsSafe` ran above on
       // whichever value is used; the runtime always receives a
