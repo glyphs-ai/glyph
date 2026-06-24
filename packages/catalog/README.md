@@ -56,14 +56,20 @@ What this package **does not** do:
 ```
 packages/catalog/src/
   schema.ts                Drizzle tables (private; only types exported)
-  types.ts                 Public DTOs (Agent / Skill / Mcp + entries + resolve results)
+  types.ts                 Cross-entity DTOs (Agent / Skill / Mcp + entries + resolve results)
   validate.ts              FQN / name / install-body validators
-  origin-mutability.ts     Helper to detect mutable origins (file:, etc.)
   agent/                   Per-entity service + errors + entity class
   skill/
   mcp/
-  facade/                  Cross-entity CatalogService + DTOs
+  facade/
+    catalog-service.ts     Unified read+write surface across all entities
+    resolve-pipeline.ts    Three-phase resolve: upstream closure → local closure → diff
+    projection.ts          Pure projection helpers (Row → DTO)
+    plan-types.ts          Shared cross-entity plan DTOs
+    errors.ts              Cross-entity facade errors (HasDependentsError)
+    index.ts               Facade barrel
   fetcher/                 Origin parser + remote bytes fetcher
+  _shared/                 Package-private utilities (dep-keys, etc.)
   migrations.ts            applyCatalogMigrations (drizzle migration applier)
   compose.ts               composeCatalogModule({ dbFile, logger? })
   testing.ts               openTestCatalogDb helper (via /testing subpath)

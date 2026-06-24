@@ -1,4 +1,3 @@
-export { HasDependentsError } from "../_shared/dependents-error.js";
 export {
   type BuildCatalogRuntimeOpts,
   buildCatalogRuntime,
@@ -6,6 +5,7 @@ export {
   CatalogService,
   type CatalogServiceOpts,
 } from "./catalog-service.js";
+export { HasDependentsError } from "./errors.js";
 export type {
   CatalogConflict,
   CatalogInstalledEntry,
