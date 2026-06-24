@@ -51,12 +51,15 @@ not a task sub-layer.
 /api/workspaces/:id/tasks/:tid/artifact/:name            GET                      task success.artifacts whitelist download
 
 /api/workspaces/:id/scheduled-tasks                      GET                      list schedule-launched tasks
+/api/workspaces/:id/scheduled-workflows                  GET                      list schedule-launched workflows
 
 /api/workspaces/:id/schedules                            GET                      list schedules
 /api/workspaces/:id/schedules/task                       POST                     create task-kind schedule
+/api/workspaces/:id/schedules/workflow                   POST                     create workflow-kind schedule
 /api/workspaces/:id/schedules/preview-cron               GET                      preview an arbitrary (expr, tz)
 /api/workspaces/:id/schedules/:sid                       GET DELETE               get / delete
 /api/workspaces/:id/schedules/task/:sid                  PATCH                    patch task-kind schedule (RFC 7396 deep-merge on target)
+/api/workspaces/:id/schedules/workflow/:sid              PATCH                    patch workflow-kind schedule (RFC 7396 deep-merge on target)
 /api/workspaces/:id/schedules/:sid/run                   POST                     manual fire-now
 /api/workspaces/:id/schedules/:sid/preview               GET                      next-N fires for this schedule
 

@@ -149,7 +149,7 @@ glyph runtime list
 
 # workspaces
 glyph workspace list
-glyph workspace add --name "Sandbox" --workdir ~/code/sandbox
+glyph workspace add --name "Sandbox" --workspace-dir ~/code/sandbox
 export GLYPH_WORKSPACE=<id>          # required for workspace-scoped commands
 glyph workspace show <workspace-id>
 glyph workspace rm <workspace-id> --purge

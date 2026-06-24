@@ -31,10 +31,13 @@ bundles. See
 ```
 packages/api/src/
 ├── application.ts            ← Application interface + composeApplication
+├── route-manifest.ts         ← flat route inventory (listRoutes over ROUTES) for the server reflection test
 ├── workspace-context.ts      ← WorkspaceContext + WorkspaceContextRegistry
 ├── wiring/                   ← per-kind handler wiring (cross-package glue)
 │   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskService
+│   ├── schedule-workflow-handler.ts     ← schedule "workflow" kind → WorkflowService
 │   ├── workflow-coord-task-runner.ts    ← workflow coordinator node → TaskService
+│   ├── workflow-human-node-runner.ts    ← workflow human node → gate awaiting the respond API
 │   └── workflow-worker-task-runner.ts   ← workflow worker node → TaskService
 └── index.ts                  ← public barrel (orchestration + re-exports
                                 of @glyphs-ai/contracts)
