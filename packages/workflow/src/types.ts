@@ -20,6 +20,8 @@
  * `hasLiveCoord` / `deriveIterationCount`).
  */
 
+import type { WorkflowEdgeEntity, WorkflowEntity, WorkflowNodeEntity } from "./workflow-entity.js";
+
 // ─── FSM enums ──────────────────────────────────────────────────────
 
 /**
@@ -68,22 +70,6 @@ export interface WorkflowSuccess {
 }
 
 /**
- * Closed enum of substrate-detected failure reasons. Stored on
- * {@link WorkflowFailure} when `kind === 'substrate'`. New reasons
- * require a typed schema bump so every consumer can extend its
- * rendering / coord-side handling explicitly.
- *
- *   - `STUCK_RETRY_LIMIT` — the stuck-coord detector inserted
- *     {@link STUCK_RETRY_MAX_ATTEMPTS} consecutive retry coords
- *     without the workflow making forward progress; the substrate
- *     gives up and transitions the workflow terminal so the slot
- *     stops being held open. See
- *     {@link WorkflowService.checkStuckAndRecoverInTx} for the
- *     trigger.
- */
-export type WorkflowSubstrateFailureReason = "STUCK_RETRY_LIMIT";
-
-/**
  * Payload attached when a workflow transitions to `failed`.
  *
  * Discriminated on `kind`:
@@ -92,10 +78,10 @@ export type WorkflowSubstrateFailureReason = "STUCK_RETRY_LIMIT";
  *     `finishWorkflow({outcome:'failed', failure})` call. The
  *     coordinator supplies the human-readable `message`.
  *   - `substrate` — set by the substrate itself when an internal
- *     safety net trips. Carries a {@link WorkflowSubstrateFailureReason}
- *     code plus a human-readable `message`; coord-side callers can
- *     never construct this arm (external entry points reject
- *     anything but `kind: 'coordinator'`).
+ *     safety net trips. Carries a closed `reason` code plus a
+ *     human-readable `message`; coord-side callers can never
+ *     construct this arm (external entry points reject anything but
+ *     `kind: 'coordinator'`).
  *
  * `message` is the human-readable summary the dashboard renders for
  * both arms.
@@ -107,7 +93,20 @@ export type WorkflowFailure =
     }
   | {
       readonly kind: "substrate";
-      readonly reason: WorkflowSubstrateFailureReason;
+      /**
+       * Closed set of substrate-detected failure codes. The sole
+       * current value is `"STUCK_RETRY_LIMIT"` — the stuck-coord
+       * detector inserted {@link STUCK_RETRY_MAX_ATTEMPTS} consecutive
+       * retry coords without the workflow making forward progress, so
+       * the substrate gave up and transitioned the workflow terminal
+       * to stop holding the slot open. Widen this union (plus the
+       * `SUBSTRATE_FAILURE_REASONS` guard in `validate.ts` and the
+       * `STUCK_RETRY_LIMIT` const in `_stuck-recovery.ts`) when a new
+       * substrate failure mode is added. See
+       * {@link WorkflowService.checkStuckAndRecoverInTx} for the
+       * trigger.
+       */
+      readonly reason: "STUCK_RETRY_LIMIT";
       readonly message: string;
     };
 
@@ -496,4 +495,170 @@ export const HUMAN_PROMPT_STYLES: readonly HumanNodePromptStyle[] = ["plain", "m
 export interface HumanNodeResponse {
   readonly choiceId?: string;
   readonly input?: string;
+}
+
+// ─── addSubgraph node references ────────────────────────────────────
+
+/**
+ * Discriminated-union reference to a node in an `addSubgraph` edge:
+ *
+ *   - `kind: "existing"`: real node id already persisted in this
+ *     workflow.
+ *   - `kind: "temp"`: a `tempId` declared in the batch's `nodes[]`,
+ *     resolved to a real id during topology assignment.
+ *
+ * Lives in `types.ts` (the pkg's public type module) so both the
+ * pure `_dag.ts` helpers and the service-facing `AddSubgraphEdgeInput`
+ * DTO can reference it without a cross-module import edge, and the
+ * public `index.ts` re-export can pick it up directly.
+ */
+export type NodeRef =
+  | { readonly kind: "existing"; readonly id: string }
+  | { readonly kind: "temp"; readonly tempId: string };
+
+// ─── Service request / response DTOs ────────────────────────────────
+//
+// Option + result shapes for the WorkflowService mutation primitives
+// and reads. Kept here (rather than inline in workflow-service.ts) so
+// the public surface lives in one place and cross-package callers
+// import wire shapes without dragging in the service module. The
+// constructor-wiring shapes (WorkflowServiceOpts, WorkflowEngineLike)
+// deliberately stay next to the class.
+
+export interface CreateWorkflowOpts {
+  readonly brief: string;
+  readonly details?: string;
+  readonly coordinatorAgent: string;
+  /**
+   * Who launched this workflow. Defaults to `"standalone"` when omitted
+   * (direct dashboard / CLI / MCP call). Integration handlers pass
+   * their own origin so the default `GET /workflows` endpoint can
+   * filter to standalone-only by construction.
+   */
+  readonly origin?: WorkflowOrigin;
+  /**
+   * Opaque caller-supplied metadata persisted onto the workflow row.
+   * Forwarded verbatim to {@link WorkflowEntity.metadata}; defaults
+   * to `{}` when omitted.
+   */
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface CreateWorkflowResult {
+  readonly workflowId: string;
+  readonly initialCoordNodeId: string;
+}
+
+export interface AddNodeOpts {
+  readonly kind: WorkflowNodeKind;
+  readonly spec: unknown;
+  readonly parents: ReadonlyArray<string>;
+}
+
+export interface AddNodeResult {
+  readonly nodeId: string;
+  readonly phase: number;
+}
+
+export interface AddEdgeOpts {
+  readonly fromNodeId: string;
+  readonly toNodeId: string;
+}
+
+export interface AddEdgeResult {
+  readonly toPhase: number;
+}
+
+/**
+ * Options accepted by {@link WorkflowService.finishWorkflow}. Discriminated
+ * on `outcome`:
+ *
+ *   - `succeeded` — optional {@link WorkflowSuccess} payload. When
+ *     omitted, the substrate persists `{ output: null }` so the row
+ *     still satisfies the "succeeded ⇒ success non-null" invariant.
+ *   - `failed` — required {@link WorkflowFailure} payload. Coord
+ *     MUST supply a human-readable failure to surface in the
+ *     dashboard's Overview tab.
+ *
+ * `cancelled` is NOT an arm here — workflow cancellation is the
+ * external-operator route ({@link WorkflowService.cancelWorkflow}),
+ * not a coord-driven path.
+ */
+export type FinishWorkflowOpts =
+  | {
+      readonly outcome: "succeeded";
+      readonly success?: WorkflowSuccess;
+    }
+  | {
+      readonly outcome: "failed";
+      readonly failure: WorkflowFailure;
+    };
+
+/**
+ * Options accepted by {@link WorkflowService.cancelWorkflow}. The
+ * `cancellation` payload is REQUIRED — operator MUST supply at
+ * least a kind + message. The server route defaults `kind='user'`
+ * when omitted on the wire.
+ */
+export interface CancelWorkflowOpts {
+  readonly cancellation: WorkflowCancellation;
+}
+
+export interface RemoveEdgeOpts {
+  readonly fromNodeId: string;
+  readonly toNodeId: string;
+}
+
+export interface ReplaceSpecOpts {
+  readonly newSpec: unknown;
+}
+
+export interface AddSubgraphNodeInput {
+  readonly tempId: string;
+  readonly kind: WorkflowNodeKind;
+  readonly spec: unknown;
+  readonly existingParents?: ReadonlyArray<string>;
+}
+
+export interface AddSubgraphEdgeInput {
+  readonly from: NodeRef;
+  readonly to: NodeRef;
+}
+
+export interface AddSubgraphOpts {
+  readonly nodes: ReadonlyArray<AddSubgraphNodeInput>;
+  readonly edges: ReadonlyArray<AddSubgraphEdgeInput>;
+}
+
+export interface AddSubgraphInsertedNode {
+  readonly tempId: string;
+  readonly nodeId: string;
+  readonly phase: number;
+}
+
+export interface AddSubgraphResult {
+  readonly insertedNodes: ReadonlyArray<AddSubgraphInsertedNode>;
+}
+
+export interface WorkflowDagSnapshot {
+  readonly workflow: WorkflowEntity;
+  readonly nodes: readonly WorkflowNodeEntity[];
+  readonly edges: readonly WorkflowEdgeEntity[];
+}
+
+export interface DispatchAtomicOpts {
+  readonly onTerminal?: (result: WorkflowNodeTerminalResult) => void;
+}
+
+export interface ListWorkflowOpts {
+  readonly coordinatorAgent?: string;
+  readonly createdSince?: string;
+  readonly idLike?: string;
+  /**
+   * Filter to workflows whose `origin` matches the given value, or any
+   * value in the given array. Accepts a single `WorkflowOrigin` or a
+   * readonly array; omit to disable the filter and return workflows of
+   * every origin.
+   */
+  readonly origin?: WorkflowOrigin | readonly WorkflowOrigin[];
 }

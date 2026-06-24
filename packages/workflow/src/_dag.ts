@@ -16,7 +16,12 @@ import {
   WorkflowSubgraphTempIdInvalidError,
   WorkflowSubgraphTempParentlessError,
 } from "./errors.js";
-import type { WorkflowNodeKind, WorkflowNodeRetryReason, WorkflowNodeStatus } from "./types.js";
+import type {
+  NodeRef,
+  WorkflowNodeKind,
+  WorkflowNodeRetryReason,
+  WorkflowNodeStatus,
+} from "./types.js";
 import { WorkflowEntity, WorkflowNodeEntity } from "./workflow-entity.js";
 
 export const COORDINATOR_KIND: WorkflowNodeKind = "coordinator";
@@ -152,22 +157,6 @@ export function wouldCreateCycle(
 }
 
 // ─── addSubgraph batch helpers (pure) ───────────────────────────────
-
-/**
- * Discriminated-union reference to a node in an `addSubgraph` edge:
- *
- *   - `kind: "existing"`: real node id already persisted in this
- *     workflow.
- *   - `kind: "temp"`: a `tempId` declared in the batch's `nodes[]`,
- *     resolved to a real id during topology assignment.
- *
- * Exported here (pure module) so the service file and the public
- * `index.ts` re-export can pick it up without dragging in service-
- * level imports.
- */
-export type NodeRef =
-  | { readonly kind: "existing"; readonly id: string }
-  | { readonly kind: "temp"; readonly tempId: string };
 
 /**
  * Shape of one declared temp node in an `addSubgraph` batch (the

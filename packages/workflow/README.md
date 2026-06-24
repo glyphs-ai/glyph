@@ -36,13 +36,54 @@ the coord's prerogative.
 
 ## API surface
 
-Service methods split into two groups:
+`WorkflowService` exposes four method groups. The coordinator-callback
+mutations and structural reads are surfaced over HTTP (see
+[Coord-callback API](#coord-callback-api)); the lifecycle and
+engine-facing methods are driven by the host (`@glyphs-ai/api` wiring +
+`@glyphs-ai/server` routes), never by the coordinator.
 
-- **9 mutation primitives**: `addNode`, `addEdge`,
+- **Mutation primitives** (9, coord-callback): `addNode`, `addEdge`,
   `addSubgraph`, `removeNode`, `removeEdge`, `replaceSpec`,
   `cancelNode`, `finishWorkflow`, `respondHumanNode`. Each is
   independently atomic; the substrate has no monolithic-batch API.
-- **4 read APIs**: `getWorkflow`, `getDag`, `getNode`, `getNodeDir`.
+- **Structural reads**: `getWorkflow`, `getDag`, `getNode`,
+  `getNodeDir`, plus the list / aggregate reads `list`,
+  `countAwaitingHumanByWorkflow`, and `aggregateByOriginMetadataKey`
+  that back the dashboard's workflow list and badges.
+- **Lifecycle / operator**: `createWorkflow` (bootstrap a workflow and
+  its initial coordinator node), `cancelWorkflow` (operator cancel,
+  cascades to in-flight nodes), `deleteWorkflow` / `purge` (teardown).
+  These are host entry points, not coord-reachable.
+- **Engine-facing**: `setEngine`, `listEligibleNodeIdsForDispatch`,
+  `dispatchAtomic`, and `markNodeTerminal` — the dispatch /
+  terminal-write seam the in-memory `WorkflowEngine` drives each tick.
+  `runnerFor`, the eligibility scan, and `dispatchAtomic` live in
+  `_dispatch.ts`; the service keeps thin delegators.
+
+## Origin + indexed metadata
+
+Every workflow row carries an `origin` (`WorkflowOrigin = standalone |
+schedule`) recording who launched it. `standalone` is the default for
+direct dashboard / CLI / MCP creation; `schedule` is stamped by the
+schedule integration handler. The default `GET /workflows` listing
+filters to `standalone` by construction so integration-owned workflows
+don't leak into the user's main list.
+
+The substrate ships **one deliberate integration-aware leak**: a
+partial index `workflows_schedule_id_idx` on
+`json_extract(metadata, '$.scheduleId') WHERE origin = 'schedule'`,
+paired with the `WORKFLOW_INDEXED_METADATA` registry in
+`workflow-repository.ts` that maps the `(origin = "schedule",
+metadataKey = "scheduleId")` pair to that expression. It exists so the
+host can answer "which workflows did schedule X create?" via an indexed
+`aggregateByOriginMetadataKey` lookup instead of a metadata scan. This
+couples the substrate to one convention of one origin
+(`schedule.metadata.scheduleId`) on purpose; a new origin does **not**
+need its own index unless it needs the same reverse lookup — in which
+case extend the registry and add a matching partial index in a
+migration. The `(origin, metadataKey)` pairing is intentionally *not*
+generalized into a dynamic index API: the set of indexed conventions is
+small and explicit.
 
 ## Layout
 
@@ -50,16 +91,22 @@ Standard `packages/_template` shape:
 
 ```
 src/
+  _dag.ts               Pure DAG helpers — topology, parent-readiness, cycle check, NodeRef serialization
+  _dispatch.ts          Free dispatch helpers — runnerFor / eligibility scan / dispatchAtomic (service delegates)
+  _engine.ts            In-memory WorkflowEngine tick loop (private)
+  _helpers.ts           Misc pkg-internal helpers (safeRmDir)
+  _stuck-recovery.ts    Stuck-coord retry cap consts (STUCK_RETRY_*) + outcome type
   schema.ts             Drizzle table definitions (private)
   workflow-entity.ts    Row ↔ entity round-trip (header / node / edge)
   workflow-repository.ts Drizzle-backed CRUD (private)
-  workflow-service.ts   Mutation primitives + read APIs
+  workflow-service.ts   Mutation primitives, reads, lifecycle + engine seam
   compose.ts            composeWorkflowModule({ dbFile, runners, ... })
+  migrations.ts         Inlined migration SQL (applied at compose time)
   testing.ts            openTestWorkflowDb() in-memory test helper
   errors.ts             WorkflowError + concrete subclasses
-  validate.ts           Id-grammar + enum-membership guards (pure)
+  validate.ts           Id-grammar / enum-membership guards + coordinator-spec check (pure)
   paths.ts              workflowDir / workflowNodeDir helpers
-  types.ts              WorkflowNodeKind + FSM enums + runner interface + ctx
+  types.ts              FSM enums, runner interface, NodeRef + service request/response DTOs
   index.ts              public barrel
 drizzle/                generated SQL migrations (committed)
 README.md               this file
