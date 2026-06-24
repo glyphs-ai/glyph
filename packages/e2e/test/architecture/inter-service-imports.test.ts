@@ -52,14 +52,15 @@
  *     which stops the allowlist from accumulating defensive entries.
  */
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { extractImportRefs, type ImportRef } from "../_helpers/ts-imports.js";
+import { isTsFile, safeIsDir, walkFiles } from "../_helpers/walk.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..", "..");
 const PACKAGES_DIR = path.join(REPO_ROOT, "packages");
-const SKIP_DIR_NAMES = new Set(["node_modules", "dist", "drizzle"]);
 
 /**
  * Closed set of domain (bounded-context) pkgs. Any import where the
@@ -100,133 +101,6 @@ const ALLOWED_VIOLATIONS: readonly Violation[] = [];
 
 // ── helpers ────────────────────────────────────────────────────────────
 
-function safeIsDir(p: string): boolean {
-  try {
-    return statSync(p).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Recursively yield every `.ts` / `.tsx` file under `dir`, skipping
- * directories in `SKIP_DIR_NAMES` (`node_modules`, `dist`, `drizzle`).
- */
-function* walkTsFiles(dir: string): Generator<string> {
-  let entries: import("node:fs").Dirent<string>[];
-  try {
-    entries = readdirSync(dir, { withFileTypes: true, encoding: "utf8" });
-  } catch {
-    return;
-  }
-  for (const e of entries) {
-    if (e.isDirectory()) {
-      if (SKIP_DIR_NAMES.has(e.name)) continue;
-      yield* walkTsFiles(path.join(dir, e.name));
-    } else if (e.isFile()) {
-      if (e.name.endsWith(".ts") || e.name.endsWith(".tsx")) {
-        yield path.join(dir, e.name);
-      }
-    }
-  }
-}
-
-/**
- * Classification of a single `import` declaration from a source file.
- * Only the fields needed to decide value-vs-type are kept; the rest
- * (binding names, source ranges) are intentionally not collected so
- * the audit stays cheap to run on every test invocation.
- */
-interface ImportClassification {
-  /** Module specifier text (e.g. `"@glyphs-ai/catalog"`). */
-  readonly specifier: string;
-  /** `true` iff the import contributes runtime code. */
-  readonly isValueImport: boolean;
-}
-
-/**
- * Classify every `import` statement in `source` according to whether
- * it contributes runtime code or is purely type-erased.
- *
- * Value imports (return `isValueImport: true`):
- *   - Side-effect-only `import "x"` (executes top-level code).
- *   - Default-binding `import x from "..."`.
- *   - Namespace-binding `import * as ns from "..."` (without `type`).
- *   - Named `import { a } from "..."` where ≥ 1 specifier lacks `type`.
- *
- * Type-only (return `isValueImport: false`):
- *   - `import type { ... } from "..."` (whole-clause type-only).
- *   - `import type * as Ns from "..."` (whole-clause type-only).
- *   - `import { type a, type b } from "..."` where EVERY specifier
- *     carries the `type` modifier (mixed clause whose value contribution
- *     is empty).
- *
- * The two AST levels for the `type` modifier matter: `importClause.isTypeOnly`
- * is `true` only for the whole-clause form (`import type { ... }`),
- * while the mixed form (`import { type Foo, type Bar }`) keeps the
- * clause-level flag at `false` and flips each `ImportSpecifier.isTypeOnly`
- * individually. Conflating the two is a common parser pitfall.
- *
- * Out of scope: re-exports (`export { ... } from "..."`), dynamic
- * `import("...")` calls (not used cross-pkg in this codebase), and
- * `import type` inside a `type Y = import("X").Foo` `ImportTypeNode`
- * (already type-erased).
- */
-function extractImports(source: string, fileName: string): ImportClassification[] {
-  const scriptKind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, scriptKind);
-  const out: ImportClassification[] = [];
-  for (const node of sf.statements) {
-    if (!ts.isImportDeclaration(node)) continue;
-    const specNode = node.moduleSpecifier;
-    if (!ts.isStringLiteral(specNode)) continue;
-    const specifier = specNode.text;
-    const clause = node.importClause;
-
-    // `import "x";` — side-effect-only. Executes top-level code; value.
-    if (!clause) {
-      out.push({ specifier, isValueImport: true });
-      continue;
-    }
-
-    // `import type { ... } from "...";` or `import type * as Ns from "...";`
-    // is whole-clause type-only.
-    if (clause.isTypeOnly) {
-      out.push({ specifier, isValueImport: false });
-      continue;
-    }
-
-    // `import x from "...";` — default binding is always a value.
-    if (clause.name !== undefined) {
-      out.push({ specifier, isValueImport: true });
-      continue;
-    }
-
-    const bindings = clause.namedBindings;
-    if (bindings === undefined) {
-      // Defensive: no bindings, no name, not type-only — shouldn't happen
-      // for a well-formed `ImportDeclaration`. Treat as side-effect-ish
-      // (value) so we surface anything unexpected rather than swallow it.
-      out.push({ specifier, isValueImport: true });
-      continue;
-    }
-
-    // `import * as Ns from "...";` (without `type`) — namespace value binding.
-    if (ts.isNamespaceImport(bindings)) {
-      out.push({ specifier, isValueImport: true });
-      continue;
-    }
-
-    if (ts.isNamedImports(bindings)) {
-      // Mixed form: only type-only if EVERY named specifier carries the
-      // `type` modifier.
-      const hasValueSpecifier = bindings.elements.some((el) => !el.isTypeOnly);
-      out.push({ specifier, isValueImport: hasValueSpecifier });
-    }
-  }
-  return out;
-}
-
 /** Repo-relative, forward-slash path. */
 function relPosix(absFile: string): string {
   return path.relative(REPO_ROOT, absFile).split(path.sep).join("/");
@@ -242,9 +116,9 @@ function collectAllCrossDomainValueImports(): readonly Violation[] {
   for (const dom of DOMAIN_PKGS) {
     const srcDir = path.join(PACKAGES_DIR, dom, "src");
     if (!safeIsDir(srcDir)) continue;
-    for (const absFile of walkTsFiles(srcDir)) {
+    for (const absFile of walkFiles(srcDir, { match: isTsFile })) {
       const source = readFileSync(absFile, "utf8");
-      const imports = extractImports(source, absFile);
+      const imports = extractImportRefs(source, absFile).filter((r) => r.kind !== "export-from");
       for (const imp of imports) {
         const importedPkg = domainPkgFromSpecifier(imp.specifier);
         if (importedPkg === null) continue;
@@ -431,7 +305,7 @@ describe("task and session src/** has zero @glyphs-ai/catalog references (struct
       const srcDir = path.join(PACKAGES_DIR, dom, "src");
       const offenders: { file: string; count: number }[] = [];
       if (safeIsDir(srcDir)) {
-        for (const absFile of walkTsFiles(srcDir)) {
+        for (const absFile of walkFiles(srcDir, { match: isTsFile })) {
           const source = readFileSync(absFile, "utf8");
           const n = countCatalogReferences(source, absFile);
           if (n > 0) offenders.push({ file: relPosix(absFile), count: n });
@@ -446,8 +320,8 @@ describe("task and session src/** has zero @glyphs-ai/catalog references (struct
 });
 
 describe("inter-service-imports parser self-tests", () => {
-  function classify(src: string): readonly ImportClassification[] {
-    return extractImports(src, "virtual.ts");
+  function classify(src: string): readonly ImportRef[] {
+    return extractImportRefs(src, "virtual.ts").filter((r) => r.kind !== "export-from");
   }
 
   it("parses root @glyphs-ai package specifiers", () => {
@@ -565,7 +439,7 @@ describe("inter-service-imports audit sanity", () => {
     for (const dom of DOMAIN_PKGS) {
       const srcDir = path.join(PACKAGES_DIR, dom, "src");
       if (!safeIsDir(srcDir)) continue;
-      for (const _ of walkTsFiles(srcDir)) {
+      for (const _ of walkFiles(srcDir, { match: isTsFile })) {
         count++;
         if (count > 0) break;
       }

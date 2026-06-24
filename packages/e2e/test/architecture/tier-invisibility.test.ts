@@ -57,13 +57,13 @@
  * the fenced consumers it polices.
  */
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { isTsFile, safeIsDir, walkFiles } from "../_helpers/walk.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..", "..");
 const PACKAGES_DIR = path.join(REPO_ROOT, "packages");
-const SKIP_DIR_NAMES = new Set(["node_modules", "dist", "drizzle"]);
 const T0_PKGS = ["workspace", "runtime", "schedule", "terminal", "catalog"] as const;
 const T1_PKGS = ["session", "task", "workflow"] as const;
 const T2_PKGS = ["contracts", "api"] as const;
@@ -109,33 +109,6 @@ interface ManifestViolation {
 }
 
 // ── helpers ────────────────────────────────────────────────────────────
-
-function safeIsDir(p: string): boolean {
-  try {
-    return statSync(p).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-function* walkTsFiles(dir: string): Generator<string> {
-  let entries: import("node:fs").Dirent<string>[];
-  try {
-    entries = readdirSync(dir, { withFileTypes: true, encoding: "utf8" });
-  } catch {
-    return;
-  }
-  for (const e of entries) {
-    if (e.isDirectory()) {
-      if (SKIP_DIR_NAMES.has(e.name)) continue;
-      yield* walkTsFiles(path.join(dir, e.name));
-    } else if (e.isFile()) {
-      if (e.name.endsWith(".ts") || e.name.endsWith(".tsx")) {
-        yield path.join(dir, e.name);
-      }
-    }
-  }
-}
 
 function relPosix(absFile: string): string {
   return path.relative(REPO_ROOT, absFile).split(path.sep).join("/");
@@ -186,7 +159,7 @@ function collectSourceViolations(consumer: Consumer): SourceViolation[] {
   for (const subdir of ["src", "test"] as const) {
     const root = path.join(PACKAGES_DIR, consumer.pkg, subdir);
     if (!safeIsDir(root)) continue;
-    for (const absFile of walkTsFiles(root)) {
+    for (const absFile of walkFiles(root, { match: isTsFile })) {
       const source = readFileSync(absFile, "utf8");
       for (const spec of extractGlyphSpecifiers(source)) {
         if (spec === selfSpec) continue;

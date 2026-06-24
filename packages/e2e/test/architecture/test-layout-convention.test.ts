@@ -40,13 +40,12 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { extractImportRefs } from "../_helpers/ts-imports.js";
+import { isTestFile, walkFiles } from "../_helpers/walk.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..", "..");
 const PACKAGES_DIR = path.join(REPO_ROOT, "packages");
-
-const SKIP_DIR_NAMES = new Set(["node_modules", "dist", "drizzle"]);
 
 interface FlatException {
   readonly file: string; // repo-relative, forward-slash
@@ -198,25 +197,6 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
 ];
 
 /**
- * Recognise vitest mocking call expressions:
- *   - `vi.mock("...")`
- *   - `vi.importActual("...")`
- *   - `vi.doMock("...")`
- *   - `vi.unmock("...")`
- *
- * These reference the spec as a harness directive — the spec string
- * names a module to virtualise, not a subject under test.
- */
-function isViMockingCall(node: ts.CallExpression): boolean {
-  const expr = node.expression;
-  if (!ts.isPropertyAccessExpression(expr)) return false;
-  if (!ts.isIdentifier(expr.expression)) return false;
-  if (expr.expression.text !== "vi") return false;
-  const name = expr.name.text;
-  return name === "mock" || name === "importActual" || name === "doMock" || name === "unmock";
-}
-
-/**
  * Extract every NON-TYPE value-import specifier from a TS source file.
  *
  * Includes:
@@ -239,80 +219,9 @@ function isViMockingCall(node: ts.CallExpression): boolean {
  */
 function extractValueImportSpecifiers(filePath: string): readonly string[] {
   const source = readFileSync(filePath, "utf8");
-  const scriptKind = filePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const sf = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, scriptKind);
-  const out: string[] = [];
-
-  function visit(node: ts.Node): void {
-    if (ts.isImportDeclaration(node)) {
-      const clause = node.importClause;
-      const specNode = node.moduleSpecifier;
-      if (!ts.isStringLiteral(specNode)) return;
-      const spec = specNode.text;
-      if (!clause) {
-        // Side-effect-only `import "x"` — counts.
-        out.push(spec);
-        return;
-      }
-      if (clause.isTypeOnly) {
-        // `import type { ... } from "..."` — pure type, skip.
-        return;
-      }
-      // A default binding or namespace binding is always a value import.
-      if (clause.name !== undefined) {
-        out.push(spec);
-        return;
-      }
-      const bindings = clause.namedBindings;
-      if (bindings === undefined) return;
-      if (ts.isNamespaceImport(bindings)) {
-        // `import * as ns from "..."` — value namespace binding.
-        out.push(spec);
-        return;
-      }
-      if (ts.isNamedImports(bindings)) {
-        // `import { a, type B, c } from "..."` — counts iff at least
-        // one specifier is NOT marked type-only.
-        const hasValueSpecifier = bindings.elements.some((e) => !e.isTypeOnly);
-        if (hasValueSpecifier) out.push(spec);
-        return;
-      }
-      return;
-    }
-
-    // `import("...")` dynamic import — counts as value.
-    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-      const arg = node.arguments[0];
-      if (arg !== undefined && ts.isStringLiteral(arg)) {
-        out.push(arg.text);
-      }
-      // fall through to recurse; nothing else to skip.
-    }
-
-    // Harness directives — IGNORE. We still need to recurse into
-    // siblings, but we explicitly skip the string-literal arg of these
-    // calls. Because we extract specifiers ONLY from ImportDeclaration
-    // and dynamic-import CallExpressions, vi.mock(...) is naturally
-    // ignored (the string literal isn't reached as an import). We do
-    // however want to short-circuit further descent into vi.mock's
-    // factory body — its `vi.importActual("...")` and any nested
-    // `await import(...)` is mock-wiring, NOT subject-under-test.
-    if (ts.isCallExpression(node) && isViMockingCall(node)) {
-      return;
-    }
-
-    // `type Y = import("X").Foo` is an ImportTypeNode — IGNORE (recursing
-    // would not produce a CallExpression so naturally skipped, but make
-    // it explicit by short-circuiting).
-    if (ts.isImportTypeNode(node)) {
-      return;
-    }
-
-    node.forEachChild(visit);
-  }
-
-  visit(sf);
-  return out;
+  return extractImportRefs(source, filePath)
+    .filter((r) => r.kind !== "export-from" && r.isValueImport)
+    .map((r) => r.specifier);
 }
 
 /**
@@ -445,24 +354,6 @@ function classifyTest(absPath: string): ClassifiedTest {
 
 function findAllTests(): readonly string[] {
   const out: string[] = [];
-  function walk(dir: string): void {
-    let entries: import("node:fs").Dirent<string>[];
-    try {
-      entries = readdirSync(dir, { withFileTypes: true, encoding: "utf8" });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      if (e.isDirectory()) {
-        if (SKIP_DIR_NAMES.has(e.name)) continue;
-        walk(path.join(dir, e.name));
-      } else if (e.isFile()) {
-        if (e.name.endsWith(".test.ts") || e.name.endsWith(".test.tsx")) {
-          out.push(path.join(dir, e.name));
-        }
-      }
-    }
-  }
   // Walk each package's test/ dir.
   const pkgs = readdirSync(PACKAGES_DIR, { withFileTypes: true, encoding: "utf8" });
   for (const pkg of pkgs) {
@@ -475,7 +366,9 @@ function findAllTests(): readonly string[] {
       continue;
     }
     if (!s.isDirectory()) continue;
-    walk(testRoot);
+    for (const absFile of walkFiles(testRoot, { match: isTestFile })) {
+      out.push(absFile);
+    }
   }
   return out;
 }
@@ -561,61 +454,10 @@ describe("test layout mirrors src layout", () => {
 // ──────────────────────────────────────────────────────────────────────
 
 function specifiersFromSource(source: string, kind: "ts" | "tsx" = "ts"): readonly string[] {
-  // Write to a temp file path-shape so extractValueImportSpecifiers can
-  // run its TS parser. We don't actually need the file to exist on
-  // disk — instead we inline a minimal duplicate of the extractor
-  // against a virtual source. This keeps the self-tests synchronous
-  // and free of I/O.
-  const scriptKind = kind === "tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const sf = ts.createSourceFile(
-    `virtual.${kind}`,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    scriptKind,
-  );
-  const out: string[] = [];
-  function visit(node: ts.Node): void {
-    if (ts.isImportDeclaration(node)) {
-      const clause = node.importClause;
-      const specNode = node.moduleSpecifier;
-      if (!ts.isStringLiteral(specNode)) return;
-      const spec = specNode.text;
-      if (!clause) {
-        out.push(spec);
-        return;
-      }
-      if (clause.isTypeOnly) return;
-      if (clause.name !== undefined) {
-        out.push(spec);
-        return;
-      }
-      const bindings = clause.namedBindings;
-      if (bindings === undefined) return;
-      if (ts.isNamespaceImport(bindings)) {
-        out.push(spec);
-        return;
-      }
-      if (ts.isNamedImports(bindings)) {
-        if (bindings.elements.some((e) => !e.isTypeOnly)) out.push(spec);
-        return;
-      }
-      return;
-    }
-    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-      const arg = node.arguments[0];
-      if (arg !== undefined && ts.isStringLiteral(arg)) out.push(arg.text);
-    }
-    if (ts.isCallExpression(node) && isViMockingCall(node)) {
-      return;
-    }
-    if (ts.isImportTypeNode(node)) {
-      return;
-    }
-    node.forEachChild(visit);
-  }
-  visit(sf);
-  return out;
+  const fileName = `virtual.${kind}`;
+  return extractImportRefs(source, fileName)
+    .filter((r) => r.kind !== "export-from" && r.isValueImport)
+    .map((r) => r.specifier);
 }
 
 describe("test-layout-convention parser self-tests", () => {
