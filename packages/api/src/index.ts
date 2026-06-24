@@ -35,7 +35,11 @@ export {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "./wiring/workflow-coord-task-runner.js";
-export { WorkflowWorkerSpecError } from "./wiring/workflow-worker-task-runner.js";
+export { WorkflowHumanSpecError } from "./wiring/workflow-human-node-runner.js";
+export {
+  WorkflowWorkerNotInCoordMenuError,
+  WorkflowWorkerSpecError,
+} from "./wiring/workflow-worker-task-runner.js";
 export {
   type WorkspaceContext,
   type WorkspaceContextState,

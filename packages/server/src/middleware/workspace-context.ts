@@ -108,7 +108,13 @@ export function workspaceContextMiddleware(
     }
 
     if (winner.kind === "err") {
-      const wrapped = new WorkspaceLoadError(id, winner.err);
+      // `application.getContext` wraps cold-load failures in
+      // `WorkspaceLoadError` at the api facade. Re-wrap only a raw
+      // throw so we never nest a WorkspaceLoadError inside another.
+      const wrapped =
+        winner.err instanceof WorkspaceLoadError
+          ? winner.err
+          : new WorkspaceLoadError(id, winner.err);
       logger.error({ err: wrapped, workspaceId: id }, "workspace cold-load failed");
       return c.json(errorBody(wrapped), 503, { "Retry-After": "5" });
     }

@@ -177,6 +177,7 @@ describe("errorBody", () => {
       "WorkflowEdgeCycleError",
       "WorkflowEdgeNotFoundError",
       "WorkflowError",
+      "WorkflowHumanSpecError",
       "WorkflowNodeKindShapeError",
       "WorkflowNodeNotFoundError",
       "WorkflowNodeNotMutableError",

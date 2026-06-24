@@ -390,7 +390,6 @@ export class WorkspaceContextRegistry {
       });
       const humanRunner = makeHumanNodeRunner({
         getService: getWorkflowService,
-        logger: this.logger,
       });
       workflowModule = await composeWorkflowModule({
         dbFile,

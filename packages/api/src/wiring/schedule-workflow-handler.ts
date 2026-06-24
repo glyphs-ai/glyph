@@ -166,6 +166,21 @@ export function makeWorkflowKindHandler(opts: {
       return { id: result.workflowId };
     },
 
+    // PERF / KNOWN N+1: both `hasInFlightForSchedule` and
+    // `deleteForSchedule` pull EVERY schedule-originated workflow via
+    // `workflows.list({ origin: "schedule" })` and then filter
+    // client-side on `metadata.scheduleId`. `ListWorkflowOpts` (in
+    // `@glyphs-ai/workflow`) exposes no metadata / scheduleId predicate,
+    // so there is no DB-scoped narrowing reachable from this layer. For
+    // a schedule that has fired thousands of times this is the hot path
+    // for `DELETE /schedules/:sid`, and `deleteForSchedule` compounds
+    // it: a `getDag` per matched workflow plus an in-flight probe +
+    // `findTaskByWorkflowNode` per node (N+M+P round-trips). The real
+    // fix is a metadata-scoped `WorkflowService.list` filter (or a
+    // dedicated `findBySchedule`) in the workflow substrate — out of
+    // scope for this api-only pass. Mirror the task handler's
+    // DB-scoped `tasks.hasInFlightByOriginMetadata` /
+    // `tasks.deleteTerminalByOriginMetadata` once that lands.
     async hasInFlightForSchedule(scheduleId) {
       const all = await workflows.list({ origin: "schedule" });
       return all.some((wf) => wf.status === "running" && wf.metadata.scheduleId === scheduleId);

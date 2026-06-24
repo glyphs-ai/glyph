@@ -40,6 +40,8 @@
 import {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
+  WorkflowHumanSpecError,
+  WorkflowWorkerNotInCoordMenuError,
   WorkflowWorkerSpecError,
 } from "@glyphs-ai/api";
 import {
@@ -85,7 +87,7 @@ import {
   WorkflowSubgraphTempParentlessError,
 } from "@glyphs-ai/workflow";
 import type { ErrorPolicy } from "../_respond-error.js";
-import { opaqueAgentResolutionBody } from "./_shared-bodies.js";
+import { opaqueAgentResolutionBody, opaqueWorkerNotInCoordMenuBody } from "./_shared-bodies.js";
 
 export const workflowsErrorPolicy: ErrorPolicy = {
   name: "workflows",
@@ -137,6 +139,22 @@ export const workflowsErrorPolicy: ErrorPolicy = {
     // Worker-runner spec-shape rejection. Same safe-message rule as
     // WorkflowCoordSpecError, but for worker-kind nodes.
     [WorkflowWorkerSpecError, 400],
+    // Human-runner strict-shape rejection — non-object spec, missing /
+    // empty `prompt`, invalid `promptStyle`, or malformed `choices`.
+    // Same safe-by-construction message rule as the coord / worker spec
+    // errors; keeps the three node runners isomorphic. It subclasses
+    // `WorkflowError`, so the catch-all entry below would also map it to
+    // 400 — listed explicitly so the policy reads as the source of truth.
+    [WorkflowHumanSpecError, 400],
+    // Worker-runner menu-membership rejection — the worker node's
+    // `spec.agent` is not in the coordinator's `dependencies.agents`
+    // dispatch menu. Caller-fixable (400), but the message enumerates
+    // the coordinator's full menu (internal workflow topology), so the
+    // wire body is collapsed to an opaque `{ error, code }` envelope.
+    // Routed by instanceof here rather than the `INTERNAL_ERROR_NAMES`
+    // string-match (retained as defense-in-depth) so a class/`.name`
+    // drift can't silently break the opaque routing.
+    [WorkflowWorkerNotInCoordMenuError, 400, opaqueWorkerNotInCoordMenuBody],
 
     // 500 — defensive guards that fire only when a persisted row or
     // internal lookup carries a value outside the closed enum. These
