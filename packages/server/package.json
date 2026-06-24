@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "HTTP API surface (Hono) for glyph -- workspace-scoped catalog / sessions / tasks / schedules over a per-workspace context registry. Pure transport adapter over @glyphs-ai/api.",
+  "description": "HTTP API surface (Hono) for glyph -- workspace-scoped catalog / sessions / tasks / schedules / workflows over a per-workspace context registry. Pure transport adapter over @glyphs-ai/api.",
   "keywords": [
     "glyph",
     "server",
@@ -13,7 +13,8 @@
     "catalog",
     "sessions",
     "tasks",
-    "schedules"
+    "schedules",
+    "workflows"
   ],
   "_devPortNote": "The PORT=41817 in scripts.dev MUST stay in lock-step with the proxy target in packages/dashboard/vite.config.ts. If they drift, dev /api/* requests silently ECONNREFUSED.",
   "engines": {
