@@ -42,17 +42,15 @@
  * vanishingly rare in this repo. Promote to an audited rule if the
  * pattern ever appears.
  *
- * Allowlist discipline (mirrors test-layout-convention.test.ts):
- *   - `ALLOWED_VIOLATIONS` carries documented exceptions.
- *   - Entries sorted by `(file, importedPkg)` (review hygiene).
- *   - Every entry has a non-empty rationale.
- *   - Stale entries (file no longer exists OR no such cross-domain
- *     import remains) fail.
- *   - Idle entries (the rule already passes without the entry) fail,
- *     which stops the allowlist from accumulating defensive entries.
+ * Allowlist discipline: `ALLOWED_VIOLATIONS` is the set of documented
+ * exceptions to decision rule #4. It is empty — T0/T1 packages have no
+ * accepted cross-BC value imports — so the audit pins it as empty with a
+ * single guard rather than running sort / rationale / stale / idle
+ * checks over a zero-length list. The canonical discipline checks for a
+ * populated allowlist live in `test-layout-convention.test.ts`.
  */
 
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -162,88 +160,13 @@ describe("inter-service value-imports are forbidden", () => {
     ).toEqual([]);
   });
 
-  it("ALLOWED_VIOLATIONS entries are sorted by (file, importedPkg)", () => {
-    const actual = ALLOWED_VIOLATIONS.map((v) => `${v.file}::${v.importedPkg}`);
-    const sorted = [...actual].sort();
-    expect(actual, "Sort ALLOWED_VIOLATIONS by (file, importedPkg) for review hygiene.").toEqual(
-      sorted,
-    );
-  });
-
-  it("ALLOWED_VIOLATIONS entries all have non-empty rationale", () => {
-    const empty = ALLOWED_VIOLATIONS.filter((v) => v.rationale.trim().length === 0).map(
-      (v) => `${v.file} → @glyphs-ai/${v.importedPkg}`,
-    );
-    expect(
-      empty,
-      `Empty rationale: ${empty.join(", ")}. Every allowlist entry needs a one-line explanation of why the cross-domain value import is acceptable and what the long-term fix is.`,
-    ).toEqual([]);
-  });
-
-  it("ALLOWED_VIOLATIONS entries are not stale (file exists AND the violating import still exists)", () => {
-    const stale: string[] = [];
-    // Group observed violations into a quick lookup.
-    const observed = new Set(all.map((v) => `${v.file}::@glyphs-ai/${v.importedPkg}`));
-    for (const ex of ALLOWED_VIOLATIONS) {
-      const abs = path.join(REPO_ROOT, ex.file);
-      let exists: boolean;
-      try {
-        exists = statSync(abs).isFile();
-      } catch {
-        exists = false;
-      }
-      if (!exists) {
-        stale.push(`${ex.file} → @glyphs-ai/${ex.importedPkg}: file does not exist on disk.`);
-        continue;
-      }
-      const key = `${ex.file}::@glyphs-ai/${ex.importedPkg}`;
-      if (!observed.has(key)) {
-        stale.push(
-          `${ex.file} → @glyphs-ai/${ex.importedPkg}: no such cross-domain value-import found in the file. Remove the entry.`,
-        );
-      }
-    }
-    expect(stale, stale.join("\n")).toEqual([]);
-  });
-
-  it("ALLOWED_VIOLATIONS entries are not idle (rule actually fails without the entry)", () => {
-    // An entry is "idle" if removing it from the allowlist still leaves
-    // zero unexcused violations for that (file, importedPkg) pair. The
-    // "stale" check above already covers the case where the import is
-    // gone entirely; this check covers the case where the import still
-    // exists but is no longer a value import (e.g. someone tightened
-    // it to `import type` but forgot to drop the allowlist entry).
-    //
-    // For this v1 the two checks are functionally equivalent because
-    // every observed (file, importedPkg) pair in `all` is by definition
-    // a current value-import — `collectAllCrossDomainValueImports`
-    // emits only value imports. So "rule passes without entry" iff
-    // "entry has no observed counterpart", which is what the stale
-    // check already enforces. We still write this as a separate `it`
-    // block so the allowlist-discipline contract documented in the
-    // top-of-file docstring (5 checks) is honoured and so future
-    // refactors that change `collectAllCrossDomainValueImports`'s
-    // emit set don't accidentally weaken the contract.
-    const idle: string[] = [];
-    const observed = new Set(all.map((v) => `${v.file}::@glyphs-ai/${v.importedPkg}`));
-    for (const ex of ALLOWED_VIOLATIONS) {
-      const key = `${ex.file}::@glyphs-ai/${ex.importedPkg}`;
-      const abs = path.join(REPO_ROOT, ex.file);
-      let exists: boolean;
-      try {
-        exists = statSync(abs).isFile();
-      } catch {
-        exists = false;
-      }
-      // Skip — the stale check owns the "file gone" message.
-      if (!exists) continue;
-      if (!observed.has(key)) {
-        idle.push(
-          `${ex.file} → @glyphs-ai/${ex.importedPkg}: the rule already passes for this pair (no current value-import). Remove the entry.`,
-        );
-      }
-    }
-    expect(idle, idle.join("\n")).toEqual([]);
+  it("ALLOWED_VIOLATIONS is intentionally empty (no documented cross-BC value-import exceptions)", () => {
+    // The codebase has zero excused cross-domain value imports, so the
+    // sort / rationale / stale / idle discipline a populated allowlist
+    // needs would run over a zero-length list. Pin the invariant
+    // directly instead; test-layout-convention.test.ts keeps the
+    // canonical discipline checks for its populated allowlist.
+    expect(ALLOWED_VIOLATIONS).toEqual([]);
   });
 });
 
