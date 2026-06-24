@@ -27,14 +27,36 @@ type re-exports) plus pure-function path helpers. No orchestration code.
 
 | File | Purpose |
 |------|---------|
+| `domain.ts` | Type-only re-exports of T0/T1 package types that cross the wire (`Agent`, `AgentEntry`, `Skill`, `Schedule`, `Task`, etc.) |
 | `health.ts` | `HealthResponse` for `GET /api/health` |
 | `plan-to-manifest.ts` | Manifest tree shapes for catalog plan resolution |
-| `routes.ts` | `ROUTES` registry + `RouteSpec<Req, Res>` + every request/response body type the HTTP API exposes |
+| `routes.ts` | Facade for the route manifest: composes the per-domain slices in `routes/` into the `ROUTES` registry and re-exports `RouteSpec<Req, Res>` plus every request/response body type the HTTP API exposes |
+| `routes/` | Per-domain route slices (`system`, `workspaces`, `sessions`, `tasks`, `schedules`, `workflows`, `catalog`) and the `_spec` primitives; package-private, reached only through the `routes.ts` facade (see `docs/pkg-template.md` § Splitting big files) |
 | `runtimes.ts` | `RuntimeInfo` for `GET /api/runtimes` |
 | `schedules.ts` | Wire-shape schedule target DTOs (`TaskTargetData`, `TaskScheduleTargetWire`, `ScheduleWireTarget`) |
 | `server-config.ts` | `ServerConfig` for `GET /api/config` (response type referenced by `routes.ts`) |
-| `domain.ts` | Type-only re-exports of T0/T1 package types that cross the wire (`Agent`, `AgentEntry`, `Skill`, `Schedule`, `Task`, etc.) |
 | `workflows.ts` | Workflow DTOs and terminal payload shapes for the T1 `@glyphs-ai/workflow` substrate, mirrored without importing its runtime implementation |
+
+## Dependencies
+
+Every workspace package this contract surface references —
+`@glyphs-ai/catalog`, `@glyphs-ai/runtime`, `@glyphs-ai/schedule`,
+`@glyphs-ai/session`, `@glyphs-ai/task` — is consumed **`import type` only**:
+the domain re-exports in `domain.ts` and the route body types erase completely
+at compile time, so nothing from these packages survives into the emitted JS.
+They are therefore declared as **optional `peerDependencies`**
+(`peerDependenciesMeta.*.optional = true`) rather than runtime `dependencies`,
+and mirrored under `devDependencies`:
+
+- **`peerDependencies` (optional)** — documents the version contract for a
+  consumer that already pulls these packages in, without forcing them into the
+  module graph of one (e.g. dashboard) that needs only the erased types.
+- **`devDependencies`** — supplies the `.d.ts` for local `tsc` and pins the
+  build order (`pnpm -r` orders by dev + prod deps), since the optional peers
+  are not auto-installed.
+
+A `dependencies` entry would advertise a runtime coupling that does not exist;
+the peer-optional + dev pattern keeps the manifest honest.
 
 ## Why a separate pkg
 
