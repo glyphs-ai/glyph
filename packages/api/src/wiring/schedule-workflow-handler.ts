@@ -67,7 +67,9 @@ export function makeWorkflowKindHandler(opts: {
         );
       }
       if (obj.brief.trim().length > 200) {
-        throw new WorkflowScheduleTargetError("Workflow target brief must be 200 characters or fewer");
+        throw new WorkflowScheduleTargetError(
+          "Workflow target brief must be 200 characters or fewer",
+        );
       }
       if (obj.details !== undefined && typeof obj.details !== "string") {
         throw new WorkflowScheduleTargetError(
