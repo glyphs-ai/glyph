@@ -1,5 +1,9 @@
 # @glyphs-ai/terminal
 
+> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+>
+> **Diverges from [`pkg-template.md`](../../docs/pkg-template.md) in:** it is a thin PTY / shell wrapper. No schema / service / repository / drizzle; `src/` holds spawn / quoting / platform primitives.
+
 Host a shell-runnable `LaunchCommand` inside a per-platform terminal
 emulator. Glyph uses this for one-click interactive launch: instead of
 asking the user to copy a manual `cd … && <runtime-cli> …` command into

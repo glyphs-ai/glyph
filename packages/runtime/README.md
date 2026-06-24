@@ -1,5 +1,9 @@
 # @glyphs-ai/runtime
 
+> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+>
+> **Diverges from [`pkg-template.md`](../../docs/pkg-template.md) in:** it is an adapter package -- a runtime registry plus adapters (`copilot`, ...). No schema / service / repository / drizzle.
+
 Runtime adapter contract + Copilot CLI implementation.
 
 A *runtime* adapts a third-party CLI (GitHub Copilot today; Gemini,

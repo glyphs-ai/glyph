@@ -679,7 +679,7 @@ interface). This is a real example from `@glyphs-ai/runtime`.
 
 ## Composition root
 
-The composition root (`@glyphs-ai/api`'s `WorkspaceRuntimeCache.load`)
+The composition root (`@glyphs-ai/api`'s `WorkspaceContextRegistry.load`)
 calls each `compose<Entity>Module({ dbFile })` once per workspace and
 threads the `service` into downstream pkgs (either as-is or through a
 capability interface).

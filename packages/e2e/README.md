@@ -1,5 +1,7 @@
 # @glyphs-ai/e2e
 
+> **Diverges from [`pkg-template.md`](../../docs/pkg-template.md) in:** it is tests-only -- no `src/` and no published API. It hosts the architecture-invariant and spawn-smoke suites.
+
 Cross-package end-to-end / integration tests for glyph. **Private
 package** — no published artifact, no production code, test-only.
 

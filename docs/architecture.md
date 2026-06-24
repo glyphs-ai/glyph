@@ -181,12 +181,13 @@ producer-side definition; TypeScript's structural typing wires the
 two together at the `composeApplication` call site without forcing
 either pkg to depend on the other.
 
-The entity packages (`workspace`, `session`, `task`, `workflow`, `catalog`) sit at
-the same level — they don't depend on each other directly. Composition
-happens at the [`@glyphs-ai/api`](../packages/api) layer: api holds
-one `WorkspaceService` process-wide and lazily mints per-workspace
-`{catalog, sessions, tasks, workflows}` bundles behind a
-`WorkspaceRuntimeCache`. The server depends on api, not on the
+The entity packages (`workspace`, `session`, `task`, `workflow`,
+`schedule`, `catalog`) sit at the same level — they don't depend on each
+other directly. Composition happens at the
+[`@glyphs-ai/api`](../packages/api) layer: api holds one
+`WorkspaceService` process-wide and lazily mints per-workspace
+`{catalog, sessions, tasks, schedules, workflows}` bundles behind a
+`WorkspaceContextRegistry`. The server depends on api, not on the
 entity pkgs directly. `runtime` is consumed by `session` + `task` to
 spawn agents; `workflow` does not spawn anything itself — its DAG
 nodes are `task` / `session` nodes that the workflow runner dispatches
@@ -405,14 +406,14 @@ surface the cause without crashing.
 ## HTTP API URL scheme
 
 Workspace-scoped resources live under
-`/api/workspaces/<wsid>/{catalog,sessions,tasks}/...`. The `<wsid>` is
+`/api/workspaces/<wsid>/{catalog,sessions,tasks,schedules,workflows}/...`. The `<wsid>` is
 the workspace's opaque UUID — stable for the lifetime of the registry
 entry, so dashboard URLs survive workspace renames. There is no global
 catalog mount; switching workspace switches the catalog the dashboard
 sees.
 
-A `WorkspaceRuntimeCache` (in `@glyphs-ai/api`) lazily mints + retains
-per-workspace `{catalog, sessions, tasks}` bundles behind that URL
+A `WorkspaceContextRegistry` (in `@glyphs-ai/api`) lazily mints + retains
+per-workspace `{catalog, sessions, tasks, schedules, workflows}` bundles behind that URL
 prefix; cache invalidation happens on workspace deletion or rename.
 An explicit `POST /api/workspaces/:id/reload` is also available for
 operator-driven reload (refused with HTTP 409 +

@@ -1,5 +1,9 @@
 # @glyphs-ai/dashboard
 
+> **Tier:** T_top (Surfaces). See the [tier model](../../docs/architecture.md#tier-model).
+>
+> **Diverges from [`pkg-template.md`](../../docs/pkg-template.md) in:** it is a browser SPA (Vite + React). `src/` is UI components / hooks / pages; no schema / service / repository / drizzle, and tests use MSW instead of an `openTest<Entity>Db` helper.
+
 The glyph dashboard SPA — React + Vite + react-router. The bundled
 production build is served by `@glyphs-ai/server` on the same port Vite
 hosts the dev UI on (8787), so dashboard URLs / muscle memory don't shift

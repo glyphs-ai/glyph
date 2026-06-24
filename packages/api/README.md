@@ -1,5 +1,7 @@
 # @glyphs-ai/api
 
+> **Diverges from [`pkg-template.md`](../../docs/pkg-template.md) in:** no schema / repository / service / compose / drizzle of its own. It is the composition root that wires T0/T1 modules into per-workspace contexts, not a BC-owning service package.
+
 The **T2 Application layer (orchestration)** — glyph's composition
 root that wires T0 foundations (`workspace`, `catalog`, `runtime`,
 `schedule`, `terminal`) and T1 execution modes (`session`, `task`,
