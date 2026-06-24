@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
 import { emptyDeps } from "../_shared/dep-keys.js";
-import { HasDependentsError } from "../_shared/dependents-error.js";
+import { HasDependentsError } from "../_shared/errors.js";
 import { safeNormalize } from "../fetcher/index.js";
 import type * as schema from "../schema.js";
 import { agentAgentDeps, agentFiles, agentMcpDeps, agentSkillDeps, agents } from "../schema.js";

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
-import { HasDependentsError } from "../_shared/dependents-error.js";
+import { HasDependentsError } from "../_shared/errors.js";
 import { safeNormalize } from "../fetcher/index.js";
 import type * as schema from "../schema.js";
 import { agentMcpDeps, mcps, skillMcpDeps } from "../schema.js";

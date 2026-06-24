@@ -2,19 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
 
-import type { AgentEntity } from "../agent/agent-entity.js";
 import { AgentRepository } from "../agent/agent-repository.js";
 import { AgentService } from "../agent/agent-service.js";
-import { AgentNotFoundError } from "../agent/errors.js";
-import { defaultFetcherRegistry, safeNormalize } from "../fetcher/index.js";
-import { McpNotFoundError } from "../mcp/errors.js";
-import type { McpEntity } from "../mcp/mcp-entity.js";
+import { defaultFetcherRegistry } from "../fetcher/index.js";
 import * as McpFormat from "../mcp/mcp-format.js";
 import { McpRepository } from "../mcp/mcp-repository.js";
 import { type McpFetcher, McpService } from "../mcp/mcp-service.js";
 import type * as schema from "../schema.js";
-import { SkillNotFoundError } from "../skill/errors.js";
-import type { SkillEntity } from "../skill/skill-entity.js";
 import { SkillRepository } from "../skill/skill-repository.js";
 import { type SkillFetcher, SkillService } from "../skill/skill-service.js";
 import type {
@@ -22,45 +16,24 @@ import type {
   AgentEntry,
   AgentResolveResult,
   Mcp,
-  ResolvedMcp,
-  ResolvedSkill,
   Skill,
   SkillEntry,
   SkillResolveResult,
 } from "../types.js";
+import * as installOps from "./catalog-service/install.js";
+import * as reads from "./catalog-service/reads.js";
+import * as resolveOps from "./catalog-service/resolve.js";
+import type { CachedPlan, CatalogRuntime, CatalogServiceCtx } from "./catalog-service/types.js";
 import type {
-  CatalogInstalledEntry,
-  CatalogInstallFailure,
   CatalogInstallResult,
-  CatalogInstallSkip,
   CatalogPlan,
-  CatalogPlanNode,
   CatalogSyncResult,
   McpResolveAdapter,
 } from "./plan-types.js";
-import {
-  buildAgentEntry,
-  buildSkillEntry,
-  newCascadeContext,
-  projectAgentPojo,
-  projectMcpMetadata,
-  projectSkillPojo,
-} from "./projection.js";
-import {
-  buildLocalClosure,
-  buildUpstreamClosure,
-  diffClosures,
-  type PipelineServices,
-} from "./resolve-pipeline.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
 const PLAN_CACHE_TTL_MS = 5 * 60 * 1000;
-
-interface CachedPlan {
-  readonly plan: CatalogPlan;
-  readonly expiresAt: number;
-}
 
 /**
  * Construction options for {@link buildCatalogRuntime}.
@@ -70,22 +43,7 @@ export interface BuildCatalogRuntimeOpts {
   readonly logger?: Logger;
 }
 
-/**
- * Internal handle binding the per-entity services + repos + adapter
- * used by {@link CatalogService}. Constructed once by
- * {@link buildCatalogRuntime}; tests can build it manually with
- * fake per-entity services for cross-entity facade tests.
- */
-export interface CatalogRuntime {
-  readonly mcp: McpService;
-  readonly skill: SkillService;
-  readonly agent: AgentService;
-  readonly mcpRepo: McpRepository;
-  readonly skillRepo: SkillRepository;
-  readonly agentRepo: AgentRepository;
-  readonly resolveMcpAdapter: McpResolveAdapter;
-  readonly logger: Logger;
-}
+export type { CatalogRuntime, CatalogServiceCtx };
 
 export interface CatalogServiceOpts {
   readonly runtime: CatalogRuntime;
@@ -179,156 +137,75 @@ export function buildCatalogRuntime(opts: BuildCatalogRuntimeOpts): CatalogRunti
  */
 export class CatalogService {
   private readonly planCache = new Map<string, CachedPlan>();
-  private readonly rt: CatalogRuntime;
+  private readonly ctx: CatalogServiceCtx;
 
   constructor(opts: CatalogServiceOpts) {
-    this.rt = opts.runtime;
+    this.ctx = { rt: opts.runtime, planCache: this.planCache };
   }
 
   // ─── Install ──────────────────────────────────────────
-
-  async install(plan: CatalogPlan): Promise<CatalogInstallResult> {
-    const installed: CatalogInstalledEntry[] = [];
-    const failed: CatalogInstallFailure[] = [];
-    const skipped: CatalogInstallSkip[] = plan.alreadyInstalled.map((n) => ({
-      kind: n.kind,
-      fqn: n.node.fqn,
-      reason: (n.disposition === "up-to-date" ? "up-to-date" : "already-installed") as
-        | "already-installed"
-        | "up-to-date",
-    }));
-
-    const poisoned = new Set<string>();
-    const depsByOrigin = new Map<string, string[]>();
-    for (const planNode of plan.toInstall) {
-      // Canonicalise dep refs so they collide with `planNode.node.origin`
-      // (which is already canonical because every entity factory and
-      // every walker normalises). Without this, a raw frontmatter
-      // dep ref (`file:/abs/x`) misses a `poisoned` entry holding the
-      // canonical form (`file:///abs/x`) and a failed dep would not
-      // poison its dependent.
-      depsByOrigin.set(planNode.node.origin, planRefs(planNode).map(safeNormalize));
-    }
-
-    for (const planNode of plan.toInstall) {
-      const fqn = planNode.node.fqn;
-      const origin = planNode.node.origin;
-      const failedDep = (depsByOrigin.get(origin) ?? []).find((dep) => poisoned.has(dep));
-      if (failedDep !== undefined) {
-        skipped.push({ kind: planNode.kind, fqn, reason: "dep-failed" });
-        poisoned.add(origin);
-        continue;
-      }
-      try {
-        const persisted = await this.installNode(planNode);
-        installed.push(toInstalledEntry(planNode.kind, fqn, persisted));
-      } catch (err) {
-        failed.push({ kind: planNode.kind, fqn, error: errorToWire(err) });
-        poisoned.add(origin);
-      }
-    }
-
-    return { installed, skipped, failed, conflicts: plan.conflicts };
+  install(plan: CatalogPlan): Promise<CatalogInstallResult> {
+    return installOps.install(this.ctx, plan);
   }
-
   async installSkill(origin: string): Promise<CatalogInstallResult> {
     return this.install(await this.resolveSkill(origin));
   }
-
   async installAgent(origin: string): Promise<CatalogInstallResult> {
     return this.install(await this.resolveAgentFromOrigin(origin));
   }
-
   async installMcpFromOrigin(origin: string): Promise<CatalogInstallResult> {
     return this.install(await this.resolveMcp(origin));
   }
-
-  /**
-   * Apply a sync plan: delete the old fqn on identity change, then
-   * run the regular install. NOT atomic across delete + install.
-   */
-  async applySync(plan: CatalogPlan): Promise<CatalogSyncResult> {
-    if (plan.identityChange !== undefined) {
-      const ic = plan.identityChange;
-      if (ic.kind === "skill") await this.rt.skill.delete(ic.oldFqn);
-      else if (ic.kind === "agent") await this.rt.agent.delete(ic.oldFqn);
-      else await this.rt.mcp.delete(ic.oldFqn);
-    }
-    const result = await this.install(plan);
-    return { ...result, orphansFlagged: plan.orphans };
+  applySync(plan: CatalogPlan): Promise<CatalogSyncResult> {
+    return installOps.applySync(this.ctx, plan);
   }
 
   // ─── Per-entry flag flips ────────────────────────────
-
-  async acknowledgeSkillPrereqs(fqn: string): Promise<Skill> {
-    const updated = await this.rt.skill.acknowledgePrereqs(fqn);
-    const ctx = await this.loadCascadeContext();
-    return projectSkillPojo(updated, ctx);
+  acknowledgeSkillPrereqs(fqn: string): Promise<Skill> {
+    return reads.acknowledgeSkillPrereqs(this.ctx, fqn);
   }
-
-  async acknowledgeAgentPrereqs(fqn: string): Promise<Agent> {
-    const updated = await this.rt.agent.acknowledgePrereqs(fqn);
-    return projectAgentPojo(updated);
+  acknowledgeAgentPrereqs(fqn: string): Promise<Agent> {
+    return reads.acknowledgeAgentPrereqs(this.ctx, fqn);
   }
-
-  async disableAgent(fqn: string): Promise<Agent> {
-    const updated = await this.rt.agent.disableByUser(fqn);
-    return projectAgentPojo(updated);
+  disableAgent(fqn: string): Promise<Agent> {
+    return reads.disableAgent(this.ctx, fqn);
   }
-
-  async enableAgent(fqn: string): Promise<Agent> {
-    const updated = await this.rt.agent.enableByUser(fqn);
-    return projectAgentPojo(updated);
+  enableAgent(fqn: string): Promise<Agent> {
+    return reads.enableAgent(this.ctx, fqn);
   }
 
   // ─── Deletes (dep-protection raised by the repo layer) ────
-
   async deleteAgent(fqn: string): Promise<void> {
-    await this.rt.agent.delete(fqn);
+    await this.ctx.rt.agent.delete(fqn);
   }
-
   async deleteSkill(fqn: string): Promise<void> {
-    await this.rt.skill.delete(fqn);
+    await this.ctx.rt.skill.delete(fqn);
   }
-
   async deleteMcp(fqn: string): Promise<void> {
-    await this.rt.mcp.delete(fqn);
+    await this.ctx.rt.mcp.delete(fqn);
   }
 
   // ─── Resolve (cross-entity walk, no writes) ──────────
-
   resolveSkill(origin: string): Promise<CatalogPlan> {
-    return this.runResolvePipeline({ kind: "skill", origin }, false);
+    return resolveOps.resolveSkill(this.ctx, origin);
   }
-
   resolveAgentFromOrigin(origin: string): Promise<CatalogPlan> {
-    return this.runResolvePipeline({ kind: "agent", origin }, false);
+    return resolveOps.resolveAgentFromOrigin(this.ctx, origin);
   }
-
   resolveMcp(origin: string): Promise<CatalogPlan> {
-    return this.runResolvePipeline({ kind: "mcp", origin }, false);
+    return resolveOps.resolveMcp(this.ctx, origin);
   }
-
-  async resolveSyncSkill(fqn: string): Promise<CatalogPlan> {
-    const local = await this.rt.skill.get(fqn);
-    if (local === null) throw new SkillNotFoundError(fqn);
-    return this.runResolvePipeline({ kind: "skill", origin: local.origin }, true);
+  resolveSyncSkill(fqn: string): Promise<CatalogPlan> {
+    return resolveOps.resolveSyncSkill(this.ctx, fqn);
   }
-
-  async resolveSyncAgent(fqn: string): Promise<CatalogPlan> {
-    const local = await this.rt.agent.get(fqn);
-    if (local === null) throw new AgentNotFoundError(fqn);
-    return this.runResolvePipeline({ kind: "agent", origin: local.origin }, true);
+  resolveSyncAgent(fqn: string): Promise<CatalogPlan> {
+    return resolveOps.resolveSyncAgent(this.ctx, fqn);
   }
-
-  async resolveSyncMcp(name: string): Promise<CatalogPlan> {
-    const local = await this.rt.mcp.get(name);
-    if (local === null) throw new McpNotFoundError(name);
-    return this.runResolvePipeline({ kind: "mcp", origin: local.origin }, true);
+  resolveSyncMcp(name: string): Promise<CatalogPlan> {
+    return resolveOps.resolveSyncMcp(this.ctx, name);
   }
 
   // ─── Preview/apply token cache ───────────────────────
-
   cachePlan(plan: CatalogPlan): string {
     this.evictExpiredPlans();
     const token = randomUUID();
@@ -351,381 +228,99 @@ export class CatalogService {
   }
 
   // ─── Listing / lookup with DTO projection ─────────────
-
-  async listSkillEntries(): Promise<SkillEntry[]> {
-    const ctx = await this.loadCascadeContext();
-    return [...ctx.skillByFqn.values()].map((s) => buildSkillEntry(s, ctx));
+  listSkillEntries(): Promise<SkillEntry[]> {
+    return reads.listSkillEntries(this.ctx);
   }
-
-  async listAgentEntries(): Promise<AgentEntry[]> {
-    const [agents, ctx] = await Promise.all([this.rt.agent.list(), this.loadCascadeContext()]);
-    return agents.map((a) => buildAgentEntry(a, ctx));
+  listAgentEntries(): Promise<AgentEntry[]> {
+    return reads.listAgentEntries(this.ctx);
   }
-
-  async listMcps(): Promise<Mcp[]> {
-    const ctx = await this.loadCascadeContext();
-    return [...ctx.mcpByFqn.values()].map((m) => projectMcpMetadata(m, ctx));
+  listMcps(): Promise<Mcp[]> {
+    return reads.listMcps(this.ctx);
   }
-
-  async listSkills(): Promise<Skill[]> {
-    const ctx = await this.loadCascadeContext();
-    return [...ctx.skillByFqn.values()].map((s) => projectSkillPojo(s, ctx));
+  listSkills(): Promise<Skill[]> {
+    return reads.listSkills(this.ctx);
   }
-
-  async listAgents(): Promise<Agent[]> {
-    const agents = await this.rt.agent.list();
-    return agents.map((a) => projectAgentPojo(a));
+  listAgents(): Promise<Agent[]> {
+    return reads.listAgents(this.ctx);
   }
-
-  async getSkillEntry(fqn: string): Promise<SkillEntry | null> {
-    const s = await this.rt.skill.get(fqn);
-    if (s === null) return null;
-    const ctx = await this.loadCascadeContext();
-    return buildSkillEntry(s, ctx);
+  getSkillEntry(fqn: string): Promise<SkillEntry | null> {
+    return reads.getSkillEntry(this.ctx, fqn);
   }
-
-  async getAgentEntry(fqn: string): Promise<AgentEntry | null> {
-    const a = await this.rt.agent.get(fqn);
-    if (a === null) return null;
-    const ctx = await this.loadCascadeContext();
-    return buildAgentEntry(a, ctx);
+  getAgentEntry(fqn: string): Promise<AgentEntry | null> {
+    return reads.getAgentEntry(this.ctx, fqn);
   }
-
-  async getSkillContent(fqn: string): Promise<string> {
-    const s = await this.rt.skill.get(fqn);
-    if (s === null) throw new SkillNotFoundError(fqn);
-    return this.rt.skill.getAnchor(fqn);
+  getSkillContent(fqn: string): Promise<string> {
+    return reads.getSkillContent(this.ctx, fqn);
   }
-
-  async getAgentContent(fqn: string): Promise<string> {
-    const a = await this.rt.agent.get(fqn);
-    if (a === null) throw new AgentNotFoundError(fqn);
-    return this.rt.agent.getAnchor(fqn);
+  getAgentContent(fqn: string): Promise<string> {
+    return reads.getAgentContent(this.ctx, fqn);
   }
-
-  async listAgentFiles(fqn: string): Promise<{ relPath: string; size: number }[]> {
-    return this.rt.agentRepo.listFilePaths(fqn);
+  listAgentFiles(fqn: string): Promise<{ relPath: string; size: number }[]> {
+    return reads.listAgentFiles(this.ctx, fqn);
   }
-
-  async listSkillFiles(fqn: string): Promise<{ relPath: string; size: number }[]> {
-    return this.rt.skillRepo.listFilePaths(fqn);
+  listSkillFiles(fqn: string): Promise<{ relPath: string; size: number }[]> {
+    return reads.listSkillFiles(this.ctx, fqn);
   }
-
-  async getAgentFile(fqn: string, relPath: string): Promise<Buffer | null> {
-    return this.rt.agentRepo.getFile(fqn, relPath);
+  getAgentFile(fqn: string, relPath: string): Promise<Buffer | null> {
+    return reads.getAgentFile(this.ctx, fqn, relPath);
   }
-
-  async getSkillFile(fqn: string, relPath: string): Promise<Buffer | null> {
-    return this.rt.skillRepo.getFile(fqn, relPath);
+  getSkillFile(fqn: string, relPath: string): Promise<Buffer | null> {
+    return reads.getSkillFile(this.ctx, fqn, relPath);
   }
-
-  async getMcpContent(fqn: string): Promise<string> {
-    return this.rt.mcp.getContent(fqn);
+  getMcpContent(fqn: string): Promise<string> {
+    return reads.getMcpContent(this.ctx, fqn);
   }
-
-  /**
-   * Parsed JSON of the MCP spec with glyph's internal `_meta` block
-   * stripped — the form runtime adapters consume when writing
-   * client-side config files.
-   */
-  async getMcpRuntimeConfig(fqn: string): Promise<Record<string, unknown>> {
-    const raw = await this.rt.mcp.getContent(fqn);
-    return McpFormat.stripMeta(raw, `mcps:${fqn}`);
+  getMcpRuntimeConfig(fqn: string): Promise<Record<string, unknown>> {
+    return reads.getMcpRuntimeConfig(this.ctx, fqn);
   }
-
-  async getSkill(fqn: string): Promise<Skill | null> {
-    const s = await this.rt.skill.get(fqn);
-    if (s === null) return null;
-    const ctx = await this.loadCascadeContext();
-    return projectSkillPojo(s, ctx);
+  getSkill(fqn: string): Promise<Skill | null> {
+    return reads.getSkill(this.ctx, fqn);
   }
-
-  async getAgent(fqn: string): Promise<Agent | null> {
-    const a = await this.rt.agent.get(fqn);
-    if (a === null) return null;
-    return projectAgentPojo(a);
+  getAgent(fqn: string): Promise<Agent | null> {
+    return reads.getAgent(this.ctx, fqn);
   }
-
-  async getMcp(name: string): Promise<Mcp | null> {
-    const m = await this.rt.mcp.get(name);
-    if (m === null) return null;
-    const ctx = await this.loadCascadeContext();
-    return projectMcpMetadata(m, ctx);
+  getMcp(name: string): Promise<Mcp | null> {
+    return reads.getMcp(this.ctx, name);
   }
 
   // ─── Entity lists (rich entities, for callers that need methods) ─
-
-  listMcpEntities(): Promise<McpEntity[]> {
-    return this.rt.mcp.list();
+  listMcpEntities() {
+    return reads.listMcpEntities(this.ctx);
   }
-  listSkillEntities(): Promise<SkillEntity[]> {
-    return this.rt.skill.list();
+  listSkillEntities() {
+    return reads.listSkillEntities(this.ctx);
   }
-  listAgentEntities(): Promise<AgentEntity[]> {
-    return this.rt.agent.list();
+  listAgentEntities() {
+    return reads.listAgentEntities(this.ctx);
   }
 
   // ─── Streaming files (runtime materialisation) ───────
-
-  async *agentEntries(fqn: string): AsyncIterable<{ relPath: string; content: Buffer }> {
-    if (!(await this.rt.agent.has(fqn))) throw new AgentNotFoundError(fqn);
-    for await (const f of this.rt.agent.streamFiles(fqn)) {
-      yield { relPath: f.relPath, content: f.content };
-    }
+  agentEntries(fqn: string) {
+    return reads.agentEntries(this.ctx, fqn);
   }
-
-  async *skillEntries(fqn: string): AsyncIterable<{ relPath: string; content: Buffer }> {
-    if (!(await this.rt.skill.has(fqn))) throw new SkillNotFoundError(fqn);
-    for await (const f of this.rt.skill.streamFiles(fqn)) {
-      yield { relPath: f.relPath, content: f.content };
-    }
+  skillEntries(fqn: string) {
+    return reads.skillEntries(this.ctx, fqn);
   }
 
   // ─── Resolve from local catalog (runtime-facing reads) ─
-
-  async resolveAgent(fqn: string): Promise<AgentResolveResult> {
-    const [agents, skills, mcps] = await Promise.all([
-      this.rt.agent.list(),
-      this.rt.skill.list(),
-      this.rt.mcp.list(),
-    ]);
-    const agent = agents.find((a) => a.fqn === fqn);
-    if (agent === undefined) throw new AgentNotFoundError(fqn);
-    const ctx = newCascadeContext(skills, agents, mcps);
-    const visited = new Set<string>();
-    const orderedSkills: SkillEntity[] = [];
-    const mcpFqns = new Set<string>();
-    const walk = (
-      skillDeps: ReadonlyArray<{ readonly fqn: string }>,
-      mcpDeps: ReadonlyArray<{ readonly fqn: string }>,
-    ): void => {
-      for (const d of mcpDeps) {
-        const m = ctx.mcpByFqn.get(d.fqn);
-        if (m !== undefined) mcpFqns.add(m.fqn);
-      }
-      for (const d of skillDeps) {
-        if (visited.has(d.fqn)) continue;
-        visited.add(d.fqn);
-        const skill = ctx.skillByFqn.get(d.fqn);
-        if (skill === undefined) continue;
-        walk(skill.dependencies.skills, skill.dependencies.mcps);
-        orderedSkills.push(skill);
-      }
-    };
-    walk(agent.dependencies.skills, agent.dependencies.mcps);
-    return {
-      agent: projectAgentPojo(agent),
-      skills: orderedSkills.map<ResolvedSkill>((s) => ({ skill: projectSkillPojo(s, ctx) })),
-      mcps: [...mcpFqns].map<ResolvedMcp>((mcpFqn) => ({ fqn: mcpFqn })),
-    };
+  resolveAgent(fqn: string): Promise<AgentResolveResult> {
+    return reads.resolveAgent(this.ctx, fqn);
   }
-
-  async resolveSkillFromCatalog(fqn: string): Promise<SkillResolveResult> {
-    const [skills, agents, mcps] = await Promise.all([
-      this.rt.skill.list(),
-      this.rt.agent.list(),
-      this.rt.mcp.list(),
-    ]);
-    const root = skills.find((s) => s.fqn === fqn);
-    if (root === undefined) throw new SkillNotFoundError(fqn);
-    const ctx = newCascadeContext(skills, agents, mcps);
-    const visited = new Set<string>();
-    const ordered: SkillEntity[] = [];
-    const mcpFqns = new Set<string>();
-    const walk = (skillFqn: string): void => {
-      if (visited.has(skillFqn)) return;
-      visited.add(skillFqn);
-      const skill = ctx.skillByFqn.get(skillFqn);
-      if (skill === undefined) return;
-      for (const d of skill.dependencies.mcps) {
-        const m = ctx.mcpByFqn.get(d.fqn);
-        if (m !== undefined) mcpFqns.add(m.fqn);
-      }
-      for (const d of skill.dependencies.skills) walk(d.fqn);
-      ordered.push(skill);
-    };
-    walk(root.fqn);
-    return {
-      skill: projectSkillPojo(root, ctx),
-      skills: ordered.map<ResolvedSkill>((s) => ({ skill: projectSkillPojo(s, ctx) })),
-      mcps: [...mcpFqns].map<ResolvedMcp>((mcpFqn) => ({ fqn: mcpFqn })),
-    };
+  resolveSkillFromCatalog(fqn: string): Promise<SkillResolveResult> {
+    return reads.resolveSkillFromCatalog(this.ctx, fqn);
   }
 
   // ─── Reverse-dep lookups ─────────────────────────────
-
-  async findSkillDependents(
-    targetFqn: string,
-  ): Promise<{ kind: "skill" | "agent"; name: string }[]> {
-    const [agents, skills] = await Promise.all([
-      this.rt.skillRepo.findDependentAgents(targetFqn),
-      this.rt.skillRepo.findDependentSkills(targetFqn),
-    ]);
-    return [
-      ...skills.map((name) => ({ kind: "skill" as const, name })),
-      ...agents.map((name) => ({ kind: "agent" as const, name })),
-    ];
+  findSkillDependents(targetFqn: string) {
+    return reads.findSkillDependents(this.ctx, targetFqn);
   }
-
-  async findMcpDependents(targetFqn: string): Promise<{ kind: "skill" | "agent"; name: string }[]> {
-    const [agents, skills] = await Promise.all([
-      this.rt.mcpRepo.findDependentAgents(targetFqn),
-      this.rt.mcpRepo.findDependentSkills(targetFqn),
-    ]);
-    return [
-      ...skills.map((name) => ({ kind: "skill" as const, name })),
-      ...agents.map((name) => ({ kind: "agent" as const, name })),
-    ];
+  findMcpDependents(targetFqn: string) {
+    return reads.findMcpDependents(this.ctx, targetFqn);
   }
-
-  async findAgentDependents(
-    targetFqn: string,
-  ): Promise<{ kind: "skill" | "agent"; name: string }[]> {
-    const agents = await this.rt.agentRepo.findDependentAgents(targetFqn);
-    return agents.map((name) => ({ kind: "agent" as const, name }));
+  findAgentDependents(targetFqn: string) {
+    return reads.findAgentDependents(this.ctx, targetFqn);
   }
-
-  async findDependents(targetFqn: string): Promise<{ kind: "skill" | "agent"; name: string }[]> {
-    const mcp = await this.rt.mcp.get(targetFqn);
-    if (mcp !== null) return this.findMcpDependents(targetFqn);
-    const skill = await this.rt.skill.get(targetFqn);
-    if (skill !== null) return this.findSkillDependents(targetFqn);
-    const agent = await this.rt.agent.get(targetFqn);
-    if (agent !== null) return this.findAgentDependents(targetFqn);
-    return [];
+  findDependents(targetFqn: string) {
+    return reads.findDependents(this.ctx, targetFqn);
   }
-
-  // ─── Internals ───────────────────────────────────────
-
-  private async installNode(
-    planNode: CatalogPlanNode,
-  ): Promise<SkillEntity | AgentEntity | McpEntity> {
-    if (planNode.kind === "skill") return this.rt.skill.install(planNode.node);
-    if (planNode.kind === "agent") return this.rt.agent.install(planNode.node);
-    return this.rt.mcp.install(planNode.node.fqn, planNode.node.origin, planNode.node.content);
-  }
-
-  private async runResolvePipeline(
-    root: { kind: "skill" | "agent" | "mcp"; origin: string },
-    isSync: boolean,
-  ): Promise<CatalogPlan> {
-    // Canonicalise the root origin once before any DB read or string
-    // comparison. Stored origins are canonical (the entity factories
-    // normalise on insert), so a raw user-typed `file:F:\path\x` would
-    // miss the `buildLocalClosure` Map keyed by canonical form, get
-    // diffed as `new`, and re-install instead of being recognised as
-    // already-installed. Normalising at the pipeline entry keeps every
-    // downstream comparison — `buildLocalClosure` map lookup,
-    // `diffClosures` rootOrigin equality, `computeReverseDepIndex`
-    // self-skip — on the same canonical key as the DB rows.
-    const canonRoot = { ...root, origin: safeNormalize(root.origin) };
-    const services: PipelineServices = {
-      skill: this.rt.skill,
-      agent: this.rt.agent,
-      mcp: this.rt.mcp,
-      resolveMcpAdapter: this.rt.resolveMcpAdapter,
-    };
-    const upstream = await buildUpstreamClosure(canonRoot, services, {
-      mode: isSync ? "sync" : "install",
-    });
-    const local = await buildLocalClosure([canonRoot.origin], services);
-    const globalReverseDepIndex = isSync
-      ? await this.computeReverseDepIndex(canonRoot.origin)
-      : undefined;
-    const diff = diffClosures(upstream.closure, local, {
-      rootOrigin: canonRoot.origin,
-      rootKind: canonRoot.kind,
-      isSync,
-      ...(globalReverseDepIndex !== undefined ? { globalReverseDepIndex } : {}),
-    });
-    const noFetchNeeded =
-      diff.toInstall.length === 0 &&
-      upstream.conflicts.length === 0 &&
-      diff.identityChange === undefined;
-    const upToDate = isSync && noFetchNeeded && diff.orphans.length === 0;
-    return {
-      toInstall: diff.toInstall as CatalogPlanNode[],
-      alreadyInstalled: diff.alreadyInstalled as CatalogPlanNode[],
-      conflicts: upstream.conflicts,
-      rootOrigin: canonRoot.origin,
-      isSync,
-      ...(diff.identityChange !== undefined ? { identityChange: diff.identityChange } : {}),
-      orphans: diff.orphans,
-      upToDate,
-    };
-  }
-
-  private async computeReverseDepIndex(rootOrigin: string): Promise<Set<string>> {
-    const [skills, agents, mcps] = await Promise.all([
-      this.rt.skill.list(),
-      this.rt.agent.list(),
-      this.rt.mcp.list(),
-    ]);
-    const skillOriginByFqn = new Map(skills.map((s) => [s.fqn, s.origin] as const));
-    const mcpOriginByFqn = new Map(mcps.map((m) => [m.fqn, m.origin] as const));
-    const referenced = new Set<string>();
-    for (const a of agents) {
-      if (a.origin === rootOrigin) continue;
-      for (const d of a.dependencies.skills) {
-        const o = skillOriginByFqn.get(d.fqn);
-        if (o !== undefined) referenced.add(o);
-      }
-      for (const d of a.dependencies.mcps) {
-        const o = mcpOriginByFqn.get(d.fqn);
-        if (o !== undefined) referenced.add(o);
-      }
-    }
-    for (const s of skills) {
-      if (s.origin === rootOrigin) continue;
-      for (const d of s.dependencies.skills) {
-        const o = skillOriginByFqn.get(d.fqn);
-        if (o !== undefined) referenced.add(o);
-      }
-      for (const d of s.dependencies.mcps) {
-        const o = mcpOriginByFqn.get(d.fqn);
-        if (o !== undefined) referenced.add(o);
-      }
-    }
-    return referenced;
-  }
-
-  private async loadCascadeContext() {
-    const [skills, agents, mcps] = await Promise.all([
-      this.rt.skill.list(),
-      this.rt.agent.list(),
-      this.rt.mcp.list(),
-    ]);
-    return newCascadeContext(skills, agents, mcps);
-  }
-}
-
-function planRefs(planNode: CatalogPlanNode): string[] {
-  if (planNode.kind === "mcp") return [];
-  if (planNode.kind === "agent") {
-    return [
-      ...planNode.node.depsRefs.skills,
-      ...planNode.node.depsRefs.mcps,
-      ...planNode.node.depsRefs.agents,
-    ];
-  }
-  return [...planNode.node.depsRefs.skills, ...planNode.node.depsRefs.mcps];
-}
-
-function toInstalledEntry(
-  kind: "mcp" | "skill" | "agent",
-  fqn: string,
-  entity: SkillEntity | AgentEntity | McpEntity,
-): CatalogInstalledEntry {
-  if (kind === "mcp") return { kind, fqn };
-  const e = entity as SkillEntity | AgentEntity;
-  const prereqs = e.prereqs;
-  const out: CatalogInstalledEntry = { kind, fqn, prereqsAck: e.prereqsAck };
-  if (prereqs !== undefined && prereqs.trim().length > 0) return { ...out, prereqs };
-  return out;
-}
-
-function errorToWire(err: unknown): { name: string; message: string } {
-  if (err instanceof Error) return { name: err.name, message: err.message };
-  if (typeof err === "string") return { name: "Error", message: err };
-  return { name: "Error", message: String(err) };
 }
