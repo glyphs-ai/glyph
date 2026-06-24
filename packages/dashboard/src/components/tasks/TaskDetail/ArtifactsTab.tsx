@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { type TaskRecord, taskArtifactUrl } from "../../../api";
-import { FileViewer } from "../../viewers/FileViewer";
+import { ArtifactViewer } from "../../viewers/ArtifactViewer";
 import { viewerNeedsBlob } from "../../viewers/index";
 
 export interface ArtifactsTabProps {
@@ -192,7 +192,7 @@ function ArtifactPreview({ selected, state, downloadUrl }: ArtifactPreviewProps)
     // artifacts. Keying on the filename is sufficient: changing files
     // implies a different viewer kind in practice.
     return (
-      <FileViewer
+      <ArtifactViewer
         key={selected}
         filename={selected}
         content={state.content}
