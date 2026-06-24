@@ -2,6 +2,7 @@ import type { CatalogService } from "@glyphs-ai/catalog";
 import type { TaskTargetData, TaskTargetPatch } from "@glyphs-ai/contracts";
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import { assertBriefShape } from "./_brief.js";
 
 /**
  * Sole module knowing about all of `@glyphs-ai/schedule`,
@@ -47,14 +48,7 @@ export function makeTaskKindHandler(opts: {
       if (typeof obj.brief !== "string" || obj.brief.trim().length === 0) {
         throw new TaskScheduleTargetError("Task target requires non-empty brief");
       }
-      if (obj.brief.includes("\n") || obj.brief.includes("\r")) {
-        throw new TaskScheduleTargetError(
-          "Task target brief must be a single line (no newline characters); pass long content via details",
-        );
-      }
-      if (obj.brief.trim().length > 200) {
-        throw new TaskScheduleTargetError("Task target brief must be 200 characters or fewer");
-      }
+      assertBriefShape(obj.brief, "Task target", TaskScheduleTargetError);
       if (obj.details !== undefined && typeof obj.details !== "string") {
         throw new TaskScheduleTargetError("Task target details, when set, must be a string");
       }

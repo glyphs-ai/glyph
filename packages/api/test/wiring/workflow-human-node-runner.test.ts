@@ -14,7 +14,10 @@ import {
   type WorkflowService,
 } from "@glyphs-ai/workflow";
 import { describe, expect, it } from "vitest";
-import { makeHumanNodeRunner } from "../../src/wiring/workflow-human-node-runner.js";
+import {
+  makeHumanNodeRunner,
+  WorkflowHumanSpecError,
+} from "../../src/wiring/workflow-human-node-runner.js";
 
 const VALIDATE_CTX: WorkflowNodeValidateCtx = {
   workflowId: "20260101-deadbeef",
@@ -116,6 +119,14 @@ describe("makeHumanNodeRunner — validate", () => {
     await expect(
       r.validate({ prompt: "p", promptStyle: "plain", choices: tooMany }, VALIDATE_CTX),
     ).rejects.toBeInstanceOf(WorkflowError);
+  });
+
+  it("rejects with WorkflowHumanSpecError (a WorkflowError subclass) carrying its canonical name", async () => {
+    const r = makeRunner();
+    const rejection = r.validate({ prompt: "x" }, VALIDATE_CTX);
+    await expect(rejection).rejects.toBeInstanceOf(WorkflowHumanSpecError);
+    await expect(rejection).rejects.toBeInstanceOf(WorkflowError);
+    await expect(rejection).rejects.toMatchObject({ name: "WorkflowHumanSpecError" });
   });
 
   it("rejects duplicate choice ids", async () => {

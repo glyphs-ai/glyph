@@ -29,3 +29,19 @@ export const opaqueAgentResolutionBody = (_err: Error) => ({
   error: "internal error",
   code: "AgentResolutionFailedError",
 });
+
+/**
+ * `WorkflowWorkerNotInCoordMenuError` is caller-fixable (its 400 status
+ * says "pick an agent that's in the menu"), but its `.message`
+ * enumerates the coordinator's full `dependencies.agents` dispatch menu
+ * — internal workflow topology that stays off the wire. The body is
+ * collapsed to `{ error: "internal error", code:
+ * "WorkflowWorkerNotInCoordMenuError" }` so the dashboard can still
+ * branch on the class without the menu leaking. Mirrors
+ * {@link opaqueAgentResolutionBody}; the `_err` parameter is unused
+ * because the envelope is class-stable.
+ */
+export const opaqueWorkerNotInCoordMenuBody = (_err: Error) => ({
+  error: "internal error",
+  code: "WorkflowWorkerNotInCoordMenuError",
+});

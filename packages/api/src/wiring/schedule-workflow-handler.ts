@@ -3,6 +3,7 @@ import type { WorkflowTargetData, WorkflowTargetPatch } from "@glyphs-ai/contrac
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import { AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
+import { assertBriefShape } from "./_brief.js";
 
 /**
  * Sole module knowing about all of `@glyphs-ai/schedule`,
@@ -61,16 +62,7 @@ export function makeWorkflowKindHandler(opts: {
       if (typeof obj.brief !== "string" || obj.brief.trim().length === 0) {
         throw new WorkflowScheduleTargetError("Workflow target requires non-empty brief");
       }
-      if (obj.brief.includes("\n") || obj.brief.includes("\r")) {
-        throw new WorkflowScheduleTargetError(
-          "Workflow target brief must be a single line (no newline characters); pass long content via details",
-        );
-      }
-      if (obj.brief.trim().length > 200) {
-        throw new WorkflowScheduleTargetError(
-          "Workflow target brief must be 200 characters or fewer",
-        );
-      }
+      assertBriefShape(obj.brief, "Workflow target", WorkflowScheduleTargetError);
       if (obj.details !== undefined && typeof obj.details !== "string") {
         throw new WorkflowScheduleTargetError(
           "Workflow target details, when set, must be a string",
@@ -166,6 +158,21 @@ export function makeWorkflowKindHandler(opts: {
       return { id: result.workflowId };
     },
 
+    // PERF / KNOWN N+1: both `hasInFlightForSchedule` and
+    // `deleteForSchedule` pull EVERY schedule-originated workflow via
+    // `workflows.list({ origin: "schedule" })` and then filter
+    // client-side on `metadata.scheduleId`. `ListWorkflowOpts` (in
+    // `@glyphs-ai/workflow`) exposes no metadata / scheduleId predicate,
+    // so there is no DB-scoped narrowing reachable from this layer. For
+    // a schedule that has fired thousands of times this is the hot path
+    // for `DELETE /schedules/:sid`, and `deleteForSchedule` compounds
+    // it: a `getDag` per matched workflow plus an in-flight probe +
+    // `findTaskByWorkflowNode` per node (N+M+P round-trips). The real
+    // fix is a metadata-scoped `WorkflowService.list` filter (or a
+    // dedicated `findBySchedule`) in the workflow substrate — out of
+    // scope for this api-only pass. Mirror the task handler's
+    // DB-scoped `tasks.hasInFlightByOriginMetadata` /
+    // `tasks.deleteTerminalByOriginMetadata` once that lands.
     async hasInFlightForSchedule(scheduleId) {
       const all = await workflows.list({ origin: "schedule" });
       return all.some((wf) => wf.status === "running" && wf.metadata.scheduleId === scheduleId);

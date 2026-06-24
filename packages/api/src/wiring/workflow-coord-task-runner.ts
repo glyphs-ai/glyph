@@ -12,10 +12,13 @@
  * (worker): same per-node interval Map, same `clearForNode` /
  * `fireTerminal` helpers, same poll-tick state machine, same cancel
  * reconciliation, same dispose. The two runners are intentionally
- * duplicated rather than sharing helpers — the runner body is small,
- * the kinds may diverge (different polling cadence, different
- * spec/brief sources), and a shared helper module would couple two
- * otherwise independent dispatch paths.
+ * duplicated rather than sharing helpers — not because either body is
+ * small (neither is), but because the kind-specific halves (spec
+ * validation, brief/details sourcing, and dispatch-payload assembly)
+ * diverge enough that a shared base would need a kind-discriminated
+ * branch at nearly every step, re-coupling two dispatch paths that are
+ * otherwise free to evolve their polling cadence and spec shape
+ * independently.
  *
  * Divergence from the worker runner:
  *

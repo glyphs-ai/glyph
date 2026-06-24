@@ -27,7 +27,12 @@ import path from "node:path";
 import type { Runtime, RuntimeCapabilities } from "@glyphs-ai/runtime";
 import { RuntimeRegistry } from "@glyphs-ai/runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Application, composeApplication, WorkspaceHasLiveTasksError } from "../src/index.js";
+import {
+  type Application,
+  composeApplication,
+  WorkspaceHasLiveTasksError,
+  WorkspaceLoadError,
+} from "../src/index.js";
 
 // Minimal Runtime stub: the registry's load() path constructs session +
 // task modules whose composers require a runtime to be registered, but
@@ -183,6 +188,27 @@ describe("Application.getContext", () => {
     expect(a).toBe(b); // same reference — memoised
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
+  });
+
+  it("wraps a cold-load failure in WorkspaceLoadError carrying the raw cause", async () => {
+    const app = await makeApp();
+    const ws = await app.registerWorkspace({ name: "demo" });
+    const boom = new Error("workspace.db is unreadable");
+    // Force the load() path's `workspaceService.get` to throw a raw
+    // error — the facade must surface it as a typed WorkspaceLoadError
+    // (not the bare fs-flavoured throw) so every host maps it uniformly.
+    const spy = vi.spyOn(app.workspaceService, "get").mockRejectedValue(boom);
+    try {
+      const rejection = app.getContext(ws.id);
+      await expect(rejection).rejects.toBeInstanceOf(WorkspaceLoadError);
+      await expect(rejection).rejects.toMatchObject({
+        name: "WorkspaceLoadError",
+        workspaceId: ws.id,
+        cause: boom,
+      });
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

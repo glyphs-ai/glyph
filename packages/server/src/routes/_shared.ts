@@ -54,6 +54,7 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "TaskScheduleTargetError",
   "WorkflowCoordAgentNotCapableError",
   "WorkflowCoordSpecError",
+  "WorkflowHumanSpecError",
   "WorkflowWorkerSpecError",
   "WorkspaceHasLiveTasksError",
   "WorkspaceLoadError",

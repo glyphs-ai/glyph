@@ -118,6 +118,12 @@ vi.mock("@glyphs-ai/schedule", () => ({
 // via `makeCoordNodeRunner` / `makeWorkerNodeRunner` (the workflow
 // module is built LAST in compose, FIRST in close).
 vi.mock("@glyphs-ai/workflow", () => ({
+  // `workflow-human-node-runner.ts` (loaded unmocked by the registry's
+  // `load()`) subclasses this at module-eval time, so the mock must
+  // provide a real base class, not just `composeWorkflowModule`.
+  WorkflowError: class WorkflowError extends Error {
+    override readonly name = "WorkflowError";
+  },
   composeWorkflowModule: vi.fn(async () => {
     if (mocks.workflowThrow !== null) throw mocks.workflowThrow;
     return {

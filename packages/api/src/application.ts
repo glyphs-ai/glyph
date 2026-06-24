@@ -13,6 +13,7 @@ import {
   type WorkspaceContext,
   WorkspaceContextRegistry,
   type WorkspaceContextState,
+  WorkspaceLoadError,
 } from "./workspace-context.js";
 
 /**
@@ -169,8 +170,18 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
       return ctx === null ? null : ctx.workspace;
     },
 
-    getContext(workspaceId) {
-      return registry.get(workspaceId);
+    async getContext(workspaceId) {
+      try {
+        return await registry.get(workspaceId);
+      } catch (err) {
+        // Own the cold-load failure at the facade so every host (HTTP,
+        // CLI, in-process) sees the same typed `WorkspaceLoadError`
+        // rather than a raw fs / compose throw. The original cause is
+        // attached for logging. `registry.get` surfaces raw causes, so
+        // the instanceof guard is idempotency insurance against an
+        // already-wrapped throw.
+        throw err instanceof WorkspaceLoadError ? err : new WorkspaceLoadError(workspaceId, err);
+      }
     },
 
     peekContextState(workspaceId) {

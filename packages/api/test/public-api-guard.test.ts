@@ -19,6 +19,9 @@ import {
   TaskScheduleTargetError,
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
+  WorkflowHumanSpecError,
+  WorkflowScheduleTargetError,
+  WorkflowWorkerNotInCoordMenuError,
   WorkflowWorkerSpecError,
   type WorkspaceContext,
   type WorkspaceContextState,
@@ -44,9 +47,14 @@ describe("@glyphs-ai/api public API guard", () => {
       new WorkspaceHasLiveTasksError("ws", 1),
       new WorkspaceLoadError("ws", new Error("cause")),
       new TaskScheduleTargetError("bad target"),
+      new WorkflowScheduleTargetError("bad workflow target"),
       new WorkflowCoordAgentNotCapableError("official/coord"),
       new WorkflowCoordSpecError("bad coord"),
       new WorkflowWorkerSpecError("bad worker"),
+      new WorkflowHumanSpecError("bad human"),
+      new WorkflowWorkerNotInCoordMenuError("official/worker", "official/coord", [
+        "official/other",
+      ]),
     ];
     for (const err of errors) {
       expectTypeOf(err).toExtend<Error>();
