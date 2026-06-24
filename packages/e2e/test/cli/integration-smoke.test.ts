@@ -14,12 +14,11 @@
  *
  */
 
-import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CLI_BIN, pickPort, runBin as run, SCRUBBED_ENV } from "../_helpers/cli-bundle.js";
+import { BIN_AVAILABLE, pickPort, runBin as run, SCRUBBED_ENV } from "../_helpers/cli-bundle.js";
 
 // Module-scoped because every test shares the boot. Set in
 // `beforeAll`, read by every `it(...)`.
@@ -27,13 +26,8 @@ let home: string;
 let port: number;
 let sharedEnv: NodeJS.ProcessEnv;
 
-describe.sequential("integration smoke", () => {
+describe.skipIf(!BIN_AVAILABLE).sequential("integration smoke", () => {
   beforeAll(async () => {
-    if (!existsSync(CLI_BIN)) {
-      throw new Error(
-        `CLI bundle not found at ${CLI_BIN}. Run \`pnpm --filter @glyphs-ai/cli build\` first.`,
-      );
-    }
     home = await mkdtemp(path.join(tmpdir(), "glyph-cli-smoke-"));
     port = pickPort();
     sharedEnv = { ...SCRUBBED_ENV, GLYPH_HOME: home };

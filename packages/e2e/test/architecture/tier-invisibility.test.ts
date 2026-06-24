@@ -60,6 +60,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { extractImportRefs } from "../_helpers/ts-imports.js";
 import { isTsFile, safeIsDir, walkFiles } from "../_helpers/walk.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..", "..");
@@ -119,30 +120,27 @@ function relPosix(absFile: string): string {
 }
 
 /**
- * Extract every `@glyphs-ai/*` specifier referenced by a TS / TSX file:
- *   - `import ... from "@glyphs-ai/x"` (value or type)
- *   - `export ... from "@glyphs-ai/x"` (re-export)
- *   - dynamic `import("@glyphs-ai/x")` calls
+ * Extract every `@glyphs-ai/*` package specifier referenced by a TS /
+ * TSX file, normalised to its package root:
+ *   - `import ... from "@glyphs-ai/x"` (value or type),
+ *   - `export ... from "@glyphs-ai/x"` (re-export),
+ *   - dynamic `import("@glyphs-ai/x")` calls.
  *
- * Uses a regex scan (not a full TS parse) deliberately — the rule is
- * "specifier text matches `@glyphs-ai/*`", and the same regex catches
- * value and type imports alike. Avoiding the TS API keeps this test
- * an order of magnitude cheaper than `inter-service-imports.test.ts`,
- * which needs AST classification (value vs type) that this audit
- * does not care about.
- *
- * False-positive scope: a comment or string containing a specifier-shaped
- * code example such as `from "@glyphs-ai/x"` or `import("@glyphs-ai/x")`
- * would also match. The audit filters self-references (a pkg mentioning
- * its own name in its own source is at worst a circular-import bug, but
- * it cannot be a fence break — see `collectSourceViolations`); other
- * cross-pkg specifier-shaped mentions are surfaced for review.
+ * Subpath specifiers (`@glyphs-ai/contracts/routes`) collapse to their
+ * package root (`@glyphs-ai/contracts`) so the fence check compares
+ * against package names. Uses the shared AST extractor, so a specifier
+ * mentioned only inside a comment or string literal is never matched.
  */
-function extractGlyphSpecifiers(source: string): string[] {
-  const re = /(?:from|import)\s*\(?\s*["'](@glyphs-ai\/[A-Za-z0-9_-]+)["']/g;
+function glyphPkgRoot(specifier: string): string | null {
+  const match = specifier.match(/^(@glyphs-ai\/[A-Za-z0-9_-]+)/);
+  return match?.[1] ?? null;
+}
+
+function extractGlyphSpecifiers(source: string, fileName: string): string[] {
   const out: string[] = [];
-  for (const match of source.matchAll(re)) {
-    out.push(match[1] as string);
+  for (const ref of extractImportRefs(source, fileName)) {
+    const root = glyphPkgRoot(ref.specifier);
+    if (root !== null) out.push(root);
   }
   return out;
 }
@@ -165,7 +163,7 @@ function collectSourceViolations(consumer: Consumer): SourceViolation[] {
     if (!safeIsDir(root)) continue;
     for (const absFile of walkFiles(root, { match: isTsFile })) {
       const source = readFileSync(absFile, "utf8");
-      for (const spec of extractGlyphSpecifiers(source)) {
+      for (const spec of extractGlyphSpecifiers(source, absFile)) {
         if (spec === selfSpec) continue;
         if (consumer.allowed.has(spec)) continue;
         out.push({ file: relPosix(absFile), specifier: spec });
@@ -193,14 +191,24 @@ function collectManifestViolations(consumer: Consumer): ManifestViolation[] {
 // ── audits ─────────────────────────────────────────────────────────────
 
 describe("tier-invisibility specifier parser", () => {
-  it("extracts @glyphs-ai import, export, and dynamic-import specifiers", () => {
-    const specs = extractGlyphSpecifiers(`
+  it("root-normalizes import, export, and dynamic specifiers and ignores comments + strings", () => {
+    const specs = extractGlyphSpecifiers(
+      `
       import { ROUTES } from "@glyphs-ai/contracts";
+      import type { Plan } from "@glyphs-ai/contracts/routes";
       export { runServer } from "@glyphs-ai/server";
       const server = await import("@glyphs-ai/server");
       const label = "@glyphs-ai/catalog";
-    `);
-    expect(specs).toEqual(["@glyphs-ai/contracts", "@glyphs-ai/server", "@glyphs-ai/server"]);
+      // import { Hidden } from "@glyphs-ai/workflow";
+    `,
+      "sample.ts",
+    );
+    expect(specs).toEqual([
+      "@glyphs-ai/contracts",
+      "@glyphs-ai/contracts",
+      "@glyphs-ai/server",
+      "@glyphs-ai/server",
+    ]);
   });
 });
 
