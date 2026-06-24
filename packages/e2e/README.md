@@ -17,10 +17,13 @@ test/
     test-layout-convention.test.ts   # test path mirrors src path
     tier-invisibility.test.ts        # app consumers only see allowlisted surfaces
   cli/
+    bundle-smoke.test.ts             # single-file `bundle/glyph.js` (opt-in: BUNDLE_SMOKE=1)
     integration-smoke.test.ts        # CLI → real HTTP server round-trips
     spawn-smoke.test.ts              # CLI subprocess lifecycle + bundle smoke
   _helpers/
-    cli-bundle.ts                    # shared spawn / port / CLI_BIN resolver
+    cli-bundle.ts                    # shared spawn / port / CLI_BIN + bundle resolver
+    ts-imports.ts                    # shared AST import/export extractor
+    walk.ts                          # shared file/dir tree walkers
 ```
 
 Tests are grouped by the **subject** of the test (`test/architecture/`
@@ -59,6 +62,20 @@ build first so this just works.
 
 The `test/architecture/` audits read source files directly via
 `node:fs` walk — they do NOT need a build to run.
+
+### Single-file bundle smoke
+
+`bundle-smoke.test.ts` execs the published single-file binary
+`bundle/glyph.js`, which only `pnpm bundle` produces (it inlines the
+migrations + dashboard). It is skipped unless `BUNDLE_SMOKE=1` is set:
+
+```bash
+pnpm bundle
+BUNDLE_SMOKE=1 pnpm --filter @glyphs-ai/e2e test
+```
+
+With the flag set but no artifact present the suite fails (rather than
+skips) so an explicit opt-in surfaces the missing `pnpm bundle` step.
 
 ## Expected runtime
 

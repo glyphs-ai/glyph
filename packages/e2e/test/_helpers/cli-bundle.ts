@@ -23,6 +23,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const CLI_BIN = path.resolve(HERE, "..", "..", "..", "cli", "dist", "bin.js");
 export const BIN_AVAILABLE = existsSync(CLI_BIN);
 
+// `packages/e2e/test/_helpers/cli-bundle.ts` -> `bundle/glyph.js` (repo root)
+export const BUNDLE_BIN = path.resolve(HERE, "..", "..", "..", "..", "bundle", "glyph.js");
+export const BUNDLE_AVAILABLE = existsSync(BUNDLE_BIN);
+
 export interface Run {
   exitCode: number;
   stdout: string;
@@ -44,7 +48,9 @@ export const SCRUBBED_ENV: NodeJS.ProcessEnv = {
 };
 
 /**
- * Spawn the bundled CLI in a child process and capture stdout/stderr.
+ * Spawn an arbitrary node entrypoint (`binPath`) in a child process and
+ * capture stdout/stderr. Shared by {@link runBin} (the per-package
+ * `dist/bin.js`) and the single-file bundle smoke (`bundle/glyph.js`).
  *
  * Env merge: starts from `process.env`, then applies `env` on top.
  * Keys set to `undefined` in `env` are DELETED from the merged
@@ -52,13 +58,17 @@ export const SCRUBBED_ENV: NodeJS.ProcessEnv = {
  * developer-shell env leaks (e.g. `GLYPH_SERVER` set by a
  * previous `pnpm dev`) before running a hermetic spawn.
  */
-export function runBin(args: readonly string[], env: NodeJS.ProcessEnv): Promise<Run> {
+export function runBinAt(
+  binPath: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+): Promise<Run> {
   return new Promise((resolve, reject) => {
     const merged: NodeJS.ProcessEnv = { ...process.env, ...env };
     for (const k of Object.keys(env)) {
       if (env[k] === undefined) delete merged[k];
     }
-    const child = spawn(process.execPath, [CLI_BIN, ...args], {
+    const child = spawn(process.execPath, [binPath, ...args], {
       env: merged,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
@@ -78,6 +88,14 @@ export function runBin(args: readonly string[], env: NodeJS.ProcessEnv): Promise
       resolve({ exitCode: code ?? -1, stdout, stderr });
     });
   });
+}
+
+/**
+ * Spawn the bundled CLI (`packages/cli/dist/bin.js`) in a child process
+ * and capture stdout/stderr. Thin wrapper over {@link runBinAt}.
+ */
+export function runBin(args: readonly string[], env: NodeJS.ProcessEnv): Promise<Run> {
+  return runBinAt(CLI_BIN, args, env);
 }
 
 export function pickPort(): number {

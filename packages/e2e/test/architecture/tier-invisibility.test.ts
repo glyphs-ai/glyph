@@ -57,13 +57,17 @@
  * the fenced consumers it polices.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { isTsFile, safeIsDir, walkFiles } from "../_helpers/walk.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..", "..");
 const PACKAGES_DIR = path.join(REPO_ROOT, "packages");
+const ARCHITECTURE_DOC = path.join(REPO_ROOT, "docs", "architecture.md");
+// Real packages that are deliberately outside the tier model: the scaffold
+// template and this cross-cutting e2e harness.
+const NON_TIERED_PKGS = new Set(["_template", "e2e"]);
 const T0_PKGS = ["workspace", "runtime", "schedule", "terminal", "catalog"] as const;
 const T1_PKGS = ["session", "task", "workflow"] as const;
 const T2_PKGS = ["contracts", "api"] as const;
@@ -228,4 +232,78 @@ describe("tier-invisibility: app consumers see only their allowlisted surfaces",
       ).toEqual([]);
     });
   }
+});
+
+/**
+ * Parse the canonical tier table from docs/architecture.md. Each tier
+ * row has the shape:
+ *
+ *   | **T0** | Foundations | `catalog`, `runtime`, ... | ...role... |
+ *
+ * Returns a map from tier label (`T0`..`T_top`) to the set of backticked
+ * package names in its "Packages" column. Parenthetical annotations in
+ * that column (e.g. `contracts` (wire types)) are not backticked and so
+ * are naturally excluded.
+ */
+function parseDocTierTable(): Map<string, Set<string>> {
+  const md = readFileSync(ARCHITECTURE_DOC, "utf8");
+  const out = new Map<string, Set<string>>();
+  const rowRe = /^\|\s*\*\*(T0|T1|T2|T3|T_top)\*\*\s*\|/;
+  for (const line of md.split("\n")) {
+    const m = rowRe.exec(line);
+    if (m === null) continue;
+    const tier = m[1];
+    if (tier === undefined) continue;
+    // cells[0] is the empty pre-pipe field; [1]=tier, [2]=name, [3]=packages.
+    const pkgCell = line.split("|")[3] ?? "";
+    const pkgs = new Set<string>();
+    for (const tok of pkgCell.matchAll(/`([^`]+)`/g)) {
+      const name = tok[1];
+      if (name !== undefined) pkgs.add(name);
+    }
+    out.set(tier, pkgs);
+  }
+  return out;
+}
+
+// The single source of truth for "which package sits in which tier" is
+// docs/architecture.md. These two cases keep the in-test tier constants
+// (used by the fence above) honest against that doc AND against the real
+// packages/ directory, so neither a doc edit nor a new package can drift
+// the registry silently.
+describe("tier registry stays in lockstep with docs/architecture.md", () => {
+  const TEST_TIERS: ReadonlyArray<readonly [string, readonly string[]]> = [
+    ["T0", T0_PKGS],
+    ["T1", T1_PKGS],
+    ["T2", T2_PKGS],
+    ["T3", T3_PKGS],
+    ["T_top", T_TOP_PKGS],
+  ];
+
+  it("each tier's package set matches the documented tier table", () => {
+    const doc = parseDocTierTable();
+    for (const [tier, pkgs] of TEST_TIERS) {
+      const documented = doc.get(tier);
+      expect(documented, `docs/architecture.md has no ${tier} tier row`).toBeDefined();
+      expect(
+        documented,
+        `${tier} packages drift between docs/architecture.md and tier-invisibility.test.ts. ${TIER_SUMMARY}`,
+      ).toEqual(new Set(pkgs));
+    }
+  });
+
+  it("every package under packages/ is slotted into exactly one tier", () => {
+    const onDisk = readdirSync(PACKAGES_DIR, { withFileTypes: true, encoding: "utf8" })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .filter((n) => !NON_TIERED_PKGS.has(n));
+    const assigned = TEST_TIERS.flatMap(([, pkgs]) => [...pkgs]);
+    expect(assigned.length, "a package is listed under more than one tier").toBe(
+      new Set(assigned).size,
+    );
+    expect(
+      new Set(onDisk),
+      `packages/ and the tier registry disagree (excluding ${[...NON_TIERED_PKGS].join(", ")}). ${TIER_SUMMARY}`,
+    ).toEqual(new Set(assigned));
+  });
 });
