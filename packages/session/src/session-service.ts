@@ -18,14 +18,14 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import type { LaunchCommand } from "@glyphs-ai/runtime";
 import pino from "pino";
-import { SessionNotFoundError } from "./errors.js";
+import { SessionNotFoundError, SpawnFnNotInjectedError } from "./errors.js";
 import { safeJoinUnderRoot, sessionsRoot } from "./paths.js";
 import type { SessionEntity } from "./session-entity.js";
 import { SessionRepository } from "./session-repository.js";
 import type { SessionServiceCtx } from "./session-service/_helpers.js";
 import { createSession } from "./session-service/create.js";
 import { draftFromEntity, loadSession, refreshSession } from "./session-service/refresh.js";
-import { buildInteractiveLaunch, spawnInteractive } from "./session-service/spawn.js";
+import { buildInteractiveLaunch } from "./session-service/spawn.js";
 import type {
   BuildInteractiveLaunchSessionOpts,
   CreateSessionOpts,
@@ -164,7 +164,35 @@ export class SessionService {
     id: string,
     opts: BuildInteractiveLaunchSessionOpts = {},
   ): Promise<SpawnSessionResult> {
-    return spawnInteractive(this.ctx, id, opts);
+    if (this.ctx.spawnFn === undefined) {
+      throw new SpawnFnNotInjectedError();
+    }
+    let launch: LaunchCommand;
+    try {
+      launch = await this.buildInteractiveLaunch(id, opts);
+    } catch (err) {
+      return {
+        ok: false as const,
+        error: err instanceof Error ? err.message : String(err),
+        code: err instanceof Error && err.name ? err.name : "BuildLaunchError",
+        display: "",
+      };
+    }
+    try {
+      const result = await this.ctx.spawnFn(launch);
+      return {
+        ok: true as const,
+        launcher: result.launcher,
+        display: launch.display,
+      };
+    } catch (err) {
+      return {
+        ok: false as const,
+        error: err instanceof Error ? err.message : String(err),
+        code: err instanceof Error && err.name ? err.name : "SpawnError",
+        display: launch.display,
+      };
+    }
   }
 }
 
