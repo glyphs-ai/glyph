@@ -17,8 +17,8 @@
  * stays kind-agnostic and takes no workspace dep on the wire pkg.
  */
 
-// ─── Substrate types ────────────────────────────────────────────────
-export type { NodeRef } from "./_dag.js";
+// ─── Stuck-recovery cap ─────────────────────────────────────────────
+export { STUCK_RETRY_LIMIT, STUCK_RETRY_MAX_ATTEMPTS } from "./_stuck-recovery.js";
 // ─── Composition ────────────────────────────────────────────────────
 export {
   composeWorkflowModule,
@@ -65,11 +65,30 @@ export {
 } from "./paths.js";
 // ─── Re-exported types ──────────────────────────────────────────────
 export type {
+  AddEdgeOpts,
+  AddEdgeResult,
+  AddNodeOpts,
+  AddNodeResult,
+  AddSubgraphEdgeInput,
+  AddSubgraphInsertedNode,
+  AddSubgraphNodeInput,
+  AddSubgraphOpts,
+  AddSubgraphResult,
+  CancelWorkflowOpts,
+  CreateWorkflowOpts,
+  CreateWorkflowResult,
+  DispatchAtomicOpts,
+  FinishWorkflowOpts,
   HumanNodeChoice,
   HumanNodePromptStyle,
   HumanNodeResponse,
   HumanNodeSpec,
+  ListWorkflowOpts,
+  NodeRef,
+  RemoveEdgeOpts,
+  ReplaceSpecOpts,
   WorkflowCancellation,
+  WorkflowDagSnapshot,
   WorkflowFailure,
   WorkflowNodeDispatchOpts,
   WorkflowNodeKind,
@@ -83,7 +102,6 @@ export type {
   WorkflowOrigin,
   WorkflowRunners,
   WorkflowStatus,
-  WorkflowSubstrateFailureReason,
   WorkflowSuccess,
 } from "./types.js";
 export {
@@ -111,27 +129,4 @@ export {
   WorkflowNodeEntity,
 } from "./workflow-entity.js";
 // ─── Service ────────────────────────────────────────────────────────
-export {
-  type AddEdgeOpts,
-  type AddEdgeResult,
-  type AddNodeOpts,
-  type AddNodeResult,
-  type AddSubgraphEdgeInput,
-  type AddSubgraphInsertedNode,
-  type AddSubgraphNodeInput,
-  type AddSubgraphOpts,
-  type AddSubgraphResult,
-  type CancelWorkflowOpts,
-  type CreateWorkflowOpts,
-  type CreateWorkflowResult,
-  type DispatchAtomicOpts,
-  type FinishWorkflowOpts,
-  type ListWorkflowOpts,
-  type RemoveEdgeOpts,
-  type ReplaceSpecOpts,
-  STUCK_RETRY_LIMIT,
-  STUCK_RETRY_MAX_ATTEMPTS,
-  type WorkflowDagSnapshot,
-  WorkflowService,
-  type WorkflowServiceOpts,
-} from "./workflow-service.js";
+export { WorkflowService, type WorkflowServiceOpts } from "./workflow-service.js";

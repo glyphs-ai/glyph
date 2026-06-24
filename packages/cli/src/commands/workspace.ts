@@ -9,17 +9,11 @@
 
 import { makeClient } from "../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../output.js";
+import type { ConnectFlagOpts } from "../registrars/_shared.js";
 import type { CommandResult } from "../result.js";
 
-interface CommonFlags {
-  readonly server?: string;
-  readonly home?: string;
-  readonly output?: string;
-  readonly json?: boolean;
-}
-
 // ─── list ──────────────────────────────────────────────────────────────
-export type WorkspaceListOpts = CommonFlags;
+export type WorkspaceListOpts = ConnectFlagOpts;
 
 export async function workspaceList(opts: WorkspaceListOpts = {}): Promise<CommandResult> {
   const client = await makeClient(opts);
@@ -40,7 +34,7 @@ export async function workspaceList(opts: WorkspaceListOpts = {}): Promise<Comma
 }
 
 // ─── add ───────────────────────────────────────────────────────────────
-export interface WorkspaceAddOpts extends CommonFlags {
+export interface WorkspaceAddOpts extends ConnectFlagOpts {
   readonly name: string;
   /** Absolute path; server mints `<GLYPH_HOME>/workspaces/<uuid>` when omitted. */
   readonly workspaceDir?: string;
@@ -66,7 +60,7 @@ export async function workspaceAdd(opts: WorkspaceAddOpts): Promise<CommandResul
 }
 
 // ─── current ───────────────────────────────────────────────────────────
-export type WorkspaceCurrentOpts = CommonFlags;
+export type WorkspaceCurrentOpts = ConnectFlagOpts;
 
 export async function workspaceCurrent(opts: WorkspaceCurrentOpts = {}): Promise<CommandResult> {
   const client = await makeClient(opts);
@@ -81,7 +75,7 @@ export async function workspaceCurrent(opts: WorkspaceCurrentOpts = {}): Promise
 }
 
 // ─── show ──────────────────────────────────────────────────────────────
-export type WorkspaceShowOpts = CommonFlags;
+export type WorkspaceShowOpts = ConnectFlagOpts;
 
 export async function workspaceShow(
   workspaceId: string,
@@ -102,7 +96,7 @@ export async function workspaceShow(
 }
 
 // ─── update ────────────────────────────────────────────────────────────
-export interface WorkspaceUpdateOpts extends CommonFlags {
+export interface WorkspaceUpdateOpts extends ConnectFlagOpts {
   readonly name?: string;
 }
 
@@ -131,7 +125,7 @@ export async function workspaceUpdate(
 }
 
 // ─── rm ────────────────────────────────────────────────────────────────
-export interface WorkspaceRmOpts extends CommonFlags {
+export interface WorkspaceRmOpts extends ConnectFlagOpts {
   readonly purge?: boolean;
 }
 
@@ -158,7 +152,7 @@ export async function workspaceRm(
 }
 
 // ─── reload ────────────────────────────────────────────────────────────
-export type WorkspaceReloadOpts = CommonFlags;
+export type WorkspaceReloadOpts = ConnectFlagOpts;
 
 export async function workspaceReload(
   workspaceId: string,
