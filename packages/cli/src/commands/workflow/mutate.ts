@@ -2,8 +2,8 @@
  * `glyph workflow ...` coord-callback mutation primitives that back the
  * coordinator-agent contract: add-node / add-subgraph / add-edge,
  * remove-node / remove-edge, replace-spec, cancel-node, finish. Also
- * exports `readJsonFileArg` (reused by the workflow-create registrar for
- * `--metadata-file`). Render helpers live in `./_shared.ts`; argument
+ * exports the shared `readJsonFileArg` file-arg reader used by the
+ * spec-file commands. Render helpers live in `./_shared.ts`; argument
  * parsing + validation helpers live in `./_validate.ts`.
  */
 
@@ -34,15 +34,15 @@ import {
  * exit-code-2 usage feedback. The parsed value is intentionally typed
  * `unknown` so each caller can apply the relevant shape check.
  *
- * The `flagName` parameter (e.g. `"--spec-file"`, `"--metadata-file"`)
- * is woven into both the "failed to read" and "JSON parse error"
+ * The `flagName` parameter (e.g. `"--spec-file"`) is woven into both
+ * the "failed to read" and "JSON parse error"
  * messages so callers don't have to post-process the result.
  *
  * Callers validate the parsed `unknown` value before forwarding it.
  *
- * Exported because the workflow-create registrar reuses this helper
- * for `--metadata-file`, keeping the read+parse+error-wrap pattern
- * in one place (no per-call-site flag-name rewriting).
+ * Exported as a shared helper so each spec-file call site keeps the
+ * read+parse+error-wrap pattern in one place (no per-call-site
+ * flag-name rewriting).
  *
  * Synchronous so registrar actions can read, parse, validate, and
  * dispatch in one flat control-flow block.

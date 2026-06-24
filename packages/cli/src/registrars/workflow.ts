@@ -15,7 +15,6 @@
 import { readFileSync } from "node:fs";
 import type { Command } from "commander";
 import {
-  readJsonFileArg,
   workflowAddEdge,
   workflowAddNode,
   workflowAddSubgraph,
@@ -40,20 +39,6 @@ import {
   type Slot,
   withWorkspaceFlags,
 } from "./_shared.js";
-
-/**
- * Classify a parsed JSON root for the error message when
- * `--metadata-file` rejects a non-object payload. Covers the four
- * shapes the validator rejects (`null`, `array`, `string`,
- * `number`/`boolean`) by name so the user knows exactly which case
- * was hit — `typeof null === "object"` (JavaScript null quirk) is
- * specifically handled before the `typeof` fall-through.
- */
-function jsonShape(v: unknown): string {
-  if (v === null) return "null";
-  if (Array.isArray(v)) return "array";
-  return typeof v;
-}
 
 export function registerWorkflowCommands(program: Command, slot: Slot): void {
   const workflowCmd = program
@@ -92,17 +77,12 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
       "--details-file <path>",
       "Read --details from a UTF-8 file (mutually exclusive with --details)",
     )
-    .option(
-      "--metadata-file <path>",
-      "Path to a JSON object persisted verbatim on the workflow row as CreateWorkflowBody.metadata",
-    )
     .action(async (opts: Record<string, unknown>) => {
-      // `--details-file` / `--metadata-file` IO lives here in the
-      // registrar (not in `commands/workflow.ts`) — same shape as the
-      // `task dispatch` action just above: the registrar does
-      // read+parse+validate, and the command function takes the
-      // already-resolved string / object. Keeps the command-layer
-      // body a thin pass-through to the HTTP client.
+      // `--details-file` IO lives here in the registrar (not in
+      // `commands/workflow.ts`) — same shape as the `task dispatch`
+      // action just above: the registrar does the file read, and the
+      // command function takes the already-resolved string. Keeps the
+      // command-layer body a thin pass-through to the HTTP client.
       const detailsInline = pickString(opts, "details");
       const detailsFile = pickString(opts, "detailsFile");
       if (detailsInline !== undefined && detailsFile !== undefined) {
@@ -124,30 +104,11 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
           return;
         }
       }
-      const metadataFile = pickString(opts, "metadataFile");
-      let metadata: Readonly<Record<string, unknown>> | undefined;
-      if (metadataFile !== undefined) {
-        const parsed = readJsonFileArg("--metadata-file", metadataFile);
-        if (!parsed.ok) {
-          slot.result = { exitCode: 2, stderr: `${parsed.error}\n` };
-          return;
-        }
-        const value = parsed.value;
-        if (typeof value !== "object" || value === null || Array.isArray(value)) {
-          slot.result = {
-            exitCode: 2,
-            stderr: `--metadata-file must be a JSON object; got ${jsonShape(value)}\n`,
-          };
-          return;
-        }
-        metadata = value as Readonly<Record<string, unknown>>;
-      }
       slot.result = await workflowCreate({
         ...parseWorkspaceFlags(opts),
         brief: pickString(opts, "brief") ?? "",
         coordAgent: pickString(opts, "coordAgent") ?? "",
         ...(details !== undefined ? { details } : {}),
-        ...(metadata !== undefined ? { metadata } : {}),
       });
     });
 
