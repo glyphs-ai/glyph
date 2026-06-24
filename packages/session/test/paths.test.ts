@@ -1,5 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { SessionError, SessionPathEscapeError } from "../src/errors.js";
 import { safeJoinUnderRoot } from "../src/paths.js";
 
 const isWin = process.platform === "win32";
@@ -13,20 +14,33 @@ describe("safeJoinUnderRoot", () => {
   });
 
   it("rejects ids that escape via ..", () => {
-    expect(() => safeJoinUnderRoot(root, "..")).toThrow(/escapes root|equals root/);
-    expect(() => safeJoinUnderRoot(root, path.join("..", "sibling"))).toThrow(/escapes root/);
+    expect(() => safeJoinUnderRoot(root, "..")).toThrow(SessionPathEscapeError);
+    expect(() => safeJoinUnderRoot(root, path.join("..", "sibling"))).toThrow(
+      SessionPathEscapeError,
+    );
   });
 
   it.runIf(!isWin)("rejects absolute path id on POSIX", () => {
-    expect(() => safeJoinUnderRoot(root, "/etc/passwd")).toThrow(/escapes root/);
+    expect(() => safeJoinUnderRoot(root, "/etc/passwd")).toThrow(SessionPathEscapeError);
   });
 
   it("rejects empty id (would equal root)", () => {
-    expect(() => safeJoinUnderRoot(root, "")).toThrow(/equals root/);
+    expect(() => safeJoinUnderRoot(root, "")).toThrow(SessionPathEscapeError);
   });
 
   it("treats /a/b vs /a/bb correctly (separator-suffixed root check)", () => {
     const r = path.resolve("/a/b");
-    expect(() => safeJoinUnderRoot(r, path.join("..", "bb"))).toThrow(/escapes root/);
+    expect(() => safeJoinUnderRoot(r, path.join("..", "bb"))).toThrow(SessionPathEscapeError);
+  });
+
+  it("thrown error is instanceof SessionError with stable name", () => {
+    try {
+      safeJoinUnderRoot(root, "..");
+      expect.fail("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(SessionError);
+      expect(err).toBeInstanceOf(SessionPathEscapeError);
+      expect((err as SessionPathEscapeError).name).toBe("SessionPathEscapeError");
+    }
   });
 });

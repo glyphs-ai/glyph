@@ -44,9 +44,13 @@ packages/session/src/
   validate.ts              id regex + assertValidSessionId + generators
   session-repository.ts    Drizzle CRUD (internal)
   session-entity.ts        SessionEntity (private; service projects to DTO)
-  session-service.ts       SessionService  create/get/list/delete/
-                           buildInteractiveLaunch/spawnInteractive
-  paths.ts                 Pure path builders for per-session workdirs
+  session-service.ts       SessionService facade (delegates to subdir)
+  session-service/         SPLIT subdir (implementation detail)
+    _helpers.ts            SessionServiceCtx, safeRm, assembleLaunchEnv
+    create.ts              Rollback-heavy provisioning path
+    refresh.ts             Projection/refresh internals (list/get)
+    spawn.ts               Launch-command assembly + terminal spawn
+  paths.ts                 Pure path builders + safeJoinUnderRoot
   migrations.ts            applySessionMigrations (drizzle migration applier)
   compose.ts               composeSessionModule({ dbFile, agentResolver,
                            contentSource, runtimeRegistry, spawnFn?, … })

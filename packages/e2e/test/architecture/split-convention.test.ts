@@ -117,6 +117,7 @@ const REQUIRED_SPLITS = new Set<string>([
   "packages/dashboard/src/components/tasks/TaskDetail",
   "packages/catalog/src/facade/catalog-service",
   "packages/catalog/src/facade/resolve-pipeline",
+  "packages/session/src/session-service",
 ]);
 
 interface ClassifiedDir {
