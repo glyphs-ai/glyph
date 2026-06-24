@@ -1142,7 +1142,7 @@ function designerModeSummaryHtml(wfid: string, decoded: string): string {
 
   <h2>Per-node artifacts</h2>
   <ul>
-    <li>Engineer: <a href="https://github.com/glyphs-ai/glyph/pull/0">PR #0 (placeholder)</a></li>
+    <li>Engineer: <code>PR #42 (placeholder)</code></li>
     <li>Reviewer: <code>verdict.json</code>, <code>review.md</code>, <code>artifact/reviewer-report.html</code></li>
     <li>Designer: <code>verdict.json</code>, <code>artifact/designer-report.html</code></li>
   </ul>
