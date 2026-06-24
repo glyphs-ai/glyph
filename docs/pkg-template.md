@@ -149,8 +149,6 @@ For worked-out classification examples and the parser self-tests, see
 
 ## File naming convention
 
-> See [docs/architecture.md § Per-package src layout](./architecture.md#per-package-src-layout) for the full rationale.
-
 **Files exposing a class get an `<entity>-<role>.ts` prefix**:
 
 | file pattern | exports |

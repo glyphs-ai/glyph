@@ -68,7 +68,7 @@ const app = await composeApplication({
   logger,                                       // optional pino
 });
 
-app.workspaceService;                            // WorkspaceService -- direct access for read-only listing / getLastOpenedId / etc.
+app.workspaceService;                            // WorkspaceService — direct access for read-only listing / getLastOpenedId / etc.
 
 // Orchestration (Stripe-style hybrid opts)
 await app.registerWorkspace({ name, workspaceDir? });

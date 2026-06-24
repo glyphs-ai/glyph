@@ -27,7 +27,7 @@ pnpm build        # tsc emit - run this once after a fresh clone
 fresh tree: each package's `tsconfig` resolves its siblings through their
 emitted `dist/*.d.ts`, so a cold typecheck or dev boot will surface
 "missing export" errors that are really just a missing build. See
-[`architecture.md` -> Testing posture](./architecture.md#testing-posture).
+[`architecture.md` → Testing posture](./architecture.md#testing-posture).
 
 ## Daily loop
 
@@ -70,9 +70,9 @@ pnpm build && pnpm typecheck && pnpm test && pnpm lint
 | You want to add ...        | Start here                                                                 |
 | -------------------------- | ------------------------------------------------------------------------- |
 | A new package              | `pnpm new-pkg <name> <EntityName> <table_name>`, then [`pkg-template.md`](./pkg-template.md). |
-| A new HTTP route           | [`architecture.md` -> Adding a new HTTP route](./architecture.md#adding-a-new-http-route). |
-| A new CLI command          | [`architecture.md` -> Adding a new CLI command](./architecture.md#adding-a-new-cli-command). |
-| A new runtime adapter      | [`architecture.md` -> Adding a new runtime](./architecture.md#adding-a-new-runtime). |
+| A new HTTP route           | [`architecture.md` → Adding a new HTTP route](./architecture.md#adding-a-new-http-route). |
+| A new CLI command          | [`architecture.md` → Adding a new CLI command](./architecture.md#adding-a-new-cli-command). |
+| A new runtime adapter      | [`architecture.md` → Adding a new runtime](./architecture.md#adding-a-new-runtime). |
 | A first-party agent / skill / MCP | [`../first-party/README.md`](../first-party/README.md).            |
 
 ## Pull requests
