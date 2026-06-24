@@ -3,7 +3,6 @@ import type { WorkflowTargetData, WorkflowTargetPatch } from "@glyphs-ai/contrac
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import { AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
-import { assertBriefShape } from "./_brief.js";
 
 /**
  * Sole module knowing about all of `@glyphs-ai/schedule`,
@@ -62,7 +61,14 @@ export function makeWorkflowKindHandler(opts: {
       if (typeof obj.brief !== "string" || obj.brief.trim().length === 0) {
         throw new WorkflowScheduleTargetError("Workflow target requires non-empty brief");
       }
-      assertBriefShape(obj.brief, "Workflow target", WorkflowScheduleTargetError);
+      if (obj.brief.includes("\n") || obj.brief.includes("\r")) {
+        throw new WorkflowScheduleTargetError(
+          "Workflow target brief must be a single line (no newline characters); pass long content via details",
+        );
+      }
+      if (obj.brief.trim().length > 200) {
+        throw new WorkflowScheduleTargetError("Workflow target brief must be 200 characters or fewer");
+      }
       if (obj.details !== undefined && typeof obj.details !== "string") {
         throw new WorkflowScheduleTargetError(
           "Workflow target details, when set, must be a string",

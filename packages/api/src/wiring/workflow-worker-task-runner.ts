@@ -72,7 +72,6 @@ import type {
   WorkflowNodeValidateCtx,
 } from "@glyphs-ai/workflow";
 import pino, { type Logger } from "pino";
-import { assertBriefShape } from "./_brief.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
@@ -205,7 +204,14 @@ export function makeWorkerNodeRunner(
       if (typeof obj.brief !== "string" || obj.brief.trim().length === 0) {
         throw new WorkflowWorkerSpecError("Worker node spec requires non-empty brief");
       }
-      assertBriefShape(obj.brief, "Worker node spec", WorkflowWorkerSpecError);
+      if (obj.brief.includes("\n") || obj.brief.includes("\r")) {
+        throw new WorkflowWorkerSpecError(
+          "Worker node spec brief must be a single line (no newline characters); pass long content via details",
+        );
+      }
+      if (obj.brief.trim().length > 200) {
+        throw new WorkflowWorkerSpecError("Worker node spec brief must be 200 characters or fewer");
+      }
       if (obj.details !== undefined && typeof obj.details !== "string") {
         throw new WorkflowWorkerSpecError("Worker node spec details, when set, must be a string");
       }
