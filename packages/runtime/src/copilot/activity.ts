@@ -68,21 +68,10 @@ interface BaseFields {
  */
 export function parseCopilotActivity(raw: string): ActivityItem[] {
   const parser = new CopilotActivityStreamParser();
-  const out: ActivityItem[] = [];
   for (const line of splitLines(raw)) {
-    const result = parser.parseLine(line);
-    for (const item of result.items) {
-      out.push(item);
-    }
+    parser.parseLine(line);
   }
-  // Stream parser returns mutated tool-call items each time, so the
-  // out[] above can carry duplicates (same seq) when a complete event
-  // arrives. Collapse to last-write-wins.
-  const bySeq = new Map<number, ActivityItem>();
-  for (const item of out) {
-    bySeq.set(item.seq, item);
-  }
-  return Array.from(bySeq.values()).sort((a, b) => a.seq - b.seq);
+  return parser.snapshot();
 }
 
 /**
@@ -301,6 +290,15 @@ export class CopilotActivityStreamParser {
 
   get nextSeq(): number {
     return this.seq;
+  }
+
+  /**
+   * Return a deduplicated, seq-sorted snapshot of all items parsed so
+   * far. Used by the one-shot {@link parseCopilotActivity} to harvest
+   * results without an intermediate array + dedupe pass.
+   */
+  snapshot(): ActivityItem[] {
+    return Array.from(this.itemsBySeq.values()).sort((a, b) => a.seq - b.seq);
   }
 
   private commit(item: ActivityItem): void {

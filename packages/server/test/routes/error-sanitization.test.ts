@@ -21,7 +21,7 @@ import {
 import {
   RuntimeHeadlessLaunchFailed,
   RuntimeProvisionFailed,
-  RuntimeRefreshFailed,
+  RuntimeReadMetadataFailed,
   RuntimeStateDeletionFailed,
 } from "@glyphs-ai/runtime";
 import { describe, expect, it } from "vitest";
@@ -104,7 +104,7 @@ describe("errorBody", () => {
       "RuntimeHeadlessLaunchFailed",
       "RuntimeProvisionFailed",
       "RuntimeReadActivityInvalidArgs",
-      "RuntimeRefreshFailed",
+      "RuntimeReadMetadataFailed",
       "RuntimeStateDeletionFailed",
       "UnknownRuntimeError",
       "TrustRegistrationFailed",
@@ -332,8 +332,12 @@ describe("RuntimeXxxFailed message sanitization", () => {
 
   const cases: Array<{ name: string; err: Error; forbidden: string[] }> = [
     {
-      name: "RuntimeRefreshFailed",
-      err: new RuntimeRefreshFailed("copilot", "20260509-deadbeef-cafef00d-aaaa-bbbb", fsCause),
+      name: "RuntimeReadMetadataFailed",
+      err: new RuntimeReadMetadataFailed(
+        "copilot",
+        "20260509-deadbeef-cafef00d-aaaa-bbbb",
+        fsCause,
+      ),
       forbidden: [
         "20260509-deadbeef-cafef00d-aaaa-bbbb",
         "EACCES",
@@ -400,7 +404,7 @@ describe("RuntimeXxxFailed message sanitization", () => {
   });
 
   it("preserves public diagnostic fields on the instance", () => {
-    const r = new RuntimeRefreshFailed("copilot", "sid-123", fsCause);
+    const r = new RuntimeReadMetadataFailed("copilot", "sid-123", fsCause);
     expect(r.kind).toBe("copilot");
     expect(r.sessionId).toBe("sid-123");
 

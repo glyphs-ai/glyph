@@ -31,7 +31,7 @@ export {
   RuntimeHeadlessLaunchFailed,
   RuntimeProvisionFailed,
   RuntimeReadActivityInvalidArgs,
-  RuntimeRefreshFailed,
+  RuntimeReadMetadataFailed,
   RuntimeStateDeletionFailed,
   UnknownRuntimeError,
 } from "./errors.js";

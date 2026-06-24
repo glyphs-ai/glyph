@@ -86,7 +86,7 @@ import {
   RuntimeHeadlessLaunchFailed,
   RuntimeProvisionFailed,
   RuntimeReadActivityInvalidArgs,
-  RuntimeRefreshFailed,
+  RuntimeReadMetadataFailed,
   RuntimeRegistry,
   type RuntimeSessionMetadata,
   RuntimeStateDeletionFailed,
@@ -113,7 +113,7 @@ describe("@glyphs-ai/runtime public API guard", () => {
     const errs: Error[] = [
       // Runtime-generic errors (`../src/errors.ts`).
       new UnknownRuntimeError("copilot"),
-      new RuntimeRefreshFailed("copilot", "sid", new Error("upstream")),
+      new RuntimeReadMetadataFailed("copilot", "sid", new Error("upstream")),
       new RuntimeStateDeletionFailed("copilot", "sid", new Error("upstream")),
       new RuntimeProvisionFailed("copilot", "/workdir", new Error("upstream")),
       new RuntimeHeadlessLaunchFailed("copilot", "/workdir", new Error("upstream")),

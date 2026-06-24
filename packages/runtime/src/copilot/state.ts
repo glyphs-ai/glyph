@@ -27,10 +27,10 @@ export interface CopilotWorkspaceMetadata {
 
 /**
  * Parse `<copilotStateDir>/<id>/workspace.yaml` into the runtime-
- * neutral metadata shape. Sole caller is `CopilotRuntime.readMetadata`;
- * returns null when the file can't be read or parsed. An empty/missing
- * `name`/`summary` returns `{ title: null, ... }` (caller distinguishes
- * "no title" from "no state").
+ * neutral metadata shape. Returns null when the file can't be read or
+ * parsed. An empty/missing `name`/`summary` returns
+ * `{ title: null, ... }` (caller distinguishes "no title" from "no
+ * state").
  *
  * Never throws — callers treat null as "no activity yet".
  *
