@@ -118,6 +118,9 @@ const REQUIRED_SPLITS = new Set<string>([
   "packages/catalog/src/facade/catalog-service",
   "packages/catalog/src/facade/resolve-pipeline",
   "packages/session/src/session-service",
+  "packages/cli/src/commands/catalog",
+  "packages/cli/src/commands/schedule",
+  "packages/cli/src/commands/workflow",
   "packages/contracts/src/routes",
 ]);
 

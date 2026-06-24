@@ -16,18 +16,11 @@ import {
   isStatusError,
   pickFormat,
 } from "../output.js";
+import type { WorkspaceFlagOpts } from "../registrars/_shared.js";
 import type { CommandResult } from "../result.js";
 
-interface CommonFlags {
-  readonly server?: string;
-  readonly home?: string;
-  readonly workspaceId?: string;
-  readonly output?: string;
-  readonly json?: boolean;
-}
-
 // ─── list ──────────────────────────────────────────────────────────────
-export interface TaskListOpts extends CommonFlags {
+export interface TaskListOpts extends WorkspaceFlagOpts {
   readonly agent?: string;
   readonly runtime?: string;
   readonly createdSince?: string;
@@ -79,7 +72,7 @@ export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> 
 }
 
 // ─── dispatch ──────────────────────────────────────────────────────────
-export interface TaskDispatchOpts extends CommonFlags {
+export interface TaskDispatchOpts extends WorkspaceFlagOpts {
   readonly agent: string;
   /** Short, single-line task title (≤ 200 chars). Required. */
   readonly brief: string;
@@ -124,7 +117,7 @@ export async function taskDispatch(opts: TaskDispatchOpts): Promise<CommandResul
 }
 
 // ─── show ──────────────────────────────────────────────────────────────
-export type TaskShowOpts = CommonFlags;
+export type TaskShowOpts = WorkspaceFlagOpts;
 
 export async function taskShow(taskId: string, opts: TaskShowOpts = {}): Promise<CommandResult> {
   if (typeof taskId !== "string" || taskId.trim() === "") {
@@ -143,7 +136,7 @@ export async function taskShow(taskId: string, opts: TaskShowOpts = {}): Promise
 }
 
 // ─── rm ────────────────────────────────────────────────────────────────
-export interface TaskRmOpts extends CommonFlags {
+export interface TaskRmOpts extends WorkspaceFlagOpts {
   readonly purge?: boolean;
 }
 
@@ -175,7 +168,7 @@ export async function taskRm(taskId: string, opts: TaskRmOpts = {}): Promise<Com
 }
 
 // ─── cancel ────────────────────────────────────────────────────────────
-export type TaskCancelOpts = CommonFlags;
+export type TaskCancelOpts = WorkspaceFlagOpts;
 
 /**
  * `glyph task cancel <task-id>` — POSTs to `tasks.cancel` and prints
@@ -204,7 +197,7 @@ export async function taskCancel(
 }
 
 // ─── activity ──────────────────────────────────────────────────────────
-export interface TaskActivityOpts extends CommonFlags {
+export interface TaskActivityOpts extends WorkspaceFlagOpts {
   /** Tail the live activity stream over SSE; exits when the task terminates. */
   readonly follow?: boolean;
   /**
