@@ -8,7 +8,6 @@ import {
   classifyStuckReason,
   computePhaseFromParents,
   HUMAN_KIND,
-  type NodeRef,
   nodeEntityFor,
   normalizeSubgraphInput,
   parentsOf,
@@ -22,7 +21,18 @@ import {
   workflowEntityFor,
   wouldCreateCycle,
 } from "./_dag.js";
-import { assertCoordinatorSpecAgent, safeRmDir } from "./_helpers.js";
+import {
+  type DispatchCtx,
+  dispatchAtomic as dispatchAtomicImpl,
+  listEligibleNodeIdsForDispatch as listEligibleNodeIdsForDispatchImpl,
+  runnerFor as runnerForImpl,
+} from "./_dispatch.js";
+import { safeRmDir } from "./_helpers.js";
+import {
+  STUCK_RETRY_LIMIT,
+  STUCK_RETRY_MAX_ATTEMPTS,
+  type StuckRecoveryOutcome,
+} from "./_stuck-recovery.js";
 import {
   EmptyParentsError,
   MultipleSuccessorCoordsError,
@@ -34,7 +44,6 @@ import {
   WorkflowEdgeCycleError,
   WorkflowEdgeNotFoundError,
   WorkflowError,
-  WorkflowNodeKindCorruptionError,
   WorkflowNodeNotFoundError,
   WorkflowNodeNotMutableError,
   WorkflowNotFoundError,
@@ -48,25 +57,42 @@ import { workflowDir, workflowNodeDir } from "./paths.js";
 import type * as schema from "./schema.js";
 import { workflows } from "./schema.js";
 import type {
+  AddEdgeOpts,
+  AddEdgeResult,
+  AddNodeOpts,
+  AddNodeResult,
+  AddSubgraphInsertedNode,
+  AddSubgraphNodeInput,
+  AddSubgraphOpts,
+  AddSubgraphResult,
+  CancelWorkflowOpts,
+  CreateWorkflowOpts,
+  CreateWorkflowResult,
+  DispatchAtomicOpts,
+  FinishWorkflowOpts,
   HumanNodeResponse,
   HumanNodeSpec,
+  ListWorkflowOpts,
+  RemoveEdgeOpts,
+  ReplaceSpecOpts,
   WorkflowCancellation,
+  WorkflowDagSnapshot,
   WorkflowFailure,
-  WorkflowNodeKind,
   WorkflowNodeRetryMetadata,
-  WorkflowNodeRetryReason,
-  WorkflowNodeRunner,
   WorkflowNodeStatus,
   WorkflowNodeTerminalResult,
   WorkflowNodeValidateCtx,
   WorkflowRunners,
-  WorkflowSubstrateFailureReason,
   WorkflowSuccess,
 } from "./types.js";
-import { assertValidWorkflowId, generateWorkflowId, generateWorkflowNodeId } from "./validate.js";
+import {
+  assertCoordinatorSpecAgent,
+  assertValidWorkflowId,
+  generateWorkflowId,
+  generateWorkflowNodeId,
+} from "./validate.js";
 import {
   extractWorkflowNodeRetryMetadata,
-  type WorkflowEdgeEntity,
   type WorkflowEntity,
   type WorkflowNodeEntity,
 } from "./workflow-entity.js";
@@ -75,24 +101,6 @@ import type { WorkflowRepository } from "./workflow-repository.js";
 type Db = BetterSQLite3Database<typeof schema>;
 
 const silentLogger: Logger = pino({ level: "silent" });
-
-/**
- * Maximum number of consecutive retry-coord insertions per stuck-
- * workflow chain. See {@link WorkflowService.checkStuckAndRecoverInTx}
- * for the rationale; five is the locked operational ceiling.
- */
-export const STUCK_RETRY_MAX_ATTEMPTS = 5;
-
-/**
- * Structured {@link WorkflowFailure} reason persisted on the workflow
- * row when the stuck-coord detector trips the
- * {@link STUCK_RETRY_MAX_ATTEMPTS} cap. The detector transitions the
- * workflow to `failed` with `{ kind: 'substrate', reason:
- * STUCK_RETRY_LIMIT }` in the same tx as the triggering mutation;
- * the dashboard surfaces the reason on the workflow's Overview
- * failure callout.
- */
-export const STUCK_RETRY_LIMIT: WorkflowSubstrateFailureReason = "STUCK_RETRY_LIMIT";
 
 /**
  * Engine seam the service uses to nudge the in-memory
@@ -123,162 +131,6 @@ export interface WorkflowServiceOpts {
    */
   readonly randomBytes?: (n: number) => Buffer;
 }
-
-export interface CreateWorkflowOpts {
-  readonly brief: string;
-  readonly details?: string;
-  readonly coordinatorAgent: string;
-  /**
-   * Who launched this workflow. Defaults to `"standalone"` when omitted
-   * (direct dashboard / CLI / MCP call). Integration handlers pass
-   * their own origin so the default `GET /workflows` endpoint can
-   * filter to standalone-only by construction.
-   */
-  readonly origin?: import("./types.js").WorkflowOrigin;
-  /**
-   * Opaque caller-supplied metadata persisted onto the workflow row.
-   * Forwarded verbatim to {@link WorkflowEntity.metadata}; defaults
-   * to `{}` when omitted.
-   */
-  readonly metadata?: Readonly<Record<string, unknown>>;
-}
-
-export interface CreateWorkflowResult {
-  readonly workflowId: string;
-  readonly initialCoordNodeId: string;
-}
-
-export interface AddNodeOpts {
-  readonly kind: WorkflowNodeKind;
-  readonly spec: unknown;
-  readonly parents: ReadonlyArray<string>;
-}
-
-export interface AddNodeResult {
-  readonly nodeId: string;
-  readonly phase: number;
-}
-
-export interface AddEdgeOpts {
-  readonly fromNodeId: string;
-  readonly toNodeId: string;
-}
-
-export interface AddEdgeResult {
-  readonly toPhase: number;
-}
-
-/**
- * Options accepted by {@link WorkflowService.finishWorkflow}. Discriminated
- * on `outcome`:
- *
- *   - `succeeded` — optional {@link WorkflowSuccess} payload. When
- *     omitted, the substrate persists `{ output: null }` so the row
- *     still satisfies the "succeeded ⇒ success non-null" invariant.
- *   - `failed` — required {@link WorkflowFailure} payload. Coord
- *     MUST supply a human-readable failure to surface in the
- *     dashboard's Overview tab.
- *
- * `cancelled` is NOT an arm here — workflow cancellation is the
- * external-operator route ({@link WorkflowService.cancelWorkflow}),
- * not a coord-driven path.
- */
-export type FinishWorkflowOpts =
-  | {
-      readonly outcome: "succeeded";
-      readonly success?: WorkflowSuccess;
-    }
-  | {
-      readonly outcome: "failed";
-      readonly failure: WorkflowFailure;
-    };
-
-/**
- * Options accepted by {@link WorkflowService.cancelWorkflow}. The
- * `cancellation` payload is REQUIRED — operator MUST supply at
- * least a kind + message. The server route defaults `kind='user'`
- * when omitted on the wire.
- */
-export interface CancelWorkflowOpts {
-  readonly cancellation: WorkflowCancellation;
-}
-
-export interface RemoveEdgeOpts {
-  readonly fromNodeId: string;
-  readonly toNodeId: string;
-}
-
-export interface ReplaceSpecOpts {
-  readonly newSpec: unknown;
-}
-
-export interface AddSubgraphNodeInput {
-  readonly tempId: string;
-  readonly kind: WorkflowNodeKind;
-  readonly spec: unknown;
-  readonly existingParents?: ReadonlyArray<string>;
-}
-
-export interface AddSubgraphEdgeInput {
-  readonly from: NodeRef;
-  readonly to: NodeRef;
-}
-
-export interface AddSubgraphOpts {
-  readonly nodes: ReadonlyArray<AddSubgraphNodeInput>;
-  readonly edges: ReadonlyArray<AddSubgraphEdgeInput>;
-}
-
-export interface AddSubgraphInsertedNode {
-  readonly tempId: string;
-  readonly nodeId: string;
-  readonly phase: number;
-}
-
-export interface AddSubgraphResult {
-  readonly insertedNodes: ReadonlyArray<AddSubgraphInsertedNode>;
-}
-
-export interface WorkflowDagSnapshot {
-  readonly workflow: WorkflowEntity;
-  readonly nodes: readonly WorkflowNodeEntity[];
-  readonly edges: readonly WorkflowEdgeEntity[];
-}
-
-export interface DispatchAtomicOpts {
-  readonly onTerminal?: (result: WorkflowNodeTerminalResult) => void;
-}
-
-export interface ListWorkflowOpts {
-  readonly coordinatorAgent?: string;
-  readonly createdSince?: string;
-  readonly idLike?: string;
-  /**
-   * Filter to workflows whose `origin` matches the given value, or any
-   * value in the given array. Accepts a single `WorkflowOrigin` or a
-   * readonly array; omit to disable the filter and return workflows of
-   * every origin.
-   */
-  readonly origin?:
-    | import("./types.js").WorkflowOrigin
-    | readonly import("./types.js").WorkflowOrigin[];
-}
-
-/**
- * Internal closure-state type used by the eight mutation primitives
- * to capture the {@link WorkflowService.checkStuckAndRecoverInTx}
- * outcome from inside the tx callback. Hoisted to a named alias so
- * the closure-scoped variable doesn't collapse to `never` under the
- * compiler's flow-narrowing of the discriminated union initializer.
- */
-type StuckRecoveryOutcome =
-  | { readonly inserted: false }
-  | {
-      readonly inserted: true;
-      readonly retryNodeId: string;
-      readonly reason: WorkflowNodeRetryReason;
-      readonly attempt: number;
-    };
 
 /**
  * Public surface for `@glyphs-ai/workflow`. Owns:
@@ -332,6 +184,14 @@ export class WorkflowService {
   private readonly randomBytes: (n: number) => Buffer;
   private readonly runners: WorkflowRunners;
   private engine: WorkflowEngineLike | null;
+  /**
+   * Capability bundle handed to the free dispatch helpers in
+   * `_dispatch.ts`. Built once in the constructor; closes over
+   * {@link markNodeTerminal} so the helpers can drive the substrate's
+   * single terminal-write path without the dispatch logic living on
+   * this class.
+   */
+  private readonly dispatchCtx: DispatchCtx;
 
   constructor(opts: WorkflowServiceOpts) {
     this.repo = opts.repo;
@@ -343,6 +203,16 @@ export class WorkflowService {
     this.randomUUID = opts.randomUUID ?? (() => nodeRandomUUID());
     this.randomBytes = opts.randomBytes ?? ((n: number) => nodeRandomBytes(n));
     this.engine = null;
+    this.dispatchCtx = {
+      db: this.db,
+      repo: this.repo,
+      runners: this.runners,
+      workspaceDir: this.workspaceDir,
+      logger: this.logger,
+      now: this.now,
+      markNodeTerminal: (workflowId, nodeId, result) =>
+        this.markNodeTerminal(workflowId, nodeId, result),
+    };
   }
 
   /**
@@ -385,52 +255,20 @@ export class WorkflowService {
    * status is `not_started` or `ready` AND per-kind parent readiness
    * is satisfied (or the node has no parents).
    *
-   * Returns node ids only (the engine re-reads each node fresh inside
-   * `dispatchAtomic` anyway). Computed inside a single read tx for a
-   * consistent snapshot. The engine treats the returned list as a
-   * best-effort hint: `dispatchAtomic` re-checks each gate inside
-   * its own write tx, so a node that becomes ineligible between this
-   * read and the dispatch tx is silently no-op'd.
+   * Delegates to the free helper in `_dispatch.ts`; see there for the
+   * snapshot / best-effort-hint semantics.
    */
   async listEligibleNodeIdsForDispatch(workflowId: string): Promise<readonly string[]> {
-    return this.db.transaction((tx) => {
-      const wf = this.repo.readWorkflowTx(tx, workflowId);
-      if (wf === null || wf.status !== "running") return [] as readonly string[];
-      const nodes = this.repo.listNodesByWorkflowTx(tx, workflowId);
-      const edges = this.repo.listEdgesByWorkflowTx(tx, workflowId);
-      const byId = new Map(nodes.map((n) => [n.id, n] as const));
-      const eligible: string[] = [];
-      for (const node of nodes) {
-        if (node.status !== "not_started" && node.status !== "ready") continue;
-        const parentIds = parentsOf(node.id, edges);
-        const parents = parentIds
-          .map((pid) => byId.get(pid))
-          .filter((p): p is WorkflowNodeEntity => p !== undefined);
-        if (parents.length !== parentIds.length) continue;
-        if (parents.length > 0 && !parentsReadyForKind(node.kind, parents)) continue;
-        eligible.push(node.id);
-      }
-      return eligible;
-    });
+    return listEligibleNodeIdsForDispatchImpl(this.dispatchCtx, workflowId);
   }
 
   /**
-   * Resolve the runner for a `WorkflowNodeKind`. Caller-supplied `kind`
-   * values are TypeScript-checked against the closed enum, so the
-   * `default` branch only fires for persisted-row corruption; it
-   * throws {@link WorkflowNodeKindCorruptionError} for diagnosis.
+   * Resolve the runner for a `WorkflowNodeKind`. Thin instance-side
+   * delegator over the free `runnerFor` in `_dispatch.ts`; retained as
+   * a method so the substrate's many internal callsites stay terse.
    */
-  private runnerFor(kind: string): WorkflowNodeRunner {
-    switch (kind) {
-      case COORDINATOR_KIND:
-        return this.runners.coordinator;
-      case WORKER_KIND:
-        return this.runners.worker;
-      case HUMAN_KIND:
-        return this.runners.human;
-      default:
-        throw new WorkflowNodeKindCorruptionError(kind);
-    }
+  private runnerFor(kind: string) {
+    return runnerForImpl(this.runners, kind);
   }
 
   // ─── Reads ────────────────────────────────────────────────
@@ -1804,127 +1642,18 @@ export class WorkflowService {
 
   /**
    * Substrate primitive: flip a node from `not_started|ready` →
-   * `running` and invoke its per-kind runner's `dispatch` AFTER
-   * the tx commits. On dispatch throw, a separate tx writes
+   * `running` and invoke its per-kind runner's `dispatch` AFTER the
+   * tx commits. On dispatch throw, a separate tx writes
    * `status='failed'`.
    *
-   * Inside the tx:
-   *   - re-reads `workflow.status` (defends against cancel race)
-   *   - re-reads `node.status` (defends against parallel dispatch)
-   *   - re-checks per-kind parent readiness (defends against
-   *     parent-cancel race between the eager-dispatch reaction and
-   *     this method)
-   *
-   * If any check fails, the tx is a no-op and the method returns
-   * silently — the substrate's invariant is "calling dispatchAtomic
-   * is always safe; it does nothing when the node is not eligible".
-   *
-   * The runner invocation is OUTSIDE the tx because holding a
-   * write lock across an async network call would serialize the
-   * entire workflow engine on a slow dispatch.
-   *
-   * `opts.onTerminal` is threaded into the runner's `dispatch` opts
-   * so the runner can push terminal results back to the substrate
-   * (where it's handled by {@link markNodeTerminal}) without knowing
-   * about service plumbing. When omitted, the substrate substitutes a
-   * default callback that delegates to {@link markNodeTerminal}
-   * directly. Either path lands the same idempotent state write —
-   * `markNodeTerminal` is the single source of truth for the
-   * substrate's terminal write.
+   * Kept as a method (the engine and several internal callsites drive
+   * it through `this`) but delegates to the free implementation in
+   * `_dispatch.ts`, where the tx-internal re-check sequence,
+   * outside-the-tx runner invocation, and `onTerminal` defaulting are
+   * documented in full.
    */
   async dispatchAtomic(nodeId: string, opts: DispatchAtomicOpts = {}): Promise<void> {
-    let dispatchPayload: {
-      readonly runner: WorkflowNodeRunner;
-      readonly workflowId: string;
-      readonly nodeId: string;
-      readonly spec: unknown;
-      readonly nodeDir: string;
-    } | null = null;
-
-    this.db.transaction((tx) => {
-      const node = this.repo.readNodeTx(tx, nodeId);
-      if (node === null) return;
-      if (node.status !== "not_started" && node.status !== "ready") return;
-      const wf = this.repo.readWorkflowTx(tx, node.workflowId);
-      if (wf === null || wf.status !== "running") return;
-
-      const runner = this.runnerFor(node.kind);
-
-      // Per-kind parent readiness re-check inside the tx.
-      const allEdges = this.repo.listEdgesByWorkflowTx(tx, node.workflowId);
-      const parentIds = parentsOf(node.id, allEdges);
-      const parents = this.repo.readNodesByIds(tx, parentIds);
-      if (parentIds.length !== parents.length) return;
-      if (parents.length > 0 && !parentsReadyForKind(node.kind, parents)) return;
-
-      const nowIso = this.now().toISOString();
-      this.repo.updateNodeLifecycle(tx, {
-        id: nodeId,
-        status: "running",
-        runningAt: nowIso,
-      });
-
-      dispatchPayload = {
-        runner,
-        workflowId: node.workflowId,
-        nodeId,
-        spec: node.spec,
-        nodeDir: workflowNodeDir(this.workspaceDir, node.workflowId, nodeId),
-      };
-    });
-
-    if (dispatchPayload === null) return;
-    const payload = dispatchPayload as {
-      readonly runner: WorkflowNodeRunner;
-      readonly workflowId: string;
-      readonly nodeId: string;
-      readonly spec: unknown;
-      readonly nodeDir: string;
-    };
-
-    // Resolve the `onTerminal` callback. Callers that don't supply
-    // one get a default that drives `markNodeTerminal` so the
-    // substrate's terminal-write path stays single-source-of-truth.
-    const effectiveOnTerminal: (result: WorkflowNodeTerminalResult) => void =
-      opts.onTerminal ??
-      ((result) => {
-        // Fire-and-forget into `markNodeTerminal`, with a `.catch`
-        // so a throw from the terminal-write tx surfaces as a logged
-        // error instead of an unhandled promise rejection.
-        void this.markNodeTerminal(payload.workflowId, payload.nodeId, result).catch((err) => {
-          this.logger.error(
-            { workflowId: payload.workflowId, nodeId: payload.nodeId, err },
-            "dispatchAtomic: default onTerminal markNodeTerminal threw",
-          );
-        });
-      });
-
-    try {
-      await payload.runner.dispatch({
-        workflowId: payload.workflowId,
-        nodeId: payload.nodeId,
-        spec: payload.spec,
-        nodeDir: payload.nodeDir,
-        onTerminal: effectiveOnTerminal,
-      });
-    } catch (err) {
-      this.logger.warn(
-        { nodeId, err },
-        "dispatchAtomic: runner.dispatch threw; marking node failed",
-      );
-      const reason = `runner.dispatch threw: ${err instanceof Error ? err.message : String(err)}`;
-      try {
-        await this.markNodeTerminal(payload.workflowId, payload.nodeId, {
-          status: "failed",
-          reason,
-        });
-      } catch (writeErr) {
-        this.logger.error(
-          { nodeId, err: writeErr },
-          "dispatchAtomic: failed to write failed status after dispatch error",
-        );
-      }
-    }
+    return dispatchAtomicImpl(this.dispatchCtx, nodeId, opts);
   }
 
   // ─── respondHumanNode ───────────────────────────────────

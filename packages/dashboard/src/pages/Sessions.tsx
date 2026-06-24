@@ -357,138 +357,145 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
         </button>
       </HeaderActions>
 
-      <div className="page-toolbar">
-        <div
-          className="page-toolbar__actions"
-          style={{ gap: "var(--space-3)", alignItems: "center" }}
-        >
-          <label htmlFor="session-id-filter" className="muted" style={{ fontSize: 12 }}>
-            Search
-          </label>
-          <input
-            id="session-id-filter"
-            type="search"
-            value={idQuery}
-            onChange={(e) => setIdQuery(e.target.value)}
-            placeholder="session id…"
-            className="input"
-            style={{ width: 160 }}
-          />
-          <label htmlFor="agent-filter" className="muted" style={{ fontSize: 12 }}>
-            Agent
-          </label>
-          <select
-            id="agent-filter"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="select"
+      <div className="sessions-page">
+        <div className="page-toolbar">
+          <div
+            className="page-toolbar__actions"
+            style={{ gap: "var(--space-3)", alignItems: "center" }}
           >
-            <option value={ALL_AGENTS}>All</option>
-            {agents.map((a) => (
-              <option key={a.agent.fqn} value={a.agent.fqn}>
-                {a.agent.fqn}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="runtime-filter" className="muted" style={{ fontSize: 12 }}>
-            Runtime
-          </label>
-          <select
-            id="runtime-filter"
-            value={runtimeFilter}
-            onChange={(e) => setRuntimeFilter(e.target.value)}
-            className="select"
-            disabled={runtimes.length === 0}
-          >
-            <option value={ALL_RUNTIMES}>All</option>
-            {runtimes.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-          <span className="muted" style={{ fontSize: 12 }}>
-            Active
-          </span>
-          <div className="pills">
-            {TIME_PRESETS.map((p) => (
-              <button
-                key={p.value}
-                type="button"
-                className={`pills__btn${timeFilter === p.value ? " pills__btn--active" : ""}`}
-                onClick={() => setTimeFilter(p.value)}
-                aria-pressed={timeFilter === p.value}
-              >
-                {p.label}
-              </button>
-            ))}
+            <label htmlFor="session-id-filter" className="muted" style={{ fontSize: 12 }}>
+              Search
+            </label>
+            <input
+              id="session-id-filter"
+              type="search"
+              value={idQuery}
+              onChange={(e) => setIdQuery(e.target.value)}
+              placeholder="session id…"
+              className="input"
+              style={{ width: 160 }}
+            />
+            <label htmlFor="agent-filter" className="muted" style={{ fontSize: 12 }}>
+              Agent
+            </label>
+            <select
+              id="agent-filter"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="select"
+            >
+              <option value={ALL_AGENTS}>All</option>
+              {agents.map((a) => (
+                <option key={a.agent.fqn} value={a.agent.fqn}>
+                  {a.agent.fqn}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="runtime-filter" className="muted" style={{ fontSize: 12 }}>
+              Runtime
+            </label>
+            <select
+              id="runtime-filter"
+              value={runtimeFilter}
+              onChange={(e) => setRuntimeFilter(e.target.value)}
+              className="select"
+              disabled={runtimes.length === 0}
+            >
+              <option value={ALL_RUNTIMES}>All</option>
+              {runtimes.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+            <span className="muted" style={{ fontSize: 12 }}>
+              Active
+            </span>
+            <div className="pills">
+              {TIME_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  className={`pills__btn${timeFilter === p.value ? " pills__btn--active" : ""}`}
+                  onClick={() => setTimeFilter(p.value)}
+                  aria-pressed={timeFilter === p.value}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
+        </div>
+
+        {error && <div className="alert alert--error">⚠️ {error}</div>}
+
+        <div className="sessions-page__body">
+          {!loaded ? (
+            <div className="empty">
+              <div className="empty__icon spin" aria-hidden="true">
+                <RefreshIcon />
+              </div>
+              <p className="empty__title">Loading sessions…</p>
+            </div>
+          ) : visibleSessions.length === 0 ? (
+            // Sessions is a single-column list page, so the empty / no-match
+            // states render in place of the list (there is no detail pane to
+            // fill). Show the rich "No sessions yet" zero-state with its CTA
+            // only when the workspace is genuinely empty AND no filter is
+            // constraining the list; when a filter is active, keep the
+            // standard filter-empty copy so the user sees what's hiding the
+            // rows. Either way `.sessions-page__body` centers the card in the
+            // remaining height instead of letting it float at the top.
+            sessions.length === 0 && !filtersActive ? (
+              <div className="empty tasks-pane__zero" data-testid="sessions-empty-zero">
+                <div className="empty__icon" aria-hidden="true">
+                  📂
+                </div>
+                <p className="empty__title">No sessions yet</p>
+                <p className="empty__hint">
+                  Create a session to bake an agent into a workdir, then launch <code>copilot</code>{" "}
+                  there.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => setCreateOpen(true)}
+                  disabled={createAgents.length === 0}
+                  title={
+                    createAgents.length === 0
+                      ? "Install at least one ready agent in the Catalog first"
+                      : "Create a new session"
+                  }
+                  data-testid="sessions-empty-zero-cta"
+                >
+                  <PlusIcon />
+                  <span>New session</span>
+                </button>
+              </div>
+            ) : (
+              <div className="empty">
+                <div className="empty__icon">📂</div>
+                <p className="empty__title">No matches</p>
+                <p className="empty__hint">Adjust the filters above to see more sessions.</p>
+              </div>
+            )
+          ) : (
+            <ul className="session-list" aria-label="Sessions">
+              {visibleSessions.map((s) => (
+                <SessionListItem
+                  key={s.id}
+                  session={s}
+                  launching={launchingId === s.id}
+                  preselected={preselectedSessionId === s.id}
+                  onPreselectConsumed={() => setPreselectedSessionId(null)}
+                  onLaunch={(opts) => onLaunch(s, opts)}
+                  onDelete={() => setDeleteModal({ session: s, purge: false })}
+                />
+              ))}
+            </ul>
+          )}
         </div>
       </div>
-
-      {error && <div className="alert alert--error">⚠️ {error}</div>}
-
-      {!loaded ? (
-        <div className="empty">
-          <div className="empty__icon spin" aria-hidden="true">
-            <RefreshIcon />
-          </div>
-          <p className="empty__title">Loading sessions…</p>
-        </div>
-      ) : visibleSessions.length === 0 ? (
-        // Same shape as Tasks: collapse to a single full-width zero-state
-        // only when the
-        // workspace is genuinely empty AND no filter is constraining the
-        // list. When a filter is active, keep the standard filter-empty
-        // copy so the user sees what's hiding the rows.
-        sessions.length === 0 && !filtersActive ? (
-          <div className="empty tasks-pane__zero" data-testid="sessions-empty-zero">
-            <div className="empty__icon" aria-hidden="true">
-              📂
-            </div>
-            <p className="empty__title">No sessions yet</p>
-            <p className="empty__hint">
-              Create a session to bake an agent into a workdir, then launch <code>copilot</code>{" "}
-              there.
-            </p>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => setCreateOpen(true)}
-              disabled={createAgents.length === 0}
-              title={
-                createAgents.length === 0
-                  ? "Install at least one ready agent in the Catalog first"
-                  : "Create a new session"
-              }
-              data-testid="sessions-empty-zero-cta"
-            >
-              <PlusIcon />
-              <span>New session</span>
-            </button>
-          </div>
-        ) : (
-          <div className="empty">
-            <div className="empty__icon">📂</div>
-            <p className="empty__title">No matches</p>
-            <p className="empty__hint">Adjust the filters above to see more sessions.</p>
-          </div>
-        )
-      ) : (
-        <ul className="session-list" aria-label="Sessions">
-          {visibleSessions.map((s) => (
-            <SessionListItem
-              key={s.id}
-              session={s}
-              launching={launchingId === s.id}
-              preselected={preselectedSessionId === s.id}
-              onPreselectConsumed={() => setPreselectedSessionId(null)}
-              onLaunch={(opts) => onLaunch(s, opts)}
-              onDelete={() => setDeleteModal({ session: s, purge: false })}
-            />
-          ))}
-        </ul>
-      )}
 
       <CreateModal
         open={createOpen}

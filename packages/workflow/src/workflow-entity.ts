@@ -374,6 +374,12 @@ function parseNodeMetadataJson(nodeId: string, raw: string): Readonly<Record<str
  * metadata. Callers that observe `undefined` should treat the node as
  * a fresh (non-retry) coord; the `attempt` counter restart semantics
  * live on the detector, not here.
+ *
+ * Part of the package's public surface (re-exported from `index.ts`):
+ * it is the supported way for callers and tests to read the retry
+ * block off a {@link WorkflowNodeEntity} without re-implementing the
+ * shape guard. The substrate itself is the only in-tree caller today;
+ * the export is retained for consumers that render retry provenance.
  */
 const RETRY_REASONS: ReadonlySet<WorkflowNodeRetryReason> = new Set<WorkflowNodeRetryReason>([
   "coord_exited_without_action",
