@@ -262,7 +262,10 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
               {!loaded ? (
                 <TasksEmptyState loading />
               ) : workspaceEmpty ? (
-                <TasksEmptyState title="No tasks yet" hint="Dispatch a task to get started." />
+                <TasksEmptyState
+                  variant="rail-hint"
+                  title="No tasks yet. Dispatch one to get started."
+                />
               ) : visibleTasks.length === 0 ? (
                 <TasksEmptyState
                   title="No matches"

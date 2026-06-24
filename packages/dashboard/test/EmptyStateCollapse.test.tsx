@@ -173,9 +173,16 @@ describe("Tasks page empty-state layout", () => {
     expect(zero).toBeTruthy();
     // The CTA button is wired and labelled.
     expect(screen.getByTestId("tasks-empty-zero-cta")).toBeTruthy();
-    // The filter rail stays mounted (its inline "No tasks yet" list hint
-    // renders), so the layout is rail + detail, not a full-width collapse.
-    expect(screen.getByText(/Dispatch a task to get started/i)).toBeTruthy();
+    // The filter rail stays mounted but now carries a lightweight text-only
+    // hint (no icon, no `.empty` card chrome) instead of a second full card.
+    // This is the F1 doubled-empty fix: rail = calm one-liner, detail =
+    // the rich anchor card.
+    const railHint = screen.getByTestId("tasks-empty-rail-hint");
+    expect(railHint.textContent).toMatch(/Dispatch one to get started/i);
+    expect(railHint.classList.contains("empty")).toBe(false);
+    expect(railHint.querySelector(".empty__icon")).toBeNull();
+    // The emoji icon now renders once (in the detail card), not twice.
+    expect(zero.querySelectorAll(".empty__icon")).toHaveLength(1);
     // The calm "No task selected" placeholder must NOT render — the
     // detail pane carries the richer zero-state instead.
     expect(screen.queryByText(/No task selected/i)).toBeNull();

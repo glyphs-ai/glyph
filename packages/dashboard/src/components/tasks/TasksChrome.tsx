@@ -38,6 +38,13 @@ export interface TasksEmptyStateProps {
   loading?: boolean;
   title?: string;
   hint?: string;
+  /**
+   * `"card"` (default) renders the full dashed-border card with icon.
+   * `"rail-hint"` renders a calm text-only one-liner (no border, no icon)
+   * for the workspace-empty list rail, so it doesn't echo the rich
+   * zero-state card carried by the detail pane.
+   */
+  variant?: "card" | "rail-hint";
 }
 
 /**
@@ -45,7 +52,7 @@ export interface TasksEmptyStateProps {
  * renders the spinner variant; otherwise the supplied title + hint
  * are shown.
  */
-export function TasksEmptyState({ loading, title, hint }: TasksEmptyStateProps) {
+export function TasksEmptyState({ loading, title, hint, variant = "card" }: TasksEmptyStateProps) {
   if (loading) {
     return (
       <div className="empty">
@@ -54,6 +61,14 @@ export function TasksEmptyState({ loading, title, hint }: TasksEmptyStateProps) 
         </div>
         <p className="empty__title">Loading tasks…</p>
       </div>
+    );
+  }
+  if (variant === "rail-hint") {
+    return (
+      <p className="tasks-pane__list-hint" data-testid="tasks-empty-rail-hint">
+        {title}
+        {hint && ` ${hint}`}
+      </p>
     );
   }
   return (

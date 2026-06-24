@@ -390,10 +390,9 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
               {!loaded ? (
                 <WorkflowListSkeleton />
               ) : workspaceEmpty ? (
-                <div className="empty" data-testid="workflows-empty-list">
-                  <p className="empty__title">No workflows yet</p>
-                  <p className="empty__hint">Create a workflow to get started.</p>
-                </div>
+                <p className="tasks-pane__list-hint" data-testid="workflows-empty-list">
+                  No workflows yet. Create one to get started.
+                </p>
               ) : visible.length === 0 ? (
                 <div className="empty" data-testid="workflows-empty-filtered">
                   <p className="empty__title">No matches</p>

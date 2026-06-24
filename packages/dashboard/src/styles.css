@@ -3041,6 +3041,33 @@ button {
   overflow-y: auto;
 }
 
+/* When the rail's only child is an .empty card (loading spinner or the
+   "No matches" filtered-empty), let it fill the scroll area instead of
+   floating as a small block at the top with ~500px of white below.
+   min-height:100% resolves against the scroll container's flex height;
+   the inner flex chain centers the icon/title/hint. */
+.tasks-pane__list-scroll > .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  margin: 0;
+}
+
+/* Lightweight, text-only rail hint for the workspace-empty case. The rich
+   card (icon + title + hint + CTA) lives in the detail pane and is the
+   visual anchor; the rail only needs a calm one-liner so the two empty
+   signals don't read as a doubled card. No border, no background, no icon. */
+.tasks-pane__list-hint {
+  margin: 0;
+  padding: var(--space-5) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 /* The right detail pane fills the grid row's height so the inner
    `.overview-tab` flex chain has a known parent height to resolve
    `flex: 1 + min-height: 0` against. The Overview body is a flex
@@ -3065,9 +3092,30 @@ button {
 }
 
 .tasks-pane__detail--empty {
-  justify-content: center;
+  /* The pane is already a flex column. Drop its own padding so its single
+     .empty child can stretch edge-to-edge and own the breathing room (see
+     rule below). Centering the child here instead (justify/align center)
+     collapsed it to its intrinsic ~400px size and left dead whitespace on
+     every side of a ~600px pane. */
+  padding: 0;
+}
+.tasks-pane__detail--empty > .empty {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  min-height: 240px;
+  justify-content: center;
+  /* Match the pane's corner radius so the dashed card nests flush inside
+     the pane border instead of poking past its rounded corners. */
+  border-radius: var(--radius-md);
+  /* Generous internal padding so the icon/title/hint/CTA have room. */
+  padding: var(--space-7) var(--space-6);
+}
+/* Non-card children (e.g. a detail-load error alert) keep breathing room
+   now that the pane itself no longer pads its contents. */
+.tasks-pane__detail--empty > .alert {
+  margin: var(--space-4);
 }
 
 /* When the workspace itself is empty (not a filter-narrowed result),
@@ -4390,11 +4438,18 @@ button {
   flex-direction: column;
 }
 /* In the empty / loading states the body's only child is the .empty
-   card; margin: auto absorbs the free space on every side so it sits
-   centered. The populated .session-list is not an .empty, so it keeps
-   its natural top-aligned flow and scrolls. */
+   card. It fills the body on both axes (the body is a flex column) and
+   centers its own icon/title/hint/CTA via its own flex chain. margin:auto
+   shrank the card to its intrinsic size and left ~200px of dead space
+   above and below, which read as "the page looks empty". The populated
+   .session-list is not an .empty, so it keeps its natural top-aligned
+   flow and scrolls. */
 .sessions-page__body > .empty {
-  margin: auto;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 /* The detail panel's last child (the active tab body  OverviewTab,
