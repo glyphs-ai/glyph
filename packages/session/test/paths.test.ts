@@ -1,7 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { SessionError, SessionPathEscapeError } from "../src/errors.js";
-import { safeJoinUnderRoot } from "../src/paths.js";
+import { safeJoinUnderRoot } from "../src/session-service/_helpers.js";
 
 const isWin = process.platform === "win32";
 

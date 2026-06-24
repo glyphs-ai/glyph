@@ -9,11 +9,10 @@ import {
   AgentResolutionFailedError,
   SessionIdAllocationFailedError,
 } from "../errors.js";
-import { safeJoinUnderRoot } from "../paths.js";
 import type { CreateSessionOpts, Session } from "../types.js";
 import { generateSessionId } from "../validate.js";
 import type { SessionServiceCtx } from "./_helpers.js";
-import { safeRm } from "./_helpers.js";
+import { safeJoinUnderRoot, safeRm } from "./_helpers.js";
 
 const DEFAULT_RUNTIME = "copilot";
 const MAX_CREATE_RETRIES = 5;

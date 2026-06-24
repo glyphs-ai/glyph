@@ -5,10 +5,43 @@
  */
 
 import { rm } from "node:fs/promises";
+import path from "node:path";
 import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { Logger } from "pino";
+import { SessionPathEscapeError } from "../errors.js";
 import type { AgentResolverPort, SpawnFn } from "../ports.js";
 import type { SessionRepository } from "../session-repository.js";
+
+/** Subdirectory under `<workspaceDir>/` where per-session workdirs live. */
+const SESSIONS_SUBDIR = "sessions";
+
+/** Resolve the absolute root directory for this workspace's session workdirs. */
+export function sessionsRoot(workspaceDir: string): string {
+  return path.join(workspaceDir, SESSIONS_SUBDIR);
+}
+
+/**
+ * Path-traversal defense. Given a validated id (caller has already run
+ * assertValidSessionId), construct the workdir path and assert it is a child
+ * of root. Throws {@link SessionPathEscapeError} if not.
+ *
+ * Uses a separator-suffixed root so `/a/b` is not considered a child of
+ * `/a/bb`.
+ */
+export function safeJoinUnderRoot(root: string, id: string): string {
+  const normalizedRoot = path.resolve(root);
+  const candidate = path.resolve(normalizedRoot, id);
+  const rootWithSep = normalizedRoot.endsWith(path.sep)
+    ? normalizedRoot
+    : normalizedRoot + path.sep;
+  if (!candidate.startsWith(rootWithSep) && candidate !== normalizedRoot) {
+    throw new SessionPathEscapeError(candidate, rootWithSep, "escapes");
+  }
+  if (candidate === normalizedRoot) {
+    throw new SessionPathEscapeError(candidate, normalizedRoot, "equals");
+  }
+  return candidate;
+}
 
 /**
  * Shared state passed by the facade to every internal function. Built

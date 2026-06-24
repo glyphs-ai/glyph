@@ -4,10 +4,10 @@
  */
 
 import type { Runtime } from "@glyphs-ai/runtime";
-import { safeJoinUnderRoot } from "../paths.js";
 import type { SessionEntity } from "../session-entity.js";
 import type { Session } from "../types.js";
 import type { SessionServiceCtx } from "./_helpers.js";
+import { safeJoinUnderRoot } from "./_helpers.js";
 
 export async function draftFromEntity(
   ctx: SessionServiceCtx,

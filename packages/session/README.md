@@ -46,11 +46,11 @@ packages/session/src/
   session-entity.ts        SessionEntity (private; service projects to DTO)
   session-service.ts       SessionService facade (delegates to subdir)
   session-service/         SPLIT subdir (implementation detail)
-    _helpers.ts            SessionServiceCtx, safeRm, assembleLaunchEnv
+    _helpers.ts            SessionServiceCtx, safeRm, assembleLaunchEnv,
+                           sessionsRoot, safeJoinUnderRoot
     create.ts              Rollback-heavy provisioning path
     refresh.ts             Projection/refresh internals (list/get)
     spawn.ts               Launch-command assembly + terminal spawn
-  paths.ts                 Pure path builders + safeJoinUnderRoot
   migrations.ts            applySessionMigrations (drizzle migration applier)
   compose.ts               composeSessionModule({ dbFile, agentResolver,
                            contentSource, runtimeRegistry, spawnFn?, … })
