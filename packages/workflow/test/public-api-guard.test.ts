@@ -56,6 +56,8 @@ import {
   ParentStateError,
   type RemoveEdgeOpts,
   type ReplaceSpecOpts,
+  type STUCK_RETRY_LIMIT,
+  STUCK_RETRY_MAX_ATTEMPTS,
   type WORKFLOW_NODES_SUBDIR,
   type WORKFLOW_SUBDIR,
   WorkflowAlreadyTerminalError,
@@ -95,7 +97,6 @@ import {
   WorkflowSubgraphNodeRefUnresolvedError,
   WorkflowSubgraphTempIdInvalidError,
   WorkflowSubgraphTempParentlessError,
-  type WorkflowSubstrateFailureReason,
   workflowDir,
   workflowNodeDir,
   workflowRoot,
@@ -186,8 +187,14 @@ describe("@glyphs-ai/workflow public API guard", () => {
     >();
   });
 
-  it("exposes workflow substrate failure reasons with package-prefixed naming", () => {
-    expectTypeOf<WorkflowSubstrateFailureReason>().toEqualTypeOf<"STUCK_RETRY_LIMIT">();
+  it("exposes the substrate stuck-retry failure reason + cap as public consts", () => {
+    // The standalone `WorkflowSubstrateFailureReason` alias was folded
+    // into the `WorkflowFailure` substrate arm; the failure-reason
+    // literal is now anchored by the public `STUCK_RETRY_LIMIT` const.
+    // Lock its literal value-type so the reason string stays part of
+    // the public surface, plus the companion attempt-cap const.
+    expectTypeOf<typeof STUCK_RETRY_LIMIT>().toEqualTypeOf<"STUCK_RETRY_LIMIT">();
+    expectTypeOf(STUCK_RETRY_MAX_ATTEMPTS).toBeNumber();
   });
 
   it("exposes workflow node retry metadata with package-prefixed naming", () => {

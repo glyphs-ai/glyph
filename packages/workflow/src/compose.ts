@@ -9,12 +9,13 @@
  * tests pass an existing `db` from `openTestWorkflowDb()`.
  *
  * Runners are injected at compose time via the `runners` field. The
- * `WorkflowRunners` type is `{ coordinator, worker }`; both fields
- * are non-optional so a missing runner is a TypeScript compile error
- * rather than a runtime throw. To add a new kind, extend
- * `WorkflowNodeKind` and add a matching field on `WorkflowRunners` — the
- * substrate's exhaustive `switch (kind)` branches will fail to
- * compile until every new kind has a runner.
+ * `WorkflowRunners` type carries one field per `WorkflowNodeKind`
+ * (`{ coordinator, worker, human }`); every field is non-optional so a
+ * missing runner is a TypeScript compile error rather than a runtime
+ * throw. To add a new kind, extend `WorkflowNodeKind` and add a
+ * matching field on `WorkflowRunners` — the substrate's exhaustive
+ * `switch (kind)` branches will fail to compile until every new kind
+ * has a runner.
  *
  * # Engine + two-phase init
  *

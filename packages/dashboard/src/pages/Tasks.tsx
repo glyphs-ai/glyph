@@ -201,16 +201,20 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
     return Array.from(set).sort();
   }, [agents, tasks]);
 
-  // True when any filter chrome is constraining the list. Used by the
-  // zero-state collapse: when the workspace returns zero tasks AND no
-  // filter is active, we collapse to a single full-width empty
-  // (Dispatch CTA); when a filter IS active we keep the split layout
-  // so the user can see and clear the filter chrome.
+  // True when any filter chrome is constraining the list. Distinguishes a
+  // genuinely empty workspace (zero tasks, no filter) from a
+  // filter-narrowed result: the former surfaces the "No tasks yet" zero
+  // state (with the Dispatch CTA) in the right detail pane, the latter the
+  // "No matches" hint. Either way the filter rail stays mounted so the
+  // user can always see and clear the filter chrome.
   const filtersActive =
     idQuery.trim() !== "" ||
     agentFilterUrl !== ALL_AGENTS ||
     runtimeFilter !== ALL_RUNTIMES ||
     timeFilter !== DEFAULT_TIME_PRESET;
+
+  // Genuinely empty workspace: loaded, zero tasks, and nothing filtered.
+  const workspaceEmpty = loaded && tasks.length === 0 && !filtersActive;
 
   if (currentWorkspaceId === null) {
     return (
@@ -238,15 +242,54 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
       <div className="tasks-page">
         {error && <div className="alert alert--error">⚠️ {error}</div>}
 
-        {/* When the workspace has zero tasks and no user-set filter is
-            hiding rows, collapse the split layout into a single
-            full-width zero-state with a Dispatch-task CTA. The previous
-            shape rendered both the list-side empty and the right-pane
-            "No task selected" placeholder side-by-side, leaving a wide gap.
-            When any filter is active (`?agent=`, `?runtime=`, `?range=`,
-            or `?q=`), keep the normal split layout so the user sees filter-oriented no-match copy. */}
-        {loaded && tasks.length === 0 && !filtersActive ? (
-          <div className="tasks-pane tasks-pane--with-detail tasks-pane--zero">
+        <div className="tasks-pane tasks-pane--with-detail">
+          <div className="tasks-pane__list">
+            <TaskFilters
+              idQuery={idQuery}
+              onIdQueryChange={setIdQuery}
+              agentFilter={agentFilter}
+              onAgentFilterChange={setAgentFilter}
+              runtimeFilter={runtimeFilter}
+              onRuntimeFilterChange={setRuntimeFilter}
+              timeFilter={timeFilter}
+              onTimeFilterChange={setTimeFilter}
+              agents={agents}
+              filterAgentNames={filterAgentNames}
+              runtimes={runtimes}
+              hideAgentFilter={false}
+            />
+            <div className="tasks-pane__list-scroll">
+              {!loaded ? (
+                <TasksEmptyState loading />
+              ) : workspaceEmpty ? (
+                <TasksEmptyState
+                  variant="rail-hint"
+                  title="No tasks yet. Dispatch one to get started."
+                />
+              ) : visibleTasks.length === 0 ? (
+                <TasksEmptyState
+                  title="No matches"
+                  hint="Adjust the filters above to see more tasks."
+                />
+              ) : (
+                <TaskList
+                  tasks={visibleTasks}
+                  selectedId={effectiveSelectedId}
+                  onSelect={setSelectedId}
+                  onDelete={setDeleteTarget}
+                  onCancel={requestCancel}
+                  onRerun={requestRerun}
+                />
+              )}
+            </div>
+          </div>
+
+          {effectiveSelectedId ? (
+            <TaskDetail taskId={effectiveSelectedId} pollIntervalMs={pollIntervalMs} />
+          ) : workspaceEmpty ? (
+            // Genuinely empty workspace: the rich zero-state (with the
+            // Dispatch CTA) lives in the detail pane while the rail keeps
+            // the filter chrome plus a short "No tasks yet" list hint.
             <TasksZeroState
               dispatchDisabled={dispatchAgents.length === 0}
               dispatchDisabledTitle={
@@ -256,61 +299,13 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
               }
               onDispatch={() => setDispatchOpen(true)}
             />
-          </div>
-        ) : (
-          <div className="tasks-pane tasks-pane--with-detail">
-            <div className="tasks-pane__list">
-              <TaskFilters
-                idQuery={idQuery}
-                onIdQueryChange={setIdQuery}
-                agentFilter={agentFilter}
-                onAgentFilterChange={setAgentFilter}
-                runtimeFilter={runtimeFilter}
-                onRuntimeFilterChange={setRuntimeFilter}
-                timeFilter={timeFilter}
-                onTimeFilterChange={setTimeFilter}
-                agents={agents}
-                filterAgentNames={filterAgentNames}
-                runtimes={runtimes}
-                hideAgentFilter={false}
-              />
-              <div className="tasks-pane__list-scroll">
-                {!loaded ? (
-                  <TasksEmptyState loading />
-                ) : visibleTasks.length === 0 ? (
-                  <TasksEmptyState
-                    title="No matches"
-                    hint="Adjust the filters above to see more tasks."
-                  />
-                ) : (
-                  <TaskList
-                    tasks={visibleTasks}
-                    selectedId={effectiveSelectedId}
-                    onSelect={setSelectedId}
-                    onDelete={setDeleteTarget}
-                    onCancel={requestCancel}
-                    onRerun={requestRerun}
-                  />
-                )}
-              </div>
-            </div>
-
-            {effectiveSelectedId ? (
-              <TaskDetail taskId={effectiveSelectedId} pollIntervalMs={pollIntervalMs} />
-            ) : visibleTasks.length === 0 ? null : (
-              // When the filter narrowed the list to zero rows the
-              // left card already carries the full "No matches" copy;
-              // rendering the detail-side "No task selected / No tasks
-              // match the current filters" placeholder next to it would
-              // produce two redundant empty states. We only fall
-              // through to the placeholder when there ARE visible rows
-              // but selection is null (in practice rare because
-              // `effectiveSelectedId` auto-binds to the first row, but
-              // we keep the branch for safety).
-              <TaskDetailPlaceholder />
-            )}
-          </div>
-        )}
+          ) : (
+            // Either the filter narrowed the list to zero, or there are
+            // rows but none is selected (rare: effectiveSelectedId auto-
+            // binds the first row). Both show the calm detail placeholder.
+            <TaskDetailPlaceholder />
+          )}
+        </div>
       </div>
 
       <DispatchModal

@@ -347,6 +347,8 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
   const filtersActive =
     idQuery !== "" || agentFilter !== ALL_AGENTS || timeFilter !== DEFAULT_TIME_PRESET;
+  // Genuinely empty workspace: loaded, zero workflows, nothing filtered.
+  const workspaceEmpty = loaded && workflows.length === 0 && !filtersActive;
   const detailWorkflow = detail.workflow;
   const showNodeTaskPane = nodeTaskId !== null && effectiveSelectedId !== null;
   const showHumanNodePane = humanNodeId !== null && effectiveSelectedId !== null;
@@ -373,125 +375,133 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
       <div className="tasks-page">
         {error && <div className="alert alert--error">⚠️ {error}</div>}
-        {loaded && workflows.length === 0 && !filtersActive ? (
-          <div className="tasks-pane tasks-pane--with-detail tasks-pane--zero">
-            <div className="empty tasks-pane__zero" data-testid="workflows-empty-zero">
-              <div className="empty__icon" aria-hidden="true">
-                🪄
-              </div>
-              <p className="empty__title">No workflows yet</p>
-              <p className="empty__hint">
-                Click <strong>New workflow</strong> to dispatch a coordinator-driven multi-step run.
-                The coordinator decides which task and follow-up coordinator nodes to spawn next —
-                each phase wakes the next one when the previous worker terminates.
-              </p>
+        <div className="tasks-pane tasks-pane--with-detail">
+          <div className="tasks-pane__list">
+            <WorkflowFilters
+              idQuery={idQuery}
+              onIdQueryChange={setIdQuery}
+              agentFilter={agentFilter}
+              onAgentFilterChange={setAgentFilter}
+              timeFilter={timeFilter}
+              onTimeFilterChange={setTimeFilter}
+              filterAgentNames={filterAgentNames}
+            />
+            <div className="tasks-pane__list-scroll">
+              {!loaded ? (
+                <WorkflowListSkeleton />
+              ) : workspaceEmpty ? (
+                <p className="tasks-pane__list-hint" data-testid="workflows-empty-list">
+                  No workflows yet. Create one to get started.
+                </p>
+              ) : visible.length === 0 ? (
+                <div className="empty" data-testid="workflows-empty-filtered">
+                  <p className="empty__title">No matches</p>
+                  <p className="empty__hint">
+                    Adjust the search, agent, or time filter above to see more workflows.
+                  </p>
+                </div>
+              ) : (
+                <WorkflowList
+                  workflows={visible}
+                  selectedId={effectiveSelectedId}
+                  onSelect={onSelectWorkflow}
+                  onCancel={handleRowCancel}
+                  onDelete={handleRowDelete}
+                  openMenuId={openMenuWorkflowId}
+                  onMenuOpenChange={setOpenMenuWorkflowId}
+                />
+              )}
             </div>
           </div>
-        ) : (
-          <div className="tasks-pane tasks-pane--with-detail">
-            <div className="tasks-pane__list">
-              <WorkflowFilters
-                idQuery={idQuery}
-                onIdQueryChange={setIdQuery}
-                agentFilter={agentFilter}
-                onAgentFilterChange={setAgentFilter}
-                timeFilter={timeFilter}
-                onTimeFilterChange={setTimeFilter}
-                filterAgentNames={filterAgentNames}
-              />
-              <div className="tasks-pane__list-scroll">
-                {!loaded ? (
-                  <WorkflowListSkeleton />
-                ) : visible.length === 0 ? (
-                  <div className="empty" data-testid="workflows-empty-filtered">
-                    <p className="empty__title">No matches</p>
-                    <p className="empty__hint">
-                      Adjust the search, agent, or time filter above to see more workflows.
-                    </p>
-                  </div>
-                ) : (
-                  <WorkflowList
-                    workflows={visible}
-                    selectedId={effectiveSelectedId}
-                    onSelect={onSelectWorkflow}
-                    onCancel={handleRowCancel}
-                    onDelete={handleRowDelete}
-                    openMenuId={openMenuWorkflowId}
-                    onMenuOpenChange={setOpenMenuWorkflowId}
-                  />
-                )}
-              </div>
-            </div>
 
-            {(() => {
-              // `!= null` (loose) rather than `!== null` (strict) so an
-              // out-of-contract `undefined` from a buggy mock or server
-              // falls through to the
-              // `<WorkflowDetailSkeleton />` branch instead of being
-              // handed to `<WorkflowView>` (which dereferences
-              // `workflow.brief` and crashes the root). The hook's
-              // typed shape is `WorkflowHeaderWire | null`, but
-              // accepting `undefined` here keeps the page robust
-              // against contract violations.
-              if (showNodeTaskPane && detailWorkflow != null) {
-                return (
-                  <WorkflowNodeTaskPane
-                    key={`${effectiveSelectedId}:${nodeTaskId}`}
-                    workflow={detailWorkflow}
-                    dag={detail.dag}
-                    nodeTaskId={nodeTaskId as string}
-                    pollIntervalMs={nodeTaskPollIntervalMs}
-                    onBack={onBackToWorkflow}
-                    onNavigate={onNavigateNode}
-                  />
-                );
-              }
-              if (showHumanNodePane && detailWorkflow != null) {
-                return (
-                  <WorkflowNodeHumanPane
-                    key={`${effectiveSelectedId}:human:${humanNodeId}`}
-                    workflow={detailWorkflow}
-                    dag={detail.dag}
-                    nodeId={humanNodeId as string}
-                    onBack={onBackToWorkflow}
-                    onNavigate={onNavigateHumanNode}
-                  />
-                );
-              }
-              if (effectiveSelectedId !== null && detailWorkflow != null) {
-                return (
-                  <WorkflowDetail
-                    key={effectiveSelectedId}
-                    workflow={detailWorkflow}
-                    dag={detail.dag}
-                    dagError={detail.dagError}
-                    selectedNodeId={selectedNodeId}
-                    onSelectNode={onSelectNode}
-                  />
-                );
-              }
-              if (effectiveSelectedId !== null && detail.error !== null) {
-                return (
-                  <aside className="tasks-pane__detail tasks-pane__detail--empty">
-                    <div className="alert alert--error">⚠️ {detail.error}</div>
-                  </aside>
-                );
-              }
-              if (effectiveSelectedId !== null) {
-                return <WorkflowDetailSkeleton />;
-              }
-              if (visible.length === 0) return null;
+          {(() => {
+            // `!= null` (loose) rather than `!== null` (strict) so an
+            // out-of-contract `undefined` from a buggy mock or server
+            // falls through to the
+            // `<WorkflowDetailSkeleton />` branch instead of being
+            // handed to `<WorkflowView>` (which dereferences
+            // `workflow.brief` and crashes the root). The hook's
+            // typed shape is `WorkflowHeaderWire | null`, but
+            // accepting `undefined` here keeps the page robust
+            // against contract violations.
+            if (showNodeTaskPane && detailWorkflow != null) {
+              return (
+                <WorkflowNodeTaskPane
+                  key={`${effectiveSelectedId}:${nodeTaskId}`}
+                  workflow={detailWorkflow}
+                  dag={detail.dag}
+                  nodeTaskId={nodeTaskId as string}
+                  pollIntervalMs={nodeTaskPollIntervalMs}
+                  onBack={onBackToWorkflow}
+                  onNavigate={onNavigateNode}
+                />
+              );
+            }
+            if (showHumanNodePane && detailWorkflow != null) {
+              return (
+                <WorkflowNodeHumanPane
+                  key={`${effectiveSelectedId}:human:${humanNodeId}`}
+                  workflow={detailWorkflow}
+                  dag={detail.dag}
+                  nodeId={humanNodeId as string}
+                  onBack={onBackToWorkflow}
+                  onNavigate={onNavigateHumanNode}
+                />
+              );
+            }
+            if (effectiveSelectedId !== null && detailWorkflow != null) {
+              return (
+                <WorkflowDetail
+                  key={effectiveSelectedId}
+                  workflow={detailWorkflow}
+                  dag={detail.dag}
+                  dagError={detail.dagError}
+                  selectedNodeId={selectedNodeId}
+                  onSelectNode={onSelectNode}
+                />
+              );
+            }
+            if (effectiveSelectedId !== null && detail.error !== null) {
               return (
                 <aside className="tasks-pane__detail tasks-pane__detail--empty">
-                  <div className="empty">
-                    <div className="empty__icon">🪄</div>
-                    <p className="empty__title">No workflow selected</p>
+                  <div className="alert alert--error">⚠️ {detail.error}</div>
+                </aside>
+              );
+            }
+            if (effectiveSelectedId !== null) {
+              return <WorkflowDetailSkeleton />;
+            }
+            if (workspaceEmpty) {
+              // Genuinely empty workspace: the rich zero-state lives in
+              // the detail pane while the rail keeps the filter chrome
+              // plus a short "No workflows yet" list hint.
+              return (
+                <aside className="tasks-pane__detail tasks-pane__detail--empty">
+                  <div className="empty" data-testid="workflows-empty-zero">
+                    <div className="empty__icon" aria-hidden="true">
+                      🪄
+                    </div>
+                    <p className="empty__title">No workflows yet</p>
+                    <p className="empty__hint">
+                      Click <strong>New workflow</strong> to dispatch a coordinator-driven
+                      multi-step run. The coordinator decides which task and follow-up coordinator
+                      nodes to spawn next — each phase wakes the next one when the previous worker
+                      terminates.
+                    </p>
                   </div>
                 </aside>
               );
-            })()}
-          </div>
-        )}
+            }
+            return (
+              <aside className="tasks-pane__detail tasks-pane__detail--empty">
+                <div className="empty">
+                  <div className="empty__icon">🪄</div>
+                  <p className="empty__title">No workflow selected</p>
+                </div>
+              </aside>
+            );
+          })()}
+        </div>
       </div>
 
       {createOpen && (
