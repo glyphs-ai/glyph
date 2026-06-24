@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { HasDependentsError } from "../../src/_shared/dependents-error.js";
+import { HasDependentsError } from "../../src/_shared/errors.js";
 import { AgentRepository } from "../../src/agent/agent-repository.js";
 import { type AgentFetcher, AgentService } from "../../src/agent/agent-service.js";
 import { CatalogService } from "../../src/facade/catalog-service.js";

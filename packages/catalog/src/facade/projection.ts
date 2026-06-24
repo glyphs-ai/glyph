@@ -7,8 +7,6 @@
  */
 
 import type { AgentEntity } from "../agent/agent-entity.js";
-import type { McpEntity } from "../mcp/mcp-entity.js";
-import type { SkillEntity } from "../skill/skill-entity.js";
 import type {
   Agent,
   AgentEntry,
@@ -19,7 +17,9 @@ import type {
   MissingDep,
   Skill,
   SkillEntry,
-} from "../types.js";
+} from "../dto.js";
+import type { McpEntity } from "../mcp/mcp-entity.js";
+import type { SkillEntity } from "../skill/skill-entity.js";
 
 export interface CascadeContext {
   readonly skillByFqn: ReadonlyMap<string, SkillEntity>;

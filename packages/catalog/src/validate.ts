@@ -22,9 +22,9 @@
  */
 
 import { AgentFrontmatterError } from "./agent/errors.js";
+import type { AgentInstallBody, McpInstallBody, SkillInstallBody } from "./dto.js";
 import { McpInvalidJsonError } from "./mcp/errors.js";
 import { SkillFrontmatterError } from "./skill/errors.js";
-import type { AgentInstallBody, McpInstallBody, SkillInstallBody } from "./types.js";
 
 const REQUEST_PATH = "<request>";
 
