@@ -1,4 +1,4 @@
-import { shExportPrefix, shQuote, waitForEarlyFailure } from "../_shared.js";
+import { hasUsableEnv, shExportPrefix, shQuote, waitForEarlyFailure } from "../_shared.js";
 import { NoTerminalFoundError } from "../errors.js";
 import type { LaunchCommand, Launcher, SpawnTerminalDeps, SpawnTerminalResult } from "../types.js";
 
@@ -91,7 +91,7 @@ function buildLinuxArgs(term: LinuxLauncher, cmd: LaunchCommand): string[] {
   // When env is non-empty we MUST go through a shell to materialise it.
   // Drop the per-terminal native-argv branches in that case — they
   // would silently not set the env.
-  const hasEnv = cmd.env !== undefined && Object.keys(cmd.env).length > 0;
+  const hasEnv = hasUsableEnv(cmd.env);
   if (hasEnv) {
     switch (term) {
       case "xfce4-terminal":

@@ -7,7 +7,7 @@ vi.mock("node:fs", () => ({
 }));
 
 import { existsSync, lstatSync } from "node:fs";
-import { existsLike, whichSyncDefault } from "../src/_shared.js";
+import { existsLike, pwshEnvPrefix, shExportPrefix, whichSyncDefault } from "../src/_shared.js";
 
 const mockedLstat = vi.mocked(lstatSync);
 const mockedExists = vi.mocked(existsSync);
@@ -149,5 +149,52 @@ describe("whichSyncDefault — best-effort PATH lookup", () => {
     process.env.PATH = "/usr/bin:/bin";
     mockedExists.mockReturnValue(false);
     expect(whichSyncDefault("nonexistent")).toBeNull();
+  });
+});
+
+describe("env prefix builders: defence-in-depth string-value filter", () => {
+  it("shExportPrefix skips non-string values without throwing", () => {
+    const env = {
+      KEEP: "yes",
+      // biome-ignore lint/suspicious/noExplicitAny: malformed env probe
+      DROP_UNDEF: undefined as any,
+      // biome-ignore lint/suspicious/noExplicitAny: malformed env probe
+      DROP_NULL: null as any,
+      // biome-ignore lint/suspicious/noExplicitAny: malformed env probe
+      DROP_NUMBER: 123 as any,
+    } as Record<string, string>;
+    const out = shExportPrefix(env);
+    expect(out).toContain("KEEP='yes'");
+    expect(out).not.toContain("DROP_UNDEF");
+    expect(out).not.toContain("DROP_NULL");
+    expect(out).not.toContain("DROP_NUMBER");
+  });
+
+  it("pwshEnvPrefix skips non-string values without throwing", () => {
+    const env = {
+      KEEP: "yes",
+      // biome-ignore lint/suspicious/noExplicitAny: malformed env probe
+      DROP_UNDEF: undefined as any,
+      // biome-ignore lint/suspicious/noExplicitAny: malformed env probe
+      DROP_NULL: null as any,
+      // biome-ignore lint/suspicious/noExplicitAny: malformed env probe
+      DROP_BOOL: false as any,
+    } as Record<string, string>;
+    const out = pwshEnvPrefix(env);
+    expect(out).toContain("$env:KEEP = 'yes'");
+    expect(out).not.toContain("DROP_UNDEF");
+    expect(out).not.toContain("DROP_NULL");
+    expect(out).not.toContain("DROP_BOOL");
+  });
+
+  it("returns empty string when EVERY entry is filtered out", () => {
+    const env = {
+      // biome-ignore lint/suspicious/noExplicitAny: malformed env probe
+      A: undefined as any,
+      // biome-ignore lint/suspicious/noExplicitAny: malformed env probe
+      B: undefined as any,
+    } as Record<string, string>;
+    expect(shExportPrefix(env)).toBe("");
+    expect(pwshEnvPrefix(env)).toBe("");
   });
 });
