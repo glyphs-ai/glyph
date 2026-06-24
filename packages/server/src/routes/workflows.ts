@@ -75,49 +75,23 @@
  * Any other prefix yields 400.
  */
 
-import { readdir, stat } from "node:fs/promises";
-import path from "node:path";
 import type {
-  AddEdgeBody,
-  AddNodeBody,
-  AddSubgraphBody,
-  AddSubgraphEdgeInputWire,
-  AddSubgraphNodeInputWire,
-  CancelWorkflowBody,
-  CreateWorkflowBody,
-  FinishWorkflowBody,
-  NodeRefWire,
-  ReplaceNodeSpecBody,
   RespondHumanNodeBody,
-  WorkflowArtifactsResponse,
-  WorkflowArtifactWire,
   WorkflowDagWire,
   WorkflowHeaderWire,
   WorkflowStatusWire,
 } from "@glyphs-ai/api";
+import { InvalidTransition, type TaskService } from "@glyphs-ai/task";
 import {
-  InvalidTransition,
-  tasksRoot as resolveTasksRoot,
-  safeJoinUnderRoot as safeJoinTaskRoot,
-  TASK_ARTIFACT_SUBDIR,
-  type TaskService,
-} from "@glyphs-ai/task";
-import {
-  type NodeRef,
-  workflowDir as resolveWorkflowDir,
   WorkflowDeleteRequiresTerminalError,
   WorkflowError,
-  type WorkflowNodeKind,
   WorkflowNodeNotFoundError,
   type WorkflowService,
 } from "@glyphs-ai/workflow";
 import { Hono } from "hono";
-import { contentTypeFor, mimeBucketFor } from "../util/mime-bucket.js";
-import { safeJoinNested } from "../util/safe-join.js";
-import { streamFileAsResponse } from "../util/stream-file.js";
 import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
 import { respondError } from "./_respond-error.js";
-import { errorBody, logEvent, parseJsonBody, type ValidationResult } from "./_shared.js";
+import { errorBody, logEvent, parseJsonBody } from "./_shared.js";
 import {
   countAwaitingHuman,
   iterationCountForNodes,
@@ -125,357 +99,22 @@ import {
   projectWorkflowHeader,
   projectWorkflowNodeWithTaskId,
 } from "./_workflow-projection.js";
+import { handleListArtifacts, handleStreamArtifact } from "./workflows/_artifacts.js";
+import {
+  nodeRefFromWire,
+  validateAddEdgeBody,
+  validateAddNodeBody,
+  validateAddSubgraphBody,
+  validateCancelWorkflowBody,
+  validateCreateBody,
+  validateCreatedSinceQuery,
+  validateFinishWorkflowBody,
+  validateReplaceNodeSpecBody,
+} from "./workflows/_validators.js";
 
 type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
 type WorkflowTasksResolver = (c: import("hono").Context) => TaskService;
 type WorkflowWorkspaceDirResolver = (c: import("hono").Context) => string;
-
-const ALLOWED_CREATE_KEYS = new Set(["brief", "details", "coordinatorAgent", "metadata"]);
-const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker", "human"];
-const KNOWN_FINISH_KINDS: readonly ("succeeded" | "failed")[] = ["succeeded", "failed"];
-
-function validateCreatedSinceQuery(raw: string | undefined): ValidationResult<string | undefined> {
-  if (raw === undefined) return { ok: true, value: undefined };
-  // Accept any ISO 8601 string that `Date.parse` understands. The
-  // substrate forwards the string verbatim into a SQL `>=` predicate
-  // against the text-sortable `created_at` column, so any parseable
-  // shape works — we only reject obviously malformed input so the
-  // caller learns about it at the boundary rather than getting an
-  // empty list back.
-  if (Number.isNaN(Date.parse(raw))) {
-    return { ok: false, error: "createdSince must be an ISO 8601 timestamp" };
-  }
-  return { ok: true, value: raw };
-}
-
-function validateCreateBody(raw: unknown): ValidationResult<CreateWorkflowBody> {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    return { ok: false, error: "request body must be an object" };
-  }
-  const obj = raw as Record<string, unknown>;
-  for (const k of Object.keys(obj)) {
-    if (!ALLOWED_CREATE_KEYS.has(k)) {
-      return { ok: false, error: `request body has unknown key "${k}"` };
-    }
-  }
-  const { brief, details, coordinatorAgent, metadata } = obj;
-  if (typeof brief !== "string" || brief.trim().length === 0) {
-    return { ok: false, error: "brief must be a non-empty string" };
-  }
-  if (typeof coordinatorAgent !== "string" || coordinatorAgent.trim().length === 0) {
-    return { ok: false, error: "coordinatorAgent must be a non-empty string" };
-  }
-  if (details !== undefined && typeof details !== "string") {
-    return { ok: false, error: "details, when set, must be a string" };
-  }
-  if (metadata !== undefined) {
-    if (metadata === null || typeof metadata !== "object" || Array.isArray(metadata)) {
-      return { ok: false, error: "metadata, when set, must be a JSON object" };
-    }
-  }
-  return {
-    ok: true,
-    value: {
-      brief,
-      coordinatorAgent,
-      ...(details !== undefined ? { details } : {}),
-      ...(metadata !== undefined
-        ? { metadata: metadata as Readonly<Record<string, unknown>> }
-        : {}),
-    },
-  };
-}
-
-// ─── Mutation-route body validators ───────────────────────────────
-//
-// One validator per mutation primitive that takes a body. Each one
-// rejects the cheap shape errors at the boundary (unknown keys, wrong
-// types, missing required fields) so the substrate sees only inputs
-// that are at least *structurally* sane. Domain rules (parent-state,
-// cycle, kind enum) are the substrate's job — these validators MUST
-// NOT pre-check anything the substrate already validates, or the
-// caller would observe two distinct rejection paths for the same
-// invariant.
-
-function isPlainObject(raw: unknown): raw is Record<string, unknown> {
-  return raw !== null && typeof raw === "object" && !Array.isArray(raw);
-}
-
-function validateAddNodeBody(raw: unknown): ValidationResult<AddNodeBody> {
-  if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
-  const allowed = new Set(["kind", "spec", "parents"]);
-  for (const k of Object.keys(raw)) {
-    if (!allowed.has(k)) return { ok: false, error: `request body has unknown key "${k}"` };
-  }
-  const { kind, spec, parents } = raw;
-  if (typeof kind !== "string" || !(KNOWN_NODE_KINDS as readonly string[]).includes(kind)) {
-    return {
-      ok: false,
-      error: `kind must be one of: ${KNOWN_NODE_KINDS.join(", ")}`,
-    };
-  }
-  if (spec === undefined) return { ok: false, error: "spec is required" };
-  if (!Array.isArray(parents)) return { ok: false, error: "parents must be an array of strings" };
-  for (const p of parents) {
-    if (typeof p !== "string" || p.length === 0) {
-      return { ok: false, error: "parents entries must be non-empty strings" };
-    }
-  }
-  return {
-    ok: true,
-    value: {
-      kind: kind as AddNodeBody["kind"],
-      spec,
-      parents: parents as readonly string[],
-    },
-  };
-}
-
-function validateAddEdgeBody(raw: unknown): ValidationResult<AddEdgeBody> {
-  if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
-  const allowed = new Set(["fromNodeId", "toNodeId"]);
-  for (const k of Object.keys(raw)) {
-    if (!allowed.has(k)) return { ok: false, error: `request body has unknown key "${k}"` };
-  }
-  const { fromNodeId, toNodeId } = raw;
-  if (typeof fromNodeId !== "string" || fromNodeId.length === 0) {
-    return { ok: false, error: "fromNodeId must be a non-empty string" };
-  }
-  if (typeof toNodeId !== "string" || toNodeId.length === 0) {
-    return { ok: false, error: "toNodeId must be a non-empty string" };
-  }
-  return { ok: true, value: { fromNodeId, toNodeId } };
-}
-
-function validateNodeRefWire(raw: unknown): ValidationResult<NodeRefWire> {
-  if (!isPlainObject(raw)) return { ok: false, error: "ref must be an object" };
-  const keys = Object.keys(raw);
-  if (keys.length !== 1) {
-    return { ok: false, error: 'ref must have exactly one key: "nodeId" OR "tempId"' };
-  }
-  if ("nodeId" in raw) {
-    if (typeof raw.nodeId !== "string" || raw.nodeId.length === 0) {
-      return { ok: false, error: "ref.nodeId must be a non-empty string" };
-    }
-    return { ok: true, value: { nodeId: raw.nodeId } };
-  }
-  if ("tempId" in raw) {
-    if (typeof raw.tempId !== "string" || raw.tempId.length === 0) {
-      return { ok: false, error: "ref.tempId must be a non-empty string" };
-    }
-    return { ok: true, value: { tempId: raw.tempId } };
-  }
-  return { ok: false, error: 'ref must have key "nodeId" OR "tempId"' };
-}
-
-function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgraphBody> {
-  if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
-  const allowed = new Set(["nodes", "edges"]);
-  for (const k of Object.keys(raw)) {
-    if (!allowed.has(k)) return { ok: false, error: `request body has unknown key "${k}"` };
-  }
-  const { nodes, edges } = raw;
-  if (!Array.isArray(nodes)) return { ok: false, error: "nodes must be an array" };
-  if (!Array.isArray(edges)) return { ok: false, error: "edges must be an array" };
-  const validNodes: AddSubgraphNodeInputWire[] = [];
-  for (let i = 0; i < nodes.length; i += 1) {
-    const n = nodes[i];
-    if (!isPlainObject(n)) return { ok: false, error: `nodes[${i}] must be an object` };
-    const nAllowed = new Set(["tempId", "kind", "spec", "existingParents"]);
-    for (const k of Object.keys(n)) {
-      if (!nAllowed.has(k)) {
-        return { ok: false, error: `nodes[${i}] has unknown key "${k}"` };
-      }
-    }
-    if (typeof n.tempId !== "string" || n.tempId.length === 0) {
-      return { ok: false, error: `nodes[${i}].tempId must be a non-empty string` };
-    }
-    if (typeof n.kind !== "string" || !(KNOWN_NODE_KINDS as readonly string[]).includes(n.kind)) {
-      return {
-        ok: false,
-        error: `nodes[${i}].kind must be one of: ${KNOWN_NODE_KINDS.join(", ")}`,
-      };
-    }
-    if (n.spec === undefined) {
-      return { ok: false, error: `nodes[${i}].spec is required` };
-    }
-    let existingParents: readonly string[] | undefined;
-    if (n.existingParents !== undefined) {
-      if (!Array.isArray(n.existingParents)) {
-        return { ok: false, error: `nodes[${i}].existingParents must be an array` };
-      }
-      for (const p of n.existingParents) {
-        if (typeof p !== "string" || p.length === 0) {
-          return {
-            ok: false,
-            error: `nodes[${i}].existingParents entries must be non-empty strings`,
-          };
-        }
-      }
-      existingParents = n.existingParents as readonly string[];
-    }
-    validNodes.push({
-      tempId: n.tempId,
-      kind: n.kind as AddSubgraphNodeInputWire["kind"],
-      spec: n.spec,
-      ...(existingParents !== undefined ? { existingParents } : {}),
-    });
-  }
-  const validEdges: AddSubgraphEdgeInputWire[] = [];
-  for (let i = 0; i < edges.length; i += 1) {
-    const e = edges[i];
-    if (!isPlainObject(e)) return { ok: false, error: `edges[${i}] must be an object` };
-    const eAllowed = new Set(["from", "to"]);
-    for (const k of Object.keys(e)) {
-      if (!eAllowed.has(k)) {
-        return { ok: false, error: `edges[${i}] has unknown key "${k}"` };
-      }
-    }
-    const fromResult = validateNodeRefWire(e.from);
-    if (!fromResult.ok) return { ok: false, error: `edges[${i}].from: ${fromResult.error}` };
-    const toResult = validateNodeRefWire(e.to);
-    if (!toResult.ok) return { ok: false, error: `edges[${i}].to: ${toResult.error}` };
-    validEdges.push({ from: fromResult.value, to: toResult.value });
-  }
-  return { ok: true, value: { nodes: validNodes, edges: validEdges } };
-}
-
-function validateReplaceNodeSpecBody(raw: unknown): ValidationResult<ReplaceNodeSpecBody> {
-  if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
-  const allowed = new Set(["newSpec"]);
-  for (const k of Object.keys(raw)) {
-    if (!allowed.has(k)) return { ok: false, error: `request body has unknown key "${k}"` };
-  }
-  if (raw.newSpec === undefined) return { ok: false, error: "newSpec is required" };
-  return { ok: true, value: { newSpec: raw.newSpec } };
-}
-
-function validateFinishWorkflowBody(raw: unknown): ValidationResult<FinishWorkflowBody> {
-  if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
-  const { kind } = raw;
-  if (typeof kind !== "string" || !(KNOWN_FINISH_KINDS as readonly string[]).includes(kind)) {
-    return {
-      ok: false,
-      error: `kind must be one of: ${KNOWN_FINISH_KINDS.join(", ")}`,
-    };
-  }
-  if (kind === "succeeded") {
-    const allowed = new Set(["kind", "success"]);
-    for (const k of Object.keys(raw)) {
-      if (!allowed.has(k)) return { ok: false, error: `request body has unknown key "${k}"` };
-    }
-    const { success } = raw;
-    if (success !== undefined) {
-      if (!isPlainObject(success)) {
-        return { ok: false, error: "success must be an object" };
-      }
-      for (const k of Object.keys(success)) {
-        if (k !== "output") {
-          return { ok: false, error: `success has unknown key "${k}"` };
-        }
-      }
-      const out = (success as { output?: unknown }).output;
-      if (out !== undefined && out !== null && typeof out !== "string") {
-        return { ok: false, error: "success.output must be a string or null" };
-      }
-      return {
-        ok: true,
-        value: {
-          kind: "succeeded",
-          success: { output: out === undefined ? null : (out as string | null) },
-        },
-      };
-    }
-    return { ok: true, value: { kind: "succeeded" } };
-  }
-  // kind === "failed"
-  const allowed = new Set(["kind", "failure"]);
-  for (const k of Object.keys(raw)) {
-    if (!allowed.has(k)) return { ok: false, error: `request body has unknown key "${k}"` };
-  }
-  const { failure } = raw;
-  if (!isPlainObject(failure)) {
-    return { ok: false, error: "failure is required and must be an object" };
-  }
-  for (const k of Object.keys(failure)) {
-    if (k !== "kind" && k !== "message") {
-      return { ok: false, error: `failure has unknown key "${k}"` };
-    }
-  }
-  const failureKind = (failure as { kind?: unknown }).kind;
-  if (failureKind !== undefined && failureKind !== "coordinator") {
-    return { ok: false, error: 'failure.kind must be "coordinator" when supplied' };
-  }
-  const message = (failure as { message?: unknown }).message;
-  if (typeof message !== "string") {
-    return { ok: false, error: "failure.message must be a string" };
-  }
-  return {
-    ok: true,
-    value: {
-      kind: "failed",
-      failure: { kind: "coordinator", message },
-    },
-  };
-}
-
-/**
- * Internal narrowed body shape used by the cancel-route handler.
- * Mirrors {@link CancelWorkflowBody} but with `kind` widened from
- * optional `"user"?` to required `"user"`, reflecting the
- * normalization the validator performs (omitted -> "user"). The wire
- * contract stays optional for callers; downstream code receives the
- * normalized value.
- */
-interface ValidatedCancelWorkflowBody {
-  readonly cancellation: {
-    readonly kind: "user";
-    readonly message: string;
-  };
-}
-
-function validateCancelWorkflowBody(raw: unknown): ValidationResult<ValidatedCancelWorkflowBody> {
-  if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
-  for (const k of Object.keys(raw)) {
-    if (k !== "cancellation") {
-      return { ok: false, error: `request body has unknown key "${k}"` };
-    }
-  }
-  const { cancellation } = raw;
-  if (!isPlainObject(cancellation)) {
-    return { ok: false, error: "cancellation is required and must be an object" };
-  }
-  for (const k of Object.keys(cancellation)) {
-    if (k !== "kind" && k !== "message") {
-      return { ok: false, error: `cancellation has unknown key "${k}"` };
-    }
-  }
-  const kind = (cancellation as { kind?: unknown }).kind;
-  if (kind !== undefined && kind !== "user") {
-    return { ok: false, error: 'cancellation.kind must be "user" when supplied' };
-  }
-  const message = (cancellation as { message?: unknown }).message;
-  if (typeof message !== "string") {
-    return { ok: false, error: "cancellation.message must be a string" };
-  }
-  return {
-    ok: true,
-    value: { cancellation: { kind: "user", message } },
-  };
-}
-
-/**
- * Translate the wire-shape {@link NodeRefWire} (structural-discriminator
- * union by `nodeId` vs `tempId` presence) to the substrate's
- * {@link NodeRef} (explicit-tag union). The wire form is JSON-friendly
- * (no extra discriminator field); the substrate form is type-friendly
- * (discriminated by `kind`). Pure projection — no validation here, the
- * caller has already proven the input is a valid wire shape.
- */
-function nodeRefFromWire(ref: NodeRefWire): NodeRef {
-  if ("nodeId" in ref) return { kind: "existing", id: ref.nodeId };
-  return { kind: "temp", tempId: ref.tempId };
-}
 
 export function workflowsRoutes(
   resolve: WorkflowServiceResolver,
@@ -483,6 +122,7 @@ export function workflowsRoutes(
   resolveWorkspaceDir: WorkflowWorkspaceDirResolver,
 ): Hono {
   const app = new Hono();
+  const artifactDeps = { resolve, resolveTasks, resolveWorkspaceDir };
 
   // ── GET / — list with optional q / coordinatorAgent / createdSince ─
   app.get("/", async (c) => {
@@ -646,175 +286,13 @@ export function workflowsRoutes(
     }
   });
 
-  // ── GET /:wfid/artifacts — list workflow + per-node artifacts ────
-  //
-  // Aggregates two on-disk namespaces:
-  //   1. `<workflowDir>/artifact/` — files the coordinator curated as
-  //      workflow-summary artifacts. May not exist (returns []).
-  //   2. `<tasksRoot>/<taskId>/artifact/` — per-node task artifacts.
-  //      Resolved via the substrate enrichment (taskId reverse-lookup).
-  //
-  // Workflow-summary entries come first; node groups follow, sorted
-  // by `nodeId` for stability across polls. A workflow with no
-  // artifacts in either namespace returns `{ artifacts: [] }` (200);
-  // a missing workflow returns 404.
-  app.get("/:wfid/artifacts", async (c) => {
-    const wfid = c.req.param("wfid");
-    let snapshot: Awaited<ReturnType<WorkflowService["getDag"]>>;
-    try {
-      snapshot = await resolve(c).getDag(wfid);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "workflows.artifacts.list",
-        policy: workflowsErrorPolicy,
-        meta: { workflowId: wfid },
-      });
-    }
-
-    const workspaceDir = resolveWorkspaceDir(c);
-    const tasksSvc = resolveTasks(c);
-
-    const summaryRoot = path.join(resolveWorkflowDir(workspaceDir, wfid), "artifact");
-    const summaryFiles = await listFilesRecursive(summaryRoot);
-    const summaryEntries: WorkflowArtifactWire[] = summaryFiles.map((f) => ({
-      kind: "workflow-summary" as const,
-      path: f.relPath,
-      size: f.size,
-      modifiedAt: f.modifiedAt,
-      mimeBucket: mimeBucketFor(f.relPath),
-    }));
-
-    // Node groups: every node (worker AND coord) that resolves to a
-    // dispatched task. We surface coord tasks too — the dashboard's
-    // Mode B drill-down navigates to either kind uniformly.
-    const nodes = [...snapshot.nodes].sort((a, b) => a.id.localeCompare(b.id));
-    const tasksRoot = resolveTasksRoot(workspaceDir);
-    const nodeEntries: WorkflowArtifactWire[] = [];
-    for (const node of nodes) {
-      const task = await tasksSvc.findTaskByWorkflowNode(node.id);
-      if (task === null) continue;
-      let taskDir: string;
-      try {
-        taskDir = safeJoinTaskRoot(tasksRoot, task.id);
-      } catch {
-        continue;
-      }
-      const artifactRoot = path.join(taskDir, TASK_ARTIFACT_SUBDIR);
-      const files = await listFilesRecursive(artifactRoot);
-      for (const f of files) {
-        nodeEntries.push({
-          kind: "node" as const,
-          nodeId: node.id,
-          taskId: task.id,
-          path: f.relPath,
-          size: f.size,
-          modifiedAt: f.modifiedAt,
-          mimeBucket: mimeBucketFor(f.relPath),
-        });
-      }
-    }
-
-    const response: WorkflowArtifactsResponse = {
-      artifacts: [...summaryEntries, ...nodeEntries],
-    };
-    return c.json(response);
-  });
-
-  // ── GET /:wfid/artifacts/:encodedPath — stream one artifact ──────
-  //
-  // `encodedPath` is a SINGLE Hono path segment, so multi-segment
-  // paths like `summary/foo/bar.md` need to be encoded with `%2F`
-  // for `/` on the wire. The route decodes once, branches on
-  // sentinel prefix, then path-traverses-checks via
-  // `safeJoinNested` before serving bytes.
-  //
-  //   - `summary/<rest>` → `<workflowDir>/artifact/<rest>` (no-store)
-  //   - `nodes/<nodeId>/<rest>` → `<tasksRoot>/<taskId>/artifact/<rest>`
-  //     (`max-age=300` once owning task is terminal; `no-store` while
-  //     it is still running, since the worker may still be appending)
-  //
-  // Any other prefix yields 400.
-  app.get("/:wfid/artifacts/:encodedPath", async (c) => {
-    const wfid = c.req.param("wfid");
-    const encoded = c.req.param("encodedPath");
-
-    let decoded: string;
-    try {
-      decoded = decodeURIComponent(encoded);
-    } catch {
-      return c.json({ error: "encodedPath is not a valid percent-encoded string" }, 400);
-    }
-
-    // Cheap up-front traversal rejection. The per-segment
-    // `safeJoinNested` below is still the canonical defence, but
-    // failing the obvious cases here keeps the error body
-    // descriptive ("traversal in path" vs the generic "escapes root").
-    if (decoded.includes("..") || decoded.includes("\0")) {
-      return c.json({ error: "traversal segment in artifact path" }, 400);
-    }
-
-    const workspaceDir = resolveWorkspaceDir(c);
-    let absPath: string;
-    let cacheControl: string;
-
-    if (decoded.startsWith("summary/")) {
-      const rest = decoded.slice("summary/".length);
-      if (rest === "" || rest.startsWith("/")) {
-        return c.json({ error: "summary path missing trailing segments" }, 400);
-      }
-      try {
-        const summaryRoot = path.join(resolveWorkflowDir(workspaceDir, wfid), "artifact");
-        absPath = safeJoinNested(summaryRoot, rest);
-      } catch {
-        return c.json({ error: "artifact path escapes workflow root" }, 400);
-      }
-      cacheControl = "no-store";
-    } else if (decoded.startsWith("nodes/")) {
-      // `nodes/<nodeId>/<rest>` — minimum two slashes inside.
-      const tail = decoded.slice("nodes/".length);
-      const sep = tail.indexOf("/");
-      if (sep <= 0 || sep === tail.length - 1) {
-        return c.json({ error: "nodes path must be nodes/<nodeId>/<rest>" }, 400);
-      }
-      const nodeId = tail.slice(0, sep);
-      const rest = tail.slice(sep + 1);
-      const task = await resolveTasks(c).findTaskByWorkflowNode(nodeId);
-      if (task === null) {
-        return c.json({ error: "no task dispatched for node" }, 404);
-      }
-      try {
-        const tasksRoot = resolveTasksRoot(workspaceDir);
-        const taskDir = safeJoinTaskRoot(tasksRoot, task.id);
-        const artifactRoot = path.join(taskDir, TASK_ARTIFACT_SUBDIR);
-        absPath = safeJoinNested(artifactRoot, rest);
-      } catch {
-        return c.json({ error: "artifact path escapes task root" }, 400);
-      }
-      // Per-node artifact bytes are only write-once AFTER the owning
-      // task reaches a terminal status (the worker may still be
-      // appending to a file while it runs). Cache aggressively once
-      // terminal; force a re-fetch on every read while running.
-      const taskTerminal =
-        task.status === "succeeded" || task.status === "failed" || task.status === "cancelled";
-      cacheControl = taskTerminal ? "max-age=300" : "no-store";
-    } else {
-      return c.json({ error: "artifact path must start with summary/ or nodes/<nid>/" }, 400);
-    }
-
-    try {
-      const st = await stat(absPath);
-      if (!st.isFile()) {
-        return c.json({ error: "artifact not found" }, 404);
-      }
-    } catch {
-      return c.json({ error: "artifact not found" }, 404);
-    }
-
-    return streamFileAsResponse(absPath, {
-      contentType: contentTypeFor(path.basename(absPath)),
-      cacheControl,
-    });
-  });
+  // Artifact read surface (list + per-artifact byte stream). The two
+  // handlers live in ./workflows/_artifacts.js; they are registered
+  // here so this file stays the single Hono registration surface.
+  app.get("/:wfid/artifacts", (c) => handleListArtifacts(c, c.req.param("wfid"), artifactDeps));
+  app.get("/:wfid/artifacts/:encodedPath", (c) =>
+    handleStreamArtifact(c, c.req.param("wfid"), c.req.param("encodedPath"), artifactDeps),
+  );
 
   // ─────────────────────────────────────────────────────────────────
   // Coord-callback mutation surface. Eight routes that expose
@@ -1213,57 +691,3 @@ export function workflowsRoutes(
 // it from `@glyphs-ai/contracts` separately. Matches the schedules
 // route pattern.
 export type { WorkflowStatusWire };
-
-/**
- * Recursive directory walk. Returns one entry per regular file
- * under `root` with the path relative to `root` (forward slashes,
- * cross-platform), size, and ISO mtime. Returns `[]` when `root`
- * doesn't exist or is unreadable — the caller treats "no curated
- * artifacts yet" as the steady-state for a fresh workflow rather
- * than a 500.
- *
- * Per-file errors are warn-skipped: a transient `stat` fault on one
- * entry doesn't poison the whole listing. (Mirrors the
- * warn-and-skip pattern in `TaskRepository.list`.)
- */
-async function listFilesRecursive(root: string): Promise<readonly FileEntry[]> {
-  const out: FileEntry[] = [];
-  await walk(root, "");
-  return out;
-
-  async function walk(dir: string, rel: string): Promise<void> {
-    let entries: import("node:fs").Dirent[];
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      // Missing or unreadable. For the root dir this is the
-      // "no artifacts yet" case; for a nested dir we just skip.
-      return;
-    }
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      const childRel = rel === "" ? entry.name : `${rel}/${entry.name}`;
-      if (entry.isDirectory()) {
-        await walk(full, childRel);
-      } else if (entry.isFile()) {
-        try {
-          const st = await stat(full);
-          out.push({
-            relPath: childRel,
-            size: st.size,
-            modifiedAt: st.mtime.toISOString(),
-          });
-        } catch {
-          // Best-effort: skip files that disappear between readdir
-          // and stat.
-        }
-      }
-    }
-  }
-}
-
-interface FileEntry {
-  readonly relPath: string;
-  readonly size: number;
-  readonly modifiedAt: string;
-}
