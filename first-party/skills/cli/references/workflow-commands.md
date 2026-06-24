@@ -74,11 +74,10 @@ glyph workflow list \
 ## `glyph workflow create`
 
 - Required flags: `--brief <text>`, `--coord-agent <fqn>`
-- Optional flags: `--details <text>`, `--details-file <path>`,
-  `--metadata-file <path>` (JSON object, persisted on the workflow row)
+- Optional flags: `--details <text>`, `--details-file <path>`
 - Route: `POST /workspaces/:id/workflows`
 - Body: `CreateWorkflowBody` —
-  `{ brief, coordinatorAgent, details?, metadata? }`
+  `{ brief, coordinatorAgent, details? }`
 - Output: `WorkflowHeaderWire` (status `running`, `iterationCount: 1` —
   one freshly-created coord node)
 
