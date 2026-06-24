@@ -36,13 +36,17 @@ export interface Run {
 /**
  * `runBin` does `env: { ...process.env, ...env }`. Without explicit
  * clears, env vars left in the developer's shell (`GLYPH_SERVER`,
- * `PORT`, `GLYPH_WORKSPACE`, `GLYPH_HOME`) leak into spawns and can
- * make tests connect to an unrelated server or home directory.
+ * `PORT`, `GLYPH_HOST`, `GLYPH_WORKSPACE`, `GLYPH_HOME`,
+ * `GLYPH_NON_INTERACTIVE`) leak into spawns and can make tests connect
+ * to an unrelated server / home directory or flip the CLI's prompt
+ * behaviour. Each is set to `undefined` so {@link runBinAt} deletes it
+ * from the merged child env.
  */
 export const SCRUBBED_ENV: NodeJS.ProcessEnv = {
   GLYPH_SERVER: undefined,
   GLYPH_WORKSPACE: undefined,
   GLYPH_HOME: undefined,
+  GLYPH_NON_INTERACTIVE: undefined,
   PORT: undefined,
   GLYPH_HOST: undefined,
 };

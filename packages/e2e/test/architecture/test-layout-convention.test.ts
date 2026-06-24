@@ -142,6 +142,11 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
       "grouped by area (cli/); zero in-pkg src value-imports, so the rule says flat. CLI spawn harnesses stay grouped by subject.",
   },
   {
+    file: "packages/e2e/test/cli/help-surface.test.ts",
+    rationale:
+      "grouped by area (cli/); zero in-pkg src value-imports, so the rule says flat. CLI help-surface snapshot stays grouped by subject.",
+  },
+  {
     file: "packages/e2e/test/cli/integration-smoke.test.ts",
     rationale:
       "grouped by area (cli/); zero in-pkg src value-imports — rule says flat. CLI spawn harnesses stay grouped by subject.",
@@ -150,6 +155,11 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
     file: "packages/e2e/test/cli/spawn-smoke.test.ts",
     rationale:
       "grouped by area (cli/); zero in-pkg src value-imports — rule says flat. CLI spawn harnesses stay grouped by subject.",
+  },
+  {
+    file: "packages/e2e/test/wire-shape/response-bodies.test.ts",
+    rationale:
+      "grouped by area (wire-shape/); zero in-pkg src value-imports (contracts types are type-only), so the rule says flat. Wire-shape response-body checks stay grouped by subject.",
   },
   // runtime
   {

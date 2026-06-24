@@ -78,11 +78,13 @@ describe.skipIf(!BIN_AVAILABLE).sequential("spawn smoke (lifecycle)", () => {
     expect(rf.pid).toBe(initialPid);
   });
 
-  it("status reports healthy + recorded port for the live server", async () => {
-    const r = await runBin(["status"], env);
+  it("status --json reports healthy + recorded port for the live server", async () => {
+    const r = await runBin(["status", "--json"], env);
     expect(r.exitCode, r.stderr).toBe(0);
-    expect(r.stdout).toMatch(/healthy/);
-    expect(r.stdout).toContain(String(port));
+    const payload = JSON.parse(r.stdout) as { state: string; port: number; pid: number };
+    expect(payload.state).toBe("healthy");
+    expect(payload.port).toBe(port);
+    expect(payload.pid).toBe(initialPid);
   });
 
   it("start is idempotent when the server is already alive", async () => {
