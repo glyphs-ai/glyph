@@ -37,22 +37,17 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BIN_AVAILABLE, CLI_BIN, pickPort, runBin, SCRUBBED_ENV } from "../_helpers/cli-bundle.js";
+import { BIN_AVAILABLE, pickPort, runBin, SCRUBBED_ENV } from "../_helpers/cli-bundle.js";
 
 // ─── lifecycle (shared boot) ──────────────────────────────────────────
 
-describe.sequential("spawn smoke (lifecycle)", () => {
+describe.skipIf(!BIN_AVAILABLE).sequential("spawn smoke (lifecycle)", () => {
   let home: string;
   let port: number;
   let env: NodeJS.ProcessEnv;
   let initialPid: number;
 
   beforeAll(async () => {
-    if (!BIN_AVAILABLE) {
-      throw new Error(
-        `CLI bundle not found at ${CLI_BIN}. Run \`pnpm --filter @glyphs-ai/cli build\` first (CI does this in the build step).`,
-      );
-    }
     home = await mkdtemp(path.join(tmpdir(), "glyph-cli-spawn-"));
     port = pickPort();
     env = { ...SCRUBBED_ENV, GLYPH_HOME: home };
@@ -118,15 +113,10 @@ describe.sequential("spawn smoke (lifecycle)", () => {
 
 // ─── stale runtime.json cleanup ───────────────────────────────────────
 
-describe("spawn smoke (status cleans up stale runtime.json)", () => {
+describe.skipIf(!BIN_AVAILABLE)("spawn smoke (status cleans up stale runtime.json)", () => {
   let home: string;
 
   beforeAll(async () => {
-    if (!BIN_AVAILABLE) {
-      throw new Error(
-        `CLI bundle not found at ${CLI_BIN}. Run \`pnpm --filter @glyphs-ai/cli build\` first.`,
-      );
-    }
     home = await mkdtemp(path.join(tmpdir(), "glyph-cli-stale-"));
   });
 
@@ -159,33 +149,30 @@ describe("spawn smoke (status cleans up stale runtime.json)", () => {
 
 // ─── bundle smoke (esbuild output / shebang) ─────────────────────────
 
-describe("bundle smoke", () => {
+describe.skipIf(!BIN_AVAILABLE)("bundle smoke", () => {
   // These cases run the ACTUAL `node dist/bin.js` bundle to catch
   // regressions the in-process `run()` seam can't see — esbuild's
   // CJS/ESM output choice, the shebang line on `bin.js`, the embedded
   // `--version` string read from package.json, and the top-level help
   // assembly across the (post-bundle) merged subcommand registrations.
   //
-  // Both cases skip when `dist/bin.js` is missing so a local
+  // The whole suite skips when `dist/bin.js` is missing so a local
   // `pnpm test` run that hasn't built the package yet still works.
   // CI always builds before testing, so this guard never trips there.
-  it.skipIf(!BIN_AVAILABLE)("`node dist/bin.js --version` exits 0 with a semver", async () => {
+  it("`node dist/bin.js --version` exits 0 with a semver", async () => {
     const r = await runBin(["--version"], {});
     expect(r.exitCode, r.stderr).toBe(0);
     expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it.skipIf(!BIN_AVAILABLE)(
-    "`node dist/bin.js --help` exits 0 and lists at least one subcommand",
-    async () => {
-      const r = await runBin(["--help"], {});
-      expect(r.exitCode, r.stderr).toBe(0);
-      // The merged top-level help renders a `Commands:` section followed
-      // by each registered subcommand. We assert two well-known ones
-      // (workspace + task) rather than the full list so individual
-      // command renames don't ripple into a bundle-smoke flake.
-      expect(r.stdout).toContain("workspace");
-      expect(r.stdout).toContain("task");
-    },
-  );
+  it("`node dist/bin.js --help` exits 0 and lists at least one subcommand", async () => {
+    const r = await runBin(["--help"], {});
+    expect(r.exitCode, r.stderr).toBe(0);
+    // The merged top-level help renders a `Commands:` section followed
+    // by each registered subcommand. We assert two well-known ones
+    // (workspace + task) rather than the full list so individual
+    // command renames don't ripple into a bundle-smoke flake.
+    expect(r.stdout).toContain("workspace");
+    expect(r.stdout).toContain("task");
+  });
 });
