@@ -1,5 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import pino, { type Logger } from "pino";
 import { assertValidJsonPath } from "./_helpers.js";
 import { ScheduleNotFoundError } from "./errors.js";
 import { ScheduleEntity } from "./schedule-entity.js";
@@ -9,6 +10,8 @@ import type { ListScheduleOpts } from "./types.js";
 import { assertValidScheduleId } from "./validate.js";
 
 type Db = BetterSQLite3Database<typeof schema>;
+
+const silentLogger: Logger = pino({ level: "silent" });
 
 /**
  * Drizzle-backed CRUD for the `schedules` table. Private to the pkg:
@@ -28,9 +31,12 @@ type Db = BetterSQLite3Database<typeof schema>;
  */
 export class ScheduleRepository {
   private readonly db: Db;
+  private readonly logger: Logger;
 
-  constructor(opts: { db: Db }) {
+  constructor(opts: { db: Db; logger?: Logger }) {
     this.db = opts.db;
+    this.logger = opts.logger ?? silentLogger;
+    void this.logger;
   }
 
   async findById(id: string): Promise<ScheduleEntity | undefined> {

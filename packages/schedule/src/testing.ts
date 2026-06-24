@@ -15,7 +15,7 @@ export function openTestScheduleDb(): {
   close(): void;
 } {
   const sqlite = new Database(":memory:");
-  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("busy_timeout = 5000");
   const db = drizzle(sqlite, { schema });
   applyScheduleMigrations(db);
   return {

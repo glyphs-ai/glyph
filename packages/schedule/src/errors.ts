@@ -155,7 +155,7 @@ export class InvalidJsonPathError extends ScheduleError {
   override readonly name = "InvalidJsonPathError";
   constructor(public readonly path: string) {
     super(
-      `Invalid JSON path "${path}". Must match ^$(\\.[a-zA-Z_][a-zA-Z0-9_]*)+$ (e.g. "$.agent", "$.workflow.id").`,
+      `Invalid JSON path "${path}". Must match ^\\$(\\.[a-zA-Z_][a-zA-Z0-9_]*)+$ (e.g. "$.agent", "$.workflow.id").`,
     );
   }
 }

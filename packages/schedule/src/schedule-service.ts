@@ -82,6 +82,7 @@ export class ScheduleService {
   private readonly randomUUID: () => string;
   private readonly timers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private readonly handlers = new Map<string, ScheduleKindHandler>();
+  private readonly inflight: Set<Promise<void>> = new Set();
   private registryFrozen = false;
   private shutdownCalled = false;
 
@@ -377,24 +378,31 @@ export class ScheduleService {
     const now = this.now();
     for (const entity of all) {
       if (!entity.enabled) continue;
-      if (
-        entity.nextFireAt !== undefined &&
-        new Date(entity.nextFireAt).getTime() <= now.getTime()
-      ) {
-        const plannedFiredAt = entity.nextFireAt;
-        try {
-          await this.dispatch(entity, plannedFiredAt);
-        } catch (err) {
-          this.logger.warn(
-            { scheduleId: entity.id, err },
-            "schedule recover: catchup dispatch failed",
-          );
+      try {
+        if (
+          entity.nextFireAt !== undefined &&
+          new Date(entity.nextFireAt).getTime() <= now.getTime()
+        ) {
+          const plannedFiredAt = entity.nextFireAt;
+          try {
+            await this.dispatch(entity, plannedFiredAt);
+            const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, now, 1);
+            await this.repo.recordFired(entity.id, plannedFiredAt, nextIso ?? null);
+          } catch (err) {
+            this.logger.warn(
+              { scheduleId: entity.id, err },
+              "schedule recover: catchup dispatch failed",
+            );
+          }
         }
-        const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, now, 1);
-        await this.repo.recordFired(entity.id, plannedFiredAt, nextIso ?? null);
+        const fresh = await this.repo.findById(entity.id);
+        if (fresh?.enabled) this.armNext(fresh);
+      } catch (err) {
+        this.logger.warn(
+          { scheduleId: entity.id, err },
+          "schedule recover: row recovery failed, continuing with remaining rows",
+        );
       }
-      const fresh = await this.repo.findById(entity.id);
-      if (fresh?.enabled) this.armNext(fresh);
     }
   }
 
@@ -404,6 +412,9 @@ export class ScheduleService {
       clearTimeout(handle);
     }
     this.timers.clear();
+    if (this.inflight.size > 0) {
+      await Promise.allSettled([...this.inflight]);
+    }
   }
 
   // ─── Internals ────────────────────────────────────────────
@@ -425,7 +436,9 @@ export class ScheduleService {
       if (delay > MAX_TIMER_DELAY_MS) {
         void this.rearmNext(id, iso);
       } else {
-        void this.fire(id);
+        const p = this.fire(id);
+        this.inflight.add(p);
+        void p.finally(() => this.inflight.delete(p));
       }
     }, timeoutDelay);
     this.timers.set(id, handle);
@@ -467,6 +480,7 @@ export class ScheduleService {
       this.logger.warn({ scheduleId: entity.id, err }, "schedule fire: dispatch failed");
       // No failure retry: record the fire and re-arm.
     }
+    if (this.shutdownCalled) return;
     const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, this.now(), 1);
     await this.repo.recordFired(entity.id, firedAt, nextIso ?? null);
     this.armNext(entity.withFired(firedAt, nextIso));
