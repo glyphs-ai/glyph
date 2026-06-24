@@ -1,5 +1,7 @@
 # `@glyphs-ai/contracts`
 
+> **Tier:** T2 (Application). See the [tier model](../../docs/architecture.md#tier-model).
+
 **Tier T2 (sibling of `@glyphs-ai/api`).** The strict-isolation entrypoint for
 glyph's external surfaces: pure types (wire shapes, route catalog, domain
 type re-exports) plus pure-function path helpers. No orchestration code.

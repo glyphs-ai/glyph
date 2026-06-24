@@ -1,20 +1,22 @@
 # @glyphs-ai/server
 
-The HTTP API surface -- a [Hono](https://hono.dev) app that mounts the
+> **Tier:** T3 (Host). See the [tier model](../../docs/architecture.md#tier-model).
+
+The HTTP API surface — a [Hono](https://hono.dev) app that mounts the
 workspace registry plus workspace-scoped catalog, session, task,
 schedule, and workflow routes. Bundled into the published `glyph`
 binary; also runs standalone for development.
 
 The server is a **pure transport adapter** over
-[`@glyphs-ai/api`](../api). Every route is parse -- dispatch to api or
-to the per-workspace runtime -- format. Business logic lives in the
+[`@glyphs-ai/api`](../api). Every route is parse — dispatch to api or
+to the per-workspace runtime — format. Business logic lives in the
 entity services; orchestration (cache, spawn, register/rename) lives
 in api.
 
 ## URL scheme
 
 Workspace-scoped resources live under `/api/workspaces/<wsid>/...`
-where `<wsid>` is the workspace's opaque UUID -- stable for the
+where `<wsid>` is the workspace's opaque UUID — stable for the
 lifetime of the registry entry, so dashboard URLs survive workspace
 renames.
 
@@ -47,12 +49,15 @@ not a task sub-layer.
 /api/workspaces/:id/tasks/:tid/artifact/:name            GET                      task success.artifacts whitelist download
 
 /api/workspaces/:id/scheduled-tasks                      GET                      list schedule-launched tasks
+/api/workspaces/:id/scheduled-workflows                  GET                      list schedule-launched workflows
 
 /api/workspaces/:id/schedules                            GET                      list schedules
 /api/workspaces/:id/schedules/task                       POST                     create task-kind schedule
+/api/workspaces/:id/schedules/workflow                   POST                     create workflow-kind schedule
 /api/workspaces/:id/schedules/preview-cron               GET                      preview an arbitrary (expr, tz)
 /api/workspaces/:id/schedules/:sid                       GET DELETE               get / delete
 /api/workspaces/:id/schedules/task/:sid                  PATCH                    patch task-kind schedule (RFC 7396 deep-merge on target)
+/api/workspaces/:id/schedules/workflow/:sid              PATCH                    patch workflow-kind schedule (RFC 7396 deep-merge on target)
 /api/workspaces/:id/schedules/:sid/run                   POST                     manual fire-now
 /api/workspaces/:id/schedules/:sid/preview               GET                      next-N fires for this schedule
 
@@ -85,7 +90,7 @@ not a task sub-layer.
 /api/workspaces/:id/catalog/mcps/:name                   GET PUT DELETE           get / update content / remove
 ```
 
-There is no global catalog mount -- switching workspace switches the
+There is no global catalog mount — switching workspace switches the
 catalog the dashboard sees.
 
 ## Verb conventions
@@ -93,13 +98,42 @@ catalog the dashboard sees.
 - **`?purge=1`** on workspace / session / task DELETE. Default (no
   flag) removes only glyph metadata; `purge=1` also wipes the
   entity's sandbox dir. Schedule and catalog DELETEs do NOT honour
-  the flag -- schedules return a `deletedDispatchCount` summary
+  the flag — schedules return a `deletedDispatchCount` summary
   instead, and catalog DELETEs always remove both the row and the
   content file. See [`docs/architecture.md`](../../docs/architecture.md).
 - **Time filters canonicalise** any `Date.parse`-able input into ISO
   8601 with a `Z` suffix before forwarding to services; the
   service's lexicographic compare relies on canonical form. Garbage
-  input -- 400 with a descriptive error.
+  input — 400 with a descriptive error.
+
+## Validation pipeline
+
+Every route that accepts a body or query validates it before touching a
+service, and the outcome is a small ADT rather than thrown control flow.
+
+- **`ValidationResult<T>`** (`src/routes/_shared.ts`) is the discriminated
+  union `ValidationOk<T>` (`{ ok: true, value }`) or `ValidationFail`
+  (`{ ok: false, error }`). It is lifted into `_shared.ts` so the
+  `schedules` and `workflows` route files share one definition instead of
+  each redeclaring the triple. On `ok: false` the route replies `400`
+  with the `error` string; on `ok: true` it forwards `value` to the
+  service. Helpers like `unknownBodyKey` reject unexpected keys, so a
+  URL-implied discriminator (e.g. a target `kind` already fixed by the
+  path) cannot be smuggled back in through the body.
+- **Per-kind spec validation** lives one layer in, at dispatch time. The
+  `@glyphs-ai/workflow` package is kind-agnostic about node specs; the
+  per-kind checks run in the api wiring runners
+  (`packages/api/src/wiring/`), which throw `WorkflowCoordSpecError`,
+  `WorkflowWorkerSpecError`, or `WorkflowHumanSpecError` when a coord /
+  worker / human node spec is malformed.
+- **`respondError` + `ErrorPolicy`** turn those typed errors into stable
+  HTTP responses. Each domain threads an `ErrorPolicy`
+  (`src/routes/_error-policies/`) mapping error classes to status codes.
+  Only error `name`s on the `SAFE_ERROR_NAMES` allow-list
+  (`src/routes/_shared.ts`) have their `.message` surfaced in the
+  response body — the three workflow spec errors are on that list;
+  anything unmapped collapses to a generic internal error so host paths
+  and `fs` strings never leak.
 
 ## Per-workspace context
 
@@ -129,7 +163,7 @@ consumes, plus a third per-task layer added downstream:
 | `GLYPH_WORKSPACE*` + `GLYPH_WORK_*` | Positive: per-task work-context env, layered on top of the base via `{...base, ...perTask}` | interactive + headless | @glyphs-ai/task + @glyphs-ai/session at dispatch / launch time |
 
 The first two are passed to the `CopilotRuntime` constructor at bootstrap.
-The interactive path (`buildInteractiveLaunch` -- terminal spawner)
+The interactive path (`buildInteractiveLaunch` — terminal spawner)
 inherits the parent env wholesale and cannot unset, so scrub keys
 only take effect on headless launches. The per-task layer is added
 inside `TaskService.dispatch` / `SessionService.assembleLaunchEnv` --
@@ -178,7 +212,7 @@ they cannot live in `@glyphs-ai/contracts` because they value-import
 1. Hono server stops accepting new connections (drains inflight).
 2. Tasks: every live subprocess receives `SIGTERM`; manager waits
    for terminal status.
-3. `application.close()` (await -- closes every per-workspace
+3. `application.close()` (await — closes every per-workspace
    context's SQLite handles, then releases `global.db`).
 4. `process.exit(0)`.
 

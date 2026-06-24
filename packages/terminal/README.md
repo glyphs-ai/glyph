@@ -1,5 +1,7 @@
 # @glyphs-ai/terminal
 
+> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+
 Host a shell-runnable `LaunchCommand` inside a per-platform terminal
 emulator. Glyph uses this for one-click interactive launch: instead of
 asking the user to copy a manual `cd … && <runtime-cli> …` command into

@@ -96,7 +96,7 @@ scripts/
   new-pkg.mjs            scaffolds a new packages/<name>/ from _template
 
 docs/
-  architecture.md   tier layering + glossary (read first)
+  architecture.md   tier layering (read first)
   pkg-template.md   conventions every package follows
   RELEASING.md      cut a release + npm publish flow
 ```

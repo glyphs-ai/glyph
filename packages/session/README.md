@@ -1,5 +1,7 @@
 # @glyphs-ai/session
 
+> **Tier:** T1 (Modes). See the [tier model](../../docs/architecture.md#tier-model).
+
 T1 interactive-session registry. Each session is a runtime-provisioned
 workdir for one agent (see [`@glyphs-ai/runtime`](../runtime)). This
 package **organizes** those workdirs and, when the composition root

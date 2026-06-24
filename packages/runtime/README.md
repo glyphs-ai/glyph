@@ -1,5 +1,7 @@
 # @glyphs-ai/runtime
 
+> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+
 Runtime adapter contract + Copilot CLI implementation.
 
 A *runtime* adapts a third-party CLI (GitHub Copilot today; Gemini,

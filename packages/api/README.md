@@ -1,5 +1,7 @@
 # @glyphs-ai/api
 
+> **Tier:** T2 (Application). See the [tier model](../../docs/architecture.md#tier-model).
+
 The **T2 Application layer (orchestration)** — glyph's composition
 root that wires T0 foundations (`workspace`, `catalog`, `runtime`,
 `schedule`, `terminal`) and T1 execution modes (`session`, `task`,
@@ -29,10 +31,13 @@ bundles. See
 ```
 packages/api/src/
 ├── application.ts            ← Application interface + composeApplication
+├── route-manifest.ts         ← flat route inventory (listRoutes over ROUTES) for the server reflection test
 ├── workspace-context.ts      ← WorkspaceContext + WorkspaceContextRegistry
 ├── wiring/                   ← per-kind handler wiring (cross-package glue)
 │   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskService
+│   ├── schedule-workflow-handler.ts     ← schedule "workflow" kind → WorkflowService
 │   ├── workflow-coord-task-runner.ts    ← workflow coordinator node → TaskService
+│   ├── workflow-human-node-runner.ts    ← workflow human node → gate awaiting the respond API
 │   └── workflow-worker-task-runner.ts   ← workflow worker node → TaskService
 └── index.ts                  ← public barrel (orchestration + re-exports
                                 of @glyphs-ai/contracts)
@@ -63,7 +68,7 @@ const app = await composeApplication({
   logger,                                       // optional pino
 });
 
-app.workspaceService;                            // WorkspaceService -- direct access for read-only listing / getLastOpenedId / etc.
+app.workspaceService;                            // WorkspaceService — direct access for read-only listing / getLastOpenedId / etc.
 
 // Orchestration (Stripe-style hybrid opts)
 await app.registerWorkspace({ name, workspaceDir? });

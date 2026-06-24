@@ -25,6 +25,8 @@ today's language — we're still learning its alphabet.
 
 ## Quickstart
 
+Requires Node 22+.
+
 ```sh
 npm install -g @glyphs-ai/glyph
 glyph start
@@ -90,7 +92,7 @@ work for single-machine use; only set what you need to override.
 | `PORT`               | `8787`         | HTTP listen port.                                                                                        |
 | `GLYPH_HOST`       | `127.0.0.1`    | Bind address. glyph is **loopback-only** — non-loopback values are refused at startup. For remote access, expose the loopback socket through SSH port-forward, a reverse proxy (mTLS / OIDC), or a mesh VPN (Tailscale, …). |
 | `GLYPH_HOME`       | `~/.glyph`   | Where the global SQLite registry (`global.db`) lives.                                                  |
-| `GLYPH_LOG_LEVEL`  | `info`         | `debug` / `info` / `warn` / `error`.                                                                     |
+| `GLYPH_LOG_LEVEL`  | `info`         | `trace` / `debug` / `info` / `warn` / `error` / `fatal` (pino's level set).                              |
 | `GLYPH_LOG_FORMAT` | `pretty`       | `pretty` (dev terminal) or `json` (log aggregators).                                                     |
 | `GLYPH_STATIC_DIR` | next to bundle | Override the dashboard SPA location. Useful when running from a non-bundle layout.                       |
 
@@ -132,7 +134,7 @@ two layers of commands:
 
 ### API client (talk to a running server)
 
-65 typed routes — wrapped 1:1 by the CLI's `client.call(...)` surface;
+Every typed route — wrapped 1:1 by the CLI's `client.call(...)` surface;
 the typed manifest in `packages/contracts/src/routes.ts` is the single
 source of truth that both the server registers handlers against and
 the CLI builds typed calls from. Adding a route on either side
@@ -147,7 +149,7 @@ glyph runtime list
 
 # workspaces
 glyph workspace list
-glyph workspace add --name "Sandbox" --workdir ~/code/sandbox
+glyph workspace add --name "Sandbox" --workspace-dir ~/code/sandbox
 export GLYPH_WORKSPACE=<id>          # required for workspace-scoped commands
 glyph workspace show <workspace-id>
 glyph workspace rm <workspace-id> --purge
@@ -157,7 +159,6 @@ glyph session new --agent writer
 glyph session list --agent writer --json
 glyph task dispatch --agent triage --brief "Scan recent issues"
 glyph task list --status running,succeeded
-glyph task events <tid>     # one-shot dump of the runtime's NDJSON log
 glyph task activity <tid>   # runtime-parsed activity timeline (JSON)
 
 # catalog
@@ -165,7 +166,11 @@ glyph catalog overview
 glyph catalog skill list
 glyph catalog skill install --file /abs/path/to/skill
 glyph catalog agent install --url https://github.com/glyphs-ai/glyph/tree/main/first-party/agents/engineer
-glyph catalog mcp install --url https://github.com/glyphs-ai/glyph/tree/main/first-party/mcps/example.json
+glyph catalog mcp install --url https://github.com/glyphs-ai/glyph/tree/main/first-party/mcps/io.playwright_mcp.json
+
+# schedules (workspace-scoped cron triggers)
+glyph schedule list
+glyph schedule create --name "Nightly scan" --agent triage --brief "Scan recent issues" --cron "0 3 * * *" --tz UTC
 ```
 
 Common flags on every API command:
@@ -190,7 +195,7 @@ blobs. What glyph adds:
 - **A workspace abstraction** — multiple isolated projects on one machine;
   each picks its own agent set without polluting the others.
 - **Runtime adapters** — first-class support for the
-  [GitHub Copilot CLI](https://github.com/github/gh-copilot) today; the same
+  [GitHub Copilot CLI](https://github.com/github/copilot-cli) today; the same
   surface lets future runtimes (Gemini, Claude Code, …) drop in.
 - **Three execution modes** — interactive `session`, one-shot `task`, and
   multi-task `workflow` (a DAG of sessions and tasks coordinated by a
@@ -200,29 +205,12 @@ blobs. What glyph adds:
 
 ## Architecture
 
-The repo is a [pnpm](https://pnpm.io/workspaces) monorepo of 14 small
-TypeScript packages with a strict layering: pure value types at the bottom,
-file-system primitives next, entity managers above (workspace / catalog /
-session / task / workflow), then the runtime adapter, then the HTTP server,
-then the React dashboard. See [`docs/architecture.md`](./docs/architecture.md)
-for the design contract — repository pattern, atomic-write seam, REST URL
-scheme, and the rationale behind the package boundaries.
-
-The conceptual model — how we think about agentic systems and why
-glyph is shaped the way it is — lives in the **paper
-[*What we believe about agentic systems*](https://glyphs-ai.github.io/glyph/)**.
-It's a short read; if its premises resonate with you, the rest of the
-codebase will make sense more quickly.
-
-Each package's own README documents its public API surface; the most
-important ones for downstream consumers are
-[`@glyphs-ai/catalog`](./packages/catalog),
-[`@glyphs-ai/workspace`](./packages/workspace),
-[`@glyphs-ai/task`](./packages/task),
-[`@glyphs-ai/session`](./packages/session),
-[`@glyphs-ai/workflow`](./packages/workflow),
-[`@glyphs-ai/runtime`](./packages/runtime), and
-[`@glyphs-ai/server`](./packages/server).
+Glyph is a pnpm monorepo with strict tier-based layering. The design
+contract — repository pattern, atomic-write seam, REST URL scheme,
+package boundaries — lives in [`docs/architecture.md`](./docs/architecture.md).
+The conceptual model behind why glyph is shaped this way lives in the
+paper [*What we believe about agentic systems*](https://glyphs-ai.github.io/glyph/);
+it's a short read.
 
 ## First-party catalog
 
@@ -236,30 +224,9 @@ the same way as first-party entries (any reachable GitHub URL).
 
 ## Development
 
-Requires Node ≥ 22, pnpm ≥ 10.
-
-```sh
-git clone https://github.com/glyphs-ai/glyph.git
-cd glyph
-pnpm install
-pnpm build       # tsc emit (run first; downstream packages import upstream .d.ts)
-pnpm typecheck   # tsc --noEmit across all packages
-pnpm test        # vitest across all packages
-pnpm lint        # biome check
-```
-
-Run the dev server (hot-reloading API + Vite-served dashboard):
-
-```sh
-pnpm dev
-# API on http://127.0.0.1:8787
-# Dashboard dev server on http://127.0.0.1:41817 (proxies /api → 8787)
-```
-
-For everything beyond the basics — repository pattern, atomic-write
-guarantees, how to add a new runtime adapter — see
-[`docs/architecture.md`](./docs/architecture.md). Release procedure
-lives in [`docs/RELEASING.md`](./docs/RELEASING.md).
+See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) for the local setup,
+daily loop, and "adding things" pointer map. The release procedure lives
+in [`docs/RELEASING.md`](./docs/RELEASING.md).
 
 ## License
 

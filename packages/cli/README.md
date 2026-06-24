@@ -1,5 +1,7 @@
 # @glyphs-ai/cli
 
+> **Tier:** T_top (Surfaces). See the [tier model](../../docs/architecture.md#tier-model).
+
 Command-line interface for glyph (lifecycle commands + HTTP API
 client).
 
@@ -35,12 +37,12 @@ packages/cli/src/
                     `schedule/`, `workflow.ts` + `workflow/`) per
                     docs/pkg-template.md; the facade re-exports its
                     concern modules and is the only import surface.
-  registrars/       Commander subtree builders -- one per top-level
+  registrars/       Commander subtree builders — one per top-level
                     command or group: `lifecycle` (serve / start / stop /
                     restart / status / logs), `config`, `health`,
                     `runtime`, and the six workspace-scoped subtrees
                     (`workspace`, `session`, `schedule`, `task`,
-                    `workflow`, `catalog`) -- plus `_shared.ts`
+                    `workflow`, `catalog`) — plus `_shared.ts`
                     (connect / workspace flag parsing + helpers).
   api-client.ts     Typed HTTP client over the `ROUTES` manifest.
   connect.ts        Resolve `baseUrl` + `workspaceId` from flags, env,
@@ -188,7 +190,7 @@ wins):
 1. Explicit CLI flags: `--server <url>`, `-w, --workspace-id <id>`.
 2. Environment: `GLYPH_SERVER`, `GLYPH_WORKSPACE`.
 3. `<GLYPH_HOME>/runtime.json` (host + port written by a recent
-   `glyph start`) -- applies to the URL only; the workspace id has
+   `glyph start`) — applies to the URL only; the workspace id has
    no on-disk fallback by design.
 4. Hard default: `http://127.0.0.1:8787`.
 
@@ -202,12 +204,12 @@ Lifecycle commands that bind a local server (`serve`, `start`,
 `127.0.0.1` and `8787`); those are bind flags on the server process,
 not connect flags on the client.
 
-`<GLYPH_HOME>` -- referenced above and in the paths throughout this
-section -- is the on-disk anchor for lifecycle state. It defaults to
+`<GLYPH_HOME>` — referenced above and in the paths throughout this
+section — is the on-disk anchor for lifecycle state. It defaults to
 `~/.glyph` and is set by the `GLYPH_HOME` environment variable. It
 determines where `runtime.json` and the rolled server logs (`logs/`)
 are written by `glyph start` and read back by `serve`, `start`, `stop`,
-`restart`, `status`, and `logs` -- the same `runtime.json` the
+`restart`, `status`, and `logs` — the same `runtime.json` the
 URL-resolution fallback (step 3 above) depends on.
 
 ## Testing
@@ -234,4 +236,4 @@ Top-level surface tier alongside `@glyphs-ai/dashboard`. Depends on
 tier-invisibility fence is enforced by
 `packages/e2e/test/architecture/tier-invisibility.test.ts`.
 
-See [`docs/architecture.md` -- Tier model](../../docs/architecture.md#tier-model).
+See [`docs/architecture.md` — Tier model](../../docs/architecture.md#tier-model).

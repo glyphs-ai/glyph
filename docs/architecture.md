@@ -181,12 +181,13 @@ producer-side definition; TypeScript's structural typing wires the
 two together at the `composeApplication` call site without forcing
 either pkg to depend on the other.
 
-The entity packages (`workspace`, `session`, `task`, `workflow`, `catalog`) sit at
-the same level — they don't depend on each other directly. Composition
-happens at the [`@glyphs-ai/api`](../packages/api) layer: api holds
-one `WorkspaceService` process-wide and lazily mints per-workspace
-`{catalog, sessions, tasks, workflows}` bundles behind a
-`WorkspaceRuntimeCache`. The server depends on api, not on the
+The entity packages (`workspace`, `session`, `task`, `workflow`,
+`schedule`, `catalog`) sit at the same level — they don't depend on each
+other directly. Composition happens at the
+[`@glyphs-ai/api`](../packages/api) layer: api holds one
+`WorkspaceService` process-wide and lazily mints per-workspace
+`{catalog, sessions, tasks, schedules, workflows}` bundles behind a
+`WorkspaceContextRegistry`. The server depends on api, not on the
 entity pkgs directly. `runtime` is consumed by `session` + `task` to
 spawn agents; `workflow` does not spawn anything itself — its DAG
 nodes are `task` / `session` nodes that the workflow runner dispatches
@@ -194,85 +195,21 @@ through the same T1 execution-mode pipeline.
 
 ## Service + repository pattern
 
-Every entity package follows the same shape: a single
-**`<Entity>Service`** class that owns reads + writes, backed by a
-package-private **Drizzle repository** that the service constructs.
-Tests open the service against `dbFile: ":memory:"` via the package's
-`composeXxxModule` helper, so the schema goes through the real
-drizzle-kit migrator on every test boot.
+Every entity package follows the same shape: a **3-layer Row / Entity /
+DTO** split, with `<Entity>Service` orchestrating reads + writes against
+a package-private Drizzle repository. The repository returns `*Entity`;
+the service returns the wire DTO. The full contract (layer table,
+projection-helper rules, when Entity becomes a class) lives in
+[`docs/pkg-template.md` → Repository contract](./pkg-template.md#repository-contract);
+the rationale for this specific shape is in the same doc under
+[Why this shape](./pkg-template.md#why-this-shape).
 
-### Per-package src layout
-
-```
-packages/<pkg>/src/
-  schema.ts                 Drizzle table def + `*Row` / `New*Row` types (package-private)
-  <entity>-entity.ts        `<Entity>Entity` — pkg-owned domain shape; interface or class
-  <entity>-repository.ts    `<Entity>Repository` — Drizzle CRUD; returns Entity
-  <entity>-service.ts       `<Entity>Service` — orchestration; returns DTO
-  types.ts                  bare-noun DTO (`Workspace`, `Session`, ...) + opts shapes
-  errors.ts                 typed error classes
-  validate.ts               id regex + zod input schemas
-  compose.ts                `compose<Entity>Module({ dbFile })` composition root
-  testing.ts                in-memory test fixture (via `/testing` subpath)
-  index.ts                  public barrel
-drizzle/                    generated SQL migrations (committed)
-drizzle.config.ts           drizzle-kit codegen config
-```
-
-### The three layers
-
-glyph uses an **explicit 3-layer split** (Row / Entity / DTO) across
-every entity pkg. The pkg-template enforces it; see
-[`docs/pkg-template.md`](./pkg-template.md) for the full rationale.
-
-| Layer | Where | Suffix | Visibility | Role |
-|---|---|---|---|---|
-| **Row** | `schema.ts` | `*Row` | pkg-private | Drizzle `$inferSelect` shape; tracks the SQLite table |
-| **Entity** | `<entity>-entity.ts` | `*Entity` | pkg-private (NOT re-exported from `index.ts`) | Pkg-owned domain shape; `interface` for anemic BCs, `class` for rich (state machine / invariants) |
-| **DTO** | `types.ts` | bare noun (no suffix) | exported from `index.ts` | Wire shape; what `<Entity>Service` returns; stable contract for HTTP / CLI / other pkgs |
-
-Repository public methods return **Entity**. Service public methods
-return **DTO**. The row → entity boundary lives inside the repository
-file; the entity → DTO boundary lives inside the service file. When
-either projection is structurally trivial it's an inline TypeScript
-assignment (no helper function); when it's non-trivial — composite
-sources, normalisation, async fetches — it grows into a module-private
-helper at the same boundary.
-
-```ts
-// e.g. packages/workspace/src/workspace-service.ts
-export class WorkspaceService {
-  // Reads — service projects Entity → DTO inline (1-line normalisation).
-  getById(id: string): Promise<Workspace | null>;
-  list(): Promise<Workspace[]>;
-  getLastOpened(): Promise<Workspace | null>;
-  getLastOpenedId(): Promise<string | null>;
-
-  // Writes — Stripe-style hybrid: primary key positional, options in bag.
-  register(input: { id, workspaceDir, name }): Promise<{ id: string }>;
-  open(id: string): Promise<void>;
-  rename(id: string, opts: { newName: string }): Promise<void>;
-  unregister(id: string, opts?: { purge?: boolean }): Promise<void>;
-}
-```
-
-### Three properties of the pattern
-
-1. **Repositories are persistence-only.** They never parse
-   frontmatter, build dependency graphs, mkdir, spawn subprocesses,
-   or call other pkgs. The repository's job is "given an id, return
-   the stored `Entity` (or undefined)." Side effects, validation,
-   cross-pkg coordination, FSM transitions all live in the service.
-2. **`*Row` never leaves the repository.** No `export * as schema`
-   from `index.ts`; the Drizzle inferred type is implementation
-   detail. Swapping ORMs only touches `schema.ts` +
-   `<entity>-repository.ts`.
-3. **`*Entity` classes are pkg-private.** Rich BCs (catalog/task)
-   keep their FSM class internal; the public projection is the
-   bare-noun DTO. Anemic BCs (workspace/session) use a plain
-   `interface` for Entity instead of a class.
-
-
+In-tree examples: anemic BCs (`workspace`, `session`) use a plain
+`interface` for Entity; rich BCs (`catalog`, `task`) use a class with
+FSM transitions and invariant validation. Tests open the service
+against `dbFile: ":memory:"` via the package's `compose<Entity>Module`
+helper, so the schema goes through the real drizzle-kit migrator on
+every test boot.
 
 ## Atomic IO seam
 
@@ -405,14 +342,14 @@ surface the cause without crashing.
 ## HTTP API URL scheme
 
 Workspace-scoped resources live under
-`/api/workspaces/<wsid>/{catalog,sessions,tasks}/...`. The `<wsid>` is
+`/api/workspaces/<wsid>/{catalog,sessions,tasks,schedules,workflows}/...`. The `<wsid>` is
 the workspace's opaque UUID — stable for the lifetime of the registry
 entry, so dashboard URLs survive workspace renames. There is no global
 catalog mount; switching workspace switches the catalog the dashboard
 sees.
 
-A `WorkspaceRuntimeCache` (in `@glyphs-ai/api`) lazily mints + retains
-per-workspace `{catalog, sessions, tasks}` bundles behind that URL
+A `WorkspaceContextRegistry` (in `@glyphs-ai/api`) lazily mints + retains
+per-workspace `{catalog, sessions, tasks, schedules, workflows}` bundles behind that URL
 prefix; cache invalidation happens on workspace deletion or rename.
 An explicit `POST /api/workspaces/:id/reload` is also available for
 operator-driven reload (refused with HTTP 409 +
@@ -781,6 +718,54 @@ The dashboard adapts automatically — runtimes are listed via
 `/api/runtimes` and the create-session / dispatch-task forms pick
 them up.
 
+## Adding a new HTTP route
+
+A route is a **contracts manifest + server handler + test** trio. The
+three sides are reconciled by a reflection test, so skipping one fails
+CI rather than drifting silently.
+
+1. **Declare it in `@glyphs-ai/contracts`.** Add a `defineRoute<...>(...)`
+   entry to the relevant per-domain slice in
+   `packages/contracts/src/routes/<domain>.ts` with typed request and
+   response shapes. New DTOs live in `contracts` (never inline in the
+   handler); the `routes.ts` facade aggregates every slice into the
+   `ROUTES` manifest that both server and CLI read.
+2. **Implement the handler in `@glyphs-ai/server`.** In
+   `packages/server/src/routes/<domain>.ts`, parse + validate the request
+   (return a `ValidationResult` on bad input — see § Validation pipeline
+   in [`packages/server/README.md`](../packages/server/README.md)),
+   dispatch to the per-workspace `WorkspaceContext` service (or to `api`),
+   and format the response. Surface typed errors through `respondError`
+   with the domain's `ErrorPolicy`, and add any new user-facing error
+   class `name` to `SAFE_ERROR_NAMES`.
+3. **Register + test.** Mount the handler so it is reachable, then let
+   `packages/server/test/route-manifest.test.ts` (the reflection test)
+   assert the registered Hono routes match the `ROUTES` manifest exactly,
+   and add a per-domain handler test under `packages/server/test/`. The
+   CLI's typed `client.call(...)` picks the route up from the same
+   manifest with no extra wiring.
+
+## Adding a new CLI command
+
+A command is a **registrar + result rendering + test** trio. The command
+talks to a running server through the typed route above — it never
+hand-rolls a `fetch`.
+
+1. **Register the subcommand.** Add it to the relevant registrar in
+   `packages/cli/src/registrars/<domain>.ts` (wrap workspace-scoped
+   commands with `withWorkspaceFlags`). The action calls
+   `client.call(...)` against the typed route and stores the response on
+   the command `slot`.
+2. **Render the result.** Route the response through the result / output
+   seam (`packages/cli/src/result.ts` + `output.ts`) so both the
+   human-readable `table` default and `--json` work. Follow the id and
+   flag naming conventions documented in
+   [`packages/cli/README.md`](../packages/cli/README.md) — reviewers
+   reject flags outside that table.
+3. **Test it.** Add a spawn / integration test under
+   `packages/e2e/test/cli/` (e.g. `spawn-smoke.test.ts`) so the command
+   is exercised end-to-end against a real spawned binary.
+
 ## Where to look next
 
 - **The paper:
@@ -796,4 +781,6 @@ them up.
   - [`@glyphs-ai/runtime`](../packages/runtime/README.md)
   - [`@glyphs-ai/api`](../packages/api/README.md)
   - [`@glyphs-ai/server`](../packages/server/README.md)
+- [`docs/CONTRIBUTING.md`](./CONTRIBUTING.md) — local setup, the daily
+  loop, and the "adding things" pointer map.
 - [`docs/RELEASING.md`](./RELEASING.md) — maintainer release procedure.

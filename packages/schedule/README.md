@@ -1,5 +1,7 @@
 # @glyphs-ai/schedule
 
+> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+
 Cron-triggered substrate. Owns one table — `schedules` — plus the
 `ScheduleService` surface (reads + writes + `recover()` +
 `shutdown()` + `preview()` + `run()`) and an open registry of

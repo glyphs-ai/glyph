@@ -1,5 +1,7 @@
 # @glyphs-ai/workflow
 
+> **Tier:** T1 (Modes). See the [tier model](../../docs/architecture.md#tier-model).
+
 Closed-kind T1 substrate for workflow DAGs in glyph. It owns three
 tables — `workflows` / `workflow_nodes` / `workflow_edges` — plus the
 entity layer that round-trips them, the error catalog, and the

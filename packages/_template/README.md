@@ -1,5 +1,7 @@
 # @glyphs-ai/__PKG__
 
+> **Tier:** chosen per package. `_template` is the scaffold that `pnpm new-pkg` copies; pick the new package's tier from the [tier model](../../docs/architecture.md#tier-model).
+
 TODO: replace this README with a short description of what the
 __PKG__ package owns.
 

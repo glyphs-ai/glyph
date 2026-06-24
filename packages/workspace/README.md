@@ -1,5 +1,7 @@
 # @glyphs-ai/workspace
 
+> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+
 A *workspace* is a user-chosen directory that holds glyph's
 per-project state. This package manages only the registry side: a
 single `$GLYPH_HOME/global.db` SQLite table mapping opaque UUIDs to

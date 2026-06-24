@@ -1,5 +1,7 @@
 # @glyphs-ai/task
 
+> **Tier:** T1 (Modes). See the [tier model](../../docs/architecture.md#tier-model).
+
 `TaskService` for autonomous (headless) agent runs. A *task* is a
 one-shot autonomous agent invocation: you give it an agent name, a
 short single-line `brief`, and an optional multi-line `details` body;

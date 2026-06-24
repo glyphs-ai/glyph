@@ -1,5 +1,7 @@
 # @glyphs-ai/catalog
 
+> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+
 Skill + MCP + Agent registry with dependency-aware resolve / install /
 sync / update / uninstall. This is a T0 foundation package; `api`
 composes it into per-workspace application services. SQLite-backed; the
