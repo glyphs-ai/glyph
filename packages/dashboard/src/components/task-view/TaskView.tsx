@@ -1,12 +1,12 @@
 import { type ReactNode, useState } from "react";
 import type { TaskActivity, TaskRecord } from "../../api";
 import { formatAbsolute, formatDuration, formatRelative } from "../../utils/time";
+import { CopyButton } from "../common/CopyButton";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { StatusBadge } from "../tasks/StatusBadge";
 import { readRuntime, STATUS_TONE } from "../tasks/shared";
 import { ActivityTab } from "../tasks/TaskDetail/ActivityTab";
 import { ArtifactsTab, countArtifacts } from "../tasks/TaskDetail/ArtifactsTab";
-import { CopyButton } from "../tasks/TaskDetail/CopyButton";
 import { OverviewTab } from "../tasks/TaskDetail/OverviewTab";
 
 export interface TaskViewProps {

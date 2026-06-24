@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
-import { CopyButton } from "../../components/tasks/TaskDetail/CopyButton";
+import { CopyButton } from "../../components/common/CopyButton";
 import { WorkflowMetaStats } from "../../components/workflows/WorkflowMetaStats";
 import { WorkflowStatusBadge } from "../../components/workflows/WorkflowStatusBadge";
 import { useWorkflowArtifacts } from "../../hooks/useWorkflowArtifacts";

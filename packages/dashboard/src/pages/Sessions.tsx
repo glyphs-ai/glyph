@@ -24,6 +24,7 @@ import {
 } from "../components/Icons";
 import { Modal } from "../components/Modal";
 import { CreateModal } from "../components/sessions/CreateModal";
+import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useMounted } from "../hooks/useMounted";
 import { useUrlSearchValue } from "../hooks/useUrlState";
 import { serverNow } from "../server-clock";
@@ -786,34 +787,14 @@ function SessionActivity({ session }: { session: SessionView }) {
 }
 
 function CopyPathButton({ path }: { path: string }) {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-    },
-    [],
-  );
-  const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(path);
-      setCopied(true);
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        setCopied(false);
-      }, 1500);
-    } catch {
-      // Clipboard may be unavailable in non-secure contexts.
-    }
-  };
+  const { copied, copy } = useCopyToClipboard();
   return (
     <button
       type="button"
       className="btn btn--ghost btn--icon"
       title={copied ? "Copied!" : `Copy workdir path (${path})`}
       aria-label="Copy workdir path"
-      onClick={onCopy}
+      onClick={() => copy(path)}
     >
       <CopyIcon />
     </button>
@@ -918,35 +899,14 @@ interface CopyRowProps {
 }
 
 function CopyRow({ text }: CopyRowProps) {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-    },
-    [],
-  );
-  const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        setCopied(false);
-      }, 1500);
-    } catch {
-      // Clipboard may be unavailable in non-secure contexts; user can select
-      // the text manually.
-    }
-  };
+  const { copied, copy } = useCopyToClipboard();
   return (
     <div className="copy-row">
       <span className="copy-row__text">{text}</span>
       <button
         type="button"
         className="btn btn--ghost btn--icon copy-row__btn"
-        onClick={onCopy}
+        onClick={() => copy(text)}
         title={copied ? "Copied!" : "Copy to clipboard"}
         aria-label="Copy to clipboard"
       >

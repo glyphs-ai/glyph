@@ -7,6 +7,7 @@ import {
   type WorkflowHeaderWire,
 } from "../../api";
 import { useClickOutside } from "../../hooks/useClickOutside";
+import { copyToClipboard } from "../../utils/clipboard";
 import { formatAbsolute, formatClockTime, formatDuration, formatRelative } from "../../utils/time";
 import { MoreHorizontalIcon } from "../Icons";
 import { StatusBadge } from "../tasks/StatusBadge";
@@ -460,11 +461,7 @@ function FireRowMenu({
   };
 
   const handleCopyId = async () => {
-    try {
-      await navigator.clipboard.writeText(fireId);
-    } catch {
-      // Clipboard access is optional.
-    }
+    await copyToClipboard(fireId);
     closeMenu("menuitem");
   };
 

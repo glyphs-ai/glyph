@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ScheduleView } from "../../api";
 import { useClickOutside } from "../../hooks/useClickOutside";
+import { copyToClipboard } from "../../utils/clipboard";
 import { formatAbsolute, formatRelative } from "../../utils/time";
 import { MoreHorizontalIcon } from "../Icons";
 import { targetAgent, targetRuntime } from "./shared";
@@ -297,11 +298,7 @@ export function ScheduleListItem({
   };
 
   const handleCopyId = async () => {
-    try {
-      await navigator.clipboard.writeText(schedule.id);
-    } catch {
-      /* clipboard unavailable (e.g. insecure context) — silently no-op */
-    }
+    await copyToClipboard(schedule.id);
     closeMenu("menuitem");
   };
 
