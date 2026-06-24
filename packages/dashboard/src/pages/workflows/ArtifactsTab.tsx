@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkflowArtifactWire, WorkflowDagWire, WorkflowHeaderWire } from "../../api";
 import { workflowArtifactUrl } from "../../api";
-import { FileViewer } from "../../components/viewers/FileViewer";
+import { ArtifactViewer } from "../../components/viewers/ArtifactViewer";
 import { viewerNeedsBlob } from "../../components/viewers/index";
 import { formatPhaseLabel } from "./dag-edge-geometry";
 
@@ -66,7 +66,7 @@ function artifactSubPath(a: WorkflowArtifactWire): string {
  * File-dropdown UX that mirrors `components/tasks/TaskDetail/ArtifactsTab.tsx`.
  * A single `<select>`
  * lists every workflow artifact, grouped via `<optgroup>` by source
- * (workflow summary → per-node), with a `<FileViewer>` preview pane
+ * (workflow summary → per-node), with a `<ArtifactViewer>` preview pane
  * that auto-loads the selected file. This replaces the nested-list
  * card grid that became unscannable once a workflow accumulated >10
  * files.
@@ -305,7 +305,7 @@ function ArtifactPreview({ selected, state, downloadUrl }: ArtifactPreviewProps)
   }
   if (state.status === "loaded") {
     return (
-      <FileViewer
+      <ArtifactViewer
         key={selected.value}
         filename={selected.label}
         content={state.content}

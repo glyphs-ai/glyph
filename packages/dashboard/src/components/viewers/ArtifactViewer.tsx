@@ -13,7 +13,7 @@ import type { ViewerProps } from "./types";
  * forwards `content` / `size` / `downloadUrl`. Kept dumb on purpose:
  * fetching, abort handling, and selection state live in the parent.
  */
-export function FileViewer(props: ViewerProps) {
+export function ArtifactViewer(props: ViewerProps) {
   const kind = pickViewer(props.filename);
   switch (kind) {
     case "markdown":

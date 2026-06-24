@@ -4,10 +4,10 @@
  * to inline-preview the files produced by a task.
  *
  * Add new types by extending `ViewerKind` + `pickViewer` + adding the
- * dispatch arm in `FileViewer`.
+ * dispatch arm in `ArtifactViewer`.
  */
 
-export { FileViewer } from "./FileViewer";
+export { ArtifactViewer } from "./ArtifactViewer";
 export type { ViewerProps } from "./types";
 
 export type ViewerKind = "markdown" | "html" | "json" | "code" | "image" | "text" | "binary";
