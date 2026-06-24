@@ -1,5 +1,5 @@
-import type { ServerConfig } from "@glyphs-ai/api";
 import { Hono } from "hono";
+import { defineHandler } from "./_handler.js";
 
 /**
  * GET /api/config — returns the resolved server config. The deps are read
@@ -27,15 +27,16 @@ export function configRoutes(deps: {
 }): Hono {
   const app = new Hono();
   const taskPollIntervalMs = deps.taskPollIntervalMs ?? 4000;
-  app.get("/", async (c) =>
-    c.json<ServerConfig>({
+  app.get(
+    "/",
+    defineHandler("config.get", async () => ({
       glyphHome: deps.glyphHome,
       currentWorkspaceId: await deps.currentWorkspaceId(),
       host: deps.host,
       port: deps.port,
       pathSeparator: deps.pathSeparator,
       tasks: { pollIntervalMs: taskPollIntervalMs },
-    }),
+    })),
   );
   return app;
 }

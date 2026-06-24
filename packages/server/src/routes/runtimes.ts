@@ -1,6 +1,7 @@
 import type { RuntimeInfo } from "@glyphs-ai/api";
 import type { RuntimeRegistry } from "@glyphs-ai/runtime";
 import { Hono } from "hono";
+import { defineHandler } from "./_handler.js";
 
 /**
  * Routes for /api/runtimes — exposes the registered runtime kinds AND
@@ -16,16 +17,19 @@ import { Hono } from "hono";
 export function runtimesRoutes(registry: RuntimeRegistry): Hono {
   const app = new Hono();
 
-  app.get("/", (c) => {
-    const out: RuntimeInfo[] = registry.kinds().map((kind) => {
-      const rt = registry.get(kind);
-      return {
-        kind,
-        capabilities: { ...(rt.capabilities ?? {}) },
-      };
-    });
-    return c.json(out);
-  });
+  app.get(
+    "/",
+    defineHandler("runtimes.list", () => {
+      const out: RuntimeInfo[] = registry.kinds().map((kind) => {
+        const rt = registry.get(kind);
+        return {
+          kind,
+          capabilities: { ...(rt.capabilities ?? {}) },
+        };
+      });
+      return out;
+    }),
+  );
 
   return app;
 }

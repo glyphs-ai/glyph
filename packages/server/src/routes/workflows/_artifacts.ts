@@ -37,7 +37,7 @@ export async function handleListArtifacts(
   c: Context,
   wfid: string,
   deps: ArtifactRouteDeps,
-): Promise<Response> {
+): Promise<WorkflowArtifactsResponse | Response> {
   const { resolve, resolveTasks, resolveWorkspaceDir } = deps;
   let snapshot: Awaited<ReturnType<WorkflowService["getDag"]>>;
   try {
@@ -96,7 +96,7 @@ export async function handleListArtifacts(
   const response: WorkflowArtifactsResponse = {
     artifacts: [...summaryEntries, ...nodeEntries],
   };
-  return c.json(response);
+  return response;
 }
 
 // ── GET /:wfid/artifacts/:encodedPath — stream one artifact ──────

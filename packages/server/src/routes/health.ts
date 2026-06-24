@@ -1,5 +1,5 @@
-import type { HealthResponse } from "@glyphs-ai/api";
 import { Hono } from "hono";
+import { defineHandler } from "./_handler.js";
 
 /**
  * GET /api/health — unauthenticated liveness + version surface.
@@ -27,18 +27,21 @@ export function healthRoutes(deps: {
   const now = deps.now ?? (() => Date.now());
   const startedAtIso = new Date(deps.startedAtMs).toISOString();
 
-  app.get("/", (c) => {
-    const nowMs = now();
-    const uptimeSec = Math.max(0, Math.floor((nowMs - deps.startedAtMs) / 1000));
-    return c.json<HealthResponse>({
-      status: "ok",
-      name: deps.name,
-      version: deps.version,
-      startedAt: startedAtIso,
-      uptimeSec,
-      serverNow: new Date(nowMs).toISOString(),
-    });
-  });
+  app.get(
+    "/",
+    defineHandler("health.get", () => {
+      const nowMs = now();
+      const uptimeSec = Math.max(0, Math.floor((nowMs - deps.startedAtMs) / 1000));
+      return {
+        status: "ok",
+        name: deps.name,
+        version: deps.version,
+        startedAt: startedAtIso,
+        uptimeSec,
+        serverNow: new Date(nowMs).toISOString(),
+      };
+    }),
+  );
 
   return app;
 }

@@ -16,9 +16,11 @@
  *
  * What this does NOT catch:
  *  - Request / response **body** shape drift between manifest types and
- *    handler logic. Handlers import their request-body types from the
- *    manifest but still construct response payloads ad hoc; review is
- *    the line of defence for body-shape drift.
+ *    handler logic: this reflection test only compares `{method, path}`
+ *    pairs. Response-body drift is no longer review-only, though — the
+ *    `defineHandler` wrapper (`../src/routes/_handler.ts`) compile-locks
+ *    each handler's success return to `RouteRes<typeof ROUTES[K]>`, so a
+ *    mismatched success body fails `tsc` before this test ever runs.
  */
 
 import { CatalogService, type CatalogServiceOpts } from "@glyphs-ai/catalog";

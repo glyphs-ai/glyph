@@ -1,6 +1,7 @@
 import type { ListTaskOpts, TaskService, TaskStatus } from "@glyphs-ai/task";
 import { Hono } from "hono";
 import { tasksErrorPolicy } from "./_error-policies/tasks.js";
+import { defineHandler } from "./_handler.js";
 import { respondError } from "./_respond-error.js";
 
 /**
@@ -47,64 +48,67 @@ export function scheduledTasksRoutes(resolveTaskService: TaskServiceResolver): H
   //   ?runtime=<kind>           — exact match on metadata.runtime
   //   ?createdSince=<iso8601>   — drop tasks older than the cutoff
   //   ?status=running,succeeded — include only listed statuses (CSV)
-  app.get("/", async (c) => {
-    const agent = c.req.query("agent");
-    const runtime = c.req.query("runtime");
-    const createdSince = c.req.query("createdSince");
-    const status = c.req.query("status");
-    const scheduleId = c.req.query("scheduleId");
+  app.get(
+    "/",
+    defineHandler("tasks.scheduled.list", async (c) => {
+      const agent = c.req.query("agent");
+      const runtime = c.req.query("runtime");
+      const createdSince = c.req.query("createdSince");
+      const status = c.req.query("status");
+      const scheduleId = c.req.query("scheduleId");
 
-    let createdSinceIso: string | undefined;
-    if (createdSince !== undefined) {
-      const t = Date.parse(createdSince);
-      if (Number.isNaN(t)) {
-        return c.json({ error: "createdSince must be an ISO 8601 timestamp" }, 400);
+      let createdSinceIso: string | undefined;
+      if (createdSince !== undefined) {
+        const t = Date.parse(createdSince);
+        if (Number.isNaN(t)) {
+          return c.json({ error: "createdSince must be an ISO 8601 timestamp" }, 400);
+        }
+        createdSinceIso = new Date(t).toISOString();
       }
-      createdSinceIso = new Date(t).toISOString();
-    }
 
-    let statuses: TaskStatus[] | undefined;
-    if (status !== undefined) {
-      const valid = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
-      const parts = status
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      const bad = parts.find((s) => !valid.has(s as TaskStatus));
-      if (bad !== undefined) {
-        return c.json(
-          {
-            error: `unknown status: ${JSON.stringify(bad)} (expected running, succeeded, failed, cancelled)`,
-          },
-          400,
-        );
+      let statuses: TaskStatus[] | undefined;
+      if (status !== undefined) {
+        const valid = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
+        const parts = status
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        const bad = parts.find((s) => !valid.has(s as TaskStatus));
+        if (bad !== undefined) {
+          return c.json(
+            {
+              error: `unknown status: ${JSON.stringify(bad)} (expected running, succeeded, failed, cancelled)`,
+            },
+            400,
+          );
+        }
+        statuses = parts as TaskStatus[];
       }
-      statuses = parts as TaskStatus[];
-    }
 
-    const opts: { -readonly [K in keyof ListTaskOpts]: ListTaskOpts[K] } = {
-      origin: ["schedule"],
-    };
-    if (agent !== undefined) opts.agent = agent;
-    if (runtime !== undefined) opts.runtime = runtime;
-    if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
-    if (statuses !== undefined) opts.statuses = statuses;
-    if (scheduleId !== undefined) opts.metadataEquals = { key: "scheduleId", value: scheduleId };
+      const opts: { -readonly [K in keyof ListTaskOpts]: ListTaskOpts[K] } = {
+        origin: ["schedule"],
+      };
+      if (agent !== undefined) opts.agent = agent;
+      if (runtime !== undefined) opts.runtime = runtime;
+      if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
+      if (statuses !== undefined) opts.statuses = statuses;
+      if (scheduleId !== undefined) opts.metadataEquals = { key: "scheduleId", value: scheduleId };
 
-    try {
-      const list = await getManager(c).list(opts);
-      return c.json(list);
-    } catch (err) {
-      // scheduled-tasks shares the canonical task error policy — same
-      // TaskService surface, same error classes, no schedule-package
-      // errors leak through this route (the listing operation never
-      // touches the schedule layer).
-      return respondError(c, err, {
-        route: "scheduled-tasks.list",
-        policy: tasksErrorPolicy,
-      });
-    }
-  });
+      try {
+        const list = await getManager(c).list(opts);
+        return list;
+      } catch (err) {
+        // scheduled-tasks shares the canonical task error policy — same
+        // TaskService surface, same error classes, no schedule-package
+        // errors leak through this route (the listing operation never
+        // touches the schedule layer).
+        return respondError(c, err, {
+          route: "scheduled-tasks.list",
+          policy: tasksErrorPolicy,
+        });
+      }
+    }),
+  );
 
   return app;
 }
