@@ -117,6 +117,11 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
       "grouped by area (architecture/); zero in-pkg src value-imports — rule says flat. Cross-cutting repo-wide audits stay grouped with architecture siblings.",
   },
   {
+    file: "packages/e2e/test/architecture/schedule-substrate.test.ts",
+    rationale:
+      "grouped by area (architecture/); zero in-pkg src value-imports, so the rule says flat. Cross-cutting repo-wide audits stay grouped with architecture siblings.",
+  },
+  {
     file: "packages/e2e/test/architecture/split-convention.test.ts",
     rationale:
       "grouped by area (architecture/); zero in-pkg src value-imports — rule says flat. Cross-cutting repo-wide audits stay grouped with architecture siblings.",
@@ -130,6 +135,11 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
     file: "packages/e2e/test/architecture/tier-invisibility.test.ts",
     rationale:
       "grouped by area (architecture/); zero in-pkg src value-imports — rule says flat. Cross-cutting repo-wide audits stay grouped with architecture siblings.",
+  },
+  {
+    file: "packages/e2e/test/cli/bundle-smoke.test.ts",
+    rationale:
+      "grouped by area (cli/); zero in-pkg src value-imports, so the rule says flat. CLI spawn harnesses stay grouped by subject.",
   },
   {
     file: "packages/e2e/test/cli/integration-smoke.test.ts",
