@@ -1,5 +1,11 @@
 import path from "node:path";
-import { escapeCmdArg, pwshEnvPrefix, pwshQuote, waitForEarlyFailure } from "../_shared.js";
+import {
+  escapeCmdArg,
+  hasUsableEnv,
+  pwshEnvPrefix,
+  pwshQuote,
+  waitForEarlyFailure,
+} from "../_shared.js";
 import { TerminalSpawnFailedError } from "../errors.js";
 import type { LaunchCommand, SpawnTerminalDeps, SpawnTerminalResult } from "../types.js";
 
@@ -85,9 +91,7 @@ export async function spawnWindows(
     ],
     {
       windowsVerbatimArguments: true,
-      ...(cmd.env !== undefined && Object.keys(cmd.env).length > 0
-        ? { env: { ...process.env, ...cmd.env } }
-        : {}),
+      ...(hasUsableEnv(cmd.env) ? { env: { ...process.env, ...cmd.env } } : {}),
     },
   );
   const failure = await waitForEarlyFailure(handle, deps.observationMs);

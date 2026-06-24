@@ -40,6 +40,9 @@ one found on `PATH` wins. `x-terminal-emulator` is intentionally last
 because on Debian/Ubuntu it points to whatever the user picked and has
 no portable arg convention.
 
+> Env propagation mechanism differs per launcher — see § Env-propagation
+> guarantees below.
+
 ## Env-propagation guarantees
 
 When `LaunchCommand.env` is non-empty, the package guarantees the variables
