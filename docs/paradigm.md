@@ -96,6 +96,12 @@ There are pieces of glyph that don't appear in this paper. The codebase has a Ru
 
 The implementation details live in the [architecture guide](./architecture.md). What's here is what we believe — the part we hope outlives the implementation.
 
+## The seams are data, too
+
+The same instinct — agents are data, not code — applies to glyph's own internal seams. The contract for what crosses the HTTP boundary lives in a types-only package, [`@glyphs-ai/contracts`](https://github.com/glyphs-ai/glyph/tree/main/packages/contracts): request and response shapes, the route manifest, nothing executable. The composition that orchestrates behaviour behind that boundary lives separately, in `@glyphs-ai/api`. The surfaces — the CLI, the dashboard — depend on the data (`contracts`) and never on the composition (`api`).
+
+Why split them? Because the boundary contract changes for different reasons, and at a different pace, than the code behind it. A wire shape is a promise to every client that already exists; orchestration is an implementation we expect to rewrite as the model improves. Keeping the promise as data — diffable, importable, with no behaviour to drift — lets the code behind it stay free to change. The mechanics (the route manifest, the reflection test that pins handlers to it, the import fence between tiers) are [architecture](./architecture.md), not paradigm; the instinct that a boundary should be data is.
+
 ## An invitation
 
 If you've read this far and found yourself nodding, we'd like to know you exist. The agentic-systems space is loud right now and we've found it valuable to find quieter people who think along similar lines.

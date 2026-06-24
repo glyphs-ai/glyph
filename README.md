@@ -273,8 +273,9 @@ full per-mode port table.
 
 For everything beyond the basics — repository pattern, atomic-write
 guarantees, how to add a new runtime adapter — see
-[`docs/architecture.md`](./docs/architecture.md). Release procedure
-lives in [`docs/RELEASING.md`](./docs/RELEASING.md).
+[`docs/architecture.md`](./docs/architecture.md). New contributors should
+start with [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md); the release
+procedure lives in [`docs/RELEASING.md`](./docs/RELEASING.md).
 
 ## License
 

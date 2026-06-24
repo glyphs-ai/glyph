@@ -781,6 +781,54 @@ The dashboard adapts automatically — runtimes are listed via
 `/api/runtimes` and the create-session / dispatch-task forms pick
 them up.
 
+## Adding a new HTTP route
+
+A route is a **contracts manifest + server handler + test** trio. The
+three sides are reconciled by a reflection test, so skipping one fails
+CI rather than drifting silently.
+
+1. **Declare it in `@glyphs-ai/contracts`.** Add a `defineRoute<...>(...)`
+   entry to the relevant per-domain slice in
+   `packages/contracts/src/routes/<domain>.ts` with typed request and
+   response shapes. New DTOs live in `contracts` (never inline in the
+   handler); the `routes.ts` facade aggregates every slice into the
+   `ROUTES` manifest that both server and CLI read.
+2. **Implement the handler in `@glyphs-ai/server`.** In
+   `packages/server/src/routes/<domain>.ts`, parse + validate the request
+   (return a `ValidationResult` on bad input — see § Validation pipeline
+   in [`packages/server/README.md`](../packages/server/README.md)),
+   dispatch to the per-workspace `WorkspaceContext` service (or to `api`),
+   and format the response. Surface typed errors through `respondError`
+   with the domain's `ErrorPolicy`, and add any new user-facing error
+   class `name` to `SAFE_ERROR_NAMES`.
+3. **Register + test.** Mount the handler so it is reachable, then let
+   `packages/server/test/route-manifest.test.ts` (the reflection test)
+   assert the registered Hono routes match the `ROUTES` manifest exactly,
+   and add a per-domain handler test under `packages/server/test/`. The
+   CLI's typed `client.call(...)` picks the route up from the same
+   manifest with no extra wiring.
+
+## Adding a new CLI command
+
+A command is a **registrar + result rendering + test** trio. The command
+talks to a running server through the typed route above — it never
+hand-rolls a `fetch`.
+
+1. **Register the subcommand.** Add it to the relevant registrar in
+   `packages/cli/src/registrars/<domain>.ts` (wrap workspace-scoped
+   commands with `withWorkspaceFlags`). The action calls
+   `client.call(...)` against the typed route and stores the response on
+   the command `slot`.
+2. **Render the result.** Route the response through the result / output
+   seam (`packages/cli/src/result.ts` + `output.ts`) so both the
+   human-readable `table` default and `--json` work. Follow the id and
+   flag naming conventions documented in
+   [`packages/cli/README.md`](../packages/cli/README.md) — reviewers
+   reject flags outside that table.
+3. **Test it.** Add a spawn / integration test under
+   `packages/e2e/test/cli/` (e.g. `spawn-smoke.test.ts`) so the command
+   is exercised end-to-end against a real spawned binary.
+
 ## Where to look next
 
 - **The paper:
@@ -796,4 +844,8 @@ them up.
   - [`@glyphs-ai/runtime`](../packages/runtime/README.md)
   - [`@glyphs-ai/api`](../packages/api/README.md)
   - [`@glyphs-ai/server`](../packages/server/README.md)
+- [`docs/CONTRIBUTING.md`](./CONTRIBUTING.md) — local setup, the daily
+  loop, the "adding things" pointer map, and the PR checklist.
+- [`docs/glossary.md`](./glossary.md) — one-line definitions of glyph's
+  domain vocabulary (node kinds, substrate, wire, origin, tier, wsid, …).
 - [`docs/RELEASING.md`](./RELEASING.md) — maintainer release procedure.
