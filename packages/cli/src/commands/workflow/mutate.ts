@@ -25,7 +25,7 @@ import {
   KNOWN_FINISH_OUTCOMES,
   KNOWN_NODE_KINDS,
   parseParents,
-  validateAddSubgraphBody,
+  validateAddSubgraphRequest,
 } from "./_validate.js";
 
 /**
@@ -142,7 +142,7 @@ export async function workflowAddSubgraph(
   if (!payloadResult.ok) {
     return { exitCode: 2, stderr: `${payloadResult.error}\n` };
   }
-  const bodyResult = validateAddSubgraphBody(payloadResult.value);
+  const bodyResult = validateAddSubgraphRequest(payloadResult.value);
   if (!bodyResult.ok) {
     return { exitCode: 2, stderr: `${bodyResult.error}\n` };
   }

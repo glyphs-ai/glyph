@@ -33,7 +33,9 @@ export function validateCreatedSinceQuery(
   return { ok: true, value: raw };
 }
 
-export function validateCreateBody(raw: unknown): ValidationResult<CreateWorkflowRequest> {
+export function validateCreateWorkflowRequest(
+  raw: unknown,
+): ValidationResult<CreateWorkflowRequest> {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
     return { ok: false, error: "request body must be an object" };
   }
@@ -78,7 +80,7 @@ function isPlainObject(raw: unknown): raw is Record<string, unknown> {
   return raw !== null && typeof raw === "object" && !Array.isArray(raw);
 }
 
-export function validateAddNodeBody(raw: unknown): ValidationResult<AddNodeRequest> {
+export function validateAddNodeRequest(raw: unknown): ValidationResult<AddNodeRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const allowed = new Set(["kind", "spec", "parents"]);
   for (const k of Object.keys(raw)) {
@@ -108,7 +110,7 @@ export function validateAddNodeBody(raw: unknown): ValidationResult<AddNodeReque
   };
 }
 
-export function validateAddEdgeBody(raw: unknown): ValidationResult<AddEdgeRequest> {
+export function validateAddEdgeRequest(raw: unknown): ValidationResult<AddEdgeRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const allowed = new Set(["fromNodeId", "toNodeId"]);
   for (const k of Object.keys(raw)) {
@@ -145,7 +147,7 @@ function validateWorkflowNodeRef(raw: unknown): ValidationResult<WorkflowNodeRef
   return { ok: false, error: 'ref must have key "nodeId" OR "tempId"' };
 }
 
-export function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgraphRequest> {
+export function validateAddSubgraphRequest(raw: unknown): ValidationResult<AddSubgraphRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const allowed = new Set(["nodes", "edges"]);
   for (const k of Object.keys(raw)) {
@@ -217,7 +219,7 @@ export function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgr
   return { ok: true, value: { nodes: validNodes, edges: validEdges } };
 }
 
-export function validateReplaceNodeSpecBody(
+export function validateReplaceNodeSpecRequest(
   raw: unknown,
 ): ValidationResult<ReplaceNodeSpecRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
@@ -229,7 +231,9 @@ export function validateReplaceNodeSpecBody(
   return { ok: true, value: { newSpec: raw.newSpec } };
 }
 
-export function validateFinishWorkflowBody(raw: unknown): ValidationResult<FinishWorkflowRequest> {
+export function validateFinishWorkflowRequest(
+  raw: unknown,
+): ValidationResult<FinishWorkflowRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const { kind } = raw;
   if (typeof kind !== "string" || !(KNOWN_FINISH_KINDS as readonly string[]).includes(kind)) {
@@ -306,16 +310,16 @@ export function validateFinishWorkflowBody(raw: unknown): ValidationResult<Finis
  * contract stays optional for callers; downstream code receives the
  * normalized value.
  */
-export interface ValidatedCancelWorkflowBody {
+export interface NormalizedCancelWorkflowRequest {
   readonly cancellation: {
     readonly kind: "user";
     readonly message: string;
   };
 }
 
-export function validateCancelWorkflowBody(
+export function validateCancelWorkflowRequest(
   raw: unknown,
-): ValidationResult<ValidatedCancelWorkflowBody> {
+): ValidationResult<NormalizedCancelWorkflowRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   for (const k of Object.keys(raw)) {
     if (k !== "cancellation") {

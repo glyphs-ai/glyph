@@ -42,7 +42,7 @@ export function parseParents(raw: string | undefined): readonly string[] {
     .filter((p) => p !== "");
 }
 
-export function validateAddSubgraphBody(
+export function validateAddSubgraphRequest(
   raw: unknown,
 ): { ok: true; body: AddSubgraphRequest } | { ok: false; error: string } {
   if (!isPlainObject(raw)) {

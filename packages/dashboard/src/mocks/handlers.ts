@@ -12,14 +12,19 @@
  * match a handler above it.
  */
 
-import type { AgentEntry, Mcp, SkillEntry, TaskScheduleTarget } from "@glyphs-ai/contracts";
+import type {
+  AgentEntry,
+  CreateTaskScheduleRequest,
+  CreateWorkflowScheduleRequest,
+  Mcp,
+  PatchTaskScheduleRequest,
+  PatchWorkflowScheduleRequest,
+  SkillEntry,
+  TaskScheduleTarget,
+} from "@glyphs-ai/contracts";
 import { type DefaultBodyType, HttpResponse, http } from "msw";
 import type {
-  CreateScheduleBody,
   CreateWorkflowRequest,
-  CreateWorkflowScheduleBody,
-  PatchScheduleBody,
-  PatchWorkflowScheduleBody,
   ScheduleDetail,
   ScheduleView,
   SessionView,
@@ -306,7 +311,7 @@ export const handlers = [
   // mode is intentionally rough on the describe accuracy; cronstrue
   // is a server-side dep.
   http.post(`/api/workspaces/${W}/schedules/task`, async ({ request }) => {
-    const body = (await request.json()) as CreateScheduleBody;
+    const body = (await request.json()) as CreateTaskScheduleRequest;
     if (typeof body.name !== "string" || body.name.trim() === "") {
       return HttpResponse.json({ error: "name must be a non-empty string" }, { status: 400 });
     }
@@ -361,7 +366,7 @@ export const handlers = [
   // `details`, no `runtime`); the mock injects `kind: "workflow"`
   // before storing. Mirrors the server route's validation shape.
   http.post(`/api/workspaces/${W}/schedules/workflow`, async ({ request }) => {
-    const body = (await request.json()) as CreateWorkflowScheduleBody;
+    const body = (await request.json()) as CreateWorkflowScheduleRequest;
     if (typeof body.name !== "string" || body.name.trim() === "") {
       return HttpResponse.json({ error: "name must be a non-empty string" }, { status: 400 });
     }
@@ -457,7 +462,7 @@ export const handlers = [
   http.patch(`/api/workspaces/${W}/schedules/task/:scheduleId`, async ({ params, request }) => {
     const idx = schedulesState.findIndex((s) => s.id === params.scheduleId);
     if (idx === -1) return notFound("schedule not found");
-    const body = (await request.json()) as PatchScheduleBody;
+    const body = (await request.json()) as PatchTaskScheduleRequest;
     const current = schedulesState[idx]!;
     let nextTarget = current.target;
     if (body.target !== undefined && current.target.kind === "task") {
@@ -494,7 +499,7 @@ export const handlers = [
   http.patch(`/api/workspaces/${W}/schedules/workflow/:scheduleId`, async ({ params, request }) => {
     const idx = schedulesState.findIndex((s) => s.id === params.scheduleId);
     if (idx === -1) return notFound("schedule not found");
-    const body = (await request.json()) as PatchWorkflowScheduleBody;
+    const body = (await request.json()) as PatchWorkflowScheduleRequest;
     const current = schedulesState[idx]!;
     let nextTarget = current.target;
     if (body.target !== undefined && current.target.kind === "workflow") {

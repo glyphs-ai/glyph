@@ -1,12 +1,10 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type {
+  AgentEntry,
+  CreateTaskScheduleRequest,
+  CreateWorkflowScheduleRequest,
+} from "@glyphs-ai/contracts";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  type CreateScheduleBody,
-  type CreateWorkflowScheduleBody,
-  createSchedule,
-  createWorkflowSchedule,
-  type ScheduleView,
-} from "../../api";
+import { createSchedule, createWorkflowSchedule, type ScheduleView } from "../../api";
 import { Modal } from "../Modal";
 import { coordEligibleAgents } from "../workflows/shared";
 import { presetToCron, validatePreset } from "./cron-presets";
@@ -159,7 +157,7 @@ export function CreateScheduleModal({
     try {
       let created: ScheduleView;
       if (state.kind === "workflow") {
-        const body: CreateWorkflowScheduleBody = {
+        const body: CreateWorkflowScheduleRequest = {
           name: state.name.trim(),
           target: {
             coordinatorAgent: state.agent,
@@ -171,7 +169,7 @@ export function CreateScheduleModal({
         };
         created = await createWorkflowSchedule(body);
       } else {
-        const body: CreateScheduleBody = {
+        const body: CreateTaskScheduleRequest = {
           name: state.name.trim(),
           target: {
             agent: state.agent,

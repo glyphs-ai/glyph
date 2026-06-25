@@ -12,6 +12,10 @@
 // and wholesale-replace on `trigger`.
 
 import type {
+  CreateTaskScheduleRequest,
+  CreateWorkflowScheduleRequest,
+  PatchTaskScheduleRequest,
+  PatchWorkflowScheduleRequest,
   PreviewScheduleResult,
   Schedule,
   ScheduleTarget,
@@ -65,18 +69,11 @@ export interface ScheduleDetail extends ScheduleView {
  *   server (required fields; omit to keep).
  * - `target.details` / `runtime` — string sets; `null` deletes;
  *   absent keeps. `target.kind` MUST NOT be set (URL discriminates).
+ *
+ * Re-exported from contracts as the single source of truth for the
+ * wire shape — the dashboard does not redeclare it.
  */
-export interface PatchScheduleBody {
-  name?: string;
-  enabled?: boolean;
-  trigger?: { kind: "cron"; expr: string; tz: string };
-  target?: {
-    agent?: string;
-    brief?: string;
-    details?: string | null;
-    runtime?: string | null;
-  };
-}
+export type { PatchTaskScheduleRequest as PatchScheduleRequest } from "@glyphs-ai/contracts";
 
 /** Response shape for `GET /schedules/:scheduleId/preview?n=N`. */
 export type SchedulePreview = PreviewScheduleResult;
@@ -120,27 +117,18 @@ export const previewSchedule = (
   );
 };
 
-export const patchSchedule = (scheduleId: string, body: PatchScheduleBody): Promise<ScheduleView> =>
+export const patchSchedule = (
+  scheduleId: string,
+  body: PatchTaskScheduleRequest,
+): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(
     `${workspacePrefix()}/schedules/task/${encodeURIComponent(scheduleId)}`,
     jsonInit("PATCH", body as object),
   );
 
-/** Body for `PATCH /schedules/workflow/:scheduleId`. */
-export interface PatchWorkflowScheduleBody {
-  name?: string;
-  enabled?: boolean;
-  trigger?: { kind: "cron"; expr: string; tz: string };
-  target?: {
-    coordinatorAgent?: string;
-    brief?: string;
-    details?: string | null;
-  };
-}
-
 export const patchWorkflowSchedule = (
   scheduleId: string,
-  body: PatchWorkflowScheduleBody,
+  body: PatchWorkflowScheduleRequest,
 ): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(
     `${workspacePrefix()}/schedules/workflow/${encodeURIComponent(scheduleId)}`,
@@ -170,13 +158,11 @@ export const runSchedule = (scheduleId: string): Promise<{ dispatchId: string }>
  * this; the CLI's `glyph schedule create` sends the same wire shape
  * directly. The `target.brief` + optional `target.details` pair mirrors
  * `@glyphs-ai/task` `DispatchOpts`.
+ *
+ * Re-exported from contracts so the dashboard always tracks the
+ * canonical wire shape.
  */
-export interface CreateScheduleBody {
-  name: string;
-  target: { agent: string; brief: string; details?: string; runtime?: string };
-  trigger: { kind: "cron"; expr: string; tz: string };
-  enabled?: boolean;
-}
+export type { CreateTaskScheduleRequest as CreateScheduleRequest } from "@glyphs-ai/contracts";
 
 /**
  * Create a task-kind schedule. Surfaces server-side validation errors
@@ -185,19 +171,16 @@ export interface CreateScheduleBody {
  * sees, e.g., "Invalid cron expression: …" rather than a generic
  * "schedule create: 400".
  */
-export const createSchedule = (body: CreateScheduleBody): Promise<ScheduleView> =>
+export const createSchedule = (body: CreateTaskScheduleRequest): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/task`, jsonInit("POST", body));
 
-/** Body for `POST /schedules/workflow`. */
-export interface CreateWorkflowScheduleBody {
-  name: string;
-  target: { coordinatorAgent: string; brief: string; details?: string };
-  trigger: { kind: "cron"; expr: string; tz: string };
-  enabled?: boolean;
-}
+/** Body for `POST /schedules/workflow` — re-exported from contracts. */
+export type { CreateWorkflowScheduleRequest } from "@glyphs-ai/contracts";
 
 /** Create a workflow-kind schedule. */
-export const createWorkflowSchedule = (body: CreateWorkflowScheduleBody): Promise<ScheduleView> =>
+export const createWorkflowSchedule = (
+  body: CreateWorkflowScheduleRequest,
+): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/workflow`, jsonInit("POST", body));
 
 /**

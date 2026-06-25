@@ -102,14 +102,14 @@ import {
 import { handleListArtifacts, handleStreamArtifact } from "./workflows/_artifacts.js";
 import {
   resolveNodeRef,
-  validateAddEdgeBody,
-  validateAddNodeBody,
-  validateAddSubgraphBody,
-  validateCancelWorkflowBody,
-  validateCreateBody,
+  validateAddEdgeRequest,
+  validateAddNodeRequest,
+  validateAddSubgraphRequest,
+  validateCancelWorkflowRequest,
   validateCreatedSinceQuery,
-  validateFinishWorkflowBody,
-  validateReplaceNodeSpecBody,
+  validateCreateWorkflowRequest,
+  validateFinishWorkflowRequest,
+  validateReplaceNodeSpecRequest,
 } from "./workflows/_validators.js";
 
 type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
@@ -168,7 +168,7 @@ export function workflowsRoutes(
   app.post("/", async (c) => {
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateCreateBody(parsed.body);
+    const validated = validateCreateWorkflowRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -265,7 +265,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateCancelWorkflowBody(parsed.body);
+    const validated = validateCancelWorkflowRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const { cancellation } = validated.value;
     try {
@@ -305,7 +305,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateAddNodeBody(parsed.body);
+    const validated = validateAddNodeRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -334,7 +334,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateAddEdgeBody(parsed.body);
+    const validated = validateAddEdgeRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -371,7 +371,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateAddSubgraphBody(parsed.body);
+    const validated = validateAddSubgraphRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -429,7 +429,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateFinishWorkflowBody(parsed.body);
+    const validated = validateFinishWorkflowRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -619,7 +619,7 @@ export function workflowsRoutes(
     const nid = c.req.param("nid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateReplaceNodeSpecBody(parsed.body);
+    const validated = validateReplaceNodeSpecRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {

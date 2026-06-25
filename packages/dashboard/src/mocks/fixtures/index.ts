@@ -28,7 +28,7 @@ export { fixtureWorkflowArtifacts } from "./workflow-artifacts.js";
 export { fixtureWorkflowDags, fixtureWorkflows } from "./workflows.js";
 export { fixtureActiveWorkspaceId, fixtureWorkspaces } from "./workspaces.js";
 
-export interface ArtifactBody {
+export interface ArtifactPayload {
   contentType: string;
   body: string | Blob;
 }
@@ -46,7 +46,7 @@ const samplePngBlob: Blob = await fetch(samplePngUrl).then((r) => r.blob());
  * the basename matches what `success.artifacts` declares for each task
  * after `extractArtifacts()` strips the absolute-path prefix.
  */
-export const artifactBodies = new Map<string, ArtifactBody>([
+export const artifactBodies = new Map<string, ArtifactPayload>([
   ["single-html/sample.html", { contentType: "text/html", body: sampleHtml }],
   ["code-markdown/sample.md", { contentType: "text/markdown", body: sampleMarkdown }],
   ["code-markdown/sample.txt", { contentType: "text/plain", body: sampleText }],
