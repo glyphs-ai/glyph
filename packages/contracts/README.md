@@ -35,7 +35,7 @@ type re-exports) plus pure-function path helpers. No orchestration code.
 | `routes.ts` | Facade for the route manifest: composes the per-domain slices in `routes/` into the `ROUTES` registry and re-exports `RouteSpec<Req, Res>` plus every request/response body type the HTTP API exposes |
 | `routes/` | Per-domain route slices (`system`, `workspaces`, `sessions`, `tasks`, `schedules`, `workflows`, `catalog`) and the `_spec` primitives; package-private, reached only through the `routes.ts` facade (see `docs/pkg-template.md` § Splitting big files) |
 | `runtimes.ts` | `RuntimeInfo` for `GET /api/runtimes` |
-| `schedules.ts` | Wire-shape schedule target DTOs (`TaskTargetData`, `TaskScheduleTargetWire`, `ScheduleWireTarget`) |
+| `schedules.ts` | Wire-shape schedule target DTOs (`TaskTargetData`, `TaskScheduleTarget`, `ScheduleTarget`) |
 | `server-config.ts` | `ServerConfig` for `GET /api/config` (response type referenced by `routes.ts`) |
 | `workflows.ts` | Workflow DTOs and terminal payload shapes for the T1 `@glyphs-ai/workflow` substrate, mirrored without importing its runtime implementation |
 

@@ -153,17 +153,17 @@ and surface as their own typed errors.
 | Verb     | Path                                       | Service method   | Body                                                                                                           | Response                                      |
 | -------- | ------------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `POST`   | `/:workflowId/nodes`                       | `addNode`        | `{ kind, spec, parents[] }`                                                                                    | `{ nodeId, phase }`                           |
-| `GET`    | `/:workflowId/nodes/:nodeId`               | `getNode`        | _none_                                                                                                         | `WorkflowNodeWire`                            |
+| `GET`    | `/:workflowId/nodes/:nodeId`               | `getNode`        | _none_                                                                                                         | `WorkflowNode`                            |
 | `POST`   | `/:workflowId/edges`                       | `addEdge`        | `{ fromNodeId, toNodeId }`                                                                                     | `{ fromNodeId, toNodeId, toPhase }`           |
 | `POST`   | `/:workflowId/subgraph`                    | `addSubgraph`    | `{ nodes:[{tempId,kind,spec,existingParents?}], edges:[{from,to}] }` — `from`/`to` are `{nodeId}` or `{tempId}` | `{ insertedNodes:[{tempId,nodeId,phase}] }`   |
-| `POST`   | `/:workflowId/nodes/:nodeId/cancel`        | `cancelNode`     | _none_                                                                                                         | `WorkflowNodeWire` (post-cancel projection)   |
-| `POST`   | `/:workflowId/finish`                      | `finishWorkflow` | `{ outcome: "succeeded" \| "failed" }`                                                                         | `WorkflowHeaderWire` (post-finish projection) |
+| `POST`   | `/:workflowId/nodes/:nodeId/cancel`        | `cancelNode`     | _none_                                                                                                         | `WorkflowNode` (post-cancel projection)   |
+| `POST`   | `/:workflowId/finish`                      | `finishWorkflow` | `{ outcome: "succeeded" \| "failed" }`                                                                         | `WorkflowHeader` (post-finish projection) |
 | `DELETE` | `/:workflowId/nodes/:nodeId`               | `removeNode`     | _none_                                                                                                         | `204 No Content`                              |
 | `DELETE` | `/:workflowId/edges/:fromNodeId/:toNodeId` | `removeEdge`     | _none_                                                                                                         | `204 No Content`                              |
-| `PATCH`  | `/:workflowId/nodes/:nodeId/spec`          | `replaceSpec`    | `{ newSpec }`                                                                                                  | `WorkflowNodeWire` (post-replace projection)  |
-| `POST`   | `/:workflowId/nodes/:nodeId/respond`       | `respondHumanNode` | `{ choiceId?, input? }`                                                                                      | `WorkflowNodeWire` (post-respond projection)  |
+| `PATCH`  | `/:workflowId/nodes/:nodeId/spec`          | `replaceSpec`    | `{ newSpec }`                                                                                                  | `WorkflowNode` (post-replace projection)  |
+| `POST`   | `/:workflowId/nodes/:nodeId/respond`       | `respondHumanNode` | `{ choiceId?, input? }`                                                                                      | `WorkflowNode` (post-respond projection)  |
 
-`NodeRefWire` on the wire is a structural-discriminator union — exactly
+`WorkflowNodeRef` on the wire is a structural-discriminator union — exactly
 one of `{nodeId}` (resolve to an existing node) or `{tempId}` (resolve
 to a temp node declared in the same `addSubgraph` batch). The route
 boundary translates each shape to the substrate's tag-discriminated
