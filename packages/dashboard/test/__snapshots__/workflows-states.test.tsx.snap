@@ -84,6 +84,7 @@ exports[`Workflows page — state matrix > No-match: an active filter with no ro
 <div
   class="empty"
   data-testid="workflows-empty-nomatch"
+  role="status"
 >
   <div
     aria-hidden="true"
@@ -117,6 +118,7 @@ exports[`Workflows page — state matrix > Zero: empty workspace renders the �
 <div
   class="empty"
   data-testid="workflows-empty-zero"
+  role="status"
 >
   <div
     aria-hidden="true"

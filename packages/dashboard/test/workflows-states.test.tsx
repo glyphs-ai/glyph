@@ -7,10 +7,12 @@ import type { WorkflowDag, WorkflowHeader } from "../src/api";
 /**
  * State-matrix lock-in for the Workflows page (two-pane). Covers the four
  * user-reachable named states — Loading, Zero, No-match, Normal — plus the
- * issue #106 contract that the detail pane is skeletonised during the
- * INITIAL list load (not just mid-flight). "Unselected" is unreachable
- * here (auto-bind) and is covered in the resolver unit test. DOM snapshots
- * pin the empty cards + skeletons against silent regressions.
+ * contract that the detail pane is skeletonised during the INITIAL list
+ * load (not just mid-flight), and a stale-time-window regression (a
+ * populated workspace whose workflows all predate the default window
+ * resolves to No-match, not Zero). "Unselected" is unreachable here
+ * (auto-bind) and is covered in the resolver unit test. DOM snapshots pin
+ * the empty cards + skeletons against silent regressions.
  */
 
 vi.mock("../src/api", async () => {
@@ -93,8 +95,9 @@ describe("Workflows page — state matrix", () => {
     mockListWorkflows.mockReturnValue(new Promise<WorkflowHeader[]>(() => {}));
     renderWorkflows(PATH, agents);
     const railSkeleton = await screen.findByTestId("workflow-list-skeleton");
-    // The detail-pane skeleton during INITIAL load is the issue #106 fix:
-    // previously the pane flashed the "No workflow selected" placeholder.
+    // The detail-pane skeleton during INITIAL load: without it the pane
+    // flashed the "No workflow selected" placeholder before the first row
+    // auto-selected.
     const detailSkeleton = screen.getByTestId("workflow-detail-skeleton");
     expect(railSkeleton).toBeTruthy();
     expect(detailSkeleton).toBeTruthy();
@@ -103,7 +106,9 @@ describe("Workflows page — state matrix", () => {
 
   it("Zero: empty workspace renders the 🪄 EmptyState with a wired New workflow CTA", async () => {
     mockListWorkflows.mockResolvedValue([]);
-    renderWorkflows(PATH, agents);
+    // range=all so no time window is active: an empty list is a
+    // genuinely-empty workspace (Zero), not a filtered-out result.
+    renderWorkflows(`${PATH}?range=all`, agents);
     const zero = await screen.findByTestId("workflows-empty-zero");
     expect(screen.getByTestId("workflows-empty-zero-cta")).toBeTruthy();
     expect(zero).toMatchSnapshot();
@@ -124,6 +129,27 @@ describe("Workflows page — state matrix", () => {
     fireEvent.click(await screen.findByTestId("workflows-empty-nomatch-cta"));
     await waitFor(() => {
       expect(screen.getByTestId("workflows-empty-zero")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("workflows-empty-nomatch")).toBeNull();
+  });
+
+  it("Stale window: a populated workspace with all workflows outside the default window resolves to No-match, and Clear filters (→ range=all) recovers them", async () => {
+    // The server applies the time window (createdSince), so the page only
+    // ever sees the windowed slice. Model a populated-but-stale workspace:
+    // empty while a window is active, rows once it widens to all-time.
+    mockListWorkflows.mockImplementation((opts?: { createdSince?: string }) =>
+      Promise.resolve(opts?.createdSince ? [] : [makeWorkflow({ id: "wf-1" })]),
+    );
+    // Default entry (range=7d) → createdSince sent → server returns []. The
+    // window is an active filter, so this is No-match (recoverable), NOT
+    // the genuinely-empty Zero state.
+    renderWorkflows(PATH, agents);
+    await screen.findByTestId("workflows-empty-nomatch");
+    expect(screen.queryByTestId("workflows-empty-zero")).toBeNull();
+    // Clear filters widens range to "all" → no createdSince → rows return.
+    fireEvent.click(screen.getByTestId("workflows-empty-nomatch-cta"));
+    await waitFor(() => {
+      expect(screen.getByTestId("workflow-row-wf-1")).toBeTruthy();
     });
     expect(screen.queryByTestId("workflows-empty-nomatch")).toBeNull();
   });

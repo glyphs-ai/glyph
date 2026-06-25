@@ -7,10 +7,10 @@ import type { ScheduleView } from "../src/api";
 /**
  * State-matrix lock-in for the Schedules page (two-pane). Covers the four
  * user-reachable named states — Loading, Zero, No-match, Normal — and pins
- * the issue #106 layout reshape: the `tasks-pane--zero` whole-page switch
- * is gone, so the filter chrome stays mounted and the empty cards live in
- * the detail pane. "Unselected" is unreachable (auto-bind); see the
- * resolver unit test. DOM snapshots guard the empty cards + skeletons.
+ * the layout reshape: the `tasks-pane--zero` whole-page switch is gone, so
+ * the filter chrome stays mounted and the empty cards live in the detail
+ * pane. "Unselected" is unreachable (auto-bind); see the resolver unit
+ * test. DOM snapshots guard the empty cards + skeletons.
  */
 
 vi.mock("../src/api", async () => {

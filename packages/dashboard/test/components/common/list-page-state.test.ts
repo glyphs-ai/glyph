@@ -8,7 +8,7 @@ import {
  * Exhaustive coverage of the shared list-page decision tree. The four
  * list pages (Tasks / Workflows / Schedules / Sessions) all funnel their
  * render branch through this resolver, so locking every state by name
- * here guarantees no page can diverge from the matrix in issue #106.
+ * here guarantees no page can diverge from the shared empty-state matrix.
  */
 describe("resolveListPageState — shared list-page decision tree", () => {
   const base: ListPageStateInput = {

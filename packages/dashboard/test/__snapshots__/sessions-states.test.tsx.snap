@@ -4,6 +4,7 @@ exports[`Sessions page — state matrix > Loading: shows the spinner EmptyState 
 <div
   class="empty"
   data-testid="sessions-loading"
+  role="status"
 >
   <div
     aria-hidden="true"
@@ -37,6 +38,7 @@ exports[`Sessions page — state matrix > No-match: a filter that hides every ro
 <div
   class="empty"
   data-testid="sessions-empty-nomatch"
+  role="status"
 >
   <div
     aria-hidden="true"
@@ -70,6 +72,7 @@ exports[`Sessions page — state matrix > Zero: empty workspace renders the 📂
 <div
   class="empty"
   data-testid="sessions-empty-zero"
+  role="status"
 >
   <div
     aria-hidden="true"

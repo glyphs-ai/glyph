@@ -50,6 +50,7 @@ exports[`Schedules page — state matrix > No-match: a filter hiding every row r
 <div
   class="empty"
   data-testid="schedules-empty-nomatch"
+  role="status"
 >
   <div
     aria-hidden="true"
@@ -83,6 +84,7 @@ exports[`Schedules page — state matrix > Zero: empty workspace renders the �
 <div
   class="empty"
   data-testid="schedules-empty-zero"
+  role="status"
 >
   <div
     aria-hidden="true"

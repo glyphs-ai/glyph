@@ -20,6 +20,7 @@ import {
   ALL_RUNTIMES,
   coerceTimePreset,
   DEFAULT_TIME_PRESET,
+  isTimeFilterActive,
   type TimePreset,
 } from "../components/tasks/shared";
 import { TaskConfirmModalsHost } from "../components/tasks/TaskConfirmModals";
@@ -206,28 +207,35 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
   }, [agents, tasks]);
 
   // True when any filter chrome is constraining the list. Distinguishes a
-  // genuinely empty workspace (zero tasks, no filter) from a
+  // genuinely empty workspace (zero tasks, no filter at all) from a
   // filter-narrowed result: the former surfaces the "No tasks yet" zero
-  // state (with the Dispatch CTA) in the right detail pane, the latter the
-  // "No matches" hint. Either way the filter rail stays mounted so the
-  // user can always see and clear the filter chrome.
+  // state (with the Dispatch CTA), the latter the "No matches" hint with a
+  // Clear-filters recovery. A bounded time window counts as an active
+  // filter (only "all" is unconstrained) — `tasks` is server-filtered by
+  // `createdSince`, so without this a populated-but-stale workspace (every
+  // task older than the window) would masquerade as genuinely empty.
+  // Either way the filter rail stays mounted so the user can see and clear
+  // the chrome.
   const filtersActive =
     idQuery.trim() !== "" ||
     agentFilterUrl !== ALL_AGENTS ||
     runtimeFilter !== ALL_RUNTIMES ||
-    timeFilter !== DEFAULT_TIME_PRESET;
+    isTimeFilterActive(timeFilter);
 
   // Atomic "Clear filters" reset. Chaining the individual
   // `useUrlSearchValue` setters would clobber one another (each reads the
   // same stale `location.search` snapshot), so wipe every filter key in a
-  // single `navigate()`. The `?taskId=` selection is intentionally kept so
-  // clearing filters is non-destructive to the current detail view.
+  // single `navigate()`. The time range is widened to "all" (not merely
+  // deleted, which would fall back to the bounded default) so clearing
+  // filters actually surfaces tasks that predate the default window. The
+  // `?taskId=` selection is intentionally kept so clearing is
+  // non-destructive to the current detail view.
   const clearFilters = useCallback(() => {
     const params = new URLSearchParams(location.search);
     params.delete("q");
     params.delete("agent");
     params.delete("runtime");
-    params.delete("range");
+    params.set("range", "all");
     const search = params.toString();
     navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
       replace: true,

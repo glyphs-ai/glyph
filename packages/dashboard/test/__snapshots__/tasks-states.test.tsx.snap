@@ -119,6 +119,7 @@ exports[`Tasks page — state matrix > No-match: a filter hiding every row rende
 <div
   class="empty"
   data-testid="tasks-empty-nomatch"
+  role="status"
 >
   <div
     aria-hidden="true"
@@ -152,6 +153,7 @@ exports[`Tasks page — state matrix > Zero: empty workspace renders the 📝 Em
 <div
   class="empty"
   data-testid="tasks-empty-zero"
+  role="status"
 >
   <div
     aria-hidden="true"

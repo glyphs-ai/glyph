@@ -53,6 +53,21 @@ export function coerceTimePreset(raw: string): TimePreset {
 }
 
 /**
+ * Whether a time preset actually constrains the result set. Only `"all"`
+ * (no lower bound) is non-constraining; every bounded window — including
+ * the default — narrows the list the server returns, so it counts as an
+ * active filter for the empty-state machine.
+ *
+ * This is what keeps a populated-but-stale workspace (every item older
+ * than the window) on the "No matches" + recovery path instead of the
+ * genuinely-empty "Zero" + create-CTA state: the windowed count is 0, but
+ * a window IS active, so it resolves to no-match rather than zero.
+ */
+export function isTimeFilterActive(preset: TimePreset): boolean {
+  return preset !== "all";
+}
+
+/**
  * Convert a preset to a millisecond cutoff. Anchored on the server's
  * approximate clock (`serverNow()`) rather than local `Date.now()`,
  * so cutoffs match what the server actually sees even if the user's

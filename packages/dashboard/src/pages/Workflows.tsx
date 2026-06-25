@@ -16,6 +16,7 @@ import {
   ALL_AGENTS,
   coerceTimePreset,
   DEFAULT_TIME_PRESET,
+  isTimeFilterActive,
   type TimePreset,
 } from "../components/tasks/shared";
 import { CreateWorkflowModal } from "../components/workflows/CreateWorkflowModal";
@@ -136,12 +137,15 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
   // Atomic "Clear filters" reset. The selection keys (`workflowId`,
   // `nodeTaskId`, `humanNodeId`) are intentionally preserved so clearing
-  // filters is non-destructive to the open detail view.
+  // filters is non-destructive to the open detail view. The time range is
+  // widened to "all" (not merely deleted, which would fall back to the
+  // bounded default) so clearing actually surfaces workflows that predate
+  // the default window.
   const clearFilters = useCallback(() => {
     const params = new URLSearchParams(location.search);
     params.delete("q");
     params.delete("agent");
-    params.delete("range");
+    params.set("range", "all");
     const search = params.toString();
     navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
       replace: true,
@@ -362,12 +366,15 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   }
 
   const filtersActive =
-    idQuery !== "" || agentFilter !== ALL_AGENTS || timeFilter !== DEFAULT_TIME_PRESET;
+    idQuery !== "" || agentFilter !== ALL_AGENTS || isTimeFilterActive(timeFilter);
   // Shared empty-state machine: Loading | Zero | No-match | Unselected |
-  // Normal. `workflows` is already server-filtered, so its length is both
-  // the item count and the visible count; the resolver still splits the
-  // genuinely-empty workspace ("zero") from a filter-narrowed result
-  // ("nomatch") via `filtersActive`.
+  // Normal. `workflows` is already server-filtered (by `createdSince` among
+  // others), so its length is both the item count and the visible count.
+  // The genuinely-empty workspace ("zero") is split from a filter-narrowed
+  // result ("nomatch") via `filtersActive` — and because a bounded time
+  // window counts as an active filter, a populated-but-stale workspace
+  // (every workflow older than the window) resolves to "nomatch" with a
+  // working Clear-filters recovery rather than the misleading "zero" state.
   const workflowsState = resolveListPageState({
     loaded,
     itemCount: workflows.length,

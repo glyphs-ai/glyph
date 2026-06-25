@@ -21,6 +21,7 @@ import { CreateModal } from "../components/sessions/CreateModal";
 import { DeleteModalBody } from "../components/sessions/DeleteModalBody";
 import { FallbackModalBody } from "../components/sessions/FallbackModalBody";
 import { SessionListItem } from "../components/sessions/SessionListItem";
+import { isTimeFilterActive } from "../components/tasks/shared";
 import { useMounted } from "../hooks/useMounted";
 import { useUrlSearchValue } from "../hooks/useUrlState";
 import { serverNow } from "../server-clock";
@@ -313,23 +314,29 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
   // True when any filter chrome is constraining the list. Splits the
   // genuinely-empty workspace ("No sessions yet" + create CTA) from a
   // filter-narrowed result ("No matches" + Clear filters CTA) in the
-  // shared empty-state resolver below.
+  // shared empty-state resolver below. A bounded time window counts as an
+  // active filter (only "all" is unconstrained) — `sessions` is
+  // server-filtered by `activeSince`, so without this a workspace whose
+  // sessions are all older than the window would masquerade as empty.
   const filtersActive =
     idQuery.trim() !== "" ||
     agentFilterUrl !== ALL_AGENTS ||
     runtimeFilter !== ALL_RUNTIMES ||
-    timeFilter !== DEFAULT_TIME_PRESET;
+    isTimeFilterActive(timeFilter);
 
   // Atomic "Clear filters" reset. Chaining the individual
   // `useUrlSearchValue` setters would clobber one another (each reads
   // the same stale `location.search` snapshot), so wipe every filter key
-  // in a single `navigate()`. Non-filter keys are preserved.
+  // in a single `navigate()`. The time range is widened to "all" (not
+  // merely deleted, which would fall back to the bounded default) so
+  // clearing surfaces sessions that predate the default window. Non-filter
+  // keys are preserved.
   const clearFilters = useCallback(() => {
     const params = new URLSearchParams(location.search);
     params.delete("q");
     params.delete("agent");
     params.delete("runtime");
-    params.delete("range");
+    params.set("range", "all");
     const search = params.toString();
     navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
       replace: true,

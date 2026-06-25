@@ -166,7 +166,9 @@ afterEach(() => {
 describe("Tasks page empty-state layout", () => {
   it("shows the zero-state in the detail pane while keeping the filter rail mounted when the workspace has no tasks", async () => {
     mockListTasks.mockResolvedValue([] as TaskRecord[]);
-    renderTasks("/workspaces/ws-1/runtime/tasks", [makeAgent("official/engineer")]);
+    // range=all so no time window is active: an empty list is a genuinely
+    // empty workspace (Zero), not a filtered-out result.
+    renderTasks("/workspaces/ws-1/runtime/tasks?range=all", [makeAgent("official/engineer")]);
 
     // The detail-pane zero-state shows up once `loaded` flips.
     const zero = await screen.findByTestId("tasks-empty-zero");
@@ -233,7 +235,9 @@ describe("Tasks page empty-state layout", () => {
 describe("Sessions page empty-state CTA wiring", () => {
   it("renders the single zero-state with a wired '+ New session' CTA when the workspace has no sessions", async () => {
     mockListSessions.mockResolvedValue([] as SessionView[]);
-    renderSessions("/workspaces/ws-1/runtime/sessions", [makeAgent("official/engineer")]);
+    // range=all so no time window is active: an empty list is a genuinely
+    // empty workspace (Zero), not a filtered-out result.
+    renderSessions("/workspaces/ws-1/runtime/sessions?range=all", [makeAgent("official/engineer")]);
 
     const zero = await screen.findByTestId("sessions-empty-zero");
     expect(zero).toBeTruthy();

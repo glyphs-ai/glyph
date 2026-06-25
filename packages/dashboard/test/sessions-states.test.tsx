@@ -13,8 +13,10 @@ import { SessionsPage } from "../src/pages/Sessions";
  * State-matrix lock-in for the Sessions page. Sessions is single-column,
  * so the matrix collapses to four named states — Loading, Zero, No-match,
  * Normal — each rendered through the shared `<EmptyState>` (no detail
- * pane, so no "unselected"). DOM snapshots pin the empty cards so a future
- * refactor can't silently regress them.
+ * pane, so no "unselected"), plus a stale-time-window regression (a
+ * populated workspace whose sessions all predate the default window
+ * resolves to No-match, not Zero). DOM snapshots pin the empty cards so a
+ * future refactor can't silently regress them.
  */
 
 vi.mock("../src/api", async () => {
@@ -117,7 +119,9 @@ describe("Sessions page — state matrix", () => {
 
   it("Zero: empty workspace renders the 📂 EmptyState with a wired New session CTA", async () => {
     mockListSessions.mockResolvedValue([]);
-    renderSessions(PATH, agents);
+    // range=all so no time window is active: an empty list is a
+    // genuinely-empty workspace (Zero), not a filtered-out result.
+    renderSessions(`${PATH}?range=all`, agents);
     const zero = await screen.findByTestId("sessions-empty-zero");
     const cta = screen.getByTestId("sessions-empty-zero-cta");
     expect(cta).toBeTruthy();
@@ -138,6 +142,27 @@ describe("Sessions page — state matrix", () => {
     mockListSessions.mockResolvedValue([makeSession({ id: "sess-1" })]);
     renderSessions(`${PATH}?q=zzz`, agents);
     fireEvent.click(await screen.findByTestId("sessions-empty-nomatch-cta"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("sessions-empty-nomatch")).toBeNull();
+    });
+    expect(screen.getByLabelText("Sessions")).toBeTruthy();
+  });
+
+  it("Stale window: a populated workspace with all sessions outside the default window resolves to No-match, and Clear filters (→ range=all) recovers them", async () => {
+    // The server applies the time window (activeSince), so the page only
+    // ever sees the windowed slice. Model a populated-but-stale workspace:
+    // empty while a window is active, rows once it widens to all-time.
+    mockListSessions.mockImplementation((opts?: { activeSince?: string }) =>
+      Promise.resolve(opts?.activeSince ? [] : [makeSession({ id: "sess-1" })]),
+    );
+    // Default entry (range=7d) → activeSince sent → server returns []. The
+    // window is an active filter, so this is No-match (recoverable), NOT
+    // the genuinely-empty Zero state.
+    renderSessions(PATH, agents);
+    await screen.findByTestId("sessions-empty-nomatch");
+    expect(screen.queryByTestId("sessions-empty-zero")).toBeNull();
+    // Clear filters widens range to "all" → no activeSince → rows return.
+    fireEvent.click(screen.getByTestId("sessions-empty-nomatch-cta"));
     await waitFor(() => {
       expect(screen.queryByTestId("sessions-empty-nomatch")).toBeNull();
     });

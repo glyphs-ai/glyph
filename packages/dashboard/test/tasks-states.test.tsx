@@ -12,9 +12,11 @@ import { TasksPage } from "../src/pages/Tasks";
 /**
  * State-matrix lock-in for the Tasks page (two-pane). Covers the four
  * user-reachable named states — Loading, Zero, No-match, Normal — plus
- * the issue #106 filter-out-selection recovery contract. ("Unselected"
- * is structurally unreachable here: `effectiveSelectedId` auto-binds the
- * first visible row, so it collapses to Normal — exhaustively covered in
+ * the filter-out-selection recovery contract and the stale-time-window
+ * regression (a populated workspace whose rows all predate the default
+ * window resolves to No-match, not Zero). ("Unselected" is structurally
+ * unreachable here: `effectiveSelectedId` auto-binds the first visible
+ * row, so it collapses to Normal — exhaustively covered in
  * `test/components/list-page-state.test.ts`.) DOM snapshots pin the empty
  * cards + skeletons against silent regressions.
  */
@@ -120,7 +122,9 @@ describe("Tasks page — state matrix", () => {
 
   it("Zero: empty workspace renders the 📝 EmptyState (Dispatch CTA) only in the detail pane", async () => {
     mockListTasks.mockResolvedValue([]);
-    renderTasks(PATH, agents);
+    // range=all so no time window is active: an empty list here is a
+    // genuinely-empty workspace (Zero), not a filtered-out result.
+    renderTasks(`${PATH}?range=all`, agents);
     const zero = await screen.findByTestId("tasks-empty-zero");
     expect(screen.getByTestId("tasks-empty-zero-cta")).toBeTruthy();
     // Rail carries no empty/no-match text — only the filter chrome.
@@ -135,6 +139,28 @@ describe("Tasks page — state matrix", () => {
     expect(screen.getByTestId("tasks-empty-nomatch-cta")).toBeTruthy();
     expect(screen.queryByTestId("tasks-empty-zero")).toBeNull();
     expect(nomatch).toMatchSnapshot();
+  });
+
+  it("Stale window: a populated workspace with all rows outside the default window resolves to No-match, and Clear filters (→ range=all) recovers them", async () => {
+    // The server applies the time window (createdSince), so the page only
+    // ever sees the windowed slice. Model a populated-but-stale workspace:
+    // empty while a window is active, rows once it widens to all-time.
+    mockListTasks.mockImplementation((opts?: { createdSince?: string }) =>
+      Promise.resolve(opts?.createdSince ? [] : [makeTask("task-A")]),
+    );
+    // Default entry (range=7d) → createdSince sent → server returns []. The
+    // window is an active filter, so this is No-match (recoverable), NOT
+    // the genuinely-empty Zero state (which would dead-end the user).
+    renderTasks(PATH, agents);
+    await screen.findByTestId("tasks-empty-nomatch");
+    expect(screen.queryByTestId("tasks-empty-zero")).toBeNull();
+    expect(mockGetTask).not.toHaveBeenCalled();
+    // Clear filters widens range to "all" → no createdSince → rows return.
+    fireEvent.click(screen.getByTestId("tasks-empty-nomatch-cta"));
+    await waitFor(() => {
+      expect(mockGetTask).toHaveBeenCalledWith("task-A");
+    });
+    expect(screen.queryByTestId("tasks-empty-nomatch")).toBeNull();
   });
 
   it("Filter-out-selection recovery: Clear filters restores the previously selected row", async () => {

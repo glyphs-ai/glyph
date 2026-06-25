@@ -57,7 +57,10 @@ export function EmptyState({
     .join(" ");
 
   const card = (
-    <div className="empty" data-testid={testId}>
+    // `role="status"` makes the card a polite live region so a no-match /
+    // zero transition (e.g. a filter collapsing the list) is announced to
+    // screen-reader users, matching the loading skeletons' announcement.
+    <div className="empty" role="status" data-testid={testId}>
       <div className="empty__icon" aria-hidden="true">
         {icon}
       </div>
