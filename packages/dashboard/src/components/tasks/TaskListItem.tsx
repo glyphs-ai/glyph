@@ -201,19 +201,15 @@ export function TaskListItem({
       const triggerRect = trigger.getBoundingClientRect();
       const containerRect = container?.getBoundingClientRect();
       const viewportTop = containerRect?.top ?? 0;
-      // Cap the lower bound at the next sibling row's `⋯` trigger when
-      // present, so the open menu never visually overlays the adjacent
-      // trigger. Without this cap, a click on the overlaid trigger would
-      // first land on the outside-click handler (closing this menu)
-      // instead of opening the next row's menu, which feels broken.
-      const nextRowTrigger =
-        trigger
-          .closest("li")
-          ?.nextElementSibling?.querySelector<HTMLElement>(".task-list__item-menu-trigger") ?? null;
+      // The lower bound is the scroll container's bottom (or the viewport
+      // when there is no scroll ancestor). We do NOT cap it at the next
+      // row's trigger: that cap shrank `spaceBelow` to roughly one row
+      // height, so on a row with an equally tight `spaceAbove` the panel
+      // collapsed to a one-menuitem-tall scrollbox. The adjacent-trigger
+      // overlay the cap guarded against is already prevented by the
+      // panel's `z-index` and the `useClickOutside` dismissal.
       const containerBottom = containerRect?.bottom ?? window.innerHeight;
-      const viewportBottom = nextRowTrigger
-        ? Math.min(containerBottom, nextRowTrigger.getBoundingClientRect().top)
-        : containerBottom;
+      const viewportBottom = containerBottom;
 
       if (cachedPanelHeight == null) {
         // Natural panel height: temporarily clear any cap so we measure
