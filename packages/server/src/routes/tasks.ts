@@ -2,15 +2,22 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import type { DispatchTaskRequest } from "@glyphs-ai/api";
 import {
+  TaskActivityQuerySchema,
+  TaskActivityResponseSchema,
+  TaskListQuerySchema,
+  TaskSchema,
+} from "@glyphs-ai/api";
+import {
   InvalidTransition,
   type ListTaskOpts,
   type TaskService,
   type TaskStatus,
 } from "@glyphs-ai/task";
-import { Hono } from "hono";
+import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { contentTypeFor } from "../util/mime-bucket.js";
 import { streamFileAsResponse } from "../util/stream-file.js";
 import { tasksErrorPolicy } from "./_error-policies/tasks.js";
+import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
 import { respondError } from "./_respond-error.js";
 import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared.js";
 
@@ -21,6 +28,9 @@ import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared
  */
 type DispatchTaskRequestRaw = { [K in keyof DispatchTaskRequest]?: unknown };
 const TASK_DISPATCH_KEYS = new Set(["agent", "brief", "details", "runtime"]);
+
+const TaskPathSchema = z.object({ tid: z.string() });
+const ArtifactPathSchema = z.object({ tid: z.string(), name: z.string() });
 
 /**
  * Resolver passed in by the mount point so route handlers pull the
@@ -63,8 +73,8 @@ function invalidTransitionBody(
  * Mounted at the parent in `index.ts`; paths here are relative to that
  * mount.
  */
-export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
-  const app = new Hono();
+export function tasksRoutes(resolveTaskService: TaskServiceResolver): OpenAPIHono {
+  const app = createApiApp();
   const getManager = resolveTaskService;
 
   // List tasks in this workspace, newest-first per the manager.
@@ -80,133 +90,174 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
   //   ?runtime=<kind>           — exact match on metadata.runtime
   //   ?createdSince=<iso8601>   — drop tasks older than the cutoff
   //   ?status=running,succeeded — include only listed statuses (CSV)
-  app.get("/", async (c) => {
-    const agent = c.req.query("agent");
-    const runtime = c.req.query("runtime");
-    const createdSince = c.req.query("createdSince");
-    const status = c.req.query("status");
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/",
+      tags: ["tasks"],
+      summary: "List standalone tasks",
+      request: { query: TaskListQuerySchema },
+      responses: {
+        200: jsonResponse(TaskSchema.array(), "Tasks"),
+        400: errorResponse("Malformed query"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const agent = c.req.query("agent");
+      const runtime = c.req.query("runtime");
+      const createdSince = c.req.query("createdSince");
+      const status = c.req.query("status");
 
-    let createdSinceIso: string | undefined;
-    if (createdSince !== undefined) {
-      const t = Date.parse(createdSince);
-      if (Number.isNaN(t)) {
-        return c.json({ error: "createdSince must be an ISO 8601 timestamp" }, 400);
+      let createdSinceIso: string | undefined;
+      if (createdSince !== undefined) {
+        const t = Date.parse(createdSince);
+        if (Number.isNaN(t)) {
+          return c.json({ error: "createdSince must be an ISO 8601 timestamp" }, 400);
+        }
+        createdSinceIso = new Date(t).toISOString();
       }
-      createdSinceIso = new Date(t).toISOString();
-    }
 
-    let statuses: TaskStatus[] | undefined;
-    if (status !== undefined) {
-      const valid = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
-      const parts = status
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      const bad = parts.find((s) => !valid.has(s as TaskStatus));
-      if (bad !== undefined) {
-        return c.json(
-          {
-            error: `unknown status: ${JSON.stringify(bad)} (expected running, succeeded, failed, cancelled)`,
-          },
-          400,
-        );
+      let statuses: TaskStatus[] | undefined;
+      if (status !== undefined) {
+        const valid = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
+        const parts = status
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        const bad = parts.find((s) => !valid.has(s as TaskStatus));
+        if (bad !== undefined) {
+          return c.json(
+            {
+              error: `unknown status: ${JSON.stringify(bad)} (expected running, succeeded, failed, cancelled)`,
+            },
+            400,
+          );
+        }
+        statuses = parts as TaskStatus[];
       }
-      statuses = parts as TaskStatus[];
-    }
 
-    const opts: { -readonly [K in keyof ListTaskOpts]: ListTaskOpts[K] } = {
-      origin: ["standalone"],
-    };
-    if (agent !== undefined) opts.agent = agent;
-    if (runtime !== undefined) opts.runtime = runtime;
-    if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
-    if (statuses !== undefined) opts.statuses = statuses;
+      const opts: { -readonly [K in keyof ListTaskOpts]: ListTaskOpts[K] } = {
+        origin: ["standalone"],
+      };
+      if (agent !== undefined) opts.agent = agent;
+      if (runtime !== undefined) opts.runtime = runtime;
+      if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
+      if (statuses !== undefined) opts.statuses = statuses;
 
-    try {
-      const list = await getManager(c).list(opts);
-      return c.json(list);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "tasks.list",
-        policy: tasksErrorPolicy,
-      });
-    }
-  });
+      try {
+        const list = await getManager(c).list(opts);
+        return c.json(list);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "tasks.list",
+          policy: tasksErrorPolicy,
+        });
+      }
+    },
+  );
 
   // Dispatch a fresh task. Returns 201 + the running Task. The agent
   // continues to run in the background; clients poll `/:tid` (or watch
   // `/:tid/activity/stream`) for completion.
-  app.post("/", async (c) => {
-    const parsed = await parseJsonBody<DispatchTaskRequestRaw>(c);
-    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const body = parsed.body;
-    if (!isJsonObject(body)) return c.json({ error: "request body must be an object" }, 400);
-    const unknown = unknownBodyKey(body, TASK_DISPATCH_KEYS);
-    if (unknown !== undefined) {
-      return c.json({ error: `request body has unknown key "${unknown}"` }, 400);
-    }
-    if (typeof body.agent !== "string" || body.agent.trim() === "") {
-      return c.json({ error: "agent is required (string)" }, 400);
-    }
-    if (typeof body.brief !== "string") {
-      return c.json({ error: "brief is required (string)" }, 400);
-    }
-    const briefTrimmed = body.brief.trim();
-    if (briefTrimmed.length === 0) {
-      return c.json({ error: "brief must be non-empty after trim" }, 400);
-    }
-    if (briefTrimmed.includes("\n") || briefTrimmed.includes("\r")) {
-      // Brief is the displayed label everywhere — task list rows,
-      // detail panel header, CLI table. Multi-line input would
-      // break the layout and tooltips. Keep the single-line
-      // contract enforced at the wire boundary.
-      return c.json({ error: "brief must be a single line (no newline characters)" }, 400);
-    }
-    if (briefTrimmed.length > BRIEF_MAX_LENGTH) {
-      return c.json({ error: `brief must be ${BRIEF_MAX_LENGTH} characters or fewer` }, 400);
-    }
-    if (body.details !== undefined && typeof body.details !== "string") {
-      return c.json({ error: "details, when present, must be a string" }, 400);
-    }
-    if (body.runtime !== undefined && typeof body.runtime !== "string") {
-      return c.json({ error: "runtime, when present, must be a string" }, 400);
-    }
-    try {
-      const task = await getManager(c).dispatch({
-        agent: body.agent,
-        brief: briefTrimmed,
-        ...(typeof body.details === "string" ? { details: body.details } : {}),
-        ...(typeof body.runtime === "string" ? { runtime: body.runtime } : {}),
-      });
-      logEvent(c, "task dispatched", {
-        taskId: task.id,
-        agent: task.agent,
-        runtime: task.metadata?.runtime,
-      });
-      return c.json(task, 201);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "tasks",
-        policy: tasksErrorPolicy,
-      });
-    }
-  });
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/",
+      tags: ["tasks"],
+      summary: "Dispatch a task",
+      responses: {
+        201: jsonResponse(TaskSchema, "Dispatched task"),
+        400: errorResponse("Malformed request body"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const parsed = await parseJsonBody<DispatchTaskRequestRaw>(c);
+      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+      const body = parsed.body;
+      if (!isJsonObject(body)) return c.json({ error: "request body must be an object" }, 400);
+      const unknown = unknownBodyKey(body, TASK_DISPATCH_KEYS);
+      if (unknown !== undefined) {
+        return c.json({ error: `request body has unknown key "${unknown}"` }, 400);
+      }
+      if (typeof body.agent !== "string" || body.agent.trim() === "") {
+        return c.json({ error: "agent is required (string)" }, 400);
+      }
+      if (typeof body.brief !== "string") {
+        return c.json({ error: "brief is required (string)" }, 400);
+      }
+      const briefTrimmed = body.brief.trim();
+      if (briefTrimmed.length === 0) {
+        return c.json({ error: "brief must be non-empty after trim" }, 400);
+      }
+      if (briefTrimmed.includes("\n") || briefTrimmed.includes("\r")) {
+        // Brief is the displayed label everywhere — task list rows,
+        // detail panel header, CLI table. Multi-line input would
+        // break the layout and tooltips. Keep the single-line
+        // contract enforced at the wire boundary.
+        return c.json({ error: "brief must be a single line (no newline characters)" }, 400);
+      }
+      if (briefTrimmed.length > BRIEF_MAX_LENGTH) {
+        return c.json({ error: `brief must be ${BRIEF_MAX_LENGTH} characters or fewer` }, 400);
+      }
+      if (body.details !== undefined && typeof body.details !== "string") {
+        return c.json({ error: "details, when present, must be a string" }, 400);
+      }
+      if (body.runtime !== undefined && typeof body.runtime !== "string") {
+        return c.json({ error: "runtime, when present, must be a string" }, 400);
+      }
+      try {
+        const task = await getManager(c).dispatch({
+          agent: body.agent,
+          brief: briefTrimmed,
+          ...(typeof body.details === "string" ? { details: body.details } : {}),
+          ...(typeof body.runtime === "string" ? { runtime: body.runtime } : {}),
+        });
+        logEvent(c, "task dispatched", {
+          taskId: task.id,
+          agent: task.agent,
+          runtime: task.metadata?.runtime,
+        });
+        return c.json(task, 201);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "tasks",
+          policy: tasksErrorPolicy,
+        });
+      }
+    },
+  );
 
   // Get a single task by id.
-  app.get("/:tid", async (c) => {
-    const id = c.req.param("tid");
-    try {
-      const task = await getManager(c).get(id);
-      if (!task) return c.json({ error: "not found", code: "TaskNotFoundError" }, 404);
-      return c.json(task);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "tasks.get",
-        policy: tasksErrorPolicy,
-        meta: { taskId: id },
-      });
-    }
-  });
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/{tid}",
+      tags: ["tasks"],
+      summary: "Get a task",
+      request: { params: TaskPathSchema },
+      responses: {
+        200: jsonResponse(TaskSchema, "Task"),
+        404: errorResponse("Task not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const id = c.req.param("tid");
+      try {
+        const task = await getManager(c).get(id);
+        if (!task) return c.json({ error: "not found", code: "TaskNotFoundError" }, 404);
+        return c.json(task);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "tasks.get",
+          policy: tasksErrorPolicy,
+          meta: { taskId: id },
+        });
+      }
+    },
+  );
 
   // Delete a task. Terminal-only — calling DELETE on a `running` /
   // `not_started` task returns 409 with a structured body so the
@@ -218,23 +269,41 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
   // hard-delete path: row + workdir + runtime state, in that order
   // (runtime first so a runtime-side failure aborts before any
   // local removal — mirrors session-delete semantics).
-  app.delete("/:tid", async (c) => {
-    const id = c.req.param("tid");
-    const purge = c.req.query("purge") === "1";
-    try {
-      await getManager(c).delete(id, { purge });
-      logEvent(c, "task deleted", { taskId: id, purge });
-      return c.body(null, 204);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "tasks.delete",
-        policy: tasksErrorPolicy,
-        meta: { taskId: id, purge },
-        customBody: (e) =>
-          e instanceof InvalidTransition ? invalidTransitionBody(e, "delete") : null,
-      });
-    }
-  });
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/{tid}",
+      tags: ["tasks"],
+      summary: "Delete a task",
+      request: {
+        params: TaskPathSchema,
+        query: z.object({ purge: z.string().optional() }),
+      },
+      responses: {
+        204: errorResponse("Deleted (no content)"),
+        404: errorResponse("Task not found"),
+        409: errorResponse("Task is not terminal"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const id = c.req.param("tid");
+      const purge = c.req.query("purge") === "1";
+      try {
+        await getManager(c).delete(id, { purge });
+        logEvent(c, "task deleted", { taskId: id, purge });
+        return c.body(null, 204);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "tasks.delete",
+          policy: tasksErrorPolicy,
+          meta: { taskId: id, purge },
+          customBody: (e) =>
+            e instanceof InvalidTransition ? invalidTransitionBody(e, "delete") : null,
+        });
+      }
+    },
+  );
 
   // POST /:tid/cancel — user-initiated cancellation of a running
   // task. POSTs the cancellation as a state transition (DELETE
@@ -256,22 +325,38 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
   //     `{ code, status, transition: 'cancel' }` so dashboard branches
   //     typed
   //   - 503 (ManagerShuttingDownError): server is shutting down
-  app.post("/:tid/cancel", async (c) => {
-    const id = c.req.param("tid");
-    try {
-      const task = await getManager(c).cancel(id);
-      logEvent(c, "task cancelled", { taskId: id });
-      return c.json(task);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "tasks.cancel",
-        policy: tasksErrorPolicy,
-        meta: { taskId: id },
-        customBody: (e) =>
-          e instanceof InvalidTransition ? invalidTransitionBody(e, "cancel") : null,
-      });
-    }
-  });
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/{tid}/cancel",
+      tags: ["tasks"],
+      summary: "Cancel a running task",
+      request: { params: TaskPathSchema },
+      responses: {
+        200: jsonResponse(TaskSchema, "Cancelled task"),
+        404: errorResponse("Task not found"),
+        409: errorResponse("Task already terminal"),
+        503: errorResponse("Server shutting down"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const id = c.req.param("tid");
+      try {
+        const task = await getManager(c).cancel(id);
+        logEvent(c, "task cancelled", { taskId: id });
+        return c.json(task);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "tasks.cancel",
+          policy: tasksErrorPolicy,
+          meta: { taskId: id },
+          customBody: (e) =>
+            e instanceof InvalidTransition ? invalidTransitionBody(e, "cancel") : null,
+        });
+      }
+    },
+  );
 
   // GET /:tid/artifact/:name
   //
@@ -292,48 +377,63 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
   //   - 404 — task missing, task still running, or `name` not on
   //     the success.artifacts whitelist
   //   - 400 — `name` contains an obviously-malicious separator
-  app.get("/:tid/artifact/:name", async (c) => {
-    const id = c.req.param("tid");
-    const rawName = c.req.param("name");
-    if (
-      rawName.includes("/") ||
-      rawName.includes("\\") ||
-      rawName === "." ||
-      rawName === ".." ||
-      rawName.split("/").includes("..") ||
-      rawName.split("\\").includes("..")
-    ) {
-      return c.json({ error: "artifact name must be a bare filename", code: "BadRequest" }, 400);
-    }
-    let absPath: string | null;
-    try {
-      absPath = await getManager(c).resolveArtifactPath(id, rawName);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "tasks.artifact",
-        policy: tasksErrorPolicy,
-        meta: { taskId: id, artifact: rawName },
-      });
-    }
-    if (absPath === null) {
-      return c.json({ error: "artifact not found", code: "NotFound" }, 404);
-    }
-    // Final fs check — the file may have been removed by an out-of-band
-    // operator action between terminal time and this request.
-    try {
-      const st = await stat(absPath);
-      if (!st.isFile()) {
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/{tid}/artifact/{name}",
+      tags: ["tasks"],
+      summary: "Download a task artifact",
+      request: { params: ArtifactPathSchema },
+      responses: {
+        200: errorResponse("Artifact file stream"),
+        400: errorResponse("Malformed artifact name"),
+        404: errorResponse("Artifact not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const id = c.req.param("tid");
+      const rawName = c.req.param("name");
+      if (
+        rawName.includes("/") ||
+        rawName.includes("\\") ||
+        rawName === "." ||
+        rawName === ".." ||
+        rawName.split("/").includes("..") ||
+        rawName.split("\\").includes("..")
+      ) {
+        return c.json({ error: "artifact name must be a bare filename", code: "BadRequest" }, 400);
+      }
+      let absPath: string | null;
+      try {
+        absPath = await getManager(c).resolveArtifactPath(id, rawName);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "tasks.artifact",
+          policy: tasksErrorPolicy,
+          meta: { taskId: id, artifact: rawName },
+        });
+      }
+      if (absPath === null) {
         return c.json({ error: "artifact not found", code: "NotFound" }, 404);
       }
-    } catch {
-      return c.json({ error: "artifact not found", code: "NotFound" }, 404);
-    }
+      // Final fs check — the file may have been removed by an out-of-band
+      // operator action between terminal time and this request.
+      try {
+        const st = await stat(absPath);
+        if (!st.isFile()) {
+          return c.json({ error: "artifact not found", code: "NotFound" }, 404);
+        }
+      } catch {
+        return c.json({ error: "artifact not found", code: "NotFound" }, 404);
+      }
 
-    return streamFileAsResponse(absPath, {
-      contentType: contentTypeFor(path.basename(absPath)),
-      cacheControl: "private, max-age=60",
-    });
-  });
+      return streamFileAsResponse(absPath, {
+        contentType: contentTypeFor(path.basename(absPath)),
+        cacheControl: "private, max-age=60",
+      });
+    },
+  );
 
   // Runtime-neutral activity timeline for a task. The runtime
   // end-to-end owns reading + parsing its own event log into the
@@ -368,68 +468,92 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
   //   - 404 with code=NoEventsYet if the runtime doesn't implement
   //     `Runtime.readActivity`, or has no log for this task yet
   //   - 200 application/json
-  app.get("/:tid/activity", async (c) => {
-    const id = c.req.param("tid");
-    const beforeRaw = c.req.query("before");
-    const afterRaw = c.req.query("after");
-    const limitRaw = c.req.query("limit");
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/{tid}/activity",
+      tags: ["tasks"],
+      summary: "Get a task's activity timeline",
+      request: { params: TaskPathSchema, query: TaskActivityQuerySchema },
+      responses: {
+        200: jsonResponse(TaskActivityResponseSchema, "Activity timeline"),
+        400: errorResponse("Malformed pagination"),
+        404: errorResponse("Task or activity not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const id = c.req.param("tid");
+      const beforeRaw = c.req.query("before");
+      const afterRaw = c.req.query("after");
+      const limitRaw = c.req.query("limit");
 
-    if (beforeRaw !== undefined && afterRaw !== undefined) {
-      return c.json({ error: "before and after are mutually exclusive", code: "BadRequest" }, 400);
-    }
-
-    let before: number | undefined;
-    if (beforeRaw !== undefined) {
-      const parsed = Number.parseInt(beforeRaw, 10);
-      if (!Number.isFinite(parsed) || parsed < 0 || `${parsed}` !== beforeRaw) {
-        return c.json({ error: "before must be a non-negative integer", code: "BadRequest" }, 400);
-      }
-      before = parsed;
-    }
-
-    let after: number | undefined;
-    if (afterRaw !== undefined) {
-      const parsed = Number.parseInt(afterRaw, 10);
-      if (!Number.isFinite(parsed) || parsed < 0 || `${parsed}` !== afterRaw) {
-        return c.json({ error: "after must be a non-negative integer", code: "BadRequest" }, 400);
-      }
-      after = parsed;
-    }
-
-    let limit: number = TASK_ACTIVITY_DEFAULT_LIMIT;
-    if (limitRaw !== undefined) {
-      const parsed = Number.parseInt(limitRaw, 10);
-      if (!Number.isFinite(parsed) || parsed < 1 || parsed > TASK_ACTIVITY_MAX_LIMIT) {
+      if (beforeRaw !== undefined && afterRaw !== undefined) {
         return c.json(
-          {
-            error: `limit must be an integer in [1, ${TASK_ACTIVITY_MAX_LIMIT}]`,
-            code: "BadRequest",
-          },
+          { error: "before and after are mutually exclusive", code: "BadRequest" },
           400,
         );
       }
-      limit = parsed;
-    }
 
-    let payload: Awaited<ReturnType<TaskService["getTaskActivity"]>>;
-    try {
-      payload = await getManager(c).getTaskActivity(id, {
-        ...(before !== undefined ? { before } : {}),
-        ...(after !== undefined ? { after } : {}),
-        limit,
-      });
-    } catch (err) {
-      return respondError(c, err, {
-        route: "tasks.activity",
-        policy: tasksErrorPolicy,
-        meta: { taskId: id },
-      });
-    }
-    if (payload === null) {
-      return c.json({ error: "no activity is available for this task", code: "NoEventsYet" }, 404);
-    }
-    return c.json(payload);
-  });
+      let before: number | undefined;
+      if (beforeRaw !== undefined) {
+        const parsed = Number.parseInt(beforeRaw, 10);
+        if (!Number.isFinite(parsed) || parsed < 0 || `${parsed}` !== beforeRaw) {
+          return c.json(
+            { error: "before must be a non-negative integer", code: "BadRequest" },
+            400,
+          );
+        }
+        before = parsed;
+      }
+
+      let after: number | undefined;
+      if (afterRaw !== undefined) {
+        const parsed = Number.parseInt(afterRaw, 10);
+        if (!Number.isFinite(parsed) || parsed < 0 || `${parsed}` !== afterRaw) {
+          return c.json({ error: "after must be a non-negative integer", code: "BadRequest" }, 400);
+        }
+        after = parsed;
+      }
+
+      let limit: number = TASK_ACTIVITY_DEFAULT_LIMIT;
+      if (limitRaw !== undefined) {
+        const parsed = Number.parseInt(limitRaw, 10);
+        if (!Number.isFinite(parsed) || parsed < 1 || parsed > TASK_ACTIVITY_MAX_LIMIT) {
+          return c.json(
+            {
+              error: `limit must be an integer in [1, ${TASK_ACTIVITY_MAX_LIMIT}]`,
+              code: "BadRequest",
+            },
+            400,
+          );
+        }
+        limit = parsed;
+      }
+
+      let payload: Awaited<ReturnType<TaskService["getTaskActivity"]>>;
+      try {
+        payload = await getManager(c).getTaskActivity(id, {
+          ...(before !== undefined ? { before } : {}),
+          ...(after !== undefined ? { after } : {}),
+          limit,
+        });
+      } catch (err) {
+        return respondError(c, err, {
+          route: "tasks.activity",
+          policy: tasksErrorPolicy,
+          meta: { taskId: id },
+        });
+      }
+      if (payload === null) {
+        return c.json(
+          { error: "no activity is available for this task", code: "NoEventsYet" },
+          404,
+        );
+      }
+      return c.json(payload);
+    },
+  );
 
   // SSE live tail. Subscribes to runtime.streamActivity and
   // pushes each ActivityItem as `event: activity` with the JSON
@@ -447,80 +571,94 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
   //   - 404 with code=NoEventsYet if the runtime doesn't implement
   //     streaming
   //   - 200 text/event-stream otherwise (long-lived response)
-  app.get("/:tid/activity/stream", async (c) => {
-    const id = c.req.param("tid");
-    let stream: AsyncIterable<import("@glyphs-ai/runtime").ActivityItem> | null;
-    try {
-      const lastEventId = c.req.header("Last-Event-ID");
-      const after =
-        lastEventId !== undefined && /^\d+$/.test(lastEventId)
-          ? Number.parseInt(lastEventId, 10)
-          : undefined;
-      stream = await getManager(c).getTaskActivityStream(id, {
-        ...(after !== undefined ? { after } : {}),
-        signal: c.req.raw.signal,
-      });
-    } catch (err) {
-      return respondError(c, err, {
-        route: "tasks.activity.stream",
-        policy: tasksErrorPolicy,
-        meta: { taskId: id },
-      });
-    }
-    if (stream === null) {
-      return c.json(
-        { error: "no streaming activity available for this task", code: "NoEventsYet" },
-        404,
-      );
-    }
-
-    // Hono SSE: hand back a Response with a ReadableStream framed
-    // per the EventSource spec.
-    const encoder = new TextEncoder();
-    const body = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const enqueue = (frame: string) => {
-          try {
-            controller.enqueue(encoder.encode(frame));
-          } catch {
-            // Controller closed (client gone).
-          }
-        };
-        try {
-          for await (const item of stream as AsyncIterable<
-            import("@glyphs-ai/runtime").ActivityItem
-          >) {
-            if (c.req.raw.signal.aborted) break;
-            enqueue(`event: activity\nid: ${item.seq}\ndata: ${JSON.stringify(item)}\n\n`);
-          }
-          enqueue("event: end\ndata: {}\n\n");
-        } catch (err) {
-          enqueue(
-            `event: error\ndata: ${JSON.stringify({
-              error: err instanceof Error ? err.message : String(err),
-            })}\n\n`,
-          );
-        } finally {
-          try {
-            controller.close();
-          } catch {
-            // already closed
-          }
-        }
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/{tid}/activity/stream",
+      tags: ["tasks"],
+      summary: "Stream a task's activity (SSE)",
+      request: { params: TaskPathSchema },
+      responses: {
+        200: errorResponse("SSE stream (text/event-stream)"),
+        404: errorResponse("Task or stream not found"),
+        500: errorResponse("Internal error"),
       },
-    });
+    }),
+    async (c) => {
+      const id = c.req.param("tid");
+      let stream: AsyncIterable<import("@glyphs-ai/runtime").ActivityItem> | null;
+      try {
+        const lastEventId = c.req.header("Last-Event-ID");
+        const after =
+          lastEventId !== undefined && /^\d+$/.test(lastEventId)
+            ? Number.parseInt(lastEventId, 10)
+            : undefined;
+        stream = await getManager(c).getTaskActivityStream(id, {
+          ...(after !== undefined ? { after } : {}),
+          signal: c.req.raw.signal,
+        });
+      } catch (err) {
+        return respondError(c, err, {
+          route: "tasks.activity.stream",
+          policy: tasksErrorPolicy,
+          meta: { taskId: id },
+        });
+      }
+      if (stream === null) {
+        return c.json(
+          { error: "no streaming activity available for this task", code: "NoEventsYet" },
+          404,
+        );
+      }
 
-    return new Response(body, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        // Disable Nginx buffering that would defeat the live-tail UX.
-        "X-Accel-Buffering": "no",
-      },
-    });
-  });
+      // Hono SSE: hand back a Response with a ReadableStream framed
+      // per the EventSource spec.
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const enqueue = (frame: string) => {
+            try {
+              controller.enqueue(encoder.encode(frame));
+            } catch {
+              // Controller closed (client gone).
+            }
+          };
+          try {
+            for await (const item of stream as AsyncIterable<
+              import("@glyphs-ai/runtime").ActivityItem
+            >) {
+              if (c.req.raw.signal.aborted) break;
+              enqueue(`event: activity\nid: ${item.seq}\ndata: ${JSON.stringify(item)}\n\n`);
+            }
+            enqueue("event: end\ndata: {}\n\n");
+          } catch (err) {
+            enqueue(
+              `event: error\ndata: ${JSON.stringify({
+                error: err instanceof Error ? err.message : String(err),
+              })}\n\n`,
+            );
+          } finally {
+            try {
+              controller.close();
+            } catch {
+              // already closed
+            }
+          }
+        },
+      });
+
+      return new Response(body, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          // Disable Nginx buffering that would defeat the live-tail UX.
+          "X-Accel-Buffering": "no",
+        },
+      });
+    },
+  );
 
   return app;
 }

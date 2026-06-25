@@ -29,6 +29,10 @@ export {
   composeApplication,
 } from "./application.js";
 export { listRoutes } from "./route-manifest.js";
+// Transport-agnostic zod schemas mirroring every wire contract. The
+// OpenAPI projection in `@glyphs-ai/server` consumes these; other
+// (non-HTTP) consumers can reuse them without an HTTP round-trip.
+export * from "./schemas/index.js";
 export { TaskScheduleTargetError } from "./wiring/schedule-task-handler.js";
 export { WorkflowScheduleTargetError } from "./wiring/schedule-workflow-handler.js";
 export {

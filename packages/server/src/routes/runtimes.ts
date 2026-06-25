@@ -1,6 +1,8 @@
 import type { RuntimeInfo } from "@glyphs-ai/api";
+import { RuntimeInfoSchema } from "@glyphs-ai/api";
 import type { RuntimeRegistry } from "@glyphs-ai/runtime";
-import { Hono } from "hono";
+import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
 
 /**
  * Routes for /api/runtimes — exposes the registered runtime kinds AND
@@ -13,19 +15,31 @@ import { Hono } from "hono";
  * (re-exported via `@glyphs-ai/api`) so dashboard / CLI consumers can
  * typecheck against it without value-importing `@glyphs-ai/server`.
  */
-export function runtimesRoutes(registry: RuntimeRegistry): Hono {
-  const app = new Hono();
+export function runtimesRoutes(registry: RuntimeRegistry): OpenAPIHono {
+  const app = createApiApp();
 
-  app.get("/", (c) => {
-    const out: RuntimeInfo[] = registry.kinds().map((kind) => {
-      const rt = registry.get(kind);
-      return {
-        kind,
-        capabilities: { ...(rt.capabilities ?? {}) },
-      };
-    });
-    return c.json(out);
-  });
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/",
+      tags: ["system"],
+      summary: "Registered runtime kinds + capabilities",
+      responses: {
+        200: jsonResponse(RuntimeInfoSchema.array(), "Registered runtimes"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    (c) => {
+      const out: RuntimeInfo[] = registry.kinds().map((kind) => {
+        const rt = registry.get(kind);
+        return {
+          kind,
+          capabilities: { ...(rt.capabilities ?? {}) },
+        };
+      });
+      return c.json(out);
+    },
+  );
 
   return app;
 }
