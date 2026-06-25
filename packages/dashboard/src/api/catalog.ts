@@ -3,6 +3,7 @@ import type {
   AgentEntry,
   BlockedReason,
   InstallAgentRequest,
+  InstallSkillRequest,
   Mcp,
   MissingDep,
   Skill,
@@ -84,11 +85,14 @@ export interface InstallSource {
  * dashboard assembles it from its UI form via
  * {@link buildOriginFromSource}.
  */
-// Catalog install request body — `{ origin: string }`. All three
-// install routes (skill / agent / mcp) and their resolve variants
-// accept the identical shape, so the dashboard re-uses the contracts
-// `InstallAgentRequest` type rather than redeclaring it.
-type InstallRequest = InstallAgentRequest;
+// Each install / resolve route satisfies its own contracts
+// `Install*Request` type. The shapes happen to be byte-identical
+// today (`{ readonly origin: string }`), but the *semantics* differ
+// per route — abstracting them into one alias would say "these are
+// the same thing" when they aren't. MCP's contracts type isn't
+// re-exported from the barrel, so its installer uses an inline
+// `{ readonly origin: string }` literal that mirrors the route's
+// inline declaration in `packages/contracts/src/routes/catalog.ts`.
 
 /**
  * Assemble a canonical origin URI from the dashboard's UI form.
@@ -177,14 +181,14 @@ interface SyncResult extends InstallResult {
 export const installAgent = (src: InstallSource): Promise<InstallResult> =>
   mutateJson<InstallResult>(
     `${catalogPrefix()}/agents`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallRequest),
+    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallAgentRequest),
   );
 
 /** See {@link installAgent}. */
 export const installSkill = (src: InstallSource): Promise<InstallResult> =>
   mutateJson<InstallResult>(
     `${catalogPrefix()}/skills`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallRequest),
+    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallSkillRequest),
   );
 
 /**
@@ -195,7 +199,9 @@ export const installSkill = (src: InstallSource): Promise<InstallResult> =>
 export const installMcp = (src: InstallSource): Promise<InstallResult> =>
   mutateJson<InstallResult>(
     `${catalogPrefix()}/mcps`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallRequest),
+    jsonInit("POST", {
+      origin: buildOriginFromSource(src),
+    } satisfies { readonly origin: string }),
   );
 
 /**
@@ -284,13 +290,13 @@ export interface ResolveManifest {
 export const resolveSkillInstall = (src: InstallSource): Promise<ResolveManifest> =>
   mutateJson<ResolveManifest>(
     `${catalogPrefix()}/skills/resolve`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallRequest),
+    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallSkillRequest),
   );
 
 export const resolveAgentInstall = (src: InstallSource): Promise<ResolveManifest> =>
   mutateJson<ResolveManifest>(
     `${catalogPrefix()}/agents/resolve`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallRequest),
+    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallAgentRequest),
   );
 
 /**
