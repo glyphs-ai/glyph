@@ -178,13 +178,13 @@ polymorphic (one resource view across kinds).
 
 | Operation                  | Route                                                   | Body                       |
 | -------------------------- | ------------------------------------------------------- | -------------------------- |
-| Create task schedule       | `POST   /api/workspaces/:id/schedules/task`             | `TaskScheduleCreateBody`   |
-| Patch task schedule        | `PATCH  /api/workspaces/:id/schedules/task/:sid`        | `TaskSchedulePatchBody`    |
+| Create task schedule       | `POST   /api/workspaces/:id/schedules/task`             | `CreateTaskScheduleRequest` |
+| Patch task schedule        | `PATCH  /api/workspaces/:id/schedules/task/:sid`        | `PatchTaskScheduleRequest`  |
 | List / get / delete / run / preview | `GET / DELETE / POST /api/workspaces/:id/schedules[/:sid][/run|/preview]` | polymorphic |
 
 The wire shape for `target` on responses is **flat** for the task
 kind (`{ kind: "task", agent, brief, details?, runtime? }`) — the
-server route's `projectScheduleToWire` helper converts the internal
+server route's `projectScheduleHeader` helper converts the internal
 envelope `{ kind: "task", data: { agent, ... } }` to flat wire on
 the way out. Dashboard / CLI consumers continue to read
 `schedule.target.agent` etc.
@@ -192,7 +192,7 @@ the way out. Dashboard / CLI consumers continue to read
 ### `POST /schedules/task` body
 
 ```ts
-interface TaskScheduleCreateBody {
+interface CreateTaskScheduleRequest {
   name: string;
   enabled?: boolean; // default true
   trigger: { kind: "cron"; expr: string; tz: string };
@@ -214,7 +214,7 @@ catalog existence lookup.
 ### `PATCH /schedules/task/:sid` body
 
 ```ts
-interface TaskSchedulePatchBody {
+interface PatchTaskScheduleRequest {
   name?: string;
   enabled?: boolean;
   trigger?: { kind: "cron"; expr: string; tz: string }; // wholesale replace

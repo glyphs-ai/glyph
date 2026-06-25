@@ -55,7 +55,7 @@ export interface EditScheduleModalProps {
  *   - No `enabled` toggle (`ScheduleDetail`'s Pause/Resume owns
  *     enabled-state; two surfaces for one boolean is a source-of-
  *     truth conflict).
- *   - Submit builds a sparse {@link PatchScheduleBody} via field-by-
+ *   - Submit builds a sparse {@link PatchTaskScheduleRequest} via field-by-
  *     field diff (trim-before-compare). `target.details` /
  *     `target.runtime` use RFC 7396 `null` when the user clears a
  *     previously-set value.

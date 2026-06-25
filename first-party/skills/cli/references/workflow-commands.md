@@ -56,7 +56,7 @@ own playbook to keep the human-vs-orchestrator boundary explicit.
   - `--created-since <iso>` — ISO 8601 lower bound (inclusive) on `created_at` (HTTP query: `createdSince`); same semantics as `task list --created-since`
 - Route: `GET /workspaces/:id/workflows`
 - Output (table): columns `id | brief | coordinatorAgent | status | createdAt`
-- Output (json): `WorkflowHeaderWire[]` — each element omits `iterationCount`
+- Output (json): `WorkflowHeader[]` — each element omits `iterationCount`
   (the list path skips the per-row DAG fetch; use `show` when you need it)
 
 ```sh
@@ -76,9 +76,9 @@ glyph workflow list \
 - Required flags: `--brief <text>`, `--coord-agent <fqn>`
 - Optional flags: `--details <text>`, `--details-file <path>`
 - Route: `POST /workspaces/:id/workflows`
-- Body: `CreateWorkflowBody` —
+- Body: `CreateWorkflowRequest` —
   `{ brief, coordinatorAgent, details? }`
-- Output: `WorkflowHeaderWire` (status `running`, `iterationCount: 1` —
+- Output: `WorkflowHeader` (status `running`, `iterationCount: 1` —
   one freshly-created coord node)
 
 ```sh
@@ -98,7 +98,7 @@ node and runs the strategy's "no parents" case.
 
 - Positional: `<workflow-id>`
 - Route: `GET /workspaces/:id/workflows/:wfid`
-- Output: `WorkflowHeaderWire` with accurate `iterationCount` (count of
+- Output: `WorkflowHeader` with accurate `iterationCount` (count of
   worker dev nodes in the DAG, irrespective of status)
 
 Use over `list` whenever you need iteration count or want a single-row
@@ -112,12 +112,12 @@ fetch by id.
 - Route: `GET /workspaces/:id/workflows/:wfid/dag`
 - Output (table): node table (`phase | nodeId | kind | status | agent`)
   followed by edge lines (`from → to`)
-- Output (json): `WorkflowDagWire` —
-  `{ header: WorkflowHeaderWire, nodes: WorkflowNodeWire[], edges: WorkflowEdgeWire[] }`
+- Output (json): `WorkflowDag` —
+  `{ header: WorkflowHeader, nodes: WorkflowNode[], edges: WorkflowEdge[] }`
 
-`WorkflowNodeWire.kind` is `"coordinator" | "worker"` (full word on both
-write and read paths). `WorkflowNodeWire.spec.kind` mirrors the node kind.
-`WorkflowNodeWire.taskId` is filled for worker nodes after dispatch; coord
+`WorkflowNode.kind` is `"coordinator" | "worker"` (full word on both
+write and read paths). `WorkflowNode.spec.kind` mirrors the node kind.
+`WorkflowNode.taskId` is filled for worker nodes after dispatch; coord
 nodes carry their own `taskId` once dispatched too.
 
 ```sh
@@ -133,7 +133,7 @@ echo "$DAG" | jq --arg me "$NODE_ID" \
 
 - Positionals: `<workflow-id> <node-id>`
 - Route: `GET /workspaces/:id/workflows/:wfid/nodes/:nid`
-- Output: `WorkflowNodeWire` (table mirrors the `dag` node row, plus
+- Output: `WorkflowNode` (table mirrors the `dag` node row, plus
   `taskId`)
 - Errors: 400 invalid id, 404 not found
 
@@ -158,10 +158,10 @@ glyph task show "$PARENT_TID" --json | jq '.workdir'
   list is rejected by the substrate — every non-initial node needs ≥1
   parent)
 - Route: `POST /workspaces/:id/workflows/:wfid/nodes`
-- Body: `AddNodeBody` — `{ kind, parents, spec }`; `spec` comes from
+- Body: `AddNodeRequest` — `{ kind, parents, spec }`; `spec` comes from
   `--spec-file` parsed as JSON
 - Output (table): `nodeId | phase`
-- Output (json): `AddNodeResultWire` — `{ nodeId, phase }`
+- Output (json): `AddNodeResponse` — `{ nodeId, phase }`
 
 Spec shape by kind (substrate-side validation; details enforced at write):
 
@@ -186,7 +186,7 @@ atomic.
 - Positional: `<workflow-id>`
 - Required flags: `--spec-file <path>`
 - Route: `POST /workspaces/:id/workflows/:wfid/subgraph`
-- Body: `AddSubgraphBody` — entire payload from `--spec-file`:
+- Body: `AddSubgraphRequest` — entire payload from `--spec-file`:
   ```jsonc
   {
     "nodes": [
@@ -201,7 +201,7 @@ atomic.
   }
   ```
 - Output (table): `tempId | nodeId | phase` per row
-- Output (json): `AddSubgraphResultWire` —
+- Output (json): `AddSubgraphResponse` —
   `{ insertedNodes: [{ tempId, nodeId, phase }] }`
 
 Substrate rules enforced atomically:
@@ -223,9 +223,9 @@ this command so the engine sees a self-consistent DAG slice.
 - Positional: `<workflow-id>`
 - Required flags: `--from-node-id <id>`, `--to-node-id <id>`
 - Route: `POST /workspaces/:id/workflows/:wfid/edges`
-- Body: `AddEdgeBody` — `{ fromNodeId, toNodeId }`
+- Body: `AddEdgeRequest` — `{ fromNodeId, toNodeId }`
 - Output (table): `edge <from> → <to> inserted (toPhase=<n>)`
-- Output (json): `AddEdgeResultWire` — `{ fromNodeId, toNodeId, toPhase }`
+- Output (json): `AddEdgeResponse` — `{ fromNodeId, toNodeId, toPhase }`
 
 `toPhase` is the destination node's recomputed phase after insertion (an
 edge can shift the to-node's phase forward in the topological order). Use
@@ -263,8 +263,8 @@ feeding a running or terminal node is rejected.
 - Positionals: `<workflow-id> <node-id>`
 - Required flags: `--spec-file <path>`
 - Route: `PATCH /workspaces/:id/workflows/:wfid/nodes/:nid/spec`
-- Body: `ReplaceNodeSpecBody` — `{ newSpec }` from `--spec-file`
-- Output: `WorkflowNodeWire` (table mirrors `dag`'s node row)
+- Body: `ReplaceNodeSpecRequest` — `{ newSpec }` from `--spec-file`
+- Output: `WorkflowNode` (table mirrors `dag`'s node row)
 
 The node's `kind` does not change; `newSpec` is re-validated against the
 same kind rules. Used by coord to swap an agent or rewrite a brief on a
@@ -279,8 +279,8 @@ node it has already created but not yet dispatched (node must be
 - Optional flags: `--message <text>` (defaults to empty),
   `--kind <user>` (only `"user"` accepted)
 - Route: `POST /workspaces/:id/workflows/:wfid/cancel`
-- Body: `CancelWorkflowBody` — `{ cancellation: { kind: "user", message } }`
-- Output: `workflow <id> cancelled` + `WorkflowHeaderWire`
+- Body: `CancelWorkflowRequest` — `{ cancellation: { kind: "user", message } }`
+- Output: `workflow <id> cancelled` + `WorkflowHeader`
 
 Triggers the cascade reconciler: every non-terminal node is cancelled
 with reason `"workflow cancelled"`. Use sparingly — coord normally
@@ -292,7 +292,7 @@ finishes itself via `finish` instead of being externally cancelled.
 
 - Positionals: `<workflow-id> <node-id>`
 - Route: `POST /workspaces/:id/workflows/:wfid/nodes/:nid/cancel`
-- Output: `node <node-id> cancelled` + `WorkflowNodeWire`
+- Output: `node <node-id> cancelled` + `WorkflowNode`
 
 Body is empty (mirrors `task cancel`). Runner-level defaults supply the
 reason: a worker node gets `"cancelled by coordinator"`; a coord node
@@ -310,7 +310,7 @@ on the underlying task entity (`tasks.cancellation.message`); read it via
   - `--summary <text>` — only with `--outcome succeeded` (sets `success.output`)
   - `--message <text>` — **required** with `--outcome failed` (sets `failure.message`)
 - Route: `POST /workspaces/:id/workflows/:wfid/finish`
-- Body: `FinishWorkflowBody`:
+- Body: `FinishWorkflowRequest`:
   ```jsonc
   // succeeded
   { "outcome": "succeeded", "success": { "output": <string|null> } }
@@ -321,7 +321,7 @@ on the underlying task entity (`tasks.cancellation.message`); read it via
   `failure.kind` is always `"coordinator"` (the only currently-valid
   arm; future arms are reserved). Don't try to send `"coord"` (the old
   3-letter value) — it is rejected.
-- Output: `workflow <workflow-id> finished as <outcome>` + `WorkflowHeaderWire`
+- Output: `workflow <workflow-id> finished as <outcome>` + `WorkflowHeader`
 
 Idempotent on re-call with the same outcome (substrate compares and
 no-ops); calling with a conflicting outcome returns
@@ -427,7 +427,7 @@ glyph workflow respond <workflow-id> <node-id> [options]
 
 ### Response
 
-`WorkflowNodeWire` (the updated node after transitioning to `succeeded`)
+`WorkflowNode` (the updated node after transitioning to `succeeded`)
 
 ### Exit codes
 
