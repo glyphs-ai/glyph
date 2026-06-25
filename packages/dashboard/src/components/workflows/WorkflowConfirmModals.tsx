@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { WorkflowHeaderWire } from "../../api";
+import type { WorkflowHeader } from "../../api";
 import { Modal } from "../Modal";
 
 export interface CancelWorkflowModalProps {
-  target: WorkflowHeaderWire;
+  target: WorkflowHeader;
   busy: boolean;
   error: string | null;
   onClose: () => void;
@@ -83,7 +83,7 @@ export function CancelWorkflowModal({
 }
 
 export interface DeleteWorkflowModalProps {
-  target: WorkflowHeaderWire;
+  target: WorkflowHeader;
   purge: boolean;
   onPurgeChange: (v: boolean) => void;
   busy: boolean;

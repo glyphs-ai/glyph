@@ -1,11 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  WorkflowArtifactWire,
-  WorkflowDagWire,
-  WorkflowHeaderWire,
-  WorkflowNodeWire,
-} from "../../../src/api";
+import type { WorkflowArtifact, WorkflowDag, WorkflowHeader, WorkflowNode } from "../../../src/api";
 
 vi.mock("../../../src/api", async () => {
   const actual = await vi.importActual<typeof import("../../../src/api")>("../../../src/api");
@@ -24,7 +19,7 @@ vi.mock("../../../src/components/tasks/TaskDetail/MarkdownSummary", () => ({
 
 import { ArtifactsTab } from "../../../src/pages/workflows/ArtifactsTab";
 
-function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-1",
     brief: "x",
@@ -39,7 +34,7 @@ function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire
   };
 }
 
-function makeNode(overrides: Partial<WorkflowNodeWire> = {}): WorkflowNodeWire {
+function makeNode(overrides: Partial<WorkflowNode> = {}): WorkflowNode {
   return {
     id: "n-default",
     workflowId: "wf-1",
@@ -52,7 +47,7 @@ function makeNode(overrides: Partial<WorkflowNodeWire> = {}): WorkflowNodeWire {
   };
 }
 
-function makeDag(nodes: WorkflowNodeWire[]): WorkflowDagWire {
+function makeDag(nodes: WorkflowNode[]): WorkflowDag {
   return {
     workflow: {
       id: "wf-1",
@@ -113,7 +108,7 @@ describe("ArtifactsTab — empty + error states", () => {
 
 describe("ArtifactsTab — dropdown UX", () => {
   it("renders a <select> with `<optgroup>` per source (Workflow + per-node)", async () => {
-    const artifacts: WorkflowArtifactWire[] = [
+    const artifacts: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
         path: "report.md",
@@ -162,7 +157,7 @@ describe("ArtifactsTab — dropdown UX", () => {
     // `Node n-12345-` with no visible character after it. Trim
     // trailing dashes off the short slice so the label always ends
     // on a glyph.
-    const artifacts: WorkflowArtifactWire[] = [
+    const artifacts: WorkflowArtifact[] = [
       {
         kind: "node",
         nodeId: "n-12345-extra-bytes-here",
@@ -194,7 +189,7 @@ describe("ArtifactsTab — dropdown UX", () => {
   });
 
   it("auto-selects the first artifact on mount and renders a download link to it", async () => {
-    const artifacts: WorkflowArtifactWire[] = [
+    const artifacts: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
         path: "report.md",
@@ -225,7 +220,7 @@ describe("ArtifactsTab — dropdown UX", () => {
   });
 
   it("renders the preview pane container regardless of fetch outcome", async () => {
-    const artifacts: WorkflowArtifactWire[] = [
+    const artifacts: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
         path: "report.md",
@@ -263,7 +258,7 @@ describe("ArtifactsTab — node group label (agent · Phase + disambiguator)", (
         spec: { kind: "worker", agent: "official/reviewer", brief: "r" },
       }),
     ]);
-    const artifacts: WorkflowArtifactWire[] = [
+    const artifacts: WorkflowArtifact[] = [
       {
         kind: "node",
         nodeId: "n-rev",
@@ -312,7 +307,7 @@ describe("ArtifactsTab — node group label (agent · Phase + disambiguator)", (
         spec: { kind: "worker", agent: "official/reviewer", brief: "second" },
       }),
     ]);
-    const artifacts: WorkflowArtifactWire[] = [
+    const artifacts: WorkflowArtifact[] = [
       {
         kind: "node",
         nodeId: "n-rev-early",
@@ -367,7 +362,7 @@ describe("ArtifactsTab — node group label (agent · Phase + disambiguator)", (
         spec: { kind: "worker", agent: "official/engineer", brief: "x" },
       }),
     ]);
-    const artifacts: WorkflowArtifactWire[] = [
+    const artifacts: WorkflowArtifact[] = [
       {
         kind: "node",
         nodeId: "n-only",
@@ -409,7 +404,7 @@ describe("ArtifactsTab — bytes-fetch is keyed on (subPath + modifiedAt), not e
     // / HTML viewer flashed every cycle. After the fix the effect
     // keys on `subPath + "|" + modifiedAt` (a string), so an
     // unchanged artifact is a no-op.
-    const artifacts1: WorkflowArtifactWire[] = [
+    const artifacts1: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
         path: "report.md",
@@ -443,7 +438,7 @@ describe("ArtifactsTab — bytes-fetch is keyed on (subPath + modifiedAt), not e
     // Simulate a poll cycle: build a structurally-identical NEW array
     // (different reference) with the SAME modifiedAt for the selected
     // artifact. The effect must not re-fire.
-    const artifacts2: WorkflowArtifactWire[] = [
+    const artifacts2: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
         path: "report.md",
@@ -470,7 +465,7 @@ describe("ArtifactsTab — bytes-fetch is keyed on (subPath + modifiedAt), not e
 
     // Now bump the selected artifact's modifiedAt: the effect SHOULD
     // re-fire because the underlying bytes legitimately changed.
-    const artifacts3: WorkflowArtifactWire[] = [
+    const artifacts3: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
         path: "report.md",

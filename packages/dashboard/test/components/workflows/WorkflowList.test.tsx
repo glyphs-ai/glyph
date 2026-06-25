@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowHeaderWire } from "../../../src/api";
+import type { WorkflowHeader } from "../../../src/api";
 import { WorkflowList } from "../../../src/components/workflows/WorkflowList";
 
-function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-default",
     brief: "Default workflow",

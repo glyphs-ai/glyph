@@ -1,14 +1,14 @@
 import { type ReactNode, useCallback, useMemo } from "react";
-import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../api";
 import { TaskView } from "../../components/task-view";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
 import { orderNodesForNav } from "./workflow-nav-utils.js";
 
 export interface WorkflowNodeTaskPaneProps {
   /** The parent workflow header (used for the back-label only). */
-  workflow: WorkflowHeaderWire;
+  workflow: WorkflowHeader;
   /** The current DAG (used for the prev/next walk). */
-  dag: WorkflowDagWire | null;
+  dag: WorkflowDag | null;
   /** The task id requested via `?nodeTaskId=`. May be stale (URL-shareable). */
   nodeTaskId: string;
   /** Polling cadence for the task header + activity stream. */
@@ -51,7 +51,7 @@ export function WorkflowNodeTaskPane({
   const orderedNodes = useMemo(() => {
     // For the task pane, only nodes with a taskId are navigable.
     return orderNodesForNav(dag).filter(
-      (n): n is WorkflowNodeWire & { taskId: string } => n.taskId !== undefined,
+      (n): n is WorkflowNode & { taskId: string } => n.taskId !== undefined,
     );
   }, [dag]);
   const currentIndex = useMemo(
@@ -120,7 +120,7 @@ export function WorkflowNodeTaskPane({
 }
 
 interface FallbackBackRowProps {
-  workflow: WorkflowHeaderWire;
+  workflow: WorkflowHeader;
   onBack: () => void;
 }
 

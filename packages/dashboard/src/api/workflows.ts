@@ -1,37 +1,35 @@
 import type {
-  CancelWorkflowBody,
-  CreateWorkflowBody,
-  RespondHumanNodeBody,
+  CancelWorkflowRequest,
+  CreateWorkflowRequest,
+  RespondHumanNodeRequest,
+  WorkflowArtifact,
   WorkflowArtifactsResponse,
-  WorkflowArtifactWire,
-  WorkflowDagWire,
-  WorkflowEdgeWire,
-  WorkflowHeaderWire,
-  WorkflowHumanNodeSpecWire,
+  WorkflowDag,
+  WorkflowEdge,
+  WorkflowHeader,
+  WorkflowHumanNodeSpec,
   WorkflowListQuery,
-  WorkflowNodeWire,
-  WorkflowNodeWireSpec,
+  WorkflowNode,
+  WorkflowNodeSpec,
 } from "@glyphs-ai/contracts";
 import { fetchJson, jsonInit, mutate, mutateJson, workspacePrefix } from "./http.js";
 
 export type {
-  CancelWorkflowBody,
-  CreateWorkflowBody,
-  RespondHumanNodeBody,
+  CancelWorkflowRequest,
+  CreateWorkflowRequest,
+  RespondHumanNodeRequest,
+  WorkflowArtifact,
   WorkflowArtifactsResponse,
-  WorkflowArtifactWire,
-  WorkflowDagWire,
-  WorkflowEdgeWire,
-  WorkflowHeaderWire,
-  WorkflowHumanNodeSpecWire,
+  WorkflowDag,
+  WorkflowEdge,
+  WorkflowHeader,
+  WorkflowHumanNodeSpec,
   WorkflowListQuery,
-  WorkflowNodeWire,
-  WorkflowNodeWireSpec,
+  WorkflowNode,
+  WorkflowNodeSpec,
 };
 
-export const listWorkflows = (
-  opts: WorkflowListQuery = {},
-): Promise<readonly WorkflowHeaderWire[]> => {
+export const listWorkflows = (opts: WorkflowListQuery = {}): Promise<readonly WorkflowHeader[]> => {
   const qs = new URLSearchParams();
   if (opts.q !== undefined && opts.q !== "") qs.set("q", opts.q);
   if (opts.coordinatorAgent !== undefined && opts.coordinatorAgent !== "") {
@@ -39,26 +37,26 @@ export const listWorkflows = (
   }
   if (opts.createdSince !== undefined) qs.set("createdSince", opts.createdSince);
   const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
-  return fetchJson<readonly WorkflowHeaderWire[]>(
+  return fetchJson<readonly WorkflowHeader[]>(
     `${workspacePrefix()}/workflows${suffix}`,
     "workflows",
   );
 };
 
-export const getWorkflow = (workflowId: string): Promise<WorkflowHeaderWire> =>
-  fetchJson<WorkflowHeaderWire>(
+export const getWorkflow = (workflowId: string): Promise<WorkflowHeader> =>
+  fetchJson<WorkflowHeader>(
     `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}`,
     "workflow",
   );
 
-export const getWorkflowDag = (workflowId: string): Promise<WorkflowDagWire> =>
-  fetchJson<WorkflowDagWire>(
+export const getWorkflowDag = (workflowId: string): Promise<WorkflowDag> =>
+  fetchJson<WorkflowDag>(
     `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/dag`,
     "workflow dag",
   );
 
-export const createWorkflow = (body: CreateWorkflowBody): Promise<WorkflowHeaderWire> =>
-  mutateJson<WorkflowHeaderWire>(`${workspacePrefix()}/workflows`, jsonInit("POST", body));
+export const createWorkflow = (body: CreateWorkflowRequest): Promise<WorkflowHeader> =>
+  mutateJson<WorkflowHeader>(`${workspacePrefix()}/workflows`, jsonInit("POST", body));
 
 /**
  * Cancel a workflow. The wire shape requires a `cancellation: { message }`
@@ -68,9 +66,9 @@ export const createWorkflow = (body: CreateWorkflowBody): Promise<WorkflowHeader
  */
 export const cancelWorkflow = (
   workflowId: string,
-  body: CancelWorkflowBody,
-): Promise<WorkflowHeaderWire> =>
-  mutateJson<WorkflowHeaderWire>(
+  body: CancelWorkflowRequest,
+): Promise<WorkflowHeader> =>
+  mutateJson<WorkflowHeader>(
     `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/cancel`,
     jsonInit("POST", body),
   );
@@ -131,9 +129,9 @@ export const workflowArtifactUrl = (workflowId: string, subPath: string): string
 export const respondHumanNode = (
   workflowId: string,
   nodeId: string,
-  body: RespondHumanNodeBody,
-): Promise<WorkflowNodeWire> =>
-  mutateJson<WorkflowNodeWire>(
+  body: RespondHumanNodeRequest,
+): Promise<WorkflowNode> =>
+  mutateJson<WorkflowNode>(
     `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/nodes/${encodeURIComponent(nodeId)}/respond`,
     jsonInit("POST", body),
   );

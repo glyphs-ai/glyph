@@ -14,11 +14,11 @@
  */
 
 import type {
-  WorkflowDagWire,
-  WorkflowEdgeWire,
-  WorkflowHeaderWire,
-  WorkflowNodeWire,
-  WorkflowNodeWireSpec,
+  WorkflowDag,
+  WorkflowEdge,
+  WorkflowHeader,
+  WorkflowNode,
+  WorkflowNodeSpec,
 } from "@glyphs-ai/api";
 import {
   deriveIterationCount,
@@ -55,7 +55,7 @@ export function projectWorkflowHeader(
   wf: WorkflowEntity,
   iterationCount: number | undefined,
   awaitingHumanCount: number,
-): WorkflowHeaderWire {
+): WorkflowHeader {
   return {
     id: wf.id,
     brief: wf.brief,
@@ -95,15 +95,15 @@ export function countAwaitingHuman(nodes: readonly { kind: string; status: strin
  * runtime parse error from `WorkflowNodeEntity.fromRow` before
  * reaching this projection.
  */
-function projectNodeSpec(node: WorkflowNodeEntity): WorkflowNodeWireSpec {
+function projectNodeSpec(node: WorkflowNodeEntity): WorkflowNodeSpec {
   if (node.kind === "worker") {
-    return { kind: "worker", ...(node.spec as object) } as WorkflowNodeWireSpec;
+    return { kind: "worker", ...(node.spec as object) } as WorkflowNodeSpec;
   }
   if (node.kind === "coordinator") {
-    return { kind: "coordinator", ...(node.spec as object) } as WorkflowNodeWireSpec;
+    return { kind: "coordinator", ...(node.spec as object) } as WorkflowNodeSpec;
   }
   if (node.kind === "human") {
-    return { kind: "human", ...(node.spec as object) } as WorkflowNodeWireSpec;
+    return { kind: "human", ...(node.spec as object) } as WorkflowNodeSpec;
   }
   return { kind: node.kind, spec: node.spec };
 }
@@ -117,7 +117,7 @@ function projectNodeSpec(node: WorkflowNodeEntity): WorkflowNodeWireSpec {
  * For routes that DO need `taskId` (the `/dag` route), use
  * {@link projectWorkflowNodeWithTaskId}.
  */
-function projectWorkflowNodeSync(node: WorkflowNodeEntity): WorkflowNodeWire {
+function projectWorkflowNodeSync(node: WorkflowNodeEntity): WorkflowNode {
   return {
     id: node.id,
     workflowId: node.workflowId,
@@ -151,7 +151,7 @@ function projectWorkflowNodeSync(node: WorkflowNodeEntity): WorkflowNodeWire {
 export async function projectWorkflowNodeWithTaskId(
   node: WorkflowNodeEntity,
   deps: { readonly tasks: ProjectionTasksDep },
-): Promise<WorkflowNodeWire> {
+): Promise<WorkflowNode> {
   const sync = projectWorkflowNodeSync(node);
   const task = await deps.tasks.findTaskByWorkflowNode(node.id);
   if (task === null) return sync;
@@ -159,7 +159,7 @@ export async function projectWorkflowNodeWithTaskId(
 }
 
 /** Project a `WorkflowEdgeEntity` to its wire-shape `(from, to)` pair. */
-function projectWorkflowEdge(edge: WorkflowEdgeEntity): WorkflowEdgeWire {
+function projectWorkflowEdge(edge: WorkflowEdgeEntity): WorkflowEdge {
   return { from: edge.from, to: edge.to };
 }
 
@@ -176,7 +176,7 @@ function projectWorkflowEdge(edge: WorkflowEdgeEntity): WorkflowEdgeWire {
 export async function projectWorkflowDag(
   snapshot: WorkflowDagSnapshot,
   deps: { readonly tasks: ProjectionTasksDep },
-): Promise<WorkflowDagWire> {
+): Promise<WorkflowDag> {
   const coordCount = snapshot.nodes.filter((n) => n.kind === "coordinator").length;
   const iterationCount = deriveIterationCount(coordCount);
   const awaitingHuman = countAwaitingHuman(snapshot.nodes);

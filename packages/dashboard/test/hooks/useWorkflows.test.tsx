@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowHeaderWire } from "../../src/api";
+import type { WorkflowHeader } from "../../src/api";
 
 vi.mock("../../src/api", async () => {
   const actual = await vi.importActual<typeof import("../../src/api")>("../../src/api");
@@ -16,7 +16,7 @@ import { useWorkflows } from "../../src/hooks/useWorkflows";
 
 const mockList = api.listWorkflows as unknown as ReturnType<typeof vi.fn>;
 
-function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-1",
     brief: "Test",

@@ -4,7 +4,7 @@ import {
   previewSchedule,
   type ScheduleDetail as ScheduleDetailType,
   type SchedulePreview,
-  type WorkflowHeaderWire,
+  type WorkflowHeader,
 } from "../../api";
 import { formatAbsolute, formatRelative } from "../../utils/time";
 import { ScheduleRecentFires } from "./ScheduleRecentFires";
@@ -35,7 +35,7 @@ export interface ScheduleDetailProps {
   /** Swaps the right pane into Mode B (fire's task detail) via the parent's atomic URL writer. */
   onSelectFire: (taskId: string) => void;
   onCancelTaskFire: (taskId: string) => Promise<void> | void;
-  onCancelWorkflowFire: (workflow: WorkflowHeaderWire) => Promise<void> | void;
+  onCancelWorkflowFire: (workflow: WorkflowHeader) => Promise<void> | void;
 }
 
 const PREVIEW_COUNT = 1;

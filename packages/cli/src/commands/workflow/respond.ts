@@ -4,7 +4,7 @@
  * `./_shared.ts`.
  */
 
-import type { RespondHumanNodeBody } from "@glyphs-ai/contracts";
+import type { RespondHumanNodeRequest } from "@glyphs-ai/contracts";
 import { makeClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
@@ -38,7 +38,7 @@ export async function workflowRespond(
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: RespondHumanNodeBody = {
+    const body: RespondHumanNodeRequest = {
       ...(opts.choiceId !== undefined ? { choiceId: opts.choiceId } : {}),
       ...(opts.input !== undefined ? { input: opts.input } : {}),
     };

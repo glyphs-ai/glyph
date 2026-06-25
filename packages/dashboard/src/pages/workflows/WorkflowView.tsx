@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
-import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../api";
 import { CopyButton } from "../../components/common/CopyButton";
 import { WorkflowMetaStats } from "../../components/workflows/WorkflowMetaStats";
 import { WorkflowStatusBadge } from "../../components/workflows/WorkflowStatusBadge";
@@ -19,8 +19,8 @@ const TAB_LABEL_BASE: Record<WorkflowTab, string> = {
 };
 
 export interface WorkflowViewProps {
-  workflow: WorkflowHeaderWire;
-  dag: WorkflowDagWire | null;
+  workflow: WorkflowHeader;
+  dag: WorkflowDag | null;
   dagError: string | null;
   /**
    * Currently-selected node id (if any). Forwarded to the Graph tab so
@@ -32,7 +32,7 @@ export interface WorkflowViewProps {
    * Fired when a node chip is activated. Parent uses it to enter Mode B
    * (flips `?nodeTaskId=...` in the URL state machine).
    */
-  onSelectNode: (node: WorkflowNodeWire) => void;
+  onSelectNode: (node: WorkflowNode) => void;
   /**
    * Optional slot for a trailing chrome row (e.g. the "Back to workflow"
    * pill + prev/next walker rendered by `WorkflowNodeTaskPane`). When
@@ -138,7 +138,7 @@ export function WorkflowView({
   );
 
   const handleGoToHumanNode = useCallback(
-    (node: WorkflowNodeWire) => {
+    (node: WorkflowNode) => {
       setActive("graph");
       onSelectNode(node);
     },

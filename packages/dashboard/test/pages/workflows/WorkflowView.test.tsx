@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowDagWire, WorkflowHeaderWire } from "../../../src/api";
+import type { WorkflowDag, WorkflowHeader } from "../../../src/api";
 
 vi.mock("../../../src/api", async () => {
   const actual = await vi.importActual<typeof import("../../../src/api")>("../../../src/api");
@@ -16,7 +16,7 @@ import { WorkflowView } from "../../../src/pages/workflows/WorkflowView";
 
 const mockListWorkflowArtifacts = api.listWorkflowArtifacts as unknown as ReturnType<typeof vi.fn>;
 
-function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-1",
     brief: "Default",
@@ -31,7 +31,7 @@ function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire
   };
 }
 
-function makeDag(wf: WorkflowHeaderWire): WorkflowDagWire {
+function makeDag(wf: WorkflowHeader): WorkflowDag {
   return {
     workflow: wf,
     nodes: [

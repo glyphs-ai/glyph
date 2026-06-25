@@ -12,11 +12,11 @@
  * match a handler above it.
  */
 
-import type { AgentEntry, Mcp, SkillEntry, TaskScheduleTargetWire } from "@glyphs-ai/contracts";
+import type { AgentEntry, Mcp, SkillEntry, TaskScheduleTarget } from "@glyphs-ai/contracts";
 import { type DefaultBodyType, HttpResponse, http } from "msw";
 import type {
   CreateScheduleBody,
-  CreateWorkflowBody,
+  CreateWorkflowRequest,
   CreateWorkflowScheduleBody,
   PatchScheduleBody,
   PatchWorkflowScheduleBody,
@@ -24,8 +24,8 @@ import type {
   ScheduleView,
   SessionView,
   TaskRecord,
-  WorkflowHeaderWire,
-  WorkflowNodeWire,
+  WorkflowHeader,
+  WorkflowNode,
 } from "../api/index.js";
 import {
   artifactBodies,
@@ -67,12 +67,12 @@ let synthFireSeq = 0;
  * colliding with the wire-type's `readonly` modifiers.
  */
 interface MutableWorkflowDag {
-  workflow: WorkflowHeaderWire;
-  nodes: WorkflowNodeWire[];
+  workflow: WorkflowHeader;
+  nodes: WorkflowNode[];
   edges: { from: string; to: string }[];
 }
 
-const workflowsState: WorkflowHeaderWire[] = fixtureWorkflows.map((w) => ({ ...w }));
+const workflowsState: WorkflowHeader[] = fixtureWorkflows.map((w) => ({ ...w }));
 const dagsState: Map<string, MutableWorkflowDag> = new Map(
   Array.from(fixtureWorkflowDags.entries()).map(([id, dag]) => [
     id,
@@ -284,7 +284,7 @@ export const handlers = [
     let rows = schedulesState.slice();
     if (agent !== null) {
       rows = rows.filter((s) => {
-        if (s.target.kind === "task") return (s.target as TaskScheduleTargetWire).agent === agent;
+        if (s.target.kind === "task") return (s.target as TaskScheduleTarget).agent === agent;
         if (s.target.kind === "workflow")
           return (s.target as { coordinatorAgent: string }).coordinatorAgent === agent;
         return false;
@@ -461,7 +461,7 @@ export const handlers = [
     const current = schedulesState[idx]!;
     let nextTarget = current.target;
     if (body.target !== undefined && current.target.kind === "task") {
-      const ct = current.target as TaskScheduleTargetWire;
+      const ct = current.target as TaskScheduleTarget;
       const t = { ...ct };
       if (body.target.agent !== undefined) t.agent = body.target.agent;
       if (body.target.brief !== undefined) t.brief = body.target.brief;
@@ -549,7 +549,7 @@ export const handlers = [
         details?: string;
       };
       const workflowId = `wf-${cryptoRandom8()}`;
-      const created: WorkflowHeaderWire = {
+      const created: WorkflowHeader = {
         id: workflowId,
         brief: `${row.name} (manual run)`,
         ...(typeof wfTarget.details === "string" && wfTarget.details.trim() !== ""
@@ -565,7 +565,7 @@ export const handlers = [
         iterationCount: 0,
       };
       workflowsState.unshift(created);
-      const coordNode: WorkflowNodeWire = {
+      const coordNode: WorkflowNode = {
         id: cryptoUuid(),
         workflowId,
         status: "running",
@@ -589,7 +589,7 @@ export const handlers = [
     //      and renders it inside the schedules page (no
     //      cross-page navigation).
     const dispatchId = `sched-${row.id}-run-${synthFireSeq}`;
-    const taskTarget = row.target.kind === "task" ? (row.target as TaskScheduleTargetWire) : null;
+    const taskTarget = row.target.kind === "task" ? (row.target as TaskScheduleTarget) : null;
     const dispatchAgent = taskTarget?.agent ?? "";
     const dispatchRuntime = taskTarget?.runtime;
     store.tasks.unshift({
@@ -629,7 +629,7 @@ export const handlers = [
     return HttpResponse.json(rows);
   }),
   http.post(`/api/workspaces/${W}/workflows`, async ({ request }) => {
-    const body = (await request.json()) as CreateWorkflowBody;
+    const body = (await request.json()) as CreateWorkflowRequest;
     if (typeof body.brief !== "string" || body.brief.trim() === "") {
       return HttpResponse.json({ error: "brief must be a non-empty string" }, { status: 400 });
     }
@@ -641,7 +641,7 @@ export const handlers = [
     }
     const id = `wf-${cryptoRandom8()}`;
     const now = new Date().toISOString();
-    const created: WorkflowHeaderWire = {
+    const created: WorkflowHeader = {
       id,
       brief: body.brief.trim(),
       ...(typeof body.details === "string" && body.details.trim() !== ""
@@ -657,7 +657,7 @@ export const handlers = [
       iterationCount: 0,
     };
     workflowsState.unshift(created);
-    const coordNode: WorkflowNodeWire = {
+    const coordNode: WorkflowNode = {
       id: cryptoUuid(),
       workflowId: id,
       status: "running",
@@ -706,7 +706,7 @@ export const handlers = [
     const message =
       typeof body?.cancellation?.message === "string" ? body.cancellation.message : "";
     const now = new Date().toISOString();
-    const cancelled: WorkflowHeaderWire = {
+    const cancelled: WorkflowHeader = {
       ...current,
       status: "cancelled",
       endedAt: now,

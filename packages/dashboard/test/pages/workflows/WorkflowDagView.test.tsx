@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowDagWire, WorkflowNodeWire } from "../../../src/api";
+import type { WorkflowDag, WorkflowNode } from "../../../src/api";
 import { WorkflowDagView } from "../../../src/pages/workflows/WorkflowDagView";
 
-function makeNode(overrides: Partial<WorkflowNodeWire> = {}): WorkflowNodeWire {
+function makeNode(overrides: Partial<WorkflowNode> = {}): WorkflowNode {
   return {
     id: "n-default",
     workflowId: "wf-1",
@@ -16,7 +16,7 @@ function makeNode(overrides: Partial<WorkflowNodeWire> = {}): WorkflowNodeWire {
   };
 }
 
-function makeDag(nodes: WorkflowNodeWire[]): WorkflowDagWire {
+function makeDag(nodes: WorkflowNode[]): WorkflowDag {
   return {
     workflow: {
       id: "wf-1",

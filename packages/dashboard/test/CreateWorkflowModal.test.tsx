@@ -1,7 +1,7 @@
 import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowHeaderWire } from "../src/api";
+import type { WorkflowHeader } from "../src/api";
 import { ApiError } from "../src/api";
 
 vi.mock("../src/api", async () => {
@@ -26,7 +26,7 @@ function makeAgent(fqn: string, opts: { coordEligible?: boolean } = {}): AgentEn
   } as unknown as AgentEntry;
 }
 
-function makeWorkflow(): WorkflowHeaderWire {
+function makeWorkflow(): WorkflowHeader {
   return {
     id: "wf-from-server",
     brief: "from-server",

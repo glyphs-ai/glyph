@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { WorkflowDagWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowDag, WorkflowNode } from "../../api";
 import { WORKFLOW_NODE_STATUS_LABEL } from "../../components/workflows/shared";
 import { truncateBrief } from "../../utils/brief";
 import { formatAbsolute, formatDuration, formatRelative } from "../../utils/time";
@@ -25,7 +25,7 @@ import {
 const DAG_BRIEF_CAP = 100;
 
 export interface WorkflowDagViewProps {
-  dag: WorkflowDagWire;
+  dag: WorkflowDag;
   /** Optional node selection (drives the `aria-current="true"` + `.dag-node--selected` styling). */
   selectedNodeId?: string | null;
   /**
@@ -36,7 +36,7 @@ export interface WorkflowDagViewProps {
    * the prop can be omitted — the nodes still render but become
    * non-interactive `<div>`s.
    */
-  onSelectNode?: (node: WorkflowNodeWire) => void;
+  onSelectNode?: (node: WorkflowNode) => void;
 }
 
 /**
@@ -326,7 +326,7 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
  * unknown spec kinds fall back to "—" so the row still renders a
  * placeholder rather than an empty span (visual stability).
  */
-function extractAgent(node: WorkflowNodeWire): string {
+function extractAgent(node: WorkflowNode): string {
   const spec = node.spec;
   if (spec.kind === "human") return "Human gate";
   if (
@@ -348,7 +348,7 @@ function extractAgent(node: WorkflowNodeWire): string {
  * Returning null lets the caller skip rendering the brief row entirely
  * rather than reserving empty vertical space.
  */
-function extractBrief(node: WorkflowNodeWire): string | null {
+function extractBrief(node: WorkflowNode): string | null {
   const spec = node.spec;
   if (spec.kind === "worker" && "brief" in spec && typeof spec.brief === "string") {
     return spec.brief;
@@ -366,7 +366,7 @@ function extractBrief(node: WorkflowNodeWire): string | null {
  * server-side projection); unknown kinds fall back to
  * `"worker"` so the visual still renders a recognisable node.
  */
-function nodeKind(node: WorkflowNodeWire): "coordinator" | "worker" | "human" {
+function nodeKind(node: WorkflowNode): "coordinator" | "worker" | "human" {
   if (node.spec.kind === "coordinator") return "coordinator";
   if (node.spec.kind === "human") return "human";
   return "worker";

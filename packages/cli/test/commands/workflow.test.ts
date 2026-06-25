@@ -341,7 +341,7 @@ describe("workflowCreate — server error envelope", () => {
   });
 });
 
-describe("workflowCreate — pre-resolved --details maps to CreateWorkflowBody.details", () => {
+describe("workflowCreate — pre-resolved --details maps to CreateWorkflowRequest.details", () => {
   it("forwards the provided string verbatim as `details`", async () => {
     const longBody = "## Why\n\nSeed the parser strategy.\n\n## How\n\nSee /docs/parser.md\n";
     const { calls } = stubFetchMulti([{ status: 201, body: JSON.stringify(sampleHeader) }]);

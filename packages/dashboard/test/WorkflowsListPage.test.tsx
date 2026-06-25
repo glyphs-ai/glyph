@@ -2,7 +2,7 @@ import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowDagWire, WorkflowHeaderWire } from "../src/api";
+import type { WorkflowDag, WorkflowHeader } from "../src/api";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");
@@ -34,7 +34,7 @@ function makeAgent(fqn: string, opts: { coordEligible?: boolean } = {}): AgentEn
   } as unknown as AgentEntry;
 }
 
-function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-default",
     brief: "Default workflow",
@@ -49,7 +49,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHead
   };
 }
 
-function makeDag(wf: WorkflowHeaderWire): WorkflowDagWire {
+function makeDag(wf: WorkflowHeader): WorkflowDag {
   return {
     workflow: wf,
     nodes: [
@@ -98,7 +98,7 @@ beforeEach(() => {
   // right pane parked on its loading skeleton.
   //
   // The prior defaults were `.mockResolvedValue(undefined)`. That
-  // violated the typed `Promise<WorkflowHeaderWire>` contract: the
+  // violated the typed `Promise<WorkflowHeader>` contract: the
   // detail hook's `setWorkflow(header.value)` then handed `undefined`
   // to `<WorkflowView>`, which dereferences `workflow.brief` (see
   // `src/pages/workflows/WorkflowView.tsx:119`) and crashed the
@@ -112,9 +112,9 @@ beforeEach(() => {
   // that do not opt into a specific detail-pane assertion. Tests that
   // do (`renders one row per workflow...`, `opens the create modal...`)
   // already override these with `mockResolvedValue(...)` of a real
-  // `WorkflowHeaderWire`, so this change is transparent to them.
-  mockGetWorkflow.mockReturnValue(new Promise<WorkflowHeaderWire>(() => {}));
-  mockGetWorkflowDag.mockReturnValue(new Promise<WorkflowDagWire>(() => {}));
+  // `WorkflowHeader`, so this change is transparent to them.
+  mockGetWorkflow.mockReturnValue(new Promise<WorkflowHeader>(() => {}));
+  mockGetWorkflowDag.mockReturnValue(new Promise<WorkflowDag>(() => {}));
 });
 
 afterEach(() => cleanup());
@@ -188,9 +188,9 @@ describe("WorkflowsPage — list rendering + sort", () => {
   it("shows the loading skeleton while the workflow list fetch is pending, then removes it on resolve", async () => {
     // Hold `listWorkflows` in a pending state so the loading branch is
     // observable. The skeleton then resolves out once the list arrives.
-    let resolveList: (rows: WorkflowHeaderWire[]) => void = () => {};
+    let resolveList: (rows: WorkflowHeader[]) => void = () => {};
     mockListWorkflows.mockReturnValue(
-      new Promise<WorkflowHeaderWire[]>((res) => {
+      new Promise<WorkflowHeader[]>((res) => {
         resolveList = res;
       }),
     );

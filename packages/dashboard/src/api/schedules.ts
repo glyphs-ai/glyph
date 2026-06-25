@@ -14,8 +14,8 @@
 import type {
   PreviewScheduleResult,
   Schedule,
-  ScheduleWireTarget,
-  WorkflowHeaderWire,
+  ScheduleTarget,
+  WorkflowHeader,
 } from "@glyphs-ai/contracts";
 import {
   fetchJson,
@@ -33,7 +33,7 @@ import {
  * `target` as the full wire union.
  */
 export type ScheduleView = Omit<Schedule, "target"> & {
-  target: ScheduleWireTarget;
+  target: ScheduleTarget;
   fireStats?: {
     awaitingCount: number;
     runningCount: number;
@@ -203,16 +203,16 @@ export const createWorkflowSchedule = (body: CreateWorkflowScheduleBody): Promis
 /**
  * List workflows launched by schedules, optionally filtered to one
  * schedule. The route contract (`workflows.scheduled.list`) responds
- * with `WorkflowHeaderWire[]`, so the dashboard reads the typed shape
+ * with `WorkflowHeader[]`, so the dashboard reads the typed shape
  * directly rather than re-narrowing an `unknown[]` at every call site.
  */
 export const listScheduledWorkflows = (opts: {
   scheduleId?: string;
-}): Promise<WorkflowHeaderWire[]> => {
+}): Promise<WorkflowHeader[]> => {
   const qs = new URLSearchParams();
   if (opts.scheduleId !== undefined) qs.set("scheduleId", opts.scheduleId);
   const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
-  return fetchJson<WorkflowHeaderWire[]>(
+  return fetchJson<WorkflowHeader[]>(
     `${workspacePrefix()}/scheduled-workflows${suffix}`,
     "scheduled-workflows",
   );

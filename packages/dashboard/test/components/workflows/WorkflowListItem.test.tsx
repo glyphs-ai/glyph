@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowHeaderWire } from "../../../src/api";
+import type { WorkflowHeader } from "../../../src/api";
 import { WorkflowListItem } from "../../../src/components/workflows/WorkflowListItem";
 import { installRectSpy } from "../../_helpers/rectSpy";
 
-function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-default-123456",
     brief: "Default workflow",
@@ -24,7 +24,7 @@ interface RenderOpts {
   menuOpen?: boolean;
 }
 
-function renderRow(overrides: Partial<WorkflowHeaderWire> = {}, opts: RenderOpts = {}) {
+function renderRow(overrides: Partial<WorkflowHeader> = {}, opts: RenderOpts = {}) {
   const { selected = false, menuOpen = false } = opts;
   const onSelect = vi.fn();
   const onCancel = vi.fn();

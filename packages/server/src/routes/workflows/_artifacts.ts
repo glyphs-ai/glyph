@@ -1,6 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
-import type { WorkflowArtifactsResponse, WorkflowArtifactWire } from "@glyphs-ai/api";
+import type { WorkflowArtifact, WorkflowArtifactsResponse } from "@glyphs-ai/api";
 import {
   tasksRoot as resolveTasksRoot,
   safeJoinUnderRoot as safeJoinTaskRoot,
@@ -55,7 +55,7 @@ export async function handleListArtifacts(
 
   const summaryRoot = path.join(resolveWorkflowDir(workspaceDir, wfid), "artifact");
   const summaryFiles = await listFilesRecursive(summaryRoot);
-  const summaryEntries: WorkflowArtifactWire[] = summaryFiles.map((f) => ({
+  const summaryEntries: WorkflowArtifact[] = summaryFiles.map((f) => ({
     kind: "workflow-summary" as const,
     path: f.relPath,
     size: f.size,
@@ -68,7 +68,7 @@ export async function handleListArtifacts(
   // Mode B drill-down navigates to either kind uniformly.
   const nodes = [...snapshot.nodes].sort((a, b) => a.id.localeCompare(b.id));
   const tasksRoot = resolveTasksRoot(workspaceDir);
-  const nodeEntries: WorkflowArtifactWire[] = [];
+  const nodeEntries: WorkflowArtifact[] = [];
   for (const node of nodes) {
     const task = await tasksSvc.findTaskByWorkflowNode(node.id);
     if (task === null) continue;

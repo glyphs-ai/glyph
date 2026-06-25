@@ -3,7 +3,7 @@ import { formatAbsolute, formatDuration, formatRelative } from "../../utils/time
 /**
  * Inputs shared by both the Task and Workflow row-meta consumers.
  * Discrete props rather than a record shape so the helper does not
- * depend on either record type (TaskRecord vs WorkflowHeaderWire) —
+ * depend on either record type (TaskRecord vs WorkflowHeader) —
  * each caller destructures its own record into this prop bag.
  *
  * `status` is typed open (`string`) on purpose: the only value the

@@ -1,14 +1,14 @@
 import type {
-  AddEdgeBody,
-  AddNodeBody,
-  AddSubgraphBody,
-  AddSubgraphEdgeInputWire,
-  AddSubgraphNodeInputWire,
-  CancelWorkflowBody,
-  CreateWorkflowBody,
-  FinishWorkflowBody,
-  NodeRefWire,
-  ReplaceNodeSpecBody,
+  AddEdgeRequest,
+  AddNodeRequest,
+  AddSubgraphRequest,
+  AddSubgraphRequestEdge,
+  AddSubgraphRequestNode,
+  CancelWorkflowRequest,
+  CreateWorkflowRequest,
+  FinishWorkflowRequest,
+  ReplaceNodeSpecRequest,
+  WorkflowNodeRef,
 } from "@glyphs-ai/api";
 import type { NodeRef, WorkflowNodeKind } from "@glyphs-ai/workflow";
 import type { ValidationResult } from "../_shared.js";
@@ -33,7 +33,7 @@ export function validateCreatedSinceQuery(
   return { ok: true, value: raw };
 }
 
-export function validateCreateBody(raw: unknown): ValidationResult<CreateWorkflowBody> {
+export function validateCreateBody(raw: unknown): ValidationResult<CreateWorkflowRequest> {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
     return { ok: false, error: "request body must be an object" };
   }
@@ -78,7 +78,7 @@ function isPlainObject(raw: unknown): raw is Record<string, unknown> {
   return raw !== null && typeof raw === "object" && !Array.isArray(raw);
 }
 
-export function validateAddNodeBody(raw: unknown): ValidationResult<AddNodeBody> {
+export function validateAddNodeBody(raw: unknown): ValidationResult<AddNodeRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const allowed = new Set(["kind", "spec", "parents"]);
   for (const k of Object.keys(raw)) {
@@ -101,14 +101,14 @@ export function validateAddNodeBody(raw: unknown): ValidationResult<AddNodeBody>
   return {
     ok: true,
     value: {
-      kind: kind as AddNodeBody["kind"],
+      kind: kind as AddNodeRequest["kind"],
       spec,
       parents: parents as readonly string[],
     },
   };
 }
 
-export function validateAddEdgeBody(raw: unknown): ValidationResult<AddEdgeBody> {
+export function validateAddEdgeBody(raw: unknown): ValidationResult<AddEdgeRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const allowed = new Set(["fromNodeId", "toNodeId"]);
   for (const k of Object.keys(raw)) {
@@ -124,7 +124,7 @@ export function validateAddEdgeBody(raw: unknown): ValidationResult<AddEdgeBody>
   return { ok: true, value: { fromNodeId, toNodeId } };
 }
 
-function validateNodeRefWire(raw: unknown): ValidationResult<NodeRefWire> {
+function validateNodeRefWire(raw: unknown): ValidationResult<WorkflowNodeRef> {
   if (!isPlainObject(raw)) return { ok: false, error: "ref must be an object" };
   const keys = Object.keys(raw);
   if (keys.length !== 1) {
@@ -145,7 +145,7 @@ function validateNodeRefWire(raw: unknown): ValidationResult<NodeRefWire> {
   return { ok: false, error: 'ref must have key "nodeId" OR "tempId"' };
 }
 
-export function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgraphBody> {
+export function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgraphRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const allowed = new Set(["nodes", "edges"]);
   for (const k of Object.keys(raw)) {
@@ -154,7 +154,7 @@ export function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgr
   const { nodes, edges } = raw;
   if (!Array.isArray(nodes)) return { ok: false, error: "nodes must be an array" };
   if (!Array.isArray(edges)) return { ok: false, error: "edges must be an array" };
-  const validNodes: AddSubgraphNodeInputWire[] = [];
+  const validNodes: AddSubgraphRequestNode[] = [];
   for (let i = 0; i < nodes.length; i += 1) {
     const n = nodes[i];
     if (!isPlainObject(n)) return { ok: false, error: `nodes[${i}] must be an object` };
@@ -193,12 +193,12 @@ export function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgr
     }
     validNodes.push({
       tempId: n.tempId,
-      kind: n.kind as AddSubgraphNodeInputWire["kind"],
+      kind: n.kind as AddSubgraphRequestNode["kind"],
       spec: n.spec,
       ...(existingParents !== undefined ? { existingParents } : {}),
     });
   }
-  const validEdges: AddSubgraphEdgeInputWire[] = [];
+  const validEdges: AddSubgraphRequestEdge[] = [];
   for (let i = 0; i < edges.length; i += 1) {
     const e = edges[i];
     if (!isPlainObject(e)) return { ok: false, error: `edges[${i}] must be an object` };
@@ -217,7 +217,9 @@ export function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgr
   return { ok: true, value: { nodes: validNodes, edges: validEdges } };
 }
 
-export function validateReplaceNodeSpecBody(raw: unknown): ValidationResult<ReplaceNodeSpecBody> {
+export function validateReplaceNodeSpecBody(
+  raw: unknown,
+): ValidationResult<ReplaceNodeSpecRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const allowed = new Set(["newSpec"]);
   for (const k of Object.keys(raw)) {
@@ -227,7 +229,7 @@ export function validateReplaceNodeSpecBody(raw: unknown): ValidationResult<Repl
   return { ok: true, value: { newSpec: raw.newSpec } };
 }
 
-export function validateFinishWorkflowBody(raw: unknown): ValidationResult<FinishWorkflowBody> {
+export function validateFinishWorkflowBody(raw: unknown): ValidationResult<FinishWorkflowRequest> {
   if (!isPlainObject(raw)) return { ok: false, error: "request body must be an object" };
   const { kind } = raw;
   if (typeof kind !== "string" || !(KNOWN_FINISH_KINDS as readonly string[]).includes(kind)) {
@@ -298,7 +300,7 @@ export function validateFinishWorkflowBody(raw: unknown): ValidationResult<Finis
 
 /**
  * Internal narrowed body shape used by the cancel-route handler.
- * Mirrors {@link CancelWorkflowBody} but with `kind` widened from
+ * Mirrors {@link CancelWorkflowRequest} but with `kind` widened from
  * optional `"user"?` to required `"user"`, reflecting the
  * normalization the validator performs (omitted -> "user"). The wire
  * contract stays optional for callers; downstream code receives the
@@ -344,14 +346,14 @@ export function validateCancelWorkflowBody(
 }
 
 /**
- * Translate the wire-shape {@link NodeRefWire} (structural-discriminator
+ * Translate the wire-shape {@link WorkflowNodeRef} (structural-discriminator
  * union by `nodeId` vs `tempId` presence) to the substrate's
  * {@link NodeRef} (explicit-tag union). The wire form is JSON-friendly
  * (no extra discriminator field); the substrate form is type-friendly
  * (discriminated by `kind`). Pure projection — no validation here, the
  * caller has already proven the input is a valid wire shape.
  */
-export function nodeRefFromWire(ref: NodeRefWire): NodeRef {
+export function nodeRefFromWire(ref: WorkflowNodeRef): NodeRef {
   if ("nodeId" in ref) return { kind: "existing", id: ref.nodeId };
   return { kind: "temp", tempId: ref.tempId };
 }

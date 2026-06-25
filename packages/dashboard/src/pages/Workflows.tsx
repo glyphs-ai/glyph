@@ -5,8 +5,8 @@ import {
   cancelWorkflow,
   deleteWorkflow,
   type ServerConfig,
-  type WorkflowHeaderWire,
-  type WorkflowNodeWire,
+  type WorkflowHeader,
+  type WorkflowNode,
 } from "../api";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
@@ -193,7 +193,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   // Mode B entry: parent renders the appropriate pane on the right.
   // Human nodes use `humanNodeId`; task-backed nodes use `nodeTaskId`.
   const onSelectNode = useCallback(
-    (node: WorkflowNodeWire) => {
+    (node: WorkflowNode) => {
       if (node.spec.kind === "human") {
         setMasterDetailUrl({ nodeTaskId: null, humanNodeId: node.id });
       } else {
@@ -230,10 +230,10 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
   const mounted = useMounted();
   const [createOpen, setCreateOpen] = useState(false);
-  const [cancelTarget, setCancelTarget] = useState<WorkflowHeaderWire | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<WorkflowHeader | null>(null);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<WorkflowHeaderWire | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkflowHeader | null>(null);
   const [deletePurge, setDeletePurge] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -242,7 +242,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   // a time so the panels don't visually overlap or fight for focus.
   const [openMenuWorkflowId, setOpenMenuWorkflowId] = useState<string | null>(null);
 
-  const handleRowCancel = useCallback((target: WorkflowHeaderWire) => {
+  const handleRowCancel = useCallback((target: WorkflowHeader) => {
     // Row menu invokes Cancel: drop the menu, open the modal targeted
     // at the row's workflow. Doesn't change the master selection —
     // the user may cancel a non-selected workflow.
@@ -251,7 +251,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     setCancelTarget(target);
   }, []);
 
-  const handleRowDelete = useCallback((target: WorkflowHeaderWire) => {
+  const handleRowDelete = useCallback((target: WorkflowHeader) => {
     // Row menu invokes Delete: drop the menu, open the modal targeted
     // at the row's workflow. Independent of master selection so any
     // terminal workflow can be deleted in-place.
@@ -262,7 +262,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   }, []);
 
   const handleCreated = useCallback(
-    (created: WorkflowHeaderWire) => {
+    (created: WorkflowHeader) => {
       setError(null);
       setMasterDetailUrl({ workflowId: created.id, nodeTaskId: null, humanNodeId: null });
       // Best-effort: refresh the list so the new row is sourced from
@@ -421,7 +421,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             // `<WorkflowDetailSkeleton />` branch instead of being
             // handed to `<WorkflowView>` (which dereferences
             // `workflow.brief` and crashes the root). The hook's
-            // typed shape is `WorkflowHeaderWire | null`, but
+            // typed shape is `WorkflowHeader | null`, but
             // accepting `undefined` here keeps the page robust
             // against contract violations.
             if (showNodeTaskPane && detailWorkflow != null) {

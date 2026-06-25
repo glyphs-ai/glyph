@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../api";
 import { MarkdownSummary } from "../../components/tasks/TaskDetail/MarkdownSummary";
 
 export interface OverviewTabProps {
-  workflow: WorkflowHeaderWire;
-  dag?: WorkflowDagWire | null;
-  onGoToHumanNode?: (node: WorkflowNodeWire) => void;
+  workflow: WorkflowHeader;
+  dag?: WorkflowDag | null;
+  onGoToHumanNode?: (node: WorkflowNode) => void;
 }
 
 /**
@@ -91,10 +91,10 @@ function renderStateStrip({
   dag,
   onGoToHumanNode,
 }: {
-  workflow: WorkflowHeaderWire;
+  workflow: WorkflowHeader;
   hasSummary: boolean;
-  dag?: WorkflowDagWire | null;
-  onGoToHumanNode?: (node: WorkflowNodeWire) => void;
+  dag?: WorkflowDag | null;
+  onGoToHumanNode?: (node: WorkflowNode) => void;
 }): ReactNode {
   if (workflow.status === "failed") {
     if (workflow.failure) {
@@ -217,9 +217,9 @@ function OverviewCard({
 /**
  * Render a workflow failure callout with `failure.kind` chip + the
  * substrate- or coordinator-supplied message. Mirrors the Task
- * `FailureStrip` shape but specialised for `WorkflowFailureWire`.
+ * `FailureStrip` shape but specialised for `WorkflowFailure`.
  */
-function FailureStrip({ failure }: { failure: NonNullable<WorkflowHeaderWire["failure"]> }) {
+function FailureStrip({ failure }: { failure: NonNullable<WorkflowHeader["failure"]> }) {
   return (
     <div
       className="alert alert--error overview-tab__failure-callout"

@@ -10,6 +10,16 @@
  * `@glyphs-ai/workflow`'s implementation modules.
  */
 
+import type {
+  WorkflowCancellation,
+  WorkflowFailure,
+  WorkflowNodeKind,
+  WorkflowNodeStatus,
+  WorkflowOrigin,
+  WorkflowStatus,
+  WorkflowSuccess,
+} from "@glyphs-ai/workflow";
+
 /**
  * Worker-kind node spec payload. Flat, matches the body shape minus
  * the discriminator. Persisted opaquely as `workflow_nodes.spec_json`
@@ -58,59 +68,21 @@ export interface WorkflowCoordinatorNodeSpec {
 }
 
 /**
- * Flat wire projection for a worker-kind workflow node spec. The
- * internal envelope `{ kind: "worker", spec: { agent, brief, ... } }`
- * is flattened to `{ kind: "worker", agent, brief, ... }` for HTTP
- * responses so dashboard / CLI code can read `node.spec.agent`
- * without unwrapping `spec`.
- */
-export type WorkflowWorkerNodeSpecWire = { readonly kind: "worker" } & WorkflowWorkerNodeSpec;
-
-/** Flat wire projection for a coordinator-kind workflow node spec. */
-export type WorkflowCoordinatorNodeSpecWire = {
-  readonly kind: "coordinator";
-} & WorkflowCoordinatorNodeSpec;
-
-/**
  * Wire-shape spec on workflow node responses. Flat for the two
  * shipped kinds (`worker` / `coordinator`); unrecognized kinds stay
  * in the substrate envelope shape the server projected.
+ *
+ * The worker / coordinator arms flatten the substrate's
+ * `{ kind, spec: { … } }` envelope to `{ kind, …spec }` so dashboard /
+ * CLI code can read `node.spec.agent` without unwrapping `spec`.
  */
-export type WorkflowNodeWireSpec =
-  | WorkflowWorkerNodeSpecWire
-  | WorkflowCoordinatorNodeSpecWire
-  | WorkflowHumanNodeSpecWire
+export type WorkflowNodeSpec =
+  | ({ readonly kind: "worker" } & WorkflowWorkerNodeSpec)
+  | ({ readonly kind: "coordinator" } & WorkflowCoordinatorNodeSpec)
+  | WorkflowHumanNodeSpec
   | { readonly kind: string; readonly spec: unknown };
 
 // ─── HTTP wire-shape DTOs ─────────────────────────────────────────
-
-/**
- * Workflow lifecycle status, mirrored from `@glyphs-ai/workflow`'s
- * `WorkflowStatus`. Duplicated as a literal-union string here so the
- * contracts package stays free of a runtime dep on `@glyphs-ai/workflow`.
- */
-export type WorkflowStatusWire = "running" | "succeeded" | "failed" | "cancelled";
-
-/**
- * Origin discriminator mirrored from `@glyphs-ai/workflow`'s
- * `WorkflowOrigin`. Partitions workflows by who launched them so the
- * default list endpoint can filter to standalone-only.
- */
-export type WorkflowOriginWire = "standalone" | "schedule";
-
-/**
- * Workflow node lifecycle status, mirrored from `@glyphs-ai/workflow`'s
- * `WorkflowNodeStatus`. Duplicated as a literal-union string here so
- * the contracts package stays free of a runtime dep on
- * `@glyphs-ai/workflow`.
- */
-export type WorkflowNodeStatusWire =
-  | "not_started"
-  | "ready"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "cancelled";
 
 /**
  * Wire projection of a workflow header. Field set mirrors the
@@ -128,13 +100,13 @@ export type WorkflowNodeStatusWire =
  * `success` / `failure` / `cancellation` are terminal payloads —
  * exactly the one matching `status` is present on terminal rows.
  */
-export interface WorkflowHeaderWire {
+export interface WorkflowHeader {
   readonly id: string;
   readonly brief: string;
   readonly details?: string;
   readonly coordinatorAgent: string;
-  readonly status: WorkflowStatusWire;
-  readonly origin: WorkflowOriginWire;
+  readonly status: WorkflowStatus;
+  readonly origin: WorkflowOrigin;
   readonly metadata: Readonly<Record<string, unknown>>;
   /**
    * Coordinator-chain depth at projection time. Present on
@@ -151,83 +123,23 @@ export interface WorkflowHeaderWire {
   readonly createdAt: string;
   readonly startedAt?: string;
   readonly endedAt?: string;
-  readonly success?: WorkflowSuccessWire;
-  readonly failure?: WorkflowFailureWire;
-  readonly cancellation?: WorkflowCancellationWire;
+  readonly success?: WorkflowSuccess;
+  readonly failure?: WorkflowFailure;
+  readonly cancellation?: WorkflowCancellation;
 }
-
-/**
- * Wire projection of a successful workflow's terminal payload.
- * `output` is the coordinator's free-form summary (nullable to
- * support headless coords that finish without a summary).
- */
-export interface WorkflowSuccessWire {
-  readonly output: string | null;
-}
-
-/**
- * Closed enum of substrate-detected workflow failure reasons.
- * Carried on {@link WorkflowFailureWire} when `kind === 'substrate'`.
- * Mirrors `SubstrateFailureReason` in `@glyphs-ai/workflow`.
- *
- *   - `STUCK_RETRY_LIMIT` — the stuck-coord detector reached the
- *     maximum consecutive retry-coord attempts without the workflow
- *     making forward progress; the substrate transitioned the
- *     workflow to `failed` so the slot stops being held open.
- */
-export type WorkflowSubstrateFailureReasonWire = "STUCK_RETRY_LIMIT";
-
-/**
- * Wire projection of a failed workflow's terminal payload.
- * Discriminated on `kind`:
- *
- *   - `coordinator` — the coordinator explicitly called `/finish`
- *                     with `kind: 'failed'` and a message.
- *   - `substrate`   — an internal substrate safety net terminated
- *                     the workflow. Carries a structured `reason`
- *                     code in addition to the human-readable
- *                     `message`. External wire callers can never
- *                     construct this arm — the `/finish` route
- *                     rejects anything but `kind: 'coordinator'`.
- */
-export type WorkflowFailureWire =
-  | {
-      readonly kind: "coordinator";
-      readonly message: string;
-    }
-  | {
-      readonly kind: "substrate";
-      readonly reason: WorkflowSubstrateFailureReasonWire;
-      readonly message: string;
-    };
-
-/**
- * Wire projection of a cancelled workflow's terminal payload.
- *
- * Discriminated single-arm interface — `kind` is retained as a
- * discriminator so additional cancellation sources can be added as
- * extra union members without breaking the on-disk wire shape that
- * existing clients consume.
- *
- *   - `user` — operator called `/cancel` from the dashboard / CLI.
- */
-export type WorkflowCancellationWire = {
-  readonly kind: "user";
-  readonly message: string;
-};
 
 /**
  * Wire projection of a single workflow node. Per-kind `spec` is
- * projected flat via {@link WorkflowNodeWireSpec}. Lifecycle
+ * projected flat via {@link WorkflowNodeSpec}. Lifecycle
  * timestamps mirror the persisted `WorkflowNodeEntity` shape —
  * `readyAt` / `runningAt` / `endedAt` are present once the node has
  * reached that state.
  */
-export interface WorkflowNodeWire {
+export interface WorkflowNode {
   readonly id: string;
   readonly workflowId: string;
   readonly phase: number;
-  readonly status: WorkflowNodeStatusWire;
+  readonly status: WorkflowNodeStatus;
   /**
    * Dispatched task id for this node. Present iff this node has a
    * dispatched task — both worker AND coordinator nodes get a
@@ -240,7 +152,7 @@ export interface WorkflowNodeWire {
    * `packages/server/src/routes/_workflow-projection.ts`.
    */
   readonly taskId?: string;
-  readonly spec: WorkflowNodeWireSpec;
+  readonly spec: WorkflowNodeSpec;
   /**
    * Free-form per-node metadata (always an object — defaults to
    * `{}` if no entries). The substrate currently writes one
@@ -257,7 +169,7 @@ export interface WorkflowNodeWire {
 }
 
 /** Wire projection of one DAG edge — parent / child node ids only. */
-export interface WorkflowEdgeWire {
+export interface WorkflowEdge {
   readonly from: string;
   readonly to: string;
 }
@@ -268,17 +180,17 @@ export interface WorkflowEdgeWire {
  * onto the snapshot for client convenience (so a single fetch yields
  * everything the dashboard needs to render the graph).
  */
-export interface WorkflowDagWire {
-  readonly workflow: WorkflowHeaderWire;
-  readonly nodes: readonly WorkflowNodeWire[];
-  readonly edges: readonly WorkflowEdgeWire[];
+export interface WorkflowDag {
+  readonly workflow: WorkflowHeader;
+  readonly nodes: readonly WorkflowNode[];
+  readonly edges: readonly WorkflowEdge[];
 }
 
 /**
  * Request body for `POST /workspaces/:id/workflows`. Mirrors
  * `WorkflowService.createWorkflow` args.
  */
-export interface CreateWorkflowBody {
+export interface CreateWorkflowRequest {
   readonly brief: string;
   readonly details?: string;
   readonly coordinatorAgent: string;
@@ -321,14 +233,6 @@ export interface WorkflowListQuery {
 // terminal workflow surfaces `WorkflowAlreadyTerminalError` → 409.
 
 /**
- * Per-node kind discriminator on every mutation body that allocates a
- * new node. Mirrors `NodeKind` in `@glyphs-ai/workflow`. Listed as a
- * literal-union string here so this pkg has no runtime dep on the
- * substrate.
- */
-export type WorkflowNodeKindWire = "coordinator" | "worker" | "human";
-
-/**
  * Request body for `POST /workspaces/:id/workflows/:wfid/nodes`.
  * Mirrors `WorkflowService.addNode` args minus `workflowId` (in path).
  *
@@ -336,8 +240,8 @@ export type WorkflowNodeKindWire = "coordinator" | "worker" | "human";
  * is the validator. `parents` MUST have ≥1 entry; an empty array is
  * rejected by the substrate with `EmptyParentsError` → 400.
  */
-export interface AddNodeBody {
-  readonly kind: WorkflowNodeKindWire;
+export interface AddNodeRequest {
+  readonly kind: WorkflowNodeKind;
   readonly spec: unknown;
   readonly parents: readonly string[];
 }
@@ -346,7 +250,7 @@ export interface AddNodeBody {
  * Response of `POST /workspaces/:id/workflows/:wfid/nodes`. Mirrors
  * `AddNodeResult` from the substrate.
  */
-export interface AddNodeResultWire {
+export interface AddNodeResponse {
   readonly nodeId: string;
   readonly phase: number;
 }
@@ -355,7 +259,7 @@ export interface AddNodeResultWire {
  * Request body for `POST /workspaces/:id/workflows/:wfid/edges`.
  * Mirrors `WorkflowService.addEdge` args minus `workflowId`.
  */
-export interface AddEdgeBody {
+export interface AddEdgeRequest {
   readonly fromNodeId: string;
   readonly toNodeId: string;
 }
@@ -368,7 +272,7 @@ export interface AddEdgeBody {
  * edge was inserted, so the caller needs the post-insert value to
  * stay in sync without a follow-up `getDag` call).
  */
-export interface AddEdgeResultWire {
+export interface AddEdgeResponse {
   readonly fromNodeId: string;
   readonly toNodeId: string;
   readonly toPhase: number;
@@ -383,25 +287,25 @@ export interface AddEdgeResultWire {
  * calling the substrate, so the wire stays JSON-friendly (no extra
  * discriminator field) while the substrate stays type-friendly.
  */
-export type NodeRefWire = { readonly nodeId: string } | { readonly tempId: string };
+export type WorkflowNodeRef = { readonly nodeId: string } | { readonly tempId: string };
 
 /**
  * One declared temp node in an `addSubgraph` batch. Mirrors
  * `AddSubgraphNodeInput` from the substrate. `existingParents` is
  * optional and defaults to `[]` (the substrate normalizes); intra-
- * batch parent edges go in {@link AddSubgraphBody.edges}.
+ * batch parent edges go in {@link AddSubgraphRequest.edges}.
  */
-export interface AddSubgraphNodeInputWire {
+export interface AddSubgraphRequestNode {
   readonly tempId: string;
-  readonly kind: WorkflowNodeKindWire;
+  readonly kind: WorkflowNodeKind;
   readonly spec: unknown;
   readonly existingParents?: readonly string[];
 }
 
 /** One declared edge in an `addSubgraph` batch. */
-export interface AddSubgraphEdgeInputWire {
-  readonly from: NodeRefWire;
-  readonly to: NodeRefWire;
+export interface AddSubgraphRequestEdge {
+  readonly from: WorkflowNodeRef;
+  readonly to: WorkflowNodeRef;
 }
 
 /**
@@ -411,25 +315,25 @@ export interface AddSubgraphEdgeInputWire {
  * `nodes.length ≥ 1` is required; the substrate rejects an empty
  * batch with `WorkflowSubgraphEmptyError` → 400.
  */
-export interface AddSubgraphBody {
-  readonly nodes: readonly AddSubgraphNodeInputWire[];
-  readonly edges: readonly AddSubgraphEdgeInputWire[];
+export interface AddSubgraphRequest {
+  readonly nodes: readonly AddSubgraphRequestNode[];
+  readonly edges: readonly AddSubgraphRequestEdge[];
 }
 
 /**
- * Per-inserted-node entry on `AddSubgraphResultWire`. Echoes the
+ * Per-inserted-node entry on `AddSubgraphResponse`. Echoes the
  * caller-supplied `tempId` alongside the substrate-allocated `nodeId`
  * + computed `phase` so the caller can map results back to its batch.
  */
-export interface AddSubgraphInsertedNodeWire {
+export interface AddSubgraphResponseInsertedNode {
   readonly tempId: string;
   readonly nodeId: string;
   readonly phase: number;
 }
 
 /** Response of `POST /workspaces/:id/workflows/:wfid/subgraph`. */
-export interface AddSubgraphResultWire {
-  readonly insertedNodes: readonly AddSubgraphInsertedNodeWire[];
+export interface AddSubgraphResponse {
+  readonly insertedNodes: readonly AddSubgraphResponseInsertedNode[];
 }
 
 /**
@@ -437,7 +341,7 @@ export interface AddSubgraphResultWire {
  * `newSpec` is forwarded verbatim — the per-kind runner re-validates
  * with the same rules used at insert time.
  */
-export interface ReplaceNodeSpecBody {
+export interface ReplaceNodeSpecRequest {
   readonly newSpec: unknown;
 }
 
@@ -451,9 +355,9 @@ export interface ReplaceNodeSpecBody {
  *     string (empty allowed).
  *
  * Workflow-level cancellation is a separate route
- * (`POST .../cancel`) — see {@link CancelWorkflowBody}.
+ * (`POST .../cancel`) — see {@link CancelWorkflowRequest}.
  */
-export type FinishWorkflowBody =
+export type FinishWorkflowRequest =
   | {
       readonly kind: "succeeded";
       readonly success?: { readonly output?: string | null };
@@ -468,7 +372,7 @@ export type FinishWorkflowBody =
  * `cancellation.kind` identifies the cancellation source; `message`
  * is a free-form string (empty allowed).
  */
-export interface CancelWorkflowBody {
+export interface CancelWorkflowRequest {
   readonly cancellation: {
     readonly kind: "user";
     readonly message: string;
@@ -499,7 +403,7 @@ export type WorkflowArtifactMimeBucket = "text" | "image" | "archive" | "generic
  * `mimeBucket` is the server's presentation hint — see
  * {@link WorkflowArtifactMimeBucket}.
  */
-export type WorkflowArtifactWire =
+export type WorkflowArtifact =
   | {
       readonly kind: "workflow-summary";
       /** Relative path under `<workflowDir>/artifact/`. */
@@ -535,7 +439,7 @@ export type WorkflowArtifactWire =
  * stability.
  */
 export interface WorkflowArtifactsResponse {
-  readonly artifacts: readonly WorkflowArtifactWire[];
+  readonly artifacts: readonly WorkflowArtifact[];
 }
 
 // ─── Human node wire types ────────────────────────────────────────
@@ -548,7 +452,7 @@ export interface WorkflowArtifactsResponse {
  * `prompt`: `"plain"` for literal text, `"markdown"` for the
  * dashboard's in-house block / inline markdown renderer.
  */
-export interface WorkflowHumanNodeSpecWire {
+export interface WorkflowHumanNodeSpec {
   readonly kind: "human";
   readonly prompt: string;
   readonly promptStyle: "plain" | "markdown";
@@ -564,7 +468,7 @@ export interface WorkflowHumanNodeSpecWire {
  *   - `input` — freeform text; required when `choiceId` is absent,
  *     optional otherwise.
  */
-export interface RespondHumanNodeBody {
+export interface RespondHumanNodeRequest {
   readonly choiceId?: string;
   readonly input?: string;
 }

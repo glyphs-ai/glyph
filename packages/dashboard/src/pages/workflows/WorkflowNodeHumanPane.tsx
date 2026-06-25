@@ -1,10 +1,10 @@
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import type {
-  RespondHumanNodeBody,
-  WorkflowDagWire,
-  WorkflowHeaderWire,
-  WorkflowHumanNodeSpecWire,
-  WorkflowNodeWire,
+  RespondHumanNodeRequest,
+  WorkflowDag,
+  WorkflowHeader,
+  WorkflowHumanNodeSpec,
+  WorkflowNode,
 } from "../../api";
 import { respondHumanNode } from "../../api/workflows.js";
 import { MarkdownSummary } from "../../components/tasks/TaskDetail/MarkdownSummary";
@@ -12,8 +12,8 @@ import { WORKFLOW_NODE_STATUS_LABEL } from "../../components/workflows/shared";
 import { orderNodesForNav } from "./workflow-nav-utils.js";
 
 export interface WorkflowNodeHumanPaneProps {
-  workflow: WorkflowHeaderWire;
-  dag: WorkflowDagWire | null;
+  workflow: WorkflowHeader;
+  dag: WorkflowDag | null;
   nodeId: string;
   onBack: () => void;
   onNavigate: (nextNodeId: string) => void;
@@ -136,11 +136,11 @@ export function WorkflowNodeHumanPane({
 }
 
 interface HumanNodeContentProps {
-  node: WorkflowNodeWire;
+  node: WorkflowNode;
 }
 
 function HumanNodeContent({ node }: HumanNodeContentProps) {
-  const spec = node.spec as WorkflowHumanNodeSpecWire;
+  const spec = node.spec as WorkflowHumanNodeSpec;
   const choices = spec.choices ?? [];
   const status = node.status;
 
@@ -218,7 +218,7 @@ function HumanNodeContent({ node }: HumanNodeContentProps) {
  * prompt like "Pick version 1.0.*" must not start italicising itself
  * after the schema lands.
  */
-function renderPrompt(spec: WorkflowHumanNodeSpecWire): ReactNode {
+function renderPrompt(spec: WorkflowHumanNodeSpec): ReactNode {
   const style = spec.promptStyle ?? "plain";
   if (style === "markdown") {
     return (
@@ -235,8 +235,8 @@ function renderPrompt(spec: WorkflowHumanNodeSpecWire): ReactNode {
 }
 
 interface HumanRespondFormProps {
-  node: WorkflowNodeWire;
-  spec: WorkflowHumanNodeSpecWire;
+  node: WorkflowNode;
+  spec: WorkflowHumanNodeSpec;
   choices: readonly { readonly id: string; readonly label: string }[];
 }
 
@@ -252,7 +252,7 @@ function HumanRespondForm({ node, spec, choices }: HumanRespondFormProps) {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
-    const body: RespondHumanNodeBody = {
+    const body: RespondHumanNodeRequest = {
       ...(selectedChoiceId !== null && { choiceId: selectedChoiceId }),
       ...(input.trim().length > 0 && { input: input.trim() }),
     };
@@ -313,7 +313,7 @@ function HumanRespondForm({ node, spec, choices }: HumanRespondFormProps) {
 }
 
 interface FallbackBackRowProps {
-  workflow: WorkflowHeaderWire;
+  workflow: WorkflowHeader;
   onBack: () => void;
 }
 

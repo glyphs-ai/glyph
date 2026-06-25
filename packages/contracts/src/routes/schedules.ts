@@ -7,7 +7,7 @@
 
 import type { PreviewScheduleResult, Schedule } from "@glyphs-ai/schedule";
 import type {
-  ScheduleWireTarget,
+  ScheduleTarget,
   TaskTargetData,
   TaskTargetPatch,
   WorkflowTargetData,
@@ -117,13 +117,13 @@ export interface SchedulePathParams {
  * expression is the single source of truth; persisting `describe`
  * would require keeping it in sync on every patch + a migration).
  *
- * The `target` field is the FLAT wire shape (`ScheduleWireTarget`),
+ * The `target` field is the FLAT wire shape (`ScheduleTarget`),
  * not the internal envelope — the server's `projectScheduleToWire`
  * helper converts on the way out. Dashboard / CLI code keeps
  * reading `schedule.target.agent` etc.
  */
 export interface ScheduleGetResponse extends Omit<Schedule, "target"> {
-  readonly target: ScheduleWireTarget;
+  readonly target: ScheduleTarget;
   readonly describe: string;
 }
 
@@ -132,8 +132,8 @@ export interface ScheduleGetResponse extends Omit<Schedule, "target"> {
  * {@link ScheduleGetResponse} but without the derived `describe`
  * field (list endpoints stay terse).
  */
-export type ScheduleWire = Omit<Schedule, "target"> & {
-  readonly target: ScheduleWireTarget;
+export type ScheduleHeader = Omit<Schedule, "target"> & {
+  readonly target: ScheduleTarget;
   /** Present only for workflow-kind schedules; omitted for task schedules. */
   readonly fireStats?: {
     readonly awaitingCount: number;
@@ -202,7 +202,7 @@ export interface ScheduleRunResponse {
 export const scheduleRoutes = {
   "schedules.list": defineRoute<
     { params: WorkspacePathParams; query: ScheduleListQuery },
-    readonly ScheduleWire[]
+    readonly ScheduleHeader[]
   >("GET", "/api/workspaces/:id/schedules"),
   /**
    * Create a task-kind schedule. URL-discriminated by `target.kind`
@@ -212,7 +212,7 @@ export const scheduleRoutes = {
    */
   "schedules.task.create": defineRoute<
     { params: WorkspacePathParams; body: TaskScheduleCreateBody },
-    ScheduleWire
+    ScheduleHeader
   >("POST", "/api/workspaces/:id/schedules/task"),
   "schedules.get": defineRoute<{ params: SchedulePathParams }, ScheduleGetResponse>(
     "GET",
@@ -230,7 +230,7 @@ export const scheduleRoutes = {
    */
   "schedules.task.patch": defineRoute<
     { params: SchedulePathParams; body: TaskSchedulePatchBody },
-    ScheduleWire
+    ScheduleHeader
   >("PATCH", "/api/workspaces/:id/schedules/task/:sid"),
   /**
    * Create a workflow-kind schedule. URL-discriminated by `target.kind`
@@ -240,7 +240,7 @@ export const scheduleRoutes = {
    */
   "schedules.workflow.create": defineRoute<
     { params: WorkspacePathParams; body: WorkflowScheduleCreateBody },
-    ScheduleWire
+    ScheduleHeader
   >("POST", "/api/workspaces/:id/schedules/workflow"),
   /**
    * Patch a workflow-kind schedule with RFC 7396 deep-merge semantics
@@ -254,7 +254,7 @@ export const scheduleRoutes = {
    */
   "schedules.workflow.patch": defineRoute<
     { params: SchedulePathParams; body: WorkflowSchedulePatchBody },
-    ScheduleWire
+    ScheduleHeader
   >("PATCH", "/api/workspaces/:id/schedules/workflow/:sid"),
   "schedules.delete": defineRoute<{ params: SchedulePathParams }, ScheduleDeleteResponse>(
     "DELETE",

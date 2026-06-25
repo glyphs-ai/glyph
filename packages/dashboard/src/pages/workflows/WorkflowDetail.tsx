@@ -1,14 +1,14 @@
-import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../api";
 import { WorkflowView } from "./WorkflowView";
 
 export interface WorkflowDetailProps {
-  workflow: WorkflowHeaderWire;
-  dag: WorkflowDagWire | null;
+  workflow: WorkflowHeader;
+  dag: WorkflowDag | null;
   dagError: string | null;
   /** When non-null the parent has highlighted a node (Mode B in scope). */
   selectedNodeId?: string | null;
   /** Fired from the Graph tab when the user activates a node chip. */
-  onSelectNode: (node: WorkflowNodeWire) => void;
+  onSelectNode: (node: WorkflowNode) => void;
 }
 
 /**

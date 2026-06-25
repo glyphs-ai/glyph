@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ScheduleDetail as ScheduleDetailType,
   ScheduleView,
-  WorkflowDagWire,
-  WorkflowHeaderWire,
+  WorkflowDag,
+  WorkflowHeader,
 } from "../src/api";
 
 vi.mock("../src/api", async () => {
@@ -89,7 +89,7 @@ const SAMPLE_WF_VIEW: ScheduleView = {
 
 const SAMPLE_WF_DETAIL: ScheduleDetailType = { ...SAMPLE_WF_VIEW, describe: "every day at 02:00" };
 
-const WF_FIRE: WorkflowHeaderWire = {
+const WF_FIRE: WorkflowHeader = {
   id: "wf-fire-1",
   brief: "Coordinate the release train.",
   status: "succeeded",
@@ -103,7 +103,7 @@ const WF_FIRE: WorkflowHeaderWire = {
   iterationCount: 1,
 };
 
-const WF_DAG: WorkflowDagWire = {
+const WF_DAG: WorkflowDag = {
   workflow: WF_FIRE,
   nodes: [
     {
@@ -476,7 +476,7 @@ describe("Schedule detail panel", () => {
 
   it("clicking a task-backed node in the fire-workflow Graph tab writes ?fireNodeId= and renders the node pane", async () => {
     const taskNodeId = "00000000-0000-4000-8000-000000000099";
-    const dagWithTaskNode: WorkflowDagWire = {
+    const dagWithTaskNode: WorkflowDag = {
       workflow: WF_FIRE,
       nodes: [
         ...WF_DAG.nodes,

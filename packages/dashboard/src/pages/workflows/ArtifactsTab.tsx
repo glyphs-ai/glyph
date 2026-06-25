@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { WorkflowArtifactWire, WorkflowDagWire, WorkflowHeaderWire } from "../../api";
+import type { WorkflowArtifact, WorkflowDag, WorkflowHeader } from "../../api";
 import { workflowArtifactUrl } from "../../api";
 import { ArtifactViewer } from "../../components/viewers/ArtifactViewer";
 import { viewerNeedsBlob } from "../../components/viewers/index";
 import { formatPhaseLabel } from "./dag-edge-geometry";
 
 export interface ArtifactsTabProps {
-  workflow: WorkflowHeaderWire;
-  dag: WorkflowDagWire | null;
+  workflow: WorkflowHeader;
+  dag: WorkflowDag | null;
   /**
    * Flattened workflow artifact list owned by the parent (the
    * `useWorkflowArtifacts` hook is lifted into {@link WorkflowView} so
@@ -15,7 +15,7 @@ export interface ArtifactsTabProps {
    * the tab having to mount first). `null` while the initial fetch is
    * still in flight; an empty array means "loaded, none surfaced".
    */
-  artifacts: readonly WorkflowArtifactWire[] | null;
+  artifacts: readonly WorkflowArtifact[] | null;
   /** Mirrors `useWorkflowArtifacts().loaded`. */
   loaded: boolean;
   /** Mirrors `useWorkflowArtifacts().error`; non-null swaps to a banner. */
@@ -28,7 +28,7 @@ export interface ArtifactsTabProps {
  *
  *   - `value`   — unique key per artifact, used as the `<option>` value.
  *     We embed the sentinel sub-path so the lookup back to a wire
- *     `WorkflowArtifactWire` is just a Map hit.
+ *     `WorkflowArtifact` is just a Map hit.
  *   - `label`   — what the operator sees in the dropdown (filename).
  *   - `group`   — `<optgroup label>`: "Workflow" or the per-node label.
  *   - `subPath` — sentinel-prefixed path passed to the server's
@@ -56,7 +56,7 @@ type FetchState =
  * artifact root only — the sentinel prefix (`summary/` or
  * `nodes/<nid>/`) is what tells the server which root to look in.
  */
-function artifactSubPath(a: WorkflowArtifactWire): string {
+function artifactSubPath(a: WorkflowArtifact): string {
   return a.kind === "workflow-summary" ? `summary/${a.path}` : `nodes/${a.nodeId}/${a.path}`;
 }
 
@@ -331,12 +331,9 @@ function ArtifactPreview({ selected, state, downloadUrl }: ArtifactPreviewProps)
  * `dag-edge-geometry.ts:groupByPhase` uses for sibling column order).
  * Single-node buckets stay clean as `agent · Phase N`.
  */
-function flattenEntries(
-  artifacts: readonly WorkflowArtifactWire[],
-  dag: WorkflowDagWire | null,
-): Entry[] {
-  const summary: WorkflowArtifactWire[] = [];
-  const byNode = new Map<string, WorkflowArtifactWire[]>();
+function flattenEntries(artifacts: readonly WorkflowArtifact[], dag: WorkflowDag | null): Entry[] {
+  const summary: WorkflowArtifact[] = [];
+  const byNode = new Map<string, WorkflowArtifact[]>();
   for (const a of artifacts) {
     if (a.kind === "workflow-summary") {
       summary.push(a);
@@ -424,7 +421,7 @@ function groupEntries(entries: readonly Entry[]): { group: string; entries: Entr
  * Returns an empty map when `dag` is null so callers can blindly
  * `.get()` without a null guard.
  */
-function buildNodeBucketIndex(dag: WorkflowDagWire | null): ReadonlyMap<string, readonly string[]> {
+function buildNodeBucketIndex(dag: WorkflowDag | null): ReadonlyMap<string, readonly string[]> {
   const out = new Map<string, string[]>();
   if (dag === null) return out;
   const ordered = [...dag.nodes].sort((a, b) => {
@@ -450,7 +447,7 @@ function buildNodeBucketIndex(dag: WorkflowDagWire | null): ReadonlyMap<string, 
 
 function nodeGroupLabel(
   nodeId: string,
-  dag: WorkflowDagWire | null,
+  dag: WorkflowDag | null,
   bucketIndex: ReadonlyMap<string, readonly string[]>,
 ): string {
   // Trim trailing dashes from the short id so labels read cleanly
@@ -477,7 +474,7 @@ function nodeGroupLabel(
   return `Node ${short}`;
 }
 
-function dagNodeOrder(dag: WorkflowDagWire | null): string[] {
+function dagNodeOrder(dag: WorkflowDag | null): string[] {
   if (dag === null) return [];
   return [...dag.nodes]
     .sort((a, b) => {
@@ -487,7 +484,7 @@ function dagNodeOrder(dag: WorkflowDagWire | null): string[] {
     .map((n) => n.id);
 }
 
-function sortArtifacts<T extends WorkflowArtifactWire>(list: readonly T[]): T[] {
+function sortArtifacts<T extends WorkflowArtifact>(list: readonly T[]): T[] {
   return [...list].sort((a, b) => a.path.localeCompare(b.path));
 }
 
@@ -506,7 +503,7 @@ function filenameOf(p: string): string {
  * re-fires when the artifact reappears with a new modifiedAt.
  */
 function lookupModifiedAt(
-  artifacts: readonly WorkflowArtifactWire[] | null,
+  artifacts: readonly WorkflowArtifact[] | null,
   entry: Entry,
 ): string | null {
   if (artifacts === null) return null;

@@ -73,7 +73,7 @@ export async function listInFlightForWorkflowNode(
 /**
  * Find the most recent task — terminal or not — for a workflow
  * node. Used by the wire-shape projector for the workflow `/dag`
- * route so each `WorkflowNodeWire` can carry its dispatched
+ * route so each `WorkflowNode` can carry its dispatched
  * `taskId` for dashboard node-to-task navigation. See
  * {@link TaskRepository.findTaskByWorkflowNode} for the predicate
  * shape (no terminal filter, ORDER BY createdAt DESC LIMIT 1).

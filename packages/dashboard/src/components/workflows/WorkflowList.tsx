@@ -1,18 +1,18 @@
 import { useMemo, useState } from "react";
-import type { WorkflowHeaderWire } from "../../api";
+import type { WorkflowHeader } from "../../api";
 import { type StatusGroup, statusGroup } from "./shared";
 import { WorkflowListItem } from "./WorkflowListItem";
 
 export interface WorkflowListProps {
-  workflows: readonly WorkflowHeaderWire[];
+  workflows: readonly WorkflowHeader[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   /** Page-supplied action callback. The list forwards it per-row so any
    *  row's `⋯` menu can cancel any workflow without selecting it first. */
-  onCancel: (target: WorkflowHeaderWire) => void;
+  onCancel: (target: WorkflowHeader) => void;
   /** Page-supplied delete callback. Disabled at row level when the
    *  workflow is `running`. */
-  onDelete: (target: WorkflowHeaderWire) => void;
+  onDelete: (target: WorkflowHeader) => void;
   /** Page-supplied single-open coordination. */
   openMenuId: string | null;
   onMenuOpenChange: (id: string | null) => void;
@@ -21,7 +21,7 @@ export interface WorkflowListProps {
 interface Group {
   key: StatusGroup;
   label: string;
-  workflows: readonly WorkflowHeaderWire[];
+  workflows: readonly WorkflowHeader[];
 }
 
 /**
@@ -41,9 +41,9 @@ export function WorkflowList({
   onMenuOpenChange,
 }: WorkflowListProps) {
   const groups = useMemo<Group[]>(() => {
-    const awaiting: WorkflowHeaderWire[] = [];
-    const running: WorkflowHeaderWire[] = [];
-    const completed: WorkflowHeaderWire[] = [];
+    const awaiting: WorkflowHeader[] = [];
+    const running: WorkflowHeader[] = [];
+    const completed: WorkflowHeader[] = [];
     for (const w of workflows) {
       const g = statusGroup(w.status, w.awaitingHumanCount);
       if (g === "awaiting") awaiting.push(w);

@@ -13,7 +13,7 @@ import {
   type ScheduleDetail as ScheduleDetailType,
   type ScheduleView,
   type ServerConfig,
-  type WorkflowHeaderWire,
+  type WorkflowHeader,
 } from "../api";
 import { Segmented } from "../components/common/Segmented";
 import { HeaderActions } from "../components/HeaderActions";
@@ -228,7 +228,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   // only on selected-target runs avoids over-fetching the recent-
   // fires panel when the user runs a non-selected schedule.
   const [recentFiresToken, setRecentFiresToken] = useState(0);
-  const [cancelWorkflowTarget, setCancelWorkflowTarget] = useState<WorkflowHeaderWire | null>(null);
+  const [cancelWorkflowTarget, setCancelWorkflowTarget] = useState<WorkflowHeader | null>(null);
   const [cancelWorkflowBusy, setCancelWorkflowBusy] = useState(false);
   const [cancelWorkflowError, setCancelWorkflowError] = useState<string | null>(null);
 
@@ -584,7 +584,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     }
   }, []);
 
-  const handleCancelWorkflowFire = useCallback((workflow: WorkflowHeaderWire) => {
+  const handleCancelWorkflowFire = useCallback((workflow: WorkflowHeader) => {
     setCancelWorkflowError(null);
     setCancelWorkflowTarget(workflow);
   }, []);

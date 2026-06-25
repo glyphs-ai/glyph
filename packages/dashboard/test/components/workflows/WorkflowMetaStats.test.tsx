@@ -1,13 +1,13 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../../src/api";
+import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../../src/api";
 import { WorkflowMetaStats } from "../../../src/components/workflows/WorkflowMetaStats";
 
 // Local mirror of the lifecycle-status literal union (not re-exported from
 // the dashboard `api` index). Keeps the test self-contained.
 type NodeStatus = "not_started" | "ready" | "running" | "succeeded" | "failed" | "cancelled";
 
-function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-meta",
     brief: "meta test",
@@ -21,7 +21,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHead
   };
 }
 
-function makeNode(id: string, phase: number, status: NodeStatus): WorkflowNodeWire {
+function makeNode(id: string, phase: number, status: NodeStatus): WorkflowNode {
   return {
     id,
     workflowId: "wf-meta",
@@ -33,7 +33,7 @@ function makeNode(id: string, phase: number, status: NodeStatus): WorkflowNodeWi
   };
 }
 
-function makeDag(nodes: readonly WorkflowNodeWire[], wf?: WorkflowHeaderWire): WorkflowDagWire {
+function makeDag(nodes: readonly WorkflowNode[], wf?: WorkflowHeader): WorkflowDag {
   const workflow = wf ?? makeWorkflow();
   return { workflow, nodes, edges: [] };
 }
