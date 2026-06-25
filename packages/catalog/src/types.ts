@@ -198,14 +198,14 @@ export interface SkillResolveResult {
  * field), but each entity gets its own named validated form so
  * downstream callers can pattern-match by install kind.
  */
-export interface SkillInstallBody {
+export interface InstallSkillRequest {
   readonly origin: string;
 }
 
-export interface AgentInstallBody {
+export interface InstallAgentRequest {
   readonly origin: string;
 }
 
-export interface McpInstallBody {
+export interface InstallMcpRequest {
   readonly origin: string;
 }

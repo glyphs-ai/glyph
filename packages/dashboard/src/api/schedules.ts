@@ -12,10 +12,14 @@
 // and wholesale-replace on `trigger`.
 
 import type {
+  CreateTaskScheduleRequest,
+  CreateWorkflowScheduleRequest,
+  PatchTaskScheduleRequest,
+  PatchWorkflowScheduleRequest,
   PreviewScheduleResult,
   Schedule,
-  ScheduleWireTarget,
-  WorkflowHeaderWire,
+  ScheduleTarget,
+  WorkflowHeader,
 } from "@glyphs-ai/contracts";
 import {
   fetchJson,
@@ -28,12 +32,12 @@ import {
 /**
  * Wire-shape view of a schedule as the dashboard sees it. The server
  * projects the substrate's opaque `{ kind, data }` envelope to a
- * flat per-kind shape on the way out (`projectScheduleToWire`); the
+ * flat per-kind shape on the way out (`projectScheduleHeader`); the
  * dashboard supports both the task and workflow kinds, so we type
  * `target` as the full wire union.
  */
 export type ScheduleView = Omit<Schedule, "target"> & {
-  target: ScheduleWireTarget;
+  target: ScheduleTarget;
   fireStats?: {
     awaitingCount: number;
     runningCount: number;
@@ -54,7 +58,7 @@ export interface ScheduleDetail extends ScheduleView {
 /**
  * Body for `PATCH /schedules/task/:scheduleId` — RFC 7396 deep-merge for
  * `target`, wholesale-replace for `trigger`, scalar-set for
- * `name` / `enabled`. Mirrors `TaskSchedulePatchBody` in the shared
+ * `name` / `enabled`. Mirrors `PatchTaskScheduleRequest` in the shared
  * route contracts (`packages/contracts/src/routes.ts`). Declared
  * locally rather than re-exported from `@glyphs-ai/schedule` because
  * the dashboard imports types only.
@@ -65,18 +69,11 @@ export interface ScheduleDetail extends ScheduleView {
  *   server (required fields; omit to keep).
  * - `target.details` / `runtime` — string sets; `null` deletes;
  *   absent keeps. `target.kind` MUST NOT be set (URL discriminates).
+ *
+ * Re-exported from contracts as the single source of truth for the
+ * wire shape — the dashboard does not redeclare it.
  */
-export interface PatchScheduleBody {
-  name?: string;
-  enabled?: boolean;
-  trigger?: { kind: "cron"; expr: string; tz: string };
-  target?: {
-    agent?: string;
-    brief?: string;
-    details?: string | null;
-    runtime?: string | null;
-  };
-}
+export type { PatchTaskScheduleRequest as PatchScheduleRequest } from "@glyphs-ai/contracts";
 
 /** Response shape for `GET /schedules/:scheduleId/preview?n=N`. */
 export type SchedulePreview = PreviewScheduleResult;
@@ -120,27 +117,18 @@ export const previewSchedule = (
   );
 };
 
-export const patchSchedule = (scheduleId: string, body: PatchScheduleBody): Promise<ScheduleView> =>
+export const patchSchedule = (
+  scheduleId: string,
+  body: PatchTaskScheduleRequest,
+): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(
     `${workspacePrefix()}/schedules/task/${encodeURIComponent(scheduleId)}`,
     jsonInit("PATCH", body as object),
   );
 
-/** Body for `PATCH /schedules/workflow/:scheduleId`. */
-export interface PatchWorkflowScheduleBody {
-  name?: string;
-  enabled?: boolean;
-  trigger?: { kind: "cron"; expr: string; tz: string };
-  target?: {
-    coordinatorAgent?: string;
-    brief?: string;
-    details?: string | null;
-  };
-}
-
 export const patchWorkflowSchedule = (
   scheduleId: string,
-  body: PatchWorkflowScheduleBody,
+  body: PatchWorkflowScheduleRequest,
 ): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(
     `${workspacePrefix()}/schedules/workflow/${encodeURIComponent(scheduleId)}`,
@@ -170,13 +158,11 @@ export const runSchedule = (scheduleId: string): Promise<{ dispatchId: string }>
  * this; the CLI's `glyph schedule create` sends the same wire shape
  * directly. The `target.brief` + optional `target.details` pair mirrors
  * `@glyphs-ai/task` `DispatchOpts`.
+ *
+ * Re-exported from contracts so the dashboard always tracks the
+ * canonical wire shape.
  */
-export interface CreateScheduleBody {
-  name: string;
-  target: { agent: string; brief: string; details?: string; runtime?: string };
-  trigger: { kind: "cron"; expr: string; tz: string };
-  enabled?: boolean;
-}
+export type { CreateTaskScheduleRequest as CreateScheduleRequest } from "@glyphs-ai/contracts";
 
 /**
  * Create a task-kind schedule. Surfaces server-side validation errors
@@ -185,34 +171,31 @@ export interface CreateScheduleBody {
  * sees, e.g., "Invalid cron expression: …" rather than a generic
  * "schedule create: 400".
  */
-export const createSchedule = (body: CreateScheduleBody): Promise<ScheduleView> =>
+export const createSchedule = (body: CreateTaskScheduleRequest): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/task`, jsonInit("POST", body));
 
-/** Body for `POST /schedules/workflow`. */
-export interface CreateWorkflowScheduleBody {
-  name: string;
-  target: { coordinatorAgent: string; brief: string; details?: string };
-  trigger: { kind: "cron"; expr: string; tz: string };
-  enabled?: boolean;
-}
+/** Body for `POST /schedules/workflow` — re-exported from contracts. */
+export type { CreateWorkflowScheduleRequest } from "@glyphs-ai/contracts";
 
 /** Create a workflow-kind schedule. */
-export const createWorkflowSchedule = (body: CreateWorkflowScheduleBody): Promise<ScheduleView> =>
+export const createWorkflowSchedule = (
+  body: CreateWorkflowScheduleRequest,
+): Promise<ScheduleView> =>
   mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/workflow`, jsonInit("POST", body));
 
 /**
  * List workflows launched by schedules, optionally filtered to one
  * schedule. The route contract (`workflows.scheduled.list`) responds
- * with `WorkflowHeaderWire[]`, so the dashboard reads the typed shape
+ * with `WorkflowHeader[]`, so the dashboard reads the typed shape
  * directly rather than re-narrowing an `unknown[]` at every call site.
  */
 export const listScheduledWorkflows = (opts: {
   scheduleId?: string;
-}): Promise<WorkflowHeaderWire[]> => {
+}): Promise<WorkflowHeader[]> => {
   const qs = new URLSearchParams();
   if (opts.scheduleId !== undefined) qs.set("scheduleId", opts.scheduleId);
   const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
-  return fetchJson<WorkflowHeaderWire[]>(
+  return fetchJson<WorkflowHeader[]>(
     `${workspacePrefix()}/scheduled-workflows${suffix}`,
     "scheduled-workflows",
   );

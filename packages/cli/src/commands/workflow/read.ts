@@ -5,7 +5,7 @@
  * `../../registrars/workflow.ts`.
  */
 
-import type { CancelWorkflowBody, CreateWorkflowBody } from "@glyphs-ai/contracts";
+import type { CancelWorkflowRequest, CreateWorkflowRequest } from "@glyphs-ai/contracts";
 import { makeClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
@@ -63,13 +63,13 @@ export async function workflowList(opts: WorkflowListOpts = {}): Promise<Command
 
 // --- create ------------------------------------------------------------
 export interface WorkflowCreateOpts extends WorkspaceFlagOpts {
-  /** Workflow brief -- non-empty. Maps to `CreateWorkflowBody.brief`. */
+  /** Workflow brief -- non-empty. Maps to `CreateWorkflowRequest.brief`. */
   readonly brief: string;
-  /** Coordinator agent FQN -- non-empty. Maps to `CreateWorkflowBody.coordinatorAgent`. */
+  /** Coordinator agent FQN -- non-empty. Maps to `CreateWorkflowRequest.coordinatorAgent`. */
   readonly coordAgent: string;
   /**
    * Optional multi-line workflow context. Maps to
-   * `CreateWorkflowBody.details`. The registrar resolves
+   * `CreateWorkflowRequest.details`. The registrar resolves
    * `--details-file <path>` into this same field before the call,
    * mirroring the `task dispatch` precedent (file IO lives in the
    * registrar, the command is a thin pass-through).
@@ -87,7 +87,7 @@ export async function workflowCreate(opts: WorkflowCreateOpts): Promise<CommandR
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: CreateWorkflowBody = {
+    const body: CreateWorkflowRequest = {
       brief: opts.brief,
       coordinatorAgent: opts.coordAgent,
       ...(opts.details !== undefined ? { details: opts.details } : {}),
@@ -231,7 +231,7 @@ export async function workflowCancel(
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: CancelWorkflowBody = {
+    const body: CancelWorkflowRequest = {
       cancellation: { kind: "user", message: opts.message ?? "" },
     };
     const updated = await client.call("workflows.cancel", {

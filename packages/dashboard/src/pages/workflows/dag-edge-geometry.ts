@@ -1,4 +1,4 @@
-import type { WorkflowEdgeWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowEdge, WorkflowNode } from "../../api";
 
 /**
  * Pure geometry helpers for the vertical (top-to-bottom) DAG layout.
@@ -47,7 +47,7 @@ export interface NodeSlot {
 
 export interface PhaseRow {
   readonly phase: number;
-  readonly nodes: readonly WorkflowNodeWire[];
+  readonly nodes: readonly WorkflowNode[];
 }
 
 /**
@@ -57,8 +57,8 @@ export interface PhaseRow {
  * with the same wire input produce the same layout (no flicker on
  * poll).
  */
-export function groupByPhase(nodes: readonly WorkflowNodeWire[]): readonly PhaseRow[] {
-  const byPhase = new Map<number, WorkflowNodeWire[]>();
+export function groupByPhase(nodes: readonly WorkflowNode[]): readonly PhaseRow[] {
+  const byPhase = new Map<number, WorkflowNode[]>();
   for (const node of nodes) {
     const slot = byPhase.get(node.phase);
     if (slot === undefined) byPhase.set(node.phase, [node]);
@@ -107,7 +107,7 @@ export interface EdgeSegment {
  * elements.
  */
 export function resolveEdges(
-  edges: readonly WorkflowEdgeWire[],
+  edges: readonly WorkflowEdge[],
   slots: ReadonlyMap<string, NodeSlot>,
 ): readonly EdgeSegment[] {
   const out: EdgeSegment[] = [];

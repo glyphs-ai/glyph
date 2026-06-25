@@ -8,22 +8,22 @@
  */
 
 import type {
-  AddEdgeBody,
-  AddEdgeResultWire,
-  AddNodeBody,
-  AddNodeResultWire,
-  AddSubgraphBody,
-  AddSubgraphResultWire,
-  CancelWorkflowBody,
-  CreateWorkflowBody,
-  FinishWorkflowBody,
-  ReplaceNodeSpecBody,
-  RespondHumanNodeBody,
+  AddEdgeRequest,
+  AddEdgeResponse,
+  AddNodeRequest,
+  AddNodeResponse,
+  AddSubgraphRequest,
+  AddSubgraphResponse,
+  CancelWorkflowRequest,
+  CreateWorkflowRequest,
+  FinishWorkflowRequest,
+  ReplaceNodeSpecRequest,
+  RespondHumanNodeRequest,
   WorkflowArtifactsResponse,
-  WorkflowDagWire,
-  WorkflowHeaderWire,
+  WorkflowDag,
+  WorkflowHeader,
   WorkflowListQuery,
-  WorkflowNodeWire,
+  WorkflowNode,
 } from "../workflows.js";
 import { defineRoute, type RouteRequest, type RouteSpec } from "./_spec.js";
 import type { WorkspacePathParams } from "./workspaces.js";
@@ -73,13 +73,13 @@ export interface WorkflowArtifactPathParams {
 export const workflowRoutes = {
   /**
    * Schedule-origin list of workflows launched by cron triggers.
-   * Mirrors `tasks.scheduled.list` but returns `WorkflowHeaderWire[]`.
+   * Mirrors `tasks.scheduled.list` but returns `WorkflowHeader[]`.
    * Constrained to schedule-launched workflows (metadata.scheduleId)
    * server-side; callers cannot widen.
    */
   "workflows.scheduled.list": defineRoute<
     { params: WorkspacePathParams; query: { readonly scheduleId?: string } },
-    readonly WorkflowHeaderWire[]
+    readonly WorkflowHeader[]
   >("GET", "/api/workspaces/:id/scheduled-workflows"),
   /**
    * List workflows in this workspace, newest-first by `created_at`.
@@ -97,27 +97,27 @@ export const workflowRoutes = {
    */
   "workflows.list": defineRoute<
     { params: WorkspacePathParams; query: WorkflowListQuery },
-    readonly WorkflowHeaderWire[]
+    readonly WorkflowHeader[]
   >("GET", "/api/workspaces/:id/workflows"),
   /**
    * Seed a new workflow + its initial coordinator node. Body mirrors
    * `WorkflowService.createWorkflow` args.
    */
   "workflows.create": defineRoute<
-    { params: WorkspacePathParams; body: CreateWorkflowBody },
-    WorkflowHeaderWire
+    { params: WorkspacePathParams; body: CreateWorkflowRequest },
+    WorkflowHeader
   >("POST", "/api/workspaces/:id/workflows"),
   /**
    * Workflow header lookup. `iterationCount` is computed exactly
    * from a single per-workflow node-list query (counts coord-kind
    * nodes; silent-retry coords count too).
    */
-  "workflows.get": defineRoute<{ params: WorkflowPathParams }, WorkflowHeaderWire>(
+  "workflows.get": defineRoute<{ params: WorkflowPathParams }, WorkflowHeader>(
     "GET",
     "/api/workspaces/:id/workflows/:wfid",
   ),
   /** Full DAG snapshot (header + nodes + edges) in a single fetch. */
-  "workflows.dag.get": defineRoute<{ params: WorkflowPathParams }, WorkflowDagWire>(
+  "workflows.dag.get": defineRoute<{ params: WorkflowPathParams }, WorkflowDag>(
     "GET",
     "/api/workspaces/:id/workflows/:wfid/dag",
   ),
@@ -128,7 +128,7 @@ export const workflowRoutes = {
    * but addressable without paying for the full DAG snapshot. 404
    * when either the workflow or the node id does not resolve.
    */
-  "workflows.nodes.get": defineRoute<{ params: WorkflowNodePathParams }, WorkflowNodeWire>(
+  "workflows.nodes.get": defineRoute<{ params: WorkflowNodePathParams }, WorkflowNode>(
     "GET",
     "/api/workspaces/:id/workflows/:wfid/nodes/:nid",
   ),
@@ -141,8 +141,8 @@ export const workflowRoutes = {
    * post-cancel `endedAt` / `status` without a second round-trip.
    */
   "workflows.cancel": defineRoute<
-    { params: WorkflowPathParams; body: CancelWorkflowBody },
-    WorkflowHeaderWire
+    { params: WorkflowPathParams; body: CancelWorkflowRequest },
+    WorkflowHeader
   >("POST", "/api/workspaces/:id/workflows/:wfid/cancel"),
   /**
    * List artifacts for a workflow: workflow-summary entries (curated
@@ -176,16 +176,16 @@ export const workflowRoutes = {
   // for diff legibility; the server's mount order is governed by Hono's
   // route matching (more-specific paths win).
   "workflows.edges.add": defineRoute<
-    { params: WorkflowPathParams; body: AddEdgeBody },
-    AddEdgeResultWire
+    { params: WorkflowPathParams; body: AddEdgeRequest },
+    AddEdgeResponse
   >("POST", "/api/workspaces/:id/workflows/:wfid/edges"),
   "workflows.nodes.add": defineRoute<
-    { params: WorkflowPathParams; body: AddNodeBody },
-    AddNodeResultWire
+    { params: WorkflowPathParams; body: AddNodeRequest },
+    AddNodeResponse
   >("POST", "/api/workspaces/:id/workflows/:wfid/nodes"),
   "workflows.subgraph.add": defineRoute<
-    { params: WorkflowPathParams; body: AddSubgraphBody },
-    AddSubgraphResultWire
+    { params: WorkflowPathParams; body: AddSubgraphRequest },
+    AddSubgraphResponse
   >("POST", "/api/workspaces/:id/workflows/:wfid/subgraph"),
   /**
    * Cancel a single worker-kind node. Coord-kind cancellation is
@@ -193,7 +193,7 @@ export const workflowRoutes = {
    * `workflows.cancel` route. The substrate rejects coord-kind targets
    * with `WorkflowNodeNotMutableError` → 409.
    */
-  "workflows.nodes.cancel": defineRoute<{ params: WorkflowNodePathParams }, WorkflowNodeWire>(
+  "workflows.nodes.cancel": defineRoute<{ params: WorkflowNodePathParams }, WorkflowNode>(
     "POST",
     "/api/workspaces/:id/workflows/:wfid/nodes/:nid/cancel",
   ),
@@ -204,8 +204,8 @@ export const workflowRoutes = {
    * transitions to `succeeded`, waking downstream nodes.
    */
   "workflows.nodes.respond": defineRoute<
-    { params: WorkflowNodePathParams; body: RespondHumanNodeBody },
-    WorkflowNodeWire
+    { params: WorkflowNodePathParams; body: RespondHumanNodeRequest },
+    WorkflowNode
   >("POST", "/api/workspaces/:id/workflows/:wfid/nodes/:nid/respond"),
   /**
    * Last act of a coord task: flip the workflow terminal. `kind`
@@ -214,8 +214,8 @@ export const workflowRoutes = {
    * surfaces `WorkflowAlreadyTerminalError` on the race.
    */
   "workflows.finish": defineRoute<
-    { params: WorkflowPathParams; body: FinishWorkflowBody },
-    WorkflowHeaderWire
+    { params: WorkflowPathParams; body: FinishWorkflowRequest },
+    WorkflowHeader
   >("POST", "/api/workspaces/:id/workflows/:wfid/finish"),
   /**
    * Delete a workflow. Two modes via the `?purge=1` query flag, mirroring
@@ -272,7 +272,7 @@ export const workflowRoutes = {
    * / kind-specific subclasses.
    */
   "workflows.nodes.spec.replace": defineRoute<
-    { params: WorkflowNodePathParams; body: ReplaceNodeSpecBody },
-    WorkflowNodeWire
+    { params: WorkflowNodePathParams; body: ReplaceNodeSpecRequest },
+    WorkflowNode
   >("PATCH", "/api/workspaces/:id/workflows/:wfid/nodes/:nid/spec"),
 } as const satisfies Record<string, RouteSpec<RouteRequest, unknown>>;

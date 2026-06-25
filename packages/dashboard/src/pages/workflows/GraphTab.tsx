@@ -1,11 +1,11 @@
-import type { WorkflowDagWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowDag, WorkflowNode } from "../../api";
 import { WorkflowDagView } from "./WorkflowDagView";
 
 export interface GraphTabProps {
-  dag: WorkflowDagWire | null;
+  dag: WorkflowDag | null;
   dagError: string | null;
   selectedNodeId: string | null;
-  onSelectNode: (node: WorkflowNodeWire) => void;
+  onSelectNode: (node: WorkflowNode) => void;
 }
 
 /**

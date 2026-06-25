@@ -10,13 +10,13 @@
 import type {
   Agent,
   AgentEntry,
-  AgentInstallBody,
   CatalogInstallResult,
   CatalogSyncResult,
+  InstallAgentRequest,
+  InstallSkillRequest,
   Mcp,
   Skill,
   SkillEntry,
-  SkillInstallBody,
 } from "@glyphs-ai/catalog";
 import type { ResolveManifest } from "../plan-to-manifest.js";
 import { defineRoute, type RouteRequest, type RouteSpec } from "./_spec.js";
@@ -37,7 +37,7 @@ export interface CatalogFileEntry {
  * plan rather than re-resolving (which would silently apply a
  * fresh, possibly-different closure).
  */
-export interface CatalogSyncBody {
+export interface SyncCatalogRequest {
   readonly planToken: string;
 }
 
@@ -95,7 +95,7 @@ export const catalogRoutes = {
     "/api/workspaces/:id/catalog/skills",
   ),
   "catalog.skills.resolve": defineRoute<
-    { params: WorkspacePathParams; body: SkillInstallBody },
+    { params: WorkspacePathParams; body: InstallSkillRequest },
     ResolveManifest
   >("POST", "/api/workspaces/:id/catalog/skills/resolve"),
   "catalog.skills.get": defineRoute<{ params: CatalogResourcePathParams }, SkillWithContent>(
@@ -107,7 +107,7 @@ export const catalogRoutes = {
     "/api/workspaces/:id/catalog/skills/:name/anchor",
   ),
   "catalog.skills.install": defineRoute<
-    { params: WorkspacePathParams; body: SkillInstallBody },
+    { params: WorkspacePathParams; body: InstallSkillRequest },
     CatalogInstallResult
   >("POST", "/api/workspaces/:id/catalog/skills"),
   "catalog.skills.delete": defineRoute<{ params: CatalogResourcePathParams }, OkResponse>(
@@ -119,7 +119,7 @@ export const catalogRoutes = {
     ResolveManifest
   >("POST", "/api/workspaces/:id/catalog/skills/:name/sync/resolve"),
   "catalog.skills.sync": defineRoute<
-    { params: CatalogResourcePathParams; body: CatalogSyncBody },
+    { params: CatalogResourcePathParams; body: SyncCatalogRequest },
     CatalogSyncResult
   >("POST", "/api/workspaces/:id/catalog/skills/:name/sync"),
   "catalog.skills.prereqs.acknowledge": defineRoute<{ params: CatalogResourcePathParams }, Skill>(
@@ -141,7 +141,7 @@ export const catalogRoutes = {
     "/api/workspaces/:id/catalog/agents",
   ),
   "catalog.agents.resolve": defineRoute<
-    { params: WorkspacePathParams; body: AgentInstallBody },
+    { params: WorkspacePathParams; body: InstallAgentRequest },
     ResolveManifest
   >("POST", "/api/workspaces/:id/catalog/agents/resolve"),
   "catalog.agents.get": defineRoute<{ params: CatalogResourcePathParams }, AgentWithContent>(
@@ -153,7 +153,7 @@ export const catalogRoutes = {
     "/api/workspaces/:id/catalog/agents/:name/anchor",
   ),
   "catalog.agents.install": defineRoute<
-    { params: WorkspacePathParams; body: AgentInstallBody },
+    { params: WorkspacePathParams; body: InstallAgentRequest },
     CatalogInstallResult
   >("POST", "/api/workspaces/:id/catalog/agents"),
   "catalog.agents.delete": defineRoute<{ params: CatalogResourcePathParams }, OkResponse>(
@@ -165,7 +165,7 @@ export const catalogRoutes = {
     ResolveManifest
   >("POST", "/api/workspaces/:id/catalog/agents/:name/sync/resolve"),
   "catalog.agents.sync": defineRoute<
-    { params: CatalogResourcePathParams; body: CatalogSyncBody },
+    { params: CatalogResourcePathParams; body: SyncCatalogRequest },
     CatalogSyncResult
   >("POST", "/api/workspaces/:id/catalog/agents/:name/sync"),
   "catalog.agents.prereqs.acknowledge": defineRoute<{ params: CatalogResourcePathParams }, Agent>(
@@ -214,7 +214,7 @@ export const catalogRoutes = {
     "/api/workspaces/:id/catalog/mcps/:name/sync/resolve",
   ),
   "catalog.mcps.sync": defineRoute<
-    { params: CatalogResourcePathParams; body: CatalogSyncBody },
+    { params: CatalogResourcePathParams; body: SyncCatalogRequest },
     CatalogSyncResult
   >("POST", "/api/workspaces/:id/catalog/mcps/:name/sync"),
 } as const satisfies Record<string, RouteSpec<RouteRequest, unknown>>;

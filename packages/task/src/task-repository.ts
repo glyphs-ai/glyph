@@ -205,7 +205,7 @@ export class TaskRepository {
   /**
    * Find the most recent task — terminal or not — for a workflow
    * node. Used by the wire-shape projector to enrich
-   * `WorkflowNodeWire.taskId` so the dashboard can navigate from a
+   * `WorkflowNode.taskId` so the dashboard can navigate from a
    * node click to the dispatched task.
    *
    * Differs from {@link listInFlightForWorkflowNode} on two axes:

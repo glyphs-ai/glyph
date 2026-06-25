@@ -197,7 +197,7 @@ export class TaskService {
   /**
    * Find the most recent task (terminal or not) dispatched for a
    * workflow node. Powers the wire-shape projector's
-   * `WorkflowNodeWire.taskId` enrichment so the dashboard can
+   * `WorkflowNode.taskId` enrichment so the dashboard can
    * navigate from a node click to its dispatched task. Returns
    * `null` when no task exists for the node (the worker has not
    * dispatched yet).

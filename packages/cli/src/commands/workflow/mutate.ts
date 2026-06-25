@@ -9,10 +9,10 @@
 
 import { readFileSync } from "node:fs";
 import type {
-  AddEdgeBody,
-  AddNodeBody,
-  FinishWorkflowBody,
-  ReplaceNodeSpecBody,
+  AddEdgeRequest,
+  AddNodeRequest,
+  FinishWorkflowRequest,
+  ReplaceNodeSpecRequest,
 } from "@glyphs-ai/contracts";
 import { makeClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../../output.js";
@@ -25,7 +25,7 @@ import {
   KNOWN_FINISH_OUTCOMES,
   KNOWN_NODE_KINDS,
   parseParents,
-  validateAddSubgraphBody,
+  validateAddSubgraphRequest,
 } from "./_validate.js";
 
 /**
@@ -101,7 +101,7 @@ export async function workflowAddNode(
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: AddNodeBody = {
+    const body: AddNodeRequest = {
       kind: opts.kind,
       spec,
       parents: parseParents(opts.parentNodeIds),
@@ -142,7 +142,7 @@ export async function workflowAddSubgraph(
   if (!payloadResult.ok) {
     return { exitCode: 2, stderr: `${payloadResult.error}\n` };
   }
-  const bodyResult = validateAddSubgraphBody(payloadResult.value);
+  const bodyResult = validateAddSubgraphRequest(payloadResult.value);
   if (!bodyResult.ok) {
     return { exitCode: 2, stderr: `${bodyResult.error}\n` };
   }
@@ -189,7 +189,7 @@ export async function workflowAddEdge(
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: AddEdgeBody = { fromNodeId, toNodeId };
+    const body: AddEdgeRequest = { fromNodeId, toNodeId };
     const result = await client.call("workflows.edges.add", {
       params: { id: workspaceId, wfid: workflowId },
       body,
@@ -291,7 +291,7 @@ export async function workflowReplaceSpec(
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: ReplaceNodeSpecBody = { newSpec };
+    const body: ReplaceNodeSpecRequest = { newSpec };
     const updated = await client.call("workflows.nodes.spec.replace", {
       params: { id: workspaceId, wfid: workflowId, nid: nodeId },
       body,
@@ -381,7 +381,7 @@ export async function workflowFinish(
   const client = await makeClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: FinishWorkflowBody =
+    const body: FinishWorkflowRequest =
       outcome === "succeeded"
         ? { kind: "succeeded", success: { output: opts.summary ?? null } }
         : { kind: "failed", failure: { kind: "coordinator", message: opts.message ?? "" } };

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { listWorkflows, type WorkflowHeaderWire, type WorkflowListQuery } from "../api";
+import { listWorkflows, type WorkflowHeader, type WorkflowListQuery } from "../api";
 import { ALL_AGENTS, presetToSinceMs, type TimePreset } from "../components/tasks/shared";
 import { sortByCreatedDesc, WORKFLOW_POLL_INTERVAL_MS } from "../components/workflows/shared";
 import { useMounted } from "./useMounted";
@@ -15,7 +15,7 @@ export interface UseWorkflowsOpts {
 }
 
 export interface UseWorkflowsResult {
-  workflows: readonly WorkflowHeaderWire[];
+  workflows: readonly WorkflowHeader[];
   loaded: boolean;
   error: string | null;
   setError: (e: string | null) => void;
@@ -55,7 +55,7 @@ export function useWorkflows({
   agentFilter,
   timeFilter,
 }: UseWorkflowsOpts): UseWorkflowsResult {
-  const [workflows, setWorkflows] = useState<readonly WorkflowHeaderWire[]>([]);
+  const [workflows, setWorkflows] = useState<readonly WorkflowHeader[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mounted = useMounted();

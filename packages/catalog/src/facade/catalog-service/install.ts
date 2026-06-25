@@ -46,7 +46,7 @@ export async function install(
       const persisted = await installNode(ctx, planNode);
       installed.push(toInstalledEntry(planNode.kind, fqn, persisted));
     } catch (err) {
-      failed.push({ kind: planNode.kind, fqn, error: errorToWire(err) });
+      failed.push({ kind: planNode.kind, fqn, error: serializeInstallError(err) });
       poisoned.add(origin);
     }
   }
@@ -102,7 +102,7 @@ function toInstalledEntry(
   return out;
 }
 
-function errorToWire(err: unknown): { name: string; message: string } {
+function serializeInstallError(err: unknown): { name: string; message: string } {
   if (err instanceof Error) return { name: err.name, message: err.message };
   if (typeof err === "string") return { name: "Error", message: err };
   return { name: "Error", message: String(err) };

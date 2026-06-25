@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getWorkflow, getWorkflowDag, type WorkflowDagWire, type WorkflowHeaderWire } from "../api";
+import { getWorkflow, getWorkflowDag, type WorkflowDag, type WorkflowHeader } from "../api";
 import { WORKFLOW_POLL_INTERVAL_MS } from "../components/workflows/shared";
 import { useMounted } from "./useMounted";
 
 export interface UseWorkflowDetailResult {
-  workflow: WorkflowHeaderWire | null;
-  dag: WorkflowDagWire | null;
+  workflow: WorkflowHeader | null;
+  dag: WorkflowDag | null;
   error: string | null;
   dagError: string | null;
   refresh: () => Promise<void>;
@@ -24,8 +24,8 @@ export interface UseWorkflowDetailResult {
  * state when the user rapidly switches rows.
  */
 export function useWorkflowDetail(workflowId: string | null): UseWorkflowDetailResult {
-  const [workflow, setWorkflow] = useState<WorkflowHeaderWire | null>(null);
-  const [dag, setDag] = useState<WorkflowDagWire | null>(null);
+  const [workflow, setWorkflow] = useState<WorkflowHeader | null>(null);
+  const [dag, setDag] = useState<WorkflowDag | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dagError, setDagError] = useState<string | null>(null);
   const mounted = useMounted();

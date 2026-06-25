@@ -25,7 +25,7 @@ export interface WorkspaceSummary {
 }
 
 /** POST /api/workspaces body. */
-export interface WorkspaceCreateBody {
+export interface CreateWorkspaceRequest {
   /** Display name (required). */
   readonly name: string;
   /** Absolute filesystem path. When omitted, server mints `<GLYPH_HOME>/workspaces/<uuid>`. */
@@ -40,7 +40,7 @@ export interface WorkspaceCreateBody {
  * `workspaceContextMiddleware`; the dashboard reads this shape to
  * distinguish a transient warming state from a typed payload.
  */
-export interface WorkspaceWarmingBody {
+export interface WorkspaceWarmingResponse {
   readonly state: "warming";
   readonly workspaceId: string;
 }
@@ -52,24 +52,24 @@ export interface WorkspaceWarmingBody {
  * `code` is the canonical `WorkspaceLoadError` class name so UI
  * surfaces can branch without string-matching the message.
  */
-export interface WorkspaceLoadFailedBody {
+export interface WorkspaceLoadFailedResponse {
   readonly error: string;
   readonly code: "WorkspaceLoadError";
 }
 
 /** PUT /api/workspaces/current body. */
-export interface WorkspaceCurrentPutBody {
+export interface SetCurrentWorkspaceRequest {
   readonly id: string;
 }
 
 /** PATCH /api/workspaces/:id body. The only mutable field today is `name`. */
-export interface WorkspacePatchBody {
+export interface PatchWorkspaceRequest {
   /** New display name. Skipped when `undefined`. */
   readonly name?: string;
 }
 
 /** GET /api/workspaces/current response. `null` when no workspace is selected. */
-export interface WorkspaceCurrentRes {
+export interface CurrentWorkspaceResponse {
   readonly id: string | null;
 }
 
@@ -83,24 +83,24 @@ export const workspaceRoutes = {
     "GET",
     "/api/workspaces",
   ),
-  "workspaces.create": defineRoute<{ body: WorkspaceCreateBody }, WorkspaceSummary>(
+  "workspaces.create": defineRoute<{ body: CreateWorkspaceRequest }, WorkspaceSummary>(
     "POST",
     "/api/workspaces",
   ),
-  "workspaces.current.get": defineRoute<Record<string, never>, WorkspaceCurrentRes>(
+  "workspaces.current.get": defineRoute<Record<string, never>, CurrentWorkspaceResponse>(
     "GET",
     "/api/workspaces/current",
   ),
-  "workspaces.current.set": defineRoute<{ body: WorkspaceCurrentPutBody }, WorkspaceCurrentRes>(
-    "PUT",
-    "/api/workspaces/current",
-  ),
+  "workspaces.current.set": defineRoute<
+    { body: SetCurrentWorkspaceRequest },
+    CurrentWorkspaceResponse
+  >("PUT", "/api/workspaces/current"),
   "workspaces.get": defineRoute<{ params: WorkspacePathParams }, WorkspaceSummary>(
     "GET",
     "/api/workspaces/:id",
   ),
   "workspaces.update": defineRoute<
-    { params: WorkspacePathParams; body: WorkspacePatchBody },
+    { params: WorkspacePathParams; body: PatchWorkspaceRequest },
     WorkspaceSummary
   >("PATCH", "/api/workspaces/:id"),
   "workspaces.delete": defineRoute<{ params: WorkspacePathParams; query: { purge?: "1" } }, void>(

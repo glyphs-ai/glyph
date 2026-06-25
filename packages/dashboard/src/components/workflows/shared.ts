@@ -6,7 +6,7 @@
  */
 
 import type { AgentEntry } from "@glyphs-ai/contracts";
-import type { WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowHeader, WorkflowNode } from "../../api";
 
 /**
  * Hard-coded poll cadence for workflow list + detail. The server-config
@@ -34,7 +34,7 @@ export function coordEligibleAgents(agents: readonly AgentEntry[]): AgentEntry[]
  * Tasks page uses for its list. Stable for identical timestamps via
  * the secondary id comparator.
  */
-export function sortByCreatedDesc(rows: readonly WorkflowHeaderWire[]): WorkflowHeaderWire[] {
+export function sortByCreatedDesc(rows: readonly WorkflowHeader[]): WorkflowHeader[] {
   return rows.slice().sort((a, b) => {
     const cmp = b.createdAt.localeCompare(a.createdAt);
     if (cmp !== 0) return cmp;
@@ -57,7 +57,7 @@ export function sortByCreatedDesc(rows: readonly WorkflowHeaderWire[]): Workflow
  */
 export type WorkflowStatusTone = "info" | "success" | "danger" | "muted";
 
-export function workflowStatusTone(status: WorkflowHeaderWire["status"]): WorkflowStatusTone {
+export function workflowStatusTone(status: WorkflowHeader["status"]): WorkflowStatusTone {
   switch (status) {
     case "running":
       return "info";
@@ -74,7 +74,7 @@ export function workflowStatusTone(status: WorkflowHeaderWire["status"]): Workfl
   }
 }
 
-export const WORKFLOW_STATUS_LABEL: Record<WorkflowHeaderWire["status"], string> = {
+export const WORKFLOW_STATUS_LABEL: Record<WorkflowHeader["status"], string> = {
   running: "Running",
   succeeded: "Succeeded",
   failed: "Failed",
@@ -94,7 +94,7 @@ export const WORKFLOW_STATUS_LABEL: Record<WorkflowHeaderWire["status"], string>
  * proper subset (no `not_started` / `ready` — those are per-node
  * pre-dispatch states a workflow as a whole never sits in).
  */
-export const WORKFLOW_NODE_STATUS_LABEL: Record<WorkflowNodeWire["status"], string> = {
+export const WORKFLOW_NODE_STATUS_LABEL: Record<WorkflowNode["status"], string> = {
   not_started: "Not started",
   ready: "Ready",
   running: "Running",
@@ -104,7 +104,7 @@ export const WORKFLOW_NODE_STATUS_LABEL: Record<WorkflowNodeWire["status"], stri
 };
 
 /** Terminal statuses — used to gate the cancel CTA and stop polling. */
-export function isTerminal(status: WorkflowHeaderWire["status"]): boolean {
+export function isTerminal(status: WorkflowHeader["status"]): boolean {
   return status !== "running";
 }
 
@@ -117,7 +117,7 @@ export function isTerminal(status: WorkflowHeaderWire["status"]): boolean {
 export type StatusGroup = "awaiting" | "running" | "completed";
 
 export function statusGroup(
-  status: WorkflowHeaderWire["status"],
+  status: WorkflowHeader["status"],
   awaitingHumanCount: number,
 ): StatusGroup {
   if (status === "running" && awaitingHumanCount > 0) return "awaiting";

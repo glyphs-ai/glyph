@@ -1,4 +1,4 @@
-import type { WorkflowHeaderWire } from "@glyphs-ai/api";
+import type { WorkflowHeader } from "@glyphs-ai/api";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import { Hono } from "hono";
 import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
@@ -39,7 +39,7 @@ export function scheduledWorkflowsRoutes(resolveWorkflowService: WorkflowService
       // Project to wire headers — same entity→wire boundary every other
       // workflow route uses. `iterationCount` is omitted (O(workflows)
       // list semantics); `awaitingHumanCount` comes from the batch query.
-      const wire: readonly WorkflowHeaderWire[] = filtered.map((wf) =>
+      const wire: readonly WorkflowHeader[] = filtered.map((wf) =>
         projectWorkflowHeader(wf, undefined, awaitingMap.get(wf.id) ?? 0),
       );
       return c.json(wire);

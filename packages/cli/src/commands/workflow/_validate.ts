@@ -6,17 +6,17 @@
  */
 
 import type {
-  AddSubgraphBody,
-  AddSubgraphEdgeInputWire,
-  AddSubgraphNodeInputWire,
-  NodeRefWire,
-  WorkflowNodeKindWire,
+  AddSubgraphRequest,
+  AddSubgraphRequestEdge,
+  AddSubgraphRequestNode,
+  WorkflowNodeKind,
+  WorkflowNodeRef,
 } from "@glyphs-ai/contracts";
 
-export const KNOWN_NODE_KINDS: readonly WorkflowNodeKindWire[] = ["coordinator", "worker", "human"];
+export const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker", "human"];
 export const KNOWN_FINISH_OUTCOMES: readonly ("succeeded" | "failed")[] = ["succeeded", "failed"];
 
-export function isNodeKind(s: string): s is WorkflowNodeKindWire {
+export function isNodeKind(s: string): s is WorkflowNodeKind {
   return (KNOWN_NODE_KINDS as readonly string[]).includes(s);
 }
 
@@ -42,9 +42,9 @@ export function parseParents(raw: string | undefined): readonly string[] {
     .filter((p) => p !== "");
 }
 
-export function validateAddSubgraphBody(
+export function validateAddSubgraphRequest(
   raw: unknown,
-): { ok: true; body: AddSubgraphBody } | { ok: false; error: string } {
+): { ok: true; body: AddSubgraphRequest } | { ok: false; error: string } {
   if (!isPlainObject(raw)) {
     return {
       ok: false,
@@ -60,7 +60,7 @@ export function validateAddSubgraphBody(
     };
   }
 
-  const nodes: AddSubgraphNodeInputWire[] = [];
+  const nodes: AddSubgraphRequestNode[] = [];
   for (let i = 0; i < nodesRaw.length; i += 1) {
     const node = nodesRaw[i];
     if (!isPlainObject(node)) return { ok: false, error: `nodes[${i}] must be an object` };
@@ -109,7 +109,7 @@ export function validateAddSubgraphBody(
     });
   }
 
-  const edges: AddSubgraphEdgeInputWire[] = [];
+  const edges: AddSubgraphRequestEdge[] = [];
   for (let i = 0; i < edgesRaw.length; i += 1) {
     const edge = edgesRaw[i];
     if (!isPlainObject(edge)) return { ok: false, error: `edges[${i}] must be an object` };
@@ -126,7 +126,7 @@ export function validateAddSubgraphBody(
 function validateNodeRefInput(
   raw: unknown,
   path: string,
-): { ok: true; value: NodeRefWire } | { ok: false; error: string } {
+): { ok: true; value: WorkflowNodeRef } | { ok: false; error: string } {
   if (!isPlainObject(raw)) return { ok: false, error: `${path} must be an object` };
   const keys = Object.keys(raw);
   if (keys.length !== 1) {

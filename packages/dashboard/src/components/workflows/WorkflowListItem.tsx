@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { WorkflowHeaderWire } from "../../api";
+import type { WorkflowHeader } from "../../api";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { truncateBrief } from "../../utils/brief";
 import { copyToClipboard } from "../../utils/clipboard";
@@ -49,7 +49,7 @@ const LIST_BRIEF_CAP = 70;
 type CloseReason = "escape" | "menuitem" | "outside";
 
 export interface WorkflowListItemProps {
-  workflow: WorkflowHeaderWire;
+  workflow: WorkflowHeader;
   selected: boolean;
   onSelect: () => void;
   /**
@@ -59,7 +59,7 @@ export interface WorkflowListItemProps {
    * list is the canonical action surface, the detail pane is the
    * canonical information surface).
    */
-  onCancel: (target: WorkflowHeaderWire) => void;
+  onCancel: (target: WorkflowHeader) => void;
   /**
    * Page-supplied row action. Disabled while the workflow is still
    * `running` (the server enforces the same gate via 409 — the UI
@@ -67,7 +67,7 @@ export interface WorkflowListItemProps {
    * trip). The page opens its delete-confirm modal with the
    * workflow as the target.
    */
-  onDelete: (target: WorkflowHeaderWire) => void;
+  onDelete: (target: WorkflowHeader) => void;
   /** Page-level single-open coordination: true iff this row's menu is the one open. */
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
@@ -78,7 +78,7 @@ export interface WorkflowListItemProps {
   /**
    * When > 0, the row renders an amber "Awaiting" pill instead of
    * the standard blue "Running" badge. Plumbed from
-   * `WorkflowHeaderWire.awaitingHumanCount`.
+   * `WorkflowHeader.awaitingHumanCount`.
    */
   awaitingHumanCount?: number;
 }

@@ -1,8 +1,8 @@
-import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../api";
 import { formatAbsolute, formatDuration, formatRelative } from "../../utils/time";
 
 export interface WorkflowMetaStatsProps {
-  workflow: WorkflowHeaderWire;
+  workflow: WorkflowHeader;
   /**
    * DAG snapshot for the active workflow. `null` while still being
    * fetched — the Phases stat is omitted in that case (matches the
@@ -10,7 +10,7 @@ export interface WorkflowMetaStatsProps {
    * The Phases stat is also omitted when the DAG has zero nodes —
    * see the JSDoc on {@link WorkflowMetaStats} for the rationale.
    */
-  dag: WorkflowDagWire | null;
+  dag: WorkflowDag | null;
 }
 
 /**
@@ -114,7 +114,7 @@ interface PhaseProgress {
  * completed 3-phase workflow returns `current = 2`, which the caller
  * renders 1-indexed as `3 / 3`).
  */
-function computePhaseProgress(nodes: readonly WorkflowNodeWire[]): PhaseProgress | null {
+function computePhaseProgress(nodes: readonly WorkflowNode[]): PhaseProgress | null {
   if (nodes.length === 0) return null;
   let maxPhase = -1;
   let minActivePhase = Number.POSITIVE_INFINITY;

@@ -7,7 +7,7 @@
  * Assertion surface:
  *   - happy-path passthrough to the injected `WorkflowService` stub
  *   - input validation 400s (status query, create body shape,
- *     mutation body shapes, NodeRefWire arms)
+ *     mutation body shapes, WorkflowNodeRef arms)
  *   - 404 mapping for `WorkflowNotFoundError`
  *   - 409 mapping for `WorkflowAlreadyTerminalError` /
  *     `WorkflowNodeNotMutableError` / `WorkflowEdgeCycleError` /
@@ -766,7 +766,7 @@ describe("workflowsRoutes — addEdge (POST /:wfid/edges)", () => {
 });
 
 describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
-  it("translates wire NodeRefWire {nodeId} → substrate {kind:'existing'}", async () => {
+  it("translates wire WorkflowNodeRef {nodeId} → substrate {kind:'existing'}", async () => {
     const addSubgraph = vi.fn(async () => ({
       insertedNodes: [{ tempId: "t1", nodeId: NEW_NID, phase: 2 }],
     }));
@@ -793,7 +793,7 @@ describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
     });
   });
 
-  it("translates wire NodeRefWire {tempId} → substrate {kind:'temp'} on both arms", async () => {
+  it("translates wire WorkflowNodeRef {tempId} → substrate {kind:'temp'} on both arms", async () => {
     const addSubgraph = vi.fn(async () => ({
       insertedNodes: [
         { tempId: "t1", nodeId: "n1", phase: 2 },

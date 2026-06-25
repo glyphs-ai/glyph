@@ -1,6 +1,6 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import type { TaskDispatchBody } from "@glyphs-ai/api";
+import type { DispatchTaskRequest } from "@glyphs-ai/api";
 import {
   InvalidTransition,
   type ListTaskOpts,
@@ -19,7 +19,7 @@ import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared
  * the rationale — the manifest type is the wire contract for callers,
  * the *Raw alias keeps runtime guards TS-meaningful.
  */
-type TaskDispatchBodyRaw = { [K in keyof TaskDispatchBody]?: unknown };
+type DispatchTaskRequestRaw = { [K in keyof DispatchTaskRequest]?: unknown };
 const TASK_DISPATCH_KEYS = new Set(["agent", "brief", "details", "runtime"]);
 
 /**
@@ -137,7 +137,7 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
   // continues to run in the background; clients poll `/:tid` (or watch
   // `/:tid/activity/stream`) for completion.
   app.post("/", async (c) => {
-    const parsed = await parseJsonBody<TaskDispatchBodyRaw>(c);
+    const parsed = await parseJsonBody<DispatchTaskRequestRaw>(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
     const body = parsed.body;
     if (!isJsonObject(body)) return c.json({ error: "request body must be an object" }, 400);

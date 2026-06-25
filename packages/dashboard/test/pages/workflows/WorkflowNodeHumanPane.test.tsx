@@ -1,9 +1,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../../src/api";
+import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../../src/api";
 import { WorkflowNodeHumanPane } from "../../../src/pages/workflows/WorkflowNodeHumanPane";
 
-function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-1",
     brief: "test workflow",
@@ -19,9 +19,9 @@ function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire
 }
 
 function makeHumanNode(
-  spec: WorkflowNodeWire["spec"],
-  overrides: Partial<WorkflowNodeWire> = {},
-): WorkflowNodeWire {
+  spec: WorkflowNode["spec"],
+  overrides: Partial<WorkflowNode> = {},
+): WorkflowNode {
   return {
     id: "11111111-1111-4111-8111-111111111111",
     workflowId: "wf-1",
@@ -31,15 +31,15 @@ function makeHumanNode(
     metadata: {},
     createdAt: "2026-05-28T00:00:00.000Z",
     ...overrides,
-  } as WorkflowNodeWire;
+  } as WorkflowNode;
 }
 
-function makeDag(node: WorkflowNodeWire): WorkflowDagWire {
+function makeDag(node: WorkflowNode): WorkflowDag {
   return {
     workflow: makeWf(),
     nodes: [node],
     edges: [],
-  } as unknown as WorkflowDagWire;
+  } as unknown as WorkflowDag;
 }
 
 afterEach(() => cleanup());
@@ -95,7 +95,7 @@ describe("WorkflowNodeHumanPane — promptStyle dispatch", () => {
     const legacySpec = {
       kind: "human",
       prompt: "Pick version 1.0.*",
-    } as unknown as WorkflowNodeWire["spec"];
+    } as unknown as WorkflowNode["spec"];
     const node = makeHumanNode(legacySpec);
     render(
       <WorkflowNodeHumanPane

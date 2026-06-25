@@ -6,7 +6,7 @@
  *
  * The internal {@link import("@glyphs-ai/schedule").ScheduleTargetEnvelope}
  * keeps `target.data` opaque (`unknown`). The server's
- * `projectScheduleToWire` helper converts the envelope to the flat
+ * `projectScheduleHeader` helper converts the envelope to the flat
  * task-wire shape for HTTP responses so dashboard / CLI consumers
  * can keep reading `schedule.target.agent` etc. without touching
  * `data`.
@@ -52,7 +52,7 @@ export interface TaskTargetPatch {
  * responses so consumers can read target fields without knowing the
  * substrate envelope.
  */
-export type TaskScheduleTargetWire = { readonly kind: "task" } & TaskTargetData;
+export type TaskScheduleTarget = { readonly kind: "task" } & TaskTargetData;
 
 // ─── Workflow-kind target shapes ─────────────────────────────────────
 
@@ -63,7 +63,7 @@ export type TaskScheduleTargetWire = { readonly kind: "task" } & TaskTargetData;
  */
 export interface WorkflowTargetData {
   readonly coordinatorAgent: string;
-  /** Single line, ≤ 200 chars. Mirrors `CreateWorkflowBody.brief`. */
+  /** Single line, ≤ 200 chars. Mirrors `CreateWorkflowRequest.brief`. */
   readonly brief: string;
   /** Multi-line, optional. */
   readonly details?: string;
@@ -94,15 +94,15 @@ export interface WorkflowTargetPatch {
  * responses so consumers can read target fields without knowing the
  * substrate envelope.
  */
-export type WorkflowScheduleTargetWire = { readonly kind: "workflow" } & WorkflowTargetData;
+export type WorkflowScheduleTarget = { readonly kind: "workflow" } & WorkflowTargetData;
 
 /**
  * Wire-shape target on schedule responses. Flat for the task kind
- * (`TaskScheduleTargetWire`) and workflow kind
- * (`WorkflowScheduleTargetWire`); unrecognized kinds stay in the
+ * (`TaskScheduleTarget`) and workflow kind
+ * (`WorkflowScheduleTarget`); unrecognized kinds stay in the
  * substrate envelope shape the server projected.
  */
-export type ScheduleWireTarget =
-  | TaskScheduleTargetWire
-  | WorkflowScheduleTargetWire
+export type ScheduleTarget =
+  | TaskScheduleTarget
+  | WorkflowScheduleTarget
   | { readonly kind: string; readonly data: unknown };

@@ -12,7 +12,7 @@
  * runners })`. Tests use `openTestWorkflowDb()` from `./testing`.
  *
  * Per-kind wire DTOs (`WorkflowWorkerNodeSpec`,
- * `WorkflowCoordinatorNodeSpec`, `WorkflowNodeWireSpec`, …) are owned
+ * `WorkflowCoordinatorNodeSpec`, `WorkflowNodeSpec`, …) are owned
  * by and imported directly from `@glyphs-ai/contracts`; the substrate
  * stays kind-agnostic and takes no workspace dep on the wire pkg.
  */

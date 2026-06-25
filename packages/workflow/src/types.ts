@@ -11,7 +11,7 @@
  * spec shape each kind requires — those are runner concerns.
  *
  * Per-kind wire DTOs (`WorkflowWorkerNodeSpec`,
- * `WorkflowCoordinatorNodeSpec`, `WorkflowNodeWireSpec`, …) live in
+ * `WorkflowCoordinatorNodeSpec`, `WorkflowNodeSpec`, …) live in
  * `@glyphs-ai/contracts`; this file owns only substrate-side types
  * (`WorkflowNodeKind`, `WorkflowStatus`, `WorkflowNodeStatus`,
  * `WorkflowNodeSpecEnvelope`, `WorkflowNodeValidateCtx`,

@@ -5,12 +5,12 @@
  * Consumed by the read / mutate / respond concern modules.
  */
 
-import type { WorkflowHeaderWire, WorkflowNodeWire } from "@glyphs-ai/contracts";
+import type { WorkflowHeader, WorkflowNode } from "@glyphs-ai/contracts";
 import { formatJson, formatRecord, pickFormat } from "../../output.js";
 
-/** Render a {@link WorkflowHeaderWire} via either JSON or the record formatter. */
+/** Render a {@link WorkflowHeader} via either JSON or the record formatter. */
 export function renderHeader(
-  header: WorkflowHeaderWire,
+  header: WorkflowHeader,
   flags: { readonly output?: string; readonly json?: boolean } | undefined,
 ): string {
   const fmt = pickFormat(flags, "table");
@@ -22,9 +22,9 @@ export function agentForSpec(spec: { readonly kind: string; readonly agent?: str
   return typeof spec.agent === "string" ? spec.agent : "";
 }
 
-/** Render a {@link WorkflowNodeWire} via either JSON or the record formatter. */
+/** Render a {@link WorkflowNode} via either JSON or the record formatter. */
 export function renderNode(
-  node: WorkflowNodeWire,
+  node: WorkflowNode,
   flags: { readonly output?: string; readonly json?: boolean } | undefined,
 ): string {
   const fmt = pickFormat(flags, "table");

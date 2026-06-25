@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { WorkflowEdgeWire, WorkflowNodeWire } from "../../../src/api";
+import type { WorkflowEdge, WorkflowNode } from "../../../src/api";
 import {
   buildSlotMap,
   formatPhaseLabel,
@@ -22,7 +22,7 @@ import {
  *     rect, relative to the DAG container
  */
 
-function makeNode(overrides: Partial<WorkflowNodeWire>): WorkflowNodeWire {
+function makeNode(overrides: Partial<WorkflowNode>): WorkflowNode {
   return {
     id: "n-default",
     workflowId: "wf-1",
@@ -78,7 +78,7 @@ describe("resolveEdges", () => {
   it("maps edges to fromRow / toRow and drops edges with unknown endpoints", () => {
     const phases = groupByPhase([makeNode({ id: "a", phase: 0 }), makeNode({ id: "b", phase: 1 })]);
     const slots = buildSlotMap(phases);
-    const edges: WorkflowEdgeWire[] = [
+    const edges: WorkflowEdge[] = [
       { from: "a", to: "b" },
       { from: "a", to: "missing" },
       { from: "missing", to: "b" },

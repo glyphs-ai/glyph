@@ -2,7 +2,7 @@ import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowDagWire, WorkflowHeaderWire } from "../src/api";
+import type { WorkflowDag, WorkflowHeader } from "../src/api";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");
@@ -33,7 +33,7 @@ function makeAgent(fqn: string): AgentEntry {
   } as unknown as AgentEntry;
 }
 
-function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-detail",
     brief: "Detail workflow",
@@ -48,7 +48,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHead
   };
 }
 
-function makeDag(wf: WorkflowHeaderWire): WorkflowDagWire {
+function makeDag(wf: WorkflowHeader): WorkflowDag {
   return {
     workflow: wf,
     nodes: [
@@ -199,9 +199,9 @@ describe("WorkflowsPage — detail header", () => {
     mockListWorkflows.mockResolvedValue([wf]);
     // Hold the per-workflow read in pending so the skeleton branch is
     // observable, then resolve after asserting it rendered.
-    let resolveWf: (v: WorkflowHeaderWire) => void = () => {};
+    let resolveWf: (v: WorkflowHeader) => void = () => {};
     mockGetWorkflow.mockReturnValue(
-      new Promise<WorkflowHeaderWire>((res) => {
+      new Promise<WorkflowHeader>((res) => {
         resolveWf = res;
       }),
     );

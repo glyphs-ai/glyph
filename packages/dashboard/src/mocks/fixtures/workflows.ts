@@ -1,4 +1,4 @@
-import type { WorkflowDagWire, WorkflowHeaderWire } from "../../api";
+import type { WorkflowDag, WorkflowHeader } from "../../api";
 
 /**
  * Hand-authored workflow fixtures. Anchored to a fixed
@@ -105,7 +105,7 @@ export const fixtureWorkflowMockIds = {
   },
 } as const;
 
-export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
+export const fixtureWorkflows: readonly WorkflowHeader[] = [
   {
     id: "20260608-1f3a7b9c",
     brief: "Migrate auth module to OAuth + add regression tests",
@@ -215,7 +215,7 @@ export const fixtureWorkflows: readonly WorkflowHeaderWire[] = [
   },
 ];
 
-const dagRunningMultistage: WorkflowDagWire = {
+const dagRunningMultistage: WorkflowDag = {
   workflow: fixtureWorkflows[0]!,
   nodes: [
     {
@@ -287,7 +287,7 @@ const dagRunningMultistage: WorkflowDagWire = {
   ],
 };
 
-const dagSucceededSimple: WorkflowDagWire = {
+const dagSucceededSimple: WorkflowDag = {
   workflow: fixtureWorkflows[2]!,
   nodes: [
     {
@@ -344,7 +344,7 @@ const dagSucceededSimple: WorkflowDagWire = {
   ],
 };
 
-const dagFailedEarly: WorkflowDagWire = {
+const dagFailedEarly: WorkflowDag = {
   workflow: fixtureWorkflows[3]!,
   nodes: [
     {
@@ -364,7 +364,7 @@ const dagFailedEarly: WorkflowDagWire = {
   edges: [],
 };
 
-const dagCancelledLate: WorkflowDagWire = {
+const dagCancelledLate: WorkflowDag = {
   workflow: fixtureWorkflows[4]!,
   nodes: [
     {
@@ -401,7 +401,7 @@ const dagCancelledLate: WorkflowDagWire = {
   edges: [{ from: NODE_ID_BRAND_COORD_0, to: NODE_ID_BRAND_TASK_1A }],
 };
 
-const dagAwaitingHuman: WorkflowDagWire = {
+const dagAwaitingHuman: WorkflowDag = {
   workflow: fixtureWorkflows[1]!,
   nodes: [
     {
@@ -469,7 +469,7 @@ const dagAwaitingHuman: WorkflowDagWire = {
   ],
 };
 
-const dagReleaseFire1: WorkflowDagWire = {
+const dagReleaseFire1: WorkflowDag = {
   workflow: fixtureWorkflows[5]!,
   nodes: [
     {
@@ -488,7 +488,7 @@ const dagReleaseFire1: WorkflowDagWire = {
   edges: [],
 };
 
-const dagReleaseFire2: WorkflowDagWire = {
+const dagReleaseFire2: WorkflowDag = {
   workflow: fixtureWorkflows[6]!,
   nodes: [
     {
@@ -506,7 +506,7 @@ const dagReleaseFire2: WorkflowDagWire = {
   edges: [],
 };
 
-export const fixtureWorkflowDags: ReadonlyMap<string, WorkflowDagWire> = new Map([
+export const fixtureWorkflowDags: ReadonlyMap<string, WorkflowDag> = new Map([
   [fixtureWorkflows[0]!.id, dagRunningMultistage],
   [fixtureWorkflows[1]!.id, dagAwaitingHuman],
   [fixtureWorkflows[2]!.id, dagSucceededSimple],

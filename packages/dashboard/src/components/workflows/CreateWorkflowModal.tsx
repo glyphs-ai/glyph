@@ -2,9 +2,9 @@ import type { AgentEntry } from "@glyphs-ai/contracts";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ApiError,
-  type CreateWorkflowBody,
+  type CreateWorkflowRequest,
   createWorkflow,
-  type WorkflowHeaderWire,
+  type WorkflowHeader,
 } from "../../api";
 import { Modal } from "../Modal";
 import { coordEligibleAgents } from "./shared";
@@ -13,7 +13,7 @@ export interface CreateWorkflowModalProps {
   open: boolean;
   agents: AgentEntry[];
   onClose: () => void;
-  onCreated: (workflow: WorkflowHeaderWire) => void;
+  onCreated: (workflow: WorkflowHeader) => void;
 }
 
 /**
@@ -77,7 +77,7 @@ export function CreateWorkflowModal({
     setSubmitError(null);
     setAgentFieldError(null);
     try {
-      const body: CreateWorkflowBody = {
+      const body: CreateWorkflowRequest = {
         brief: brief.trim(),
         coordinatorAgent: agent,
         ...(details.trim() !== "" ? { details: details.trim() } : {}),

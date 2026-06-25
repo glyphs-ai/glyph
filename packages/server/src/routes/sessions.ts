@@ -1,4 +1,4 @@
-import type { SessionCreateBody, WorkspaceContext } from "@glyphs-ai/api";
+import type { CreateSessionRequest, WorkspaceContext } from "@glyphs-ai/api";
 import { Hono } from "hono";
 import { sessionsErrorPolicy } from "./_error-policies/sessions.js";
 import { respondError } from "./_respond-error.js";
@@ -15,7 +15,7 @@ import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared
  */
 type WorkspaceContextResolver = (c: import("hono").Context) => WorkspaceContext;
 
-type SessionCreateBodyRaw = { [K in keyof SessionCreateBody]?: unknown };
+type CreateSessionRequestRaw = { [K in keyof CreateSessionRequest]?: unknown };
 const SESSION_CREATE_KEYS = new Set(["agent", "runtime"]);
 const SESSION_SPAWN_KEYS = new Set(["remote"]);
 
@@ -74,7 +74,7 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): Hono {
   });
 
   app.post("/", async (c) => {
-    const parsed = await parseJsonBody<SessionCreateBodyRaw>(c);
+    const parsed = await parseJsonBody<CreateSessionRequestRaw>(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
     const body = parsed.body;
     if (!isJsonObject(body)) return c.json({ error: "request body must be an object" }, 400);

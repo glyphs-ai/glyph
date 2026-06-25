@@ -48,7 +48,7 @@ export interface ScheduledTaskListQuery {
 }
 
 /** POST /api/workspaces/:id/tasks body. */
-export interface TaskDispatchBody {
+export interface DispatchTaskRequest {
   readonly agent: string;
   /**
    * Short, single-line task title. Required. Must be ≤ 200 chars
@@ -126,7 +126,7 @@ export const taskRoutes = {
     { params: WorkspacePathParams; query: ScheduledTaskListQuery },
     readonly Task[]
   >("GET", "/api/workspaces/:id/scheduled-tasks"),
-  "tasks.dispatch": defineRoute<{ params: WorkspacePathParams; body: TaskDispatchBody }, Task>(
+  "tasks.dispatch": defineRoute<{ params: WorkspacePathParams; body: DispatchTaskRequest }, Task>(
     "POST",
     "/api/workspaces/:id/tasks",
   ),

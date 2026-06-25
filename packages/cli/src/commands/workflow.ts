@@ -29,10 +29,10 @@
  *
  * Flag-name choices for create / show / dag / cancel / rm:
  *  - `--brief` (not `--name`) for create -- matches
- *    `CreateWorkflowBody.brief` on the wire and the
+ *    `CreateWorkflowRequest.brief` on the wire and the
  *    `schedule create --brief` / `task dispatch --brief` precedent.
  *  - `--coord-agent` for the coordinator agent FQN, mapping to
- *    `CreateWorkflowBody.coordinatorAgent`.
+ *    `CreateWorkflowRequest.coordinatorAgent`.
  *  - `--message` / `--kind` on cancel send the terminal payload
  *    (`cancellation: { kind, message }`).
  *  - `--summary` on finish (succeeded path) -> `success.output`.
@@ -41,7 +41,7 @@
  * Flag-name choices for the mutation commands:
  *  - `--kind <coordinator|worker>` for `add-node` / `add-subgraph`,
  *    matching the substrate's `NodeKind` (the wire alias is
- *    `WorkflowNodeKindWire`). Note: the existing dag-projection wire
+ *    `WorkflowNodeKind`). Note: the existing dag-projection wire
  *    spells worker-kind as `"task"` for historical reasons (an early
  *    landing predates the kind rename); add/replace bodies use the
  *    substrate canonical names because they hit the un-projected

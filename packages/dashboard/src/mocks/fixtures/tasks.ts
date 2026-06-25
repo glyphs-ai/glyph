@@ -264,7 +264,7 @@ export const fixtureTasks: TaskRecord[] = [
   // Workflow-launched task fixtures (origin: "workflow") so the Mode B
   // drill-down from the Workflows page's Graph tab can resolve real
   // task records. Ids match the `taskId` / `id` values on
-  // `WorkflowNodeWire` in `fixtureWorkflowDags` via the shared
+  // `WorkflowNode` in `fixtureWorkflowDags` via the shared
   // `fixtureWorkflowMockIds` map. Briefs / agents mirror the
   // originating node so the right-pane TaskView shows continuity.
   {

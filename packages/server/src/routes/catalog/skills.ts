@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import { readPlanTokenBody, readSkillInstallBody } from "./helpers.js";
+import { readInstallSkillRequest, readPlanToken } from "./helpers.js";
 import { mimeFromExt } from "./mime.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
@@ -31,7 +31,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): Hono {
 
   app.post("/resolve", async (c) => {
     const catalog = getCatalog(c);
-    const parsed = await readSkillInstallBody(c);
+    const parsed = await readInstallSkillRequest(c);
     if ("error" in parsed) return c.json(parsed, 400);
     try {
       const plan = await catalog.resolveSkill(parsed.origin);
@@ -116,7 +116,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): Hono {
 
   app.post("/", async (c) => {
     const catalog = getCatalog(c);
-    const parsed = await readSkillInstallBody(c);
+    const parsed = await readInstallSkillRequest(c);
     if ("error" in parsed) return c.json(parsed, 400);
     try {
       const result = await catalog.installSkill(parsed.origin);
@@ -162,7 +162,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): Hono {
 
   app.post("/:name{.+}/sync", async (c) => {
     const catalog = getCatalog(c);
-    const parsed = await readPlanTokenBody(c);
+    const parsed = await readPlanToken(c);
     if ("error" in parsed) return c.json(parsed, 400);
     const plan = catalog.takePlan(parsed.planToken);
     if (plan === null) {

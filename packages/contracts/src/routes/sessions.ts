@@ -16,7 +16,7 @@ export interface SessionListQuery {
 }
 
 /** POST /api/workspaces/:id/sessions body. */
-export interface SessionCreateBody {
+export interface CreateSessionRequest {
   readonly agent: string;
   readonly runtime?: string;
 }
@@ -27,13 +27,13 @@ export interface SessionDeleteQuery {
 }
 
 /** POST /api/workspaces/:id/sessions/:sid/spawn body. */
-export interface SessionSpawnBody {
+export interface SpawnSessionRequest {
   /** When `true`, build a remote-launch command instead of a local one. */
   readonly remote?: boolean;
 }
 
 /** Response from the spawn route. Indicates whether terminal launch succeeded. */
-export type SessionSpawnRes =
+export type SpawnSessionResponse =
   | { readonly ok: true; readonly launcher: string; readonly display: string }
   | { readonly ok: false; readonly error: string; readonly code: string; readonly display: string };
 
@@ -48,10 +48,10 @@ export const sessionRoutes = {
     { params: WorkspacePathParams; query: SessionListQuery },
     readonly Session[]
   >("GET", "/api/workspaces/:id/sessions"),
-  "sessions.create": defineRoute<{ params: WorkspacePathParams; body: SessionCreateBody }, Session>(
-    "POST",
-    "/api/workspaces/:id/sessions",
-  ),
+  "sessions.create": defineRoute<
+    { params: WorkspacePathParams; body: CreateSessionRequest },
+    Session
+  >("POST", "/api/workspaces/:id/sessions"),
   "sessions.get": defineRoute<{ params: SessionPathParams }, Session>(
     "GET",
     "/api/workspaces/:id/sessions/:sid",
@@ -61,7 +61,7 @@ export const sessionRoutes = {
     "/api/workspaces/:id/sessions/:sid",
   ),
   "sessions.spawn": defineRoute<
-    { params: SessionPathParams; body: SessionSpawnBody },
-    SessionSpawnRes
+    { params: SessionPathParams; body: SpawnSessionRequest },
+    SpawnSessionResponse
   >("POST", "/api/workspaces/:id/sessions/:sid/spawn"),
 } as const satisfies Record<string, RouteSpec<RouteRequest, unknown>>;

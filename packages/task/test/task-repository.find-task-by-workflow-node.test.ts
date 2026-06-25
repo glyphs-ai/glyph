@@ -1,6 +1,6 @@
 /**
  * `TaskRepository.findTaskByWorkflowNode(nodeId)` is the read used
- * by the wire-shape projector to enrich `WorkflowNodeWire.taskId`
+ * by the wire-shape projector to enrich `WorkflowNode.taskId`
  * for the workflow `/dag` route. Powers the dashboard's node
  * drill-down — clicking a node navigates to its dispatched
  * task. Differs from {@link TaskRepository.listInFlightForWorkflowNode}

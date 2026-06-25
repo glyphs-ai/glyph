@@ -1,8 +1,8 @@
-import type { WorkflowHeaderWire } from "../../api";
+import type { WorkflowHeader } from "../../api";
 import { WORKFLOW_STATUS_LABEL, workflowStatusTone } from "./shared";
 
 export interface WorkflowStatusBadgeProps {
-  status: WorkflowHeaderWire["status"];
+  status: WorkflowHeader["status"];
 }
 
 /**

@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { listScheduledWorkflows, type WorkflowHeaderWire, type WorkflowNodeWire } from "../../api";
+import { listScheduledWorkflows, type WorkflowHeader, type WorkflowNode } from "../../api";
 import { useWorkflowDetail } from "../../hooks/useWorkflowDetail";
 import { WorkflowNodeHumanPane } from "../../pages/workflows/WorkflowNodeHumanPane";
 import { WorkflowNodeTaskPane } from "../../pages/workflows/WorkflowNodeTaskPane";
@@ -59,7 +59,7 @@ export function FireWorkflowDetailPane({
   onSelectNode,
   onBackFromNode,
 }: FireWorkflowDetailPaneProps) {
-  const [rows, setRows] = useState<WorkflowHeaderWire[] | null>(null);
+  const [rows, setRows] = useState<WorkflowHeader[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const cancelledRef = useRef(false);
@@ -200,7 +200,7 @@ function FireWorkflowView({
   const { workflow, dag, error, dagError } = useWorkflowDetail(fireWorkflowId);
 
   const handleSelectNode = useCallback(
-    (node: WorkflowNodeWire) => {
+    (node: WorkflowNode) => {
       if (node.spec.kind === "human") {
         onSelectNode(node.id);
       } else {

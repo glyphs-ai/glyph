@@ -175,6 +175,9 @@ importers:
       '@glyphs-ai/task':
         specifier: workspace:*
         version: link:../task
+      '@glyphs-ai/workflow':
+        specifier: workspace:*
+        version: link:../workflow
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17

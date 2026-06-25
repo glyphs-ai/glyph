@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowDagWire, WorkflowHeaderWire, WorkflowNodeWire } from "../../../src/api";
+import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../../src/api";
 import { OverviewTab } from "../../../src/pages/workflows/OverviewTab";
 
-function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-1",
     brief: "Default brief",
@@ -110,16 +110,16 @@ describe("OverviewTab — typed state strips", () => {
 });
 
 describe("OverviewTab — awaiting CTA", () => {
-  const humanNode: WorkflowNodeWire = {
+  const humanNode: WorkflowNode = {
     id: "node-human-1",
     workflowId: "wf-1",
     phase: 1,
     status: "running",
     spec: { kind: "human", prompt: "Please confirm", promptStyle: "plain" },
     createdAt: "2026-05-28T00:01:00.000Z",
-  } as unknown as WorkflowNodeWire;
+  } as unknown as WorkflowNode;
 
-  const dag: WorkflowDagWire = {
+  const dag: WorkflowDag = {
     nodes: [
       humanNode,
       {
@@ -132,7 +132,7 @@ describe("OverviewTab — awaiting CTA", () => {
       },
     ],
     edges: [],
-  } as unknown as WorkflowDagWire;
+  } as unknown as WorkflowDag;
 
   it("renders awaiting message when awaitingHumanCount === 1", () => {
     render(<OverviewTab workflow={makeWf({ awaitingHumanCount: 1 })} dag={dag} />);

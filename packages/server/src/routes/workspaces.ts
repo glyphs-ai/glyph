@@ -1,17 +1,17 @@
 import type {
   Application,
-  WorkspaceCreateBody,
-  WorkspaceCurrentPutBody,
-  WorkspacePatchBody,
+  CreateWorkspaceRequest,
+  PatchWorkspaceRequest,
+  SetCurrentWorkspaceRequest,
 } from "@glyphs-ai/api";
 import { Hono } from "hono";
 import { workspacesErrorPolicy } from "./_error-policies/workspaces.js";
 import { respondError } from "./_respond-error.js";
 import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared.js";
 
-type CreateBodyRaw = { [K in keyof WorkspaceCreateBody]?: unknown };
-type PutCurrentBodyRaw = { [K in keyof WorkspaceCurrentPutBody]?: unknown };
-type PatchBodyRaw = { [K in keyof WorkspacePatchBody]?: unknown };
+type CreateWorkspaceRequestRaw = { [K in keyof CreateWorkspaceRequest]?: unknown };
+type SetCurrentWorkspaceRequestRaw = { [K in keyof SetCurrentWorkspaceRequest]?: unknown };
+type PatchWorkspaceRequestRaw = { [K in keyof PatchWorkspaceRequest]?: unknown };
 
 const WORKSPACE_CREATE_KEYS = new Set(["name", "workspaceDir"]);
 const WORKSPACE_CURRENT_KEYS = new Set(["id"]);
@@ -47,7 +47,7 @@ export function workspacesRoutes(application: Application): Hono {
   // Create a workspace. `name` required. `workspaceDir` optional — when
   // omitted, core mints `<defaultWorkspaceParent>/<uuid>/`.
   app.post("/", async (c) => {
-    const parsed = await parseJsonBody<CreateBodyRaw>(c);
+    const parsed = await parseJsonBody<CreateWorkspaceRequestRaw>(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
     const body = parsed.body;
     if (!isJsonObject(body)) return c.json({ error: "request body must be an object" }, 400);
@@ -99,7 +99,7 @@ export function workspacesRoutes(application: Application): Hono {
 
   // Set the currently-selected workspace by id (mark as just-opened).
   app.put("/current", async (c) => {
-    const parsed = await parseJsonBody<PutCurrentBodyRaw>(c);
+    const parsed = await parseJsonBody<SetCurrentWorkspaceRequestRaw>(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
     if (!isJsonObject(parsed.body)) {
       return c.json({ error: "request body must be an object" }, 400);
@@ -149,7 +149,7 @@ export function workspacesRoutes(application: Application): Hono {
   // Rename a workspace (`name` is currently the only mutable field).
   app.patch("/:id", async (c) => {
     const id = c.req.param("id");
-    const parsed = await parseJsonBody<PatchBodyRaw>(c);
+    const parsed = await parseJsonBody<PatchWorkspaceRequestRaw>(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
     const body = parsed.body;
     if (!isJsonObject(body)) return c.json({ error: "request body must be an object" }, 400);

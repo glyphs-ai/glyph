@@ -217,7 +217,7 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
 
     // 3. Add a worker via the addSubgraph HTTP surface (exercising the
     //    most complex mutation primitive in one call: temp-id alloc,
-    //    intra-batch edge translation, NodeRefWire→NodeRef boundary).
+    //    intra-batch edge translation, WorkflowNodeRef→NodeRef boundary).
     //    The batch attaches the worker to the (now-succeeded) initial
     //    coord (worker's "all parents succeeded" readiness rule), and
     //    attaches a trailing coord cend to BOTH the detector-inserted

@@ -4,9 +4,9 @@
  */
 
 import type {
-  ScheduleWireTarget,
-  TaskScheduleTargetWire,
-  WorkflowScheduleTargetWire,
+  ScheduleTarget,
+  TaskScheduleTarget,
+  WorkflowScheduleTarget,
 } from "@glyphs-ai/contracts";
 import type { ScheduleView } from "../../api";
 
@@ -37,37 +37,37 @@ export const WORKFLOW_ACTIVITY_FILTERS: readonly {
   { value: "idle", label: "Idle" },
 ];
 
-/** Type guard: narrows ScheduleWireTarget to task kind. */
-export function isTaskTarget(t: ScheduleWireTarget): t is TaskScheduleTargetWire {
+/** Type guard: narrows ScheduleTarget to task kind. */
+export function isTaskTarget(t: ScheduleTarget): t is TaskScheduleTarget {
   return t.kind === "task";
 }
 
-/** Type guard: narrows ScheduleWireTarget to workflow kind. */
-export function isWorkflowTarget(t: ScheduleWireTarget): t is WorkflowScheduleTargetWire {
+/** Type guard: narrows ScheduleTarget to workflow kind. */
+export function isWorkflowTarget(t: ScheduleTarget): t is WorkflowScheduleTarget {
   return t.kind === "workflow";
 }
 
 /** Extract display agent for any schedule target. */
-export function targetAgent(t: ScheduleWireTarget): string {
+export function targetAgent(t: ScheduleTarget): string {
   if (isTaskTarget(t)) return t.agent;
   if (isWorkflowTarget(t)) return t.coordinatorAgent;
   return "";
 }
 
 /** Extract display runtime (task only, otherwise undefined). */
-export function targetRuntime(t: ScheduleWireTarget): string | undefined {
+export function targetRuntime(t: ScheduleTarget): string | undefined {
   if (isTaskTarget(t)) return t.runtime;
   return undefined;
 }
 
 /** Extract the one-line brief shared by the task and workflow kinds. */
-export function targetBrief(t: ScheduleWireTarget): string {
+export function targetBrief(t: ScheduleTarget): string {
   if (isTaskTarget(t) || isWorkflowTarget(t)) return t.brief;
   return "";
 }
 
 /** Extract the optional multi-line details shared by the task and workflow kinds. */
-export function targetDetails(t: ScheduleWireTarget): string | undefined {
+export function targetDetails(t: ScheduleTarget): string | undefined {
   if (isTaskTarget(t) || isWorkflowTarget(t)) return t.details;
   return undefined;
 }

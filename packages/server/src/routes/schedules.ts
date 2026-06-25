@@ -54,7 +54,7 @@
  */
 
 import type {
-  ScheduleWire,
+  ScheduleHeader,
   TaskTargetData,
   TaskTargetPatch,
   WorkflowTargetData,
@@ -390,18 +390,18 @@ function validateWorkflowTargetPatch(raw: unknown): ValidationResult<WorkflowTar
  */
 function collectWorkflowFireStats(
   aggregated: ReadonlyMap<string, { runningCount: number; awaitingCount: number }>,
-): ReadonlyMap<string, NonNullable<ScheduleWire["fireStats"]>> {
-  const stats = new Map<string, NonNullable<ScheduleWire["fireStats"]>>();
+): ReadonlyMap<string, NonNullable<ScheduleHeader["fireStats"]>> {
+  const stats = new Map<string, NonNullable<ScheduleHeader["fireStats"]>>();
   for (const [scheduleId, { runningCount, awaitingCount }] of aggregated) {
     stats.set(scheduleId, { runningCount, awaitingCount });
   }
   return stats;
 }
 
-function projectScheduleToWire(
+function projectScheduleHeader(
   s: Schedule,
-  workflowFireStats?: ReadonlyMap<string, NonNullable<ScheduleWire["fireStats"]>>,
-): ScheduleWire {
+  workflowFireStats?: ReadonlyMap<string, NonNullable<ScheduleHeader["fireStats"]>>,
+): ScheduleHeader {
   if (s.target.kind === "task") {
     const data = s.target.data as TaskTargetData;
     return {
@@ -484,7 +484,7 @@ export function schedulesRoutes(
               return collectWorkflowFireStats(aggregated);
             })()
           : undefined;
-      return c.json(list.map((schedule) => projectScheduleToWire(schedule, workflowFireStats)));
+      return c.json(list.map((schedule) => projectScheduleHeader(schedule, workflowFireStats)));
     } catch (err) {
       return respondError(c, err, {
         route: "schedules.list",
@@ -535,7 +535,7 @@ export function schedulesRoutes(
         scheduleId: created.id,
         agent: targetResult.value.agent,
       });
-      return c.json(projectScheduleToWire(created), 201);
+      return c.json(projectScheduleHeader(created), 201);
     } catch (err) {
       return respondError(c, err, {
         route: "schedules.task.create",
@@ -602,7 +602,7 @@ export function schedulesRoutes(
       // Compute fireStats for workflow-kind schedules (spec: MUST on
       // both list and single-get endpoints).
       let workflowFireStats:
-        | ReadonlyMap<string, NonNullable<ScheduleWire["fireStats"]>>
+        | ReadonlyMap<string, NonNullable<ScheduleHeader["fireStats"]>>
         | undefined;
       if (found.target.kind === "workflow" && resolveWorkflowService !== undefined) {
         const workflowService = resolveWorkflowService(c);
@@ -619,7 +619,7 @@ export function schedulesRoutes(
       // NOT persisted on the entity — `trigger.expr` is the single
       // source of truth.
       return c.json({
-        ...projectScheduleToWire(found, workflowFireStats),
+        ...projectScheduleHeader(found, workflowFireStats),
         describe: describeCron(found.trigger.expr),
       });
     } catch (err) {
@@ -706,7 +706,7 @@ export function schedulesRoutes(
         expectedKind: "task",
       });
       logEvent(c, "schedule.patch", { scheduleId: sid });
-      return c.json(projectScheduleToWire(updated));
+      return c.json(projectScheduleHeader(updated));
     } catch (err) {
       // Project `ScheduleKindMismatchError` to the standard
       // `ScheduleNotFoundError` envelope so the wire shape does not
@@ -764,7 +764,7 @@ export function schedulesRoutes(
         scheduleId: created.id,
         coordinatorAgent: targetResult.value.coordinatorAgent,
       });
-      return c.json(projectScheduleToWire(created), 201);
+      return c.json(projectScheduleHeader(created), 201);
     } catch (err) {
       return respondError(c, err, {
         route: "schedules.workflow.create",
@@ -829,7 +829,7 @@ export function schedulesRoutes(
         expectedKind: "workflow",
       });
       logEvent(c, "schedule.patch", { scheduleId: sid });
-      return c.json(projectScheduleToWire(updated));
+      return c.json(projectScheduleHeader(updated));
     } catch (err) {
       if (err instanceof ScheduleKindMismatchError) {
         logEvent(c, "schedule.patch.kind_mismatch", {

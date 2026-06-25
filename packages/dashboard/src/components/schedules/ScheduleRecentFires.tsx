@@ -4,7 +4,7 @@ import {
   listScheduledTasks,
   listScheduledWorkflows,
   type TaskRecord,
-  type WorkflowHeaderWire,
+  type WorkflowHeader,
 } from "../../api";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { copyToClipboard } from "../../utils/clipboard";
@@ -21,7 +21,7 @@ export interface ScheduleRecentFiresProps {
   refreshToken: number;
   onSelectFire?: (fireId: string) => void;
   onCancelTaskFire?: (taskId: string) => Promise<void> | void;
-  onCancelWorkflowFire?: (workflow: WorkflowHeaderWire) => Promise<void> | void;
+  onCancelWorkflowFire?: (workflow: WorkflowHeader) => Promise<void> | void;
 }
 
 const MAX_ROWS = 10;
@@ -100,7 +100,7 @@ function WorkflowFiresBody({
   onSelectFire,
   onCancelWorkflowFire,
 }: ScheduleRecentFiresProps) {
-  const [rows, setRows] = useState<WorkflowHeaderWire[] | null>(null);
+  const [rows, setRows] = useState<WorkflowHeader[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is intentionally part of the re-fetch trigger set
@@ -233,10 +233,10 @@ function TaskFireRow({
 }
 
 interface WorkflowFireRowProps {
-  workflow: WorkflowHeaderWire;
+  workflow: WorkflowHeader;
   currentWorkspaceId: string;
   onSelectFire?: (workflowId: string) => void;
-  onCancelWorkflowFire?: (workflow: WorkflowHeaderWire) => Promise<void> | void;
+  onCancelWorkflowFire?: (workflow: WorkflowHeader) => Promise<void> | void;
 }
 
 function WorkflowFireRow({

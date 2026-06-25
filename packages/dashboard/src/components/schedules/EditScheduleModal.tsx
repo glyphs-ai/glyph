@@ -1,13 +1,10 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type {
+  AgentEntry,
+  PatchTaskScheduleRequest,
+  PatchWorkflowScheduleRequest,
+} from "@glyphs-ai/contracts";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  getSchedule,
-  type PatchScheduleBody,
-  type PatchWorkflowScheduleBody,
-  patchSchedule,
-  patchWorkflowSchedule,
-  type ScheduleDetail,
-} from "../../api";
+import { getSchedule, patchSchedule, patchWorkflowSchedule, type ScheduleDetail } from "../../api";
 import { Modal } from "../Modal";
 import { presetToCron, validatePreset } from "./cron-presets";
 import { ScheduleFormFields } from "./ScheduleFormFields";
@@ -19,6 +16,16 @@ import {
 } from "./schedule-form-shared";
 import { targetAgent, targetBrief, targetDetails, targetRuntime } from "./shared";
 import { useSchedulePreview } from "./useSchedulePreview";
+
+// Mutable mirrors of the contracts PATCH request shapes — the
+// builder below assigns fields conditionally, so we strip
+// `readonly` recursively (the nested `target` is also readonly) for
+// local construction. The wire payload is then shipped through
+// `patchSchedule` / `patchWorkflowSchedule`, whose signatures are
+// the canonical readonly contracts type.
+type DeepMutable<T> = T extends object ? { -readonly [K in keyof T]: DeepMutable<T[K]> } : T;
+type MutablePatchTaskSchedule = DeepMutable<PatchTaskScheduleRequest>;
+type MutablePatchWorkflowSchedule = DeepMutable<PatchWorkflowScheduleRequest>;
 
 export interface EditScheduleModalProps {
   open: boolean;
@@ -48,7 +55,7 @@ export interface EditScheduleModalProps {
  *   - No `enabled` toggle (`ScheduleDetail`'s Pause/Resume owns
  *     enabled-state; two surfaces for one boolean is a source-of-
  *     truth conflict).
- *   - Submit builds a sparse {@link PatchScheduleBody} via field-by-
+ *   - Submit builds a sparse {@link PatchTaskScheduleRequest} via field-by-
  *     field diff (trim-before-compare). `target.details` /
  *     `target.runtime` use RFC 7396 `null` when the user clears a
  *     previously-set value.
@@ -135,8 +142,8 @@ export function EditScheduleModal({
   // diff disables submit" gate to the actual wire payload.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the seed* values are derived from `schedule` (already a dep) — re-listing them would needlessly re-run on unrelated schedule mutations while the user is mid-edit
   const patch = useMemo<
-    | { kind: "task"; body: PatchScheduleBody }
-    | { kind: "workflow"; body: PatchWorkflowScheduleBody }
+    | { kind: "task"; body: MutablePatchTaskSchedule }
+    | { kind: "workflow"; body: MutablePatchWorkflowSchedule }
   >(() => {
     const trimmedName = state.name.trim();
     const trimmedBrief = state.brief.trim();
@@ -144,9 +151,9 @@ export function EditScheduleModal({
     const triggerChanged = expr !== schedule.trigger.expr || state.tz !== schedule.trigger.tz;
 
     if (state.kind === "workflow") {
-      const body: PatchWorkflowScheduleBody = {};
+      const body: MutablePatchWorkflowSchedule = {};
       if (trimmedName !== schedule.name) body.name = trimmedName;
-      const target: NonNullable<PatchWorkflowScheduleBody["target"]> = {};
+      const target: NonNullable<MutablePatchWorkflowSchedule["target"]> = {};
       if (state.agent !== seedAgent) target.coordinatorAgent = state.agent;
       if (trimmedBrief !== seedBrief) target.brief = trimmedBrief;
       if (trimmedDetails !== seedDetails) {
@@ -157,9 +164,9 @@ export function EditScheduleModal({
       return { kind: "workflow", body };
     }
 
-    const body: PatchScheduleBody = {};
+    const body: MutablePatchTaskSchedule = {};
     if (trimmedName !== schedule.name) body.name = trimmedName;
-    const target: NonNullable<PatchScheduleBody["target"]> = {};
+    const target: NonNullable<MutablePatchTaskSchedule["target"]> = {};
     if (state.agent !== seedAgent) target.agent = state.agent;
     if (trimmedBrief !== seedBrief) target.brief = trimmedBrief;
     if (trimmedDetails !== seedDetails) {

@@ -574,6 +574,140 @@ NEVER use these suffixes:
 - `Queries` — merged into `Service`
 - `View` / `Pojo` / `Dto` — replaced by bare-noun DTO
 
+## Wire / HTTP layer conventions
+
+> Applies to `@glyphs-ai/contracts` — the wire / HTTP layer. The
+> `## Naming conventions` rules above govern *pkg-internal* types
+> (`*Row` / `*Entity` / bare-noun DTO). This section governs the
+> *cross-the-wire* types that live in `@glyphs-ai/contracts`: HTTP
+> request / response bodies and the per-endpoint projections of pkg
+> DTOs.
+
+> Research basis: protobuf / gRPC (Google API style guide), AWS SDK v3,
+> Stripe, GitHub REST, and OpenAPI codegen all name HTTP payloads
+> `*Request` / `*Response` and re-use a bare noun for entities that
+> cross unchanged. Fowler-style DTO guidance (Java / .NET) treats
+> `Dto` as a *role*, not a suffix. None of them mark the serialized
+> form with a `Wire` tag — wire format is the default, not a variant.
+
+The contracts package is **only** JSON-over-HTTP: there is no
+rich-in-memory counterpart for a contracts type to contrast with, so a
+`Wire` suffix disambiguates nothing. Four rules replace it.
+
+### Rule 1 — Same shape as the owning pkg DTO → re-export, don't redefine
+
+When a wire type is structurally identical to a DTO already owned by a
+domain pkg, **re-export it** instead of hand-copying a second
+definition.
+
+```ts
+// packages/contracts/src/workflows.ts
+import type {
+  WorkflowStatus,
+  WorkflowSuccess,
+} from "@glyphs-ai/workflow";
+
+export type { WorkflowStatus, WorkflowSuccess } from "@glyphs-ai/workflow";
+```
+
+Re-export keeps the wire layer DRY and turns any drift in the owning
+pkg into a `tsc` error here, immediately. A second `interface
+Workflow` in contracts that is byte-identical to the pkg DTO is the
+anti-pattern (`WorkflowStatusWire = "running" | …` vs the pkg's
+`WorkflowStatus` — two names for exactly one thing). All re-exports are
+`type`-only, so no runtime dep crosses into the dashboard / CLI
+bundles.
+
+### Rule 2 — Different shape (subset / extension / projection) → descriptive suffix, never `Wire`
+
+When the wire shape is a projection — a trimmed list row, a denormed
+snapshot, a flattened envelope — give it a name that states the
+*intent*, never a `Wire` tag.
+
+| Use case | Suffix | Example |
+|---|---|---|
+| List / summary row (trimmed) | `Header` | `WorkflowHeader`, `ScheduleHeader` |
+| Full detail (when it differs from the list row) | `Detail` | `WorkflowDetail` |
+| Endpoint-specific projection | concrete noun | `WorkflowDag`, `WorkflowNode`, `WorkflowEdge` |
+| Terminal / outcome payload | the concept | `WorkflowSuccess`, `WorkflowFailure`, `WorkflowCancellation` |
+| Polymorphic spec union | concept (+ subtype on the arms) | `WorkflowNodeSpec` |
+
+```ts
+// Wire projection of a workflow header — mirrors WorkflowEntity but
+// adds awaitingHumanCount and drops pkg-private columns.
+export interface WorkflowHeader {
+  readonly id: string;
+  readonly status: WorkflowStatus; // re-exported per Rule 1
+  readonly awaitingHumanCount: number;
+  // …
+}
+```
+
+`WorkflowHeader` tells a reader it is the list / summary projection.
+`WorkflowHeaderWire` told them nothing — not whether it was a list row,
+a detail, or a request body.
+
+### Rule 3 — Request / response bodies → `*Request` / `*Response` (full word, no `Req` / `Res`)
+
+HTTP bodies are named for their direction with the full word — never
+the `Req` / `Res` abbreviations.
+
+```ts
+export interface AddNodeRequest {
+  readonly kind: WorkflowNodeKind;
+  readonly spec: unknown;
+  readonly parents: readonly string[];
+}
+
+export interface AddNodeResponse {
+  readonly nodeId: string;
+  readonly phase: number;
+}
+```
+
+This aligns with the route manifest's `RouteReq<K>` / `RouteRes<K>`
+roots and with every external HTTP convention surveyed above. A request
+body that re-uses a re-exported pkg DTO unchanged still follows Rule 1
+(re-export); `*Request` / `*Response` is for bodies that have their own
+shape.
+
+### Rule 4 — Nested sub-structures → flat naming, repo-wide
+
+A type nested inside a request / response body is named by
+concatenating its parent's name with its role — **flat**, no TypeScript
+`namespace`. Pick one style and keep it repo-wide; glyph uses flat.
+
+```ts
+export interface AddSubgraphRequest {
+  readonly nodes: readonly AddSubgraphRequestNode[];
+  readonly edges: readonly AddSubgraphRequestEdge[];
+}
+
+export interface AddSubgraphRequestNode {
+  readonly tempId: string;
+  readonly kind: WorkflowNodeKind;
+  readonly spec: unknown;
+}
+
+export interface AddSubgraphResponse {
+  readonly insertedNodes: readonly AddSubgraphResponseInsertedNode[];
+}
+```
+
+Flat names keep every wire type reachable by a single `grep` and avoid
+the `Parent.Child` import friction a `namespace` introduces.
+
+### Why no `Wire` suffix?
+
+- **Disambiguates nothing** — contracts is *only* the JSON-over-HTTP
+  layer. There is no rich in-memory form for it to contrast with.
+- **Industry never adopted it** — the protobuf-style stack treats the
+  wire format as the default and never tags it.
+- **Pollutes byte-identical unions** — `WorkflowStatusWire` vs
+  `WorkflowStatus` are two names for one thing; Rule 1 collapses them.
+- **Hides intent** — `WorkflowHeaderWire` does not say whether it is a
+  list projection, a detail, or a request body. `WorkflowHeader` does.
+
 ## Repository contract
 
 > Industry research: Codex (Rust) `ThreadStore` returns plain

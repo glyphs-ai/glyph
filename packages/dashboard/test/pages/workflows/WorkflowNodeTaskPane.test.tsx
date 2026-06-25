@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowDagWire, WorkflowHeaderWire } from "../../../src/api";
+import type { WorkflowDag, WorkflowHeader } from "../../../src/api";
 
 vi.mock("../../../src/hooks/useTaskDetail", () => ({
   useTaskDetail: () => ({
@@ -14,7 +14,7 @@ vi.mock("../../../src/hooks/useTaskDetail", () => ({
 
 import { WorkflowNodeTaskPane } from "../../../src/pages/workflows/WorkflowNodeTaskPane";
 
-function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire {
+function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
     id: "wf-1",
     brief: "test workflow",
@@ -29,7 +29,7 @@ function makeWf(overrides: Partial<WorkflowHeaderWire> = {}): WorkflowHeaderWire
   };
 }
 
-function makeDag(): WorkflowDagWire {
+function makeDag(): WorkflowDag {
   return {
     workflow: makeWf(),
     nodes: [

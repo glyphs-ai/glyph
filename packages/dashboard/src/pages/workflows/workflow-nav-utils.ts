@@ -1,4 +1,4 @@
-import type { WorkflowDagWire, WorkflowNodeWire } from "../../api";
+import type { WorkflowDag, WorkflowNode } from "../../api";
 
 /**
  * Project the DAG into a flat, navigation-ordered node list. Includes
@@ -10,7 +10,7 @@ import type { WorkflowDagWire, WorkflowNodeWire } from "../../api";
  *   2. createdAt ASC (within a phase, the node inserted earliest is
  *      walked first — mirrors `groupByPhase` / `buildSlotMap`).
  */
-export function orderNodesForNav(dag: WorkflowDagWire | null): WorkflowNodeWire[] {
+export function orderNodesForNav(dag: WorkflowDag | null): WorkflowNode[] {
   if (dag === null) return [];
   return dag.nodes
     .filter((n) => n.taskId !== undefined || n.spec.kind === "human")

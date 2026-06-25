@@ -76,10 +76,10 @@
  */
 
 import type {
-  RespondHumanNodeBody,
-  WorkflowDagWire,
-  WorkflowHeaderWire,
-  WorkflowStatusWire,
+  RespondHumanNodeRequest,
+  WorkflowDag,
+  WorkflowHeader,
+  WorkflowStatus,
 } from "@glyphs-ai/api";
 import { InvalidTransition, type TaskService } from "@glyphs-ai/task";
 import {
@@ -101,15 +101,15 @@ import {
 } from "./_workflow-projection.js";
 import { handleListArtifacts, handleStreamArtifact } from "./workflows/_artifacts.js";
 import {
-  nodeRefFromWire,
-  validateAddEdgeBody,
-  validateAddNodeBody,
-  validateAddSubgraphBody,
-  validateCancelWorkflowBody,
-  validateCreateBody,
+  resolveNodeRef,
+  validateAddEdgeRequest,
+  validateAddNodeRequest,
+  validateAddSubgraphRequest,
+  validateCancelWorkflowRequest,
   validateCreatedSinceQuery,
-  validateFinishWorkflowBody,
-  validateReplaceNodeSpecBody,
+  validateCreateWorkflowRequest,
+  validateFinishWorkflowRequest,
+  validateReplaceNodeSpecRequest,
 } from "./workflows/_validators.js";
 
 type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
@@ -152,7 +152,7 @@ export function workflowsRoutes(
       // endpoint O(workflows): computing it per row would require a
       // DAG snapshot per workflow. Clients that need the accurate
       // count fetch the header via `GET /:wfid`.
-      const wire: readonly WorkflowHeaderWire[] = list.map((wf) =>
+      const wire: readonly WorkflowHeader[] = list.map((wf) =>
         projectWorkflowHeader(wf, undefined, awaitingMap.get(wf.id) ?? 0),
       );
       return c.json(wire);
@@ -168,7 +168,7 @@ export function workflowsRoutes(
   app.post("/", async (c) => {
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateCreateBody(parsed.body);
+    const validated = validateCreateWorkflowRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -217,7 +217,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     try {
       const snapshot = await resolve(c).getDag(wfid);
-      const wire: WorkflowDagWire = await projectWorkflowDag(snapshot, {
+      const wire: WorkflowDag = await projectWorkflowDag(snapshot, {
         tasks: resolveTasks(c),
       });
       return c.json(wire);
@@ -265,7 +265,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateCancelWorkflowBody(parsed.body);
+    const validated = validateCancelWorkflowRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const { cancellation } = validated.value;
     try {
@@ -305,7 +305,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateAddNodeBody(parsed.body);
+    const validated = validateAddNodeRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -334,7 +334,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateAddEdgeBody(parsed.body);
+    const validated = validateAddEdgeRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -371,7 +371,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateAddSubgraphBody(parsed.body);
+    const validated = validateAddSubgraphRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -383,8 +383,8 @@ export function workflowsRoutes(
           ...(n.existingParents !== undefined ? { existingParents: n.existingParents } : {}),
         })),
         edges: body.edges.map((e) => ({
-          from: nodeRefFromWire(e.from),
-          to: nodeRefFromWire(e.to),
+          from: resolveNodeRef(e.from),
+          to: resolveNodeRef(e.to),
         })),
       });
       logEvent(c, "workflow.addSubgraph", {
@@ -429,7 +429,7 @@ export function workflowsRoutes(
     const wfid = c.req.param("wfid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateFinishWorkflowBody(parsed.body);
+    const validated = validateFinishWorkflowRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -619,7 +619,7 @@ export function workflowsRoutes(
     const nid = c.req.param("nid");
     const parsed = await parseJsonBody(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const validated = validateReplaceNodeSpecBody(parsed.body);
+    const validated = validateReplaceNodeSpecRequest(parsed.body);
     if (!validated.ok) return c.json({ error: validated.error }, 400);
     const body = validated.value;
     try {
@@ -665,7 +665,7 @@ export function workflowsRoutes(
     if (input !== undefined && typeof input !== "string") {
       return c.json({ error: "input, when set, must be a string" }, 400);
     }
-    const response: RespondHumanNodeBody = {
+    const response: RespondHumanNodeRequest = {
       ...(choiceId !== undefined ? { choiceId } : {}),
       ...(input !== undefined ? { input } : {}),
     };
@@ -689,4 +689,4 @@ export function workflowsRoutes(
 // Re-export the wire-shape type so `index.ts` doesn't have to thread
 // it from `@glyphs-ai/contracts` separately. Matches the schedules
 // route pattern.
-export type { WorkflowStatusWire };
+export type { WorkflowStatus };
