@@ -101,7 +101,7 @@ import {
 } from "./_workflow-projection.js";
 import { handleListArtifacts, handleStreamArtifact } from "./workflows/_artifacts.js";
 import {
-  nodeRefFromWire,
+  resolveNodeRef,
   validateAddEdgeBody,
   validateAddNodeBody,
   validateAddSubgraphBody,
@@ -383,8 +383,8 @@ export function workflowsRoutes(
           ...(n.existingParents !== undefined ? { existingParents: n.existingParents } : {}),
         })),
         edges: body.edges.map((e) => ({
-          from: nodeRefFromWire(e.from),
-          to: nodeRefFromWire(e.to),
+          from: resolveNodeRef(e.from),
+          to: resolveNodeRef(e.to),
         })),
       });
       logEvent(c, "workflow.addSubgraph", {

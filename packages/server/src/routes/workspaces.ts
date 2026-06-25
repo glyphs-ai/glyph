@@ -1,17 +1,17 @@
 import type {
   Application,
-  WorkspaceCreateBody,
-  WorkspaceCurrentPutBody,
-  WorkspacePatchBody,
+  CreateWorkspaceRequest,
+  PatchWorkspaceRequest,
+  SetCurrentWorkspaceRequest,
 } from "@glyphs-ai/api";
 import { Hono } from "hono";
 import { workspacesErrorPolicy } from "./_error-policies/workspaces.js";
 import { respondError } from "./_respond-error.js";
 import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared.js";
 
-type CreateBodyRaw = { [K in keyof WorkspaceCreateBody]?: unknown };
-type PutCurrentBodyRaw = { [K in keyof WorkspaceCurrentPutBody]?: unknown };
-type PatchBodyRaw = { [K in keyof WorkspacePatchBody]?: unknown };
+type CreateBodyRaw = { [K in keyof CreateWorkspaceRequest]?: unknown };
+type PutCurrentBodyRaw = { [K in keyof SetCurrentWorkspaceRequest]?: unknown };
+type PatchBodyRaw = { [K in keyof PatchWorkspaceRequest]?: unknown };
 
 const WORKSPACE_CREATE_KEYS = new Set(["name", "workspaceDir"]);
 const WORKSPACE_CURRENT_KEYS = new Set(["id"]);

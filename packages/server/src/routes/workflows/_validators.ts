@@ -124,7 +124,7 @@ export function validateAddEdgeBody(raw: unknown): ValidationResult<AddEdgeReque
   return { ok: true, value: { fromNodeId, toNodeId } };
 }
 
-function validateNodeRefWire(raw: unknown): ValidationResult<WorkflowNodeRef> {
+function validateWorkflowNodeRef(raw: unknown): ValidationResult<WorkflowNodeRef> {
   if (!isPlainObject(raw)) return { ok: false, error: "ref must be an object" };
   const keys = Object.keys(raw);
   if (keys.length !== 1) {
@@ -208,9 +208,9 @@ export function validateAddSubgraphBody(raw: unknown): ValidationResult<AddSubgr
         return { ok: false, error: `edges[${i}] has unknown key "${k}"` };
       }
     }
-    const fromResult = validateNodeRefWire(e.from);
+    const fromResult = validateWorkflowNodeRef(e.from);
     if (!fromResult.ok) return { ok: false, error: `edges[${i}].from: ${fromResult.error}` };
-    const toResult = validateNodeRefWire(e.to);
+    const toResult = validateWorkflowNodeRef(e.to);
     if (!toResult.ok) return { ok: false, error: `edges[${i}].to: ${toResult.error}` };
     validEdges.push({ from: fromResult.value, to: toResult.value });
   }
@@ -353,7 +353,7 @@ export function validateCancelWorkflowBody(
  * (discriminated by `kind`). Pure projection — no validation here, the
  * caller has already proven the input is a valid wire shape.
  */
-export function nodeRefFromWire(ref: WorkflowNodeRef): NodeRef {
+export function resolveNodeRef(ref: WorkflowNodeRef): NodeRef {
   if ("nodeId" in ref) return { kind: "existing", id: ref.nodeId };
   return { kind: "temp", tempId: ref.tempId };
 }

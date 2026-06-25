@@ -138,7 +138,7 @@ export type ScheduleTrigger = {
  * field is the internal opaque envelope; the server's route layer
  * projects to a kind-specific flat wire shape (e.g.
  * `{ kind: "task", agent, brief, ... }`) for HTTP responses via
- * `projectScheduleToWire` so dashboard / CLI consumers keep reading
+ * `projectScheduleHeader` so dashboard / CLI consumers keep reading
  * flat fields.
  */
 export interface Schedule {

@@ -15,17 +15,17 @@
 export type {
   Agent,
   AgentEntry,
-  AgentInstallBody,
   BlockedReason,
   CatalogConflict,
   CatalogInstallResult,
   CatalogKind,
   CatalogSyncResult,
+  InstallAgentRequest,
+  InstallSkillRequest,
   Mcp,
   MissingDep,
   Skill,
   SkillEntry,
-  SkillInstallBody,
 } from "@glyphs-ai/catalog";
 export type { ActivityItem, TruncationInfo } from "@glyphs-ai/runtime";
 export type { PreviewScheduleResult, Schedule } from "@glyphs-ai/schedule";

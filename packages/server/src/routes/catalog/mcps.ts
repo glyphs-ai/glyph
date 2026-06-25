@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import { readMcpInstallBody, readPlanTokenBody } from "./helpers.js";
+import { readInstallMcpRequest, readPlanTokenBody } from "./helpers.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 
@@ -51,7 +51,7 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): Hono {
 
   app.post("/", async (c) => {
     const catalog = getCatalog(c);
-    const parsed = await readMcpInstallBody(c);
+    const parsed = await readInstallMcpRequest(c);
     if ("error" in parsed) return c.json(parsed, 400);
     try {
       const result = await catalog.installMcpFromOrigin(parsed.origin);

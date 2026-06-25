@@ -1,7 +1,7 @@
 import {
-  type AgentInstallBody,
-  type McpInstallBody,
-  type SkillInstallBody,
+  type InstallAgentRequest,
+  type InstallMcpRequest,
+  type InstallSkillRequest,
   validateAgentInstallInput,
   validateMcpInstallInput,
   validateSkillInstallInput,
@@ -22,9 +22,9 @@ import { parseJsonBody } from "../_shared.js";
  */
 
 /** POST /catalog/skills body: `{ origin: string }`. Scope is frontmatter-driven. */
-export async function readSkillInstallBody(
+export async function readInstallSkillRequest(
   c: Context,
-): Promise<SkillInstallBody | { error: string }> {
+): Promise<InstallSkillRequest | { error: string }> {
   const parsed = await parseJsonBody<unknown>(c);
   if (!parsed.ok) return { error: parsed.error };
   try {
@@ -35,9 +35,9 @@ export async function readSkillInstallBody(
 }
 
 /** POST /catalog/agents body — same shape as skills. */
-export async function readAgentInstallBody(
+export async function readInstallAgentRequest(
   c: Context,
-): Promise<AgentInstallBody | { error: string }> {
+): Promise<InstallAgentRequest | { error: string }> {
   const parsed = await parseJsonBody<unknown>(c);
   if (!parsed.ok) return { error: parsed.error };
   try {
@@ -53,7 +53,9 @@ export async function readAgentInstallBody(
  * never supply it. The spec name IS the
  * catalog identity — no scope, no derivation, no mapping.
  */
-export async function readMcpInstallBody(c: Context): Promise<McpInstallBody | { error: string }> {
+export async function readInstallMcpRequest(
+  c: Context,
+): Promise<InstallMcpRequest | { error: string }> {
   const parsed = await parseJsonBody<unknown>(c);
   if (!parsed.ok) return { error: parsed.error };
   try {

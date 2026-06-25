@@ -34,7 +34,7 @@ export interface ScheduleListQuery {
  * so the user must commit to one explicitly). If callers want UTC,
  * they pass `"UTC"`.
  */
-export interface TaskScheduleCreateBody {
+export interface CreateTaskScheduleRequest {
   readonly name: string;
   readonly target: TaskTargetData;
   readonly trigger: {
@@ -59,20 +59,20 @@ export interface TaskScheduleCreateBody {
  *     - `details` / `runtime`: string sets, `null` deletes, absent keeps.
  *   `target.kind` MUST NOT be set (URL discriminates).
  */
-export interface TaskSchedulePatchBody {
+export interface PatchTaskScheduleRequest {
   readonly name?: string;
   readonly target?: TaskTargetPatch;
-  readonly trigger?: TaskScheduleCreateBody["trigger"];
+  readonly trigger?: CreateTaskScheduleRequest["trigger"];
   readonly enabled?: boolean;
 }
 
 /**
  * POST /api/workspaces/:id/schedules/workflow body — create a workflow-kind
  * schedule. URL-discriminated by `target.kind` so the body carries no
- * `kind` field. Mirrors `TaskScheduleCreateBody` shape but the target is
+ * `kind` field. Mirrors `CreateTaskScheduleRequest` shape but the target is
  * `WorkflowTargetData` (coordinatorAgent + brief + optional details).
  */
-export interface WorkflowScheduleCreateBody {
+export interface CreateWorkflowScheduleRequest {
   readonly name: string;
   readonly target: WorkflowTargetData;
   readonly trigger: {
@@ -93,10 +93,10 @@ export interface WorkflowScheduleCreateBody {
  * - `details`: string sets, `null` deletes, absent keeps.
  * - `target.kind` MUST NOT be set (URL discriminates).
  */
-export interface WorkflowSchedulePatchBody {
+export interface PatchWorkflowScheduleRequest {
   readonly name?: string;
   readonly target?: WorkflowTargetPatch;
-  readonly trigger?: WorkflowScheduleCreateBody["trigger"];
+  readonly trigger?: CreateWorkflowScheduleRequest["trigger"];
   readonly enabled?: boolean;
 }
 
@@ -118,7 +118,7 @@ export interface SchedulePathParams {
  * would require keeping it in sync on every patch + a migration).
  *
  * The `target` field is the FLAT wire shape (`ScheduleTarget`),
- * not the internal envelope — the server's `projectScheduleToWire`
+ * not the internal envelope — the server's `projectScheduleHeader`
  * helper converts on the way out. Dashboard / CLI code keeps
  * reading `schedule.target.agent` etc.
  */
@@ -211,7 +211,7 @@ export const scheduleRoutes = {
    * `service.create({ name, trigger, target: { kind: "task", data }, enabled })`.
    */
   "schedules.task.create": defineRoute<
-    { params: WorkspacePathParams; body: TaskScheduleCreateBody },
+    { params: WorkspacePathParams; body: CreateTaskScheduleRequest },
     ScheduleHeader
   >("POST", "/api/workspaces/:id/schedules/task"),
   "schedules.get": defineRoute<{ params: SchedulePathParams }, ScheduleGetResponse>(
@@ -229,7 +229,7 @@ export const scheduleRoutes = {
    * a generic 404 envelope (no kind-information leak).
    */
   "schedules.task.patch": defineRoute<
-    { params: SchedulePathParams; body: TaskSchedulePatchBody },
+    { params: SchedulePathParams; body: PatchTaskScheduleRequest },
     ScheduleHeader
   >("PATCH", "/api/workspaces/:id/schedules/task/:sid"),
   /**
@@ -239,7 +239,7 @@ export const scheduleRoutes = {
    * `service.create({ name, trigger, target: { kind: "workflow", data }, enabled })`.
    */
   "schedules.workflow.create": defineRoute<
-    { params: WorkspacePathParams; body: WorkflowScheduleCreateBody },
+    { params: WorkspacePathParams; body: CreateWorkflowScheduleRequest },
     ScheduleHeader
   >("POST", "/api/workspaces/:id/schedules/workflow"),
   /**
@@ -253,7 +253,7 @@ export const scheduleRoutes = {
    * a generic 404 envelope (no kind-information leak).
    */
   "schedules.workflow.patch": defineRoute<
-    { params: SchedulePathParams; body: WorkflowSchedulePatchBody },
+    { params: SchedulePathParams; body: PatchWorkflowScheduleRequest },
     ScheduleHeader
   >("PATCH", "/api/workspaces/:id/schedules/workflow/:sid"),
   "schedules.delete": defineRoute<{ params: SchedulePathParams }, ScheduleDeleteResponse>(

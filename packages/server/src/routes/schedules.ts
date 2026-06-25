@@ -398,7 +398,7 @@ function collectWorkflowFireStats(
   return stats;
 }
 
-function projectScheduleToWire(
+function projectScheduleHeader(
   s: Schedule,
   workflowFireStats?: ReadonlyMap<string, NonNullable<ScheduleHeader["fireStats"]>>,
 ): ScheduleHeader {
@@ -484,7 +484,7 @@ export function schedulesRoutes(
               return collectWorkflowFireStats(aggregated);
             })()
           : undefined;
-      return c.json(list.map((schedule) => projectScheduleToWire(schedule, workflowFireStats)));
+      return c.json(list.map((schedule) => projectScheduleHeader(schedule, workflowFireStats)));
     } catch (err) {
       return respondError(c, err, {
         route: "schedules.list",
@@ -535,7 +535,7 @@ export function schedulesRoutes(
         scheduleId: created.id,
         agent: targetResult.value.agent,
       });
-      return c.json(projectScheduleToWire(created), 201);
+      return c.json(projectScheduleHeader(created), 201);
     } catch (err) {
       return respondError(c, err, {
         route: "schedules.task.create",
@@ -619,7 +619,7 @@ export function schedulesRoutes(
       // NOT persisted on the entity — `trigger.expr` is the single
       // source of truth.
       return c.json({
-        ...projectScheduleToWire(found, workflowFireStats),
+        ...projectScheduleHeader(found, workflowFireStats),
         describe: describeCron(found.trigger.expr),
       });
     } catch (err) {
@@ -706,7 +706,7 @@ export function schedulesRoutes(
         expectedKind: "task",
       });
       logEvent(c, "schedule.patch", { scheduleId: sid });
-      return c.json(projectScheduleToWire(updated));
+      return c.json(projectScheduleHeader(updated));
     } catch (err) {
       // Project `ScheduleKindMismatchError` to the standard
       // `ScheduleNotFoundError` envelope so the wire shape does not
@@ -764,7 +764,7 @@ export function schedulesRoutes(
         scheduleId: created.id,
         coordinatorAgent: targetResult.value.coordinatorAgent,
       });
-      return c.json(projectScheduleToWire(created), 201);
+      return c.json(projectScheduleHeader(created), 201);
     } catch (err) {
       return respondError(c, err, {
         route: "schedules.workflow.create",
@@ -829,7 +829,7 @@ export function schedulesRoutes(
         expectedKind: "workflow",
       });
       logEvent(c, "schedule.patch", { scheduleId: sid });
-      return c.json(projectScheduleToWire(updated));
+      return c.json(projectScheduleHeader(updated));
     } catch (err) {
       if (err instanceof ScheduleKindMismatchError) {
         logEvent(c, "schedule.patch.kind_mismatch", {

@@ -24,7 +24,7 @@
 import { AgentFrontmatterError } from "./agent/errors.js";
 import { McpInvalidJsonError } from "./mcp/errors.js";
 import { SkillFrontmatterError } from "./skill/errors.js";
-import type { AgentInstallBody, McpInstallBody, SkillInstallBody } from "./types.js";
+import type { InstallAgentRequest, InstallMcpRequest, InstallSkillRequest } from "./types.js";
 
 const REQUEST_PATH = "<request>";
 
@@ -32,13 +32,13 @@ const REQUEST_PATH = "<request>";
  * Validate the body of `POST /catalog/skills`. Throws on shape
  * violations; the route layer maps to HTTP 400.
  */
-export function validateSkillInstallInput(raw: unknown): SkillInstallBody {
+export function validateSkillInstallInput(raw: unknown): InstallSkillRequest {
   const obj = expectObject(raw, "skill");
   return { origin: requireOrigin(obj, "skill") };
 }
 
 /** Validate the body of `POST /catalog/agents`. Same shape as skills. */
-export function validateAgentInstallInput(raw: unknown): AgentInstallBody {
+export function validateAgentInstallInput(raw: unknown): InstallAgentRequest {
   const obj = expectObject(raw, "agent");
   return { origin: requireOrigin(obj, "agent") };
 }
@@ -48,7 +48,7 @@ export function validateAgentInstallInput(raw: unknown): AgentInstallBody {
  * agents — `name` is derived from the fetched JSON's `_meta.name`
  * field at install time, not from the request body.
  */
-export function validateMcpInstallInput(raw: unknown): McpInstallBody {
+export function validateMcpInstallInput(raw: unknown): InstallMcpRequest {
   const obj = expectObject(raw, "mcp");
   return { origin: requireOrigin(obj, "mcp") };
 }

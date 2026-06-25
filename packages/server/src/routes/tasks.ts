@@ -1,6 +1,6 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import type { TaskDispatchBody } from "@glyphs-ai/api";
+import type { DispatchTaskRequest } from "@glyphs-ai/api";
 import {
   InvalidTransition,
   type ListTaskOpts,
@@ -19,7 +19,7 @@ import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared
  * the rationale — the manifest type is the wire contract for callers,
  * the *Raw alias keeps runtime guards TS-meaningful.
  */
-type TaskDispatchBodyRaw = { [K in keyof TaskDispatchBody]?: unknown };
+type TaskDispatchBodyRaw = { [K in keyof DispatchTaskRequest]?: unknown };
 const TASK_DISPATCH_KEYS = new Set(["agent", "brief", "details", "runtime"]);
 
 /**

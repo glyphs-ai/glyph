@@ -6,7 +6,7 @@
  *
  * The internal {@link import("@glyphs-ai/schedule").ScheduleTargetEnvelope}
  * keeps `target.data` opaque (`unknown`). The server's
- * `projectScheduleToWire` helper converts the envelope to the flat
+ * `projectScheduleHeader` helper converts the envelope to the flat
  * task-wire shape for HTTP responses so dashboard / CLI consumers
  * can keep reading `schedule.target.agent` etc. without touching
  * `data`.

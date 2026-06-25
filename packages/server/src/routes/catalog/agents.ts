@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import { readAgentInstallBody, readPlanTokenBody } from "./helpers.js";
+import { readInstallAgentRequest, readPlanTokenBody } from "./helpers.js";
 import { mimeFromExt } from "./mime.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
@@ -29,7 +29,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): Hono {
 
   app.post("/resolve", async (c) => {
     const catalog = getCatalog(c);
-    const parsed = await readAgentInstallBody(c);
+    const parsed = await readInstallAgentRequest(c);
     if ("error" in parsed) return c.json(parsed, 400);
     try {
       const plan = await catalog.resolveAgentFromOrigin(parsed.origin);
@@ -114,7 +114,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): Hono {
 
   app.post("/", async (c) => {
     const catalog = getCatalog(c);
-    const parsed = await readAgentInstallBody(c);
+    const parsed = await readInstallAgentRequest(c);
     if ("error" in parsed) return c.json(parsed, 400);
     try {
       const result = await catalog.installAgent(parsed.origin);

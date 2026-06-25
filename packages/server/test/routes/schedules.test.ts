@@ -34,7 +34,7 @@ import { schedulesRoutes } from "../../src/routes/schedules.js";
 
 /**
  * Sample schedule in the internal envelope shape. The route's
- * `projectScheduleToWire` flattens this for the HTTP response so
+ * `projectScheduleHeader` flattens this for the HTTP response so
  * `body.target.agent` etc. still work on the wire.
  */
 const sampleSchedule: Schedule = {
@@ -86,7 +86,7 @@ function stubService(overrides: Partial<Record<keyof ScheduleService, unknown>>)
 }
 
 describe("schedulesRoutes — list", () => {
-  // Sample as it appears on the WIRE after projectScheduleToWire flattens
+  // Sample as it appears on the WIRE after projectScheduleHeader flattens
   // the internal envelope. The route always returns the flat shape.
   const wireSample = {
     ...sampleSchedule,
@@ -205,7 +205,7 @@ describe("schedulesRoutes — create", () => {
     });
     expect(res.status).toBe(201);
     const body = await res.json();
-    // Wire shape stays flat for task — projectScheduleToWire converts
+    // Wire shape stays flat for task — projectScheduleHeader converts
     // the internal envelope on the way out.
     expect(body.target).toEqual({ kind: "task", ...validTarget });
     expect(create).toHaveBeenCalledTimes(1);

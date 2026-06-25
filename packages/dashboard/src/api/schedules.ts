@@ -28,7 +28,7 @@ import {
 /**
  * Wire-shape view of a schedule as the dashboard sees it. The server
  * projects the substrate's opaque `{ kind, data }` envelope to a
- * flat per-kind shape on the way out (`projectScheduleToWire`); the
+ * flat per-kind shape on the way out (`projectScheduleHeader`); the
  * dashboard supports both the task and workflow kinds, so we type
  * `target` as the full wire union.
  */
@@ -54,7 +54,7 @@ export interface ScheduleDetail extends ScheduleView {
 /**
  * Body for `PATCH /schedules/task/:scheduleId` — RFC 7396 deep-merge for
  * `target`, wholesale-replace for `trigger`, scalar-set for
- * `name` / `enabled`. Mirrors `TaskSchedulePatchBody` in the shared
+ * `name` / `enabled`. Mirrors `PatchTaskScheduleRequest` in the shared
  * route contracts (`packages/contracts/src/routes.ts`). Declared
  * locally rather than re-exported from `@glyphs-ai/schedule` because
  * the dashboard imports types only.
