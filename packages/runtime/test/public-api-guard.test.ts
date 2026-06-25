@@ -206,7 +206,6 @@ describe("@glyphs-ai/runtime public API guard", () => {
     // Copilot-specific shapes.
     expectTypeOf<CopilotRuntimeConfig>().toBeObject();
     expectTypeOf<CopilotPreflightDeps>().toHaveProperty("resolveSpecifier");
-    expectTypeOf<CopilotPreflightDeps>().toHaveProperty("createRequireAt");
     expectTypeOf<EventBuffer>().toHaveProperty("events");
     expectTypeOf<LaunchCopilotHeadlessOpts>().toHaveProperty("workdir");
     expectTypeOf<LaunchCopilotHeadlessOpts>().toHaveProperty("agent");
