@@ -71,7 +71,7 @@ export async function readInstallMcpRequest(
  * cached preview-time `CatalogPlan`. Required — there is no fallback
  * "re-resolve and apply" path: the dashboard always previews first.
  */
-export async function readPlanTokenBody(
+export async function readPlanToken(
   c: Context,
 ): Promise<{ planToken: string } | { error: string }> {
   const parsed = await parseJsonBody<{ planToken?: unknown }>(c);
@@ -83,9 +83,7 @@ export async function readPlanTokenBody(
 }
 
 /** PUT body for updating a resource's content: `{ content: string }`. */
-export async function readContentBody(
-  c: Context,
-): Promise<{ content: string } | { error: string }> {
+export async function readContent(c: Context): Promise<{ content: string } | { error: string }> {
   const parsed = await parseJsonBody<{ content?: unknown }>(c);
   if (!parsed.ok) return { error: parsed.error };
   if (typeof parsed.body.content !== "string") {
@@ -98,7 +96,7 @@ export async function readContentBody(
  * PATCH body for updating resource metadata: any JSON object. Field-level
  * validation is delegated to the catalog layer.
  */
-export async function readMetadataBody(
+export async function readMetadata(
   c: Context,
 ): Promise<{ body: Record<string, unknown> } | { error: string }> {
   const parsed = await parseJsonBody<unknown>(c);
