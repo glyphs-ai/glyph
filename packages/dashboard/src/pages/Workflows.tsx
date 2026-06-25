@@ -8,6 +8,8 @@ import {
   type WorkflowHeader,
   type WorkflowNode,
 } from "../api";
+import { EmptyState } from "../components/common/EmptyState";
+import { resolveListPageState } from "../components/common/listPageState";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
 import {
@@ -131,6 +133,20 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     agentFilter,
     timeFilter,
   });
+
+  // Atomic "Clear filters" reset. The selection keys (`workflowId`,
+  // `nodeTaskId`, `humanNodeId`) are intentionally preserved so clearing
+  // filters is non-destructive to the open detail view.
+  const clearFilters = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    params.delete("q");
+    params.delete("agent");
+    params.delete("range");
+    const search = params.toString();
+    navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
+      replace: true,
+    });
+  }, [navigate, location.pathname, location.search, location.hash]);
 
   const visible = workflows;
 
@@ -347,8 +363,18 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
   const filtersActive =
     idQuery !== "" || agentFilter !== ALL_AGENTS || timeFilter !== DEFAULT_TIME_PRESET;
-  // Genuinely empty workspace: loaded, zero workflows, nothing filtered.
-  const workspaceEmpty = loaded && workflows.length === 0 && !filtersActive;
+  // Shared empty-state machine: Loading | Zero | No-match | Unselected |
+  // Normal. `workflows` is already server-filtered, so its length is both
+  // the item count and the visible count; the resolver still splits the
+  // genuinely-empty workspace ("zero") from a filter-narrowed result
+  // ("nomatch") via `filtersActive`.
+  const workflowsState = resolveListPageState({
+    loaded,
+    itemCount: workflows.length,
+    filtersActive,
+    visibleCount: visible.length,
+    effectiveSelectedId,
+  });
   const detailWorkflow = detail.workflow;
   const showNodeTaskPane = nodeTaskId !== null && effectiveSelectedId !== null;
   const showHumanNodePane = humanNodeId !== null && effectiveSelectedId !== null;
@@ -387,20 +413,9 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
               filterAgentNames={filterAgentNames}
             />
             <div className="tasks-pane__list-scroll">
-              {!loaded ? (
+              {workflowsState === "loading" ? (
                 <WorkflowListSkeleton />
-              ) : workspaceEmpty ? (
-                <p className="tasks-pane__list-hint" data-testid="workflows-empty-list">
-                  No workflows yet. Create one to get started.
-                </p>
-              ) : visible.length === 0 ? (
-                <div className="empty" data-testid="workflows-empty-filtered">
-                  <p className="empty__title">No matches</p>
-                  <p className="empty__hint">
-                    Adjust the search, agent, or time filter above to see more workflows.
-                  </p>
-                </div>
-              ) : (
+              ) : workflowsState === "zero" || workflowsState === "nomatch" ? null : (
                 <WorkflowList
                   workflows={visible}
                   selectedId={effectiveSelectedId}
@@ -449,6 +464,58 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
                 />
               );
             }
+            // Initial list load: keep the detail pane skeletonised too,
+            // rather than flashing the "No workflow selected" placeholder
+            // before the auto-selected first row resolves.
+            if (workflowsState === "loading") {
+              return <WorkflowDetailSkeleton />;
+            }
+            if (workflowsState === "zero") {
+              return (
+                <EmptyState
+                  asDetailPane
+                  icon="🪄"
+                  title="No workflows yet"
+                  hint={
+                    <>
+                      Click <strong>New workflow</strong> to dispatch a coordinator-driven
+                      multi-step run. The coordinator decides which task and follow-up coordinator
+                      nodes to spawn next — each phase wakes the next one when the previous worker
+                      terminates.
+                    </>
+                  }
+                  testId="workflows-empty-zero"
+                  cta={{
+                    label: "New workflow",
+                    onClick: () => setCreateOpen(true),
+                    icon: <PlusIcon />,
+                    disabled: agents.length === 0,
+                    disabledTitle:
+                      agents.length === 0
+                        ? "Install at least one agent in the Catalog before creating workflows"
+                        : "Create a new workflow",
+                    testId: "workflows-empty-zero-cta",
+                  }}
+                />
+              );
+            }
+            if (workflowsState === "nomatch") {
+              return (
+                <EmptyState
+                  asDetailPane
+                  icon="🔍"
+                  title="No matches"
+                  hint="Adjust the filters above to see more workflows, or clear them all."
+                  testId="workflows-empty-nomatch"
+                  cta={{
+                    label: "Clear filters",
+                    onClick: clearFilters,
+                    variant: "secondary",
+                    testId: "workflows-empty-nomatch-cta",
+                  }}
+                />
+              );
+            }
             if (effectiveSelectedId !== null && detailWorkflow != null) {
               return (
                 <WorkflowDetail
@@ -471,35 +538,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             if (effectiveSelectedId !== null) {
               return <WorkflowDetailSkeleton />;
             }
-            if (workspaceEmpty) {
-              // Genuinely empty workspace: the rich zero-state lives in
-              // the detail pane while the rail keeps the filter chrome
-              // plus a short "No workflows yet" list hint.
-              return (
-                <aside className="tasks-pane__detail tasks-pane__detail--empty">
-                  <div className="empty" data-testid="workflows-empty-zero">
-                    <div className="empty__icon" aria-hidden="true">
-                      🪄
-                    </div>
-                    <p className="empty__title">No workflows yet</p>
-                    <p className="empty__hint">
-                      Click <strong>New workflow</strong> to dispatch a coordinator-driven
-                      multi-step run. The coordinator decides which task and follow-up coordinator
-                      nodes to spawn next — each phase wakes the next one when the previous worker
-                      terminates.
-                    </p>
-                  </div>
-                </aside>
-              );
-            }
-            return (
-              <aside className="tasks-pane__detail tasks-pane__detail--empty">
-                <div className="empty">
-                  <div className="empty__icon">🪄</div>
-                  <p className="empty__title">No workflow selected</p>
-                </div>
-              </aside>
-            );
+            return <EmptyState asDetailPane icon="🪄" title="No workflow selected" />;
           })()}
         </div>
       </div>

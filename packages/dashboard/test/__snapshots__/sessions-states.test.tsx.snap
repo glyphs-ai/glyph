@@ -1,0 +1,120 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Sessions page — state matrix > Loading: shows the spinner EmptyState while the list fetch is pending 1`] = `
+<div
+  class="empty"
+  data-testid="sessions-loading"
+>
+  <div
+    aria-hidden="true"
+    class="empty__icon"
+  >
+    <svg
+      aria-hidden="true"
+      class="spin"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.5"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+      />
+    </svg>
+  </div>
+  <p
+    class="empty__title"
+  >
+    Loading sessions…
+  </p>
+</div>
+`;
+
+exports[`Sessions page — state matrix > No-match: a filter that hides every row renders the 🔍 EmptyState + Clear filters CTA 1`] = `
+<div
+  class="empty"
+  data-testid="sessions-empty-nomatch"
+>
+  <div
+    aria-hidden="true"
+    class="empty__icon"
+  >
+    🔍
+  </div>
+  <p
+    class="empty__title"
+  >
+    No matches
+  </p>
+  <p
+    class="empty__hint"
+  >
+    Adjust the filters above to see more sessions, or clear them all.
+  </p>
+  <button
+    class="btn empty__cta"
+    data-testid="sessions-empty-nomatch-cta"
+    type="button"
+  >
+    <span>
+      Clear filters
+    </span>
+  </button>
+</div>
+`;
+
+exports[`Sessions page — state matrix > Zero: empty workspace renders the 📂 EmptyState with a wired New session CTA 1`] = `
+<div
+  class="empty"
+  data-testid="sessions-empty-zero"
+>
+  <div
+    aria-hidden="true"
+    class="empty__icon"
+  >
+    📂
+  </div>
+  <p
+    class="empty__title"
+  >
+    No sessions yet
+  </p>
+  <p
+    class="empty__hint"
+  >
+    Create a session to bake an agent into a workdir, then launch 
+    <code>
+      copilot
+    </code>
+     
+    there.
+  </p>
+  <button
+    class="btn btn--primary empty__cta"
+    data-testid="sessions-empty-zero-cta"
+    title="Create a new session"
+    type="button"
+  >
+    <svg
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.5"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M12 4.5v15m7.5-7.5h-15"
+      />
+    </svg>
+    <span>
+      New session
+    </span>
+  </button>
+</div>
+`;

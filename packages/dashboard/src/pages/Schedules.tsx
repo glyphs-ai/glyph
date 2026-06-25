@@ -15,6 +15,9 @@ import {
   type ServerConfig,
   type WorkflowHeader,
 } from "../api";
+import { EmptyState } from "../components/common/EmptyState";
+import { ListSkeleton } from "../components/common/ListSkeleton";
+import { resolveListPageState } from "../components/common/listPageState";
 import { Segmented } from "../components/common/Segmented";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
@@ -24,6 +27,7 @@ import { FireTaskDetailPane } from "../components/schedules/FireTaskDetailPane";
 import { FireWorkflowDetailPane } from "../components/schedules/FireWorkflowDetailPane";
 import { DeleteScheduleModal } from "../components/schedules/ScheduleConfirmModals";
 import { ScheduleDetail } from "../components/schedules/ScheduleDetail";
+import { ScheduleDetailSkeleton } from "../components/schedules/ScheduleDetailSkeleton";
 import { ScheduleList } from "../components/schedules/ScheduleList";
 import { SchedulesFilters } from "../components/schedules/SchedulesFilters";
 import {
@@ -702,6 +706,30 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     stateFilter !== DEFAULT_SCHEDULE_STATE_FILTER ||
     activityFilter !== DEFAULT_WORKFLOW_ACTIVITY_FILTER;
 
+  // Atomic "Clear filters" reset. `setPageUrl` already writes every key
+  // in a single `navigate()`, so resetting q / state / activity together
+  // can't race. The `kind` Segmented tab is a primary navigation control,
+  // not a filter, so it (and the current selection) is left untouched.
+  const clearFilters = () => {
+    setPageUrl({
+      q: "",
+      state: DEFAULT_SCHEDULE_STATE_FILTER,
+      activity: DEFAULT_WORKFLOW_ACTIVITY_FILTER,
+    });
+  };
+
+  // Shared empty-state machine: Loading | Zero | No-match | Unselected |
+  // Normal. `itemCount` is the whole schedule list (all kinds) so the
+  // genuinely-empty workspace still resolves to "zero" exactly as before;
+  // an empty kind tab or filter-narrowed result resolves to "nomatch".
+  const schedulesState = resolveListPageState({
+    loaded,
+    itemCount: schedules.length,
+    filtersActive,
+    visibleCount: visible.length,
+    effectiveSelectedId,
+  });
+
   return (
     <>
       <HeaderActions>
@@ -745,104 +773,116 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
               : "."}
           </div>
         )}
-        {loaded && schedules.length === 0 && !filtersActive ? (
-          <div className="tasks-pane tasks-pane--with-detail tasks-pane--zero">
-            <div className="empty tasks-pane__zero" data-testid="schedules-empty-zero">
-              <div className="empty__icon" aria-hidden="true">
-                📅
-              </div>
-              <p className="empty__title">No schedules yet</p>
-              <p className="empty__hint">
-                Click <strong>New schedule</strong> to set up a cron-triggered agent run — preview
-                the next fires before you save. Once a schedule exists, use the row menu to edit,
-                pause, resume, or run it immediately — or run{" "}
-                <code>glyph schedule patch &lt;id&gt;</code> for the scripted equivalent.
-              </p>
+        <div className="tasks-pane tasks-pane--with-detail">
+          <div className="tasks-pane__list">
+            <SchedulesFilters
+              searchDraft={searchDraft}
+              onSearchDraftChange={setSearchDraft}
+              stateFilter={stateFilter}
+              onStateFilterChange={setStateFilter}
+              activityFilter={activityFilter}
+              onActivityFilterChange={setActivityFilter}
+              showActivityFilters={kindFilter === "workflow"}
+            />
+            <div className="tasks-pane__list-scroll">
+              {schedulesState === "loading" ? (
+                <ListSkeleton ariaLabel="Loading schedules" testId="schedules-list-skeleton" />
+              ) : schedulesState === "zero" || schedulesState === "nomatch" ? null : (
+                <ScheduleList
+                  schedules={visible}
+                  selectedId={effectiveSelectedId}
+                  onSelect={handleSelectSchedule}
+                  onEdit={setEditTarget}
+                  onToggleEnabled={handleToggleEnabled}
+                  onRunNow={handleRunNow}
+                  onDelete={setDeleteTarget}
+                  busyByScheduleId={busyByScheduleId}
+                  openMenuId={openMenuId}
+                  onMenuOpenChange={setOpenMenuId}
+                />
+              )}
             </div>
           </div>
-        ) : (
-          <div className="tasks-pane tasks-pane--with-detail">
-            <div className="tasks-pane__list">
-              <SchedulesFilters
-                searchDraft={searchDraft}
-                onSearchDraftChange={setSearchDraft}
-                stateFilter={stateFilter}
-                onStateFilterChange={setStateFilter}
-                activityFilter={activityFilter}
-                onActivityFilterChange={setActivityFilter}
-                showActivityFilters={kindFilter === "workflow"}
-              />
-              <div className="tasks-pane__list-scroll">
-                {!loaded ? (
-                  <div className="empty">
-                    <p className="empty__title">Loading schedules…</p>
-                  </div>
-                ) : visible.length === 0 ? (
-                  <div className="empty" data-testid="schedules-empty-filtered">
-                    <p className="empty__title">No matches</p>
-                    <p className="empty__hint">Adjust the filters above to see more schedules.</p>
-                  </div>
-                ) : (
-                  <ScheduleList
-                    schedules={visible}
-                    selectedId={effectiveSelectedId}
-                    onSelect={handleSelectSchedule}
-                    onEdit={setEditTarget}
-                    onToggleEnabled={handleToggleEnabled}
-                    onRunNow={handleRunNow}
-                    onDelete={setDeleteTarget}
-                    busyByScheduleId={busyByScheduleId}
-                    openMenuId={openMenuId}
-                    onMenuOpenChange={setOpenMenuId}
-                  />
-                )}
-              </div>
-            </div>
 
-            {effectiveSelectedId && effectiveFireTaskId ? (
-              <FireTaskDetailPane
-                key={effectiveSelectedId}
-                scheduleId={effectiveSelectedId}
-                scheduleName={selectedSchedule?.name ?? "schedule"}
-                fireTaskId={effectiveFireTaskId}
-                pollIntervalMs={fireTaskPollIntervalMs}
-                onBack={handleBackFromFire}
-                onNavigate={handleNavigateFire}
-              />
-            ) : effectiveSelectedId && effectiveFireWorkflowId ? (
-              <FireWorkflowDetailPane
-                key={effectiveSelectedId}
-                scheduleId={effectiveSelectedId}
-                scheduleName={selectedSchedule?.name ?? "schedule"}
-                fireWorkflowId={effectiveFireWorkflowId}
-                fireNodeId={effectiveFireNodeId}
-                onBack={handleBackFromFire}
-                onNavigate={handleNavigateFire}
-                onSelectNode={handleSelectFireNode}
-                onBackFromNode={handleBackFromFireNode}
-              />
-            ) : effectiveSelectedId ? (
-              <ScheduleDetail
-                key={effectiveSelectedId}
-                scheduleId={effectiveSelectedId}
-                currentWorkspaceId={currentWorkspaceId}
-                refreshToken={refreshToken}
-                recentFiresToken={recentFiresToken}
-                enabledOverride={selectedSchedule?.enabled}
-                onSelectFire={handleSelectFire}
-                onCancelTaskFire={handleCancelTaskFire}
-                onCancelWorkflowFire={handleCancelWorkflowFire}
-              />
-            ) : visible.length === 0 ? null : (
-              <aside className="tasks-pane__detail tasks-pane__detail--empty">
-                <div className="empty">
-                  <div className="empty__icon">📅</div>
-                  <p className="empty__title">No schedule selected</p>
-                </div>
-              </aside>
-            )}
-          </div>
-        )}
+          {effectiveSelectedId && effectiveFireTaskId ? (
+            <FireTaskDetailPane
+              key={effectiveSelectedId}
+              scheduleId={effectiveSelectedId}
+              scheduleName={selectedSchedule?.name ?? "schedule"}
+              fireTaskId={effectiveFireTaskId}
+              pollIntervalMs={fireTaskPollIntervalMs}
+              onBack={handleBackFromFire}
+              onNavigate={handleNavigateFire}
+            />
+          ) : effectiveSelectedId && effectiveFireWorkflowId ? (
+            <FireWorkflowDetailPane
+              key={effectiveSelectedId}
+              scheduleId={effectiveSelectedId}
+              scheduleName={selectedSchedule?.name ?? "schedule"}
+              fireWorkflowId={effectiveFireWorkflowId}
+              fireNodeId={effectiveFireNodeId}
+              onBack={handleBackFromFire}
+              onNavigate={handleNavigateFire}
+              onSelectNode={handleSelectFireNode}
+              onBackFromNode={handleBackFromFireNode}
+            />
+          ) : schedulesState === "loading" ? (
+            <ScheduleDetailSkeleton />
+          ) : schedulesState === "zero" ? (
+            <EmptyState
+              asDetailPane
+              icon="📅"
+              title="No schedules yet"
+              hint={
+                <>
+                  Click <strong>New schedule</strong> to set up a cron-triggered agent run — preview
+                  the next fires before you save. Once a schedule exists, use the row menu to edit,
+                  pause, resume, or run it immediately.
+                </>
+              }
+              testId="schedules-empty-zero"
+              cta={{
+                label: "New schedule",
+                onClick: () => setCreateOpen(true),
+                icon: <PlusIcon />,
+                disabled: agents.length === 0,
+                disabledTitle:
+                  agents.length === 0
+                    ? "Install at least one agent in the Catalog before creating schedules"
+                    : "Create a new schedule",
+                testId: "schedules-empty-zero-cta",
+              }}
+            />
+          ) : schedulesState === "nomatch" ? (
+            <EmptyState
+              asDetailPane
+              icon="🔍"
+              title="No matches"
+              hint="Adjust the filters above to see more schedules, or clear them all."
+              testId="schedules-empty-nomatch"
+              cta={{
+                label: "Clear filters",
+                onClick: clearFilters,
+                variant: "secondary",
+                testId: "schedules-empty-nomatch-cta",
+              }}
+            />
+          ) : effectiveSelectedId ? (
+            <ScheduleDetail
+              key={effectiveSelectedId}
+              scheduleId={effectiveSelectedId}
+              currentWorkspaceId={currentWorkspaceId}
+              refreshToken={refreshToken}
+              recentFiresToken={recentFiresToken}
+              enabledOverride={selectedSchedule?.enabled}
+              onSelectFire={handleSelectFire}
+              onCancelTaskFire={handleCancelTaskFire}
+              onCancelWorkflowFire={handleCancelWorkflowFire}
+            />
+          ) : (
+            <EmptyState asDetailPane icon="📅" title="No schedule selected" />
+          )}
+        </div>
       </div>
 
       {deleteTarget && (

@@ -1,5 +1,5 @@
 import type { AgentEntry } from "@glyphs-ai/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   type CreateSessionOpts,
@@ -12,6 +12,8 @@ import {
   spawnSession,
   type WorkspaceListItem,
 } from "../api";
+import { EmptyState } from "../components/common/EmptyState";
+import { resolveListPageState } from "../components/common/listPageState";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon, RefreshIcon } from "../components/Icons";
 import { Modal } from "../components/Modal";
@@ -308,15 +310,43 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
     });
   })();
 
-  // True when any filter chrome is constraining the list. Used by the
-  // workspace-empty zero-state collapse so we don't hide the filter
-  // controls behind a CTA when a filter is the actual reason the list
-  // is empty.
+  // True when any filter chrome is constraining the list. Splits the
+  // genuinely-empty workspace ("No sessions yet" + create CTA) from a
+  // filter-narrowed result ("No matches" + Clear filters CTA) in the
+  // shared empty-state resolver below.
   const filtersActive =
     idQuery.trim() !== "" ||
     agentFilterUrl !== ALL_AGENTS ||
     runtimeFilter !== ALL_RUNTIMES ||
     timeFilter !== DEFAULT_TIME_PRESET;
+
+  // Atomic "Clear filters" reset. Chaining the individual
+  // `useUrlSearchValue` setters would clobber one another (each reads
+  // the same stale `location.search` snapshot), so wipe every filter key
+  // in a single `navigate()`. Non-filter keys are preserved.
+  const clearFilters = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    params.delete("q");
+    params.delete("agent");
+    params.delete("runtime");
+    params.delete("range");
+    const search = params.toString();
+    navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
+      replace: true,
+    });
+  }, [navigate, location.pathname, location.search, location.hash]);
+
+  // Single-column page: the empty-state machine collapses to
+  // Loading | Zero | No-match | Normal (no detail pane → no "unselected"
+  // branch). Feed a non-null selection sentinel whenever the visible
+  // list is populated so the shared resolver never returns "unselected".
+  const sessionsState = resolveListPageState({
+    loaded,
+    itemCount: sessions.length,
+    filtersActive,
+    visibleCount: visibleSessions.length,
+    effectiveSelectedId: visibleSessions.length > 0 ? "__list__" : null,
+  });
 
   if (currentWorkspaceId === null) {
     return (
@@ -424,55 +454,48 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
         {error && <div className="alert alert--error">⚠️ {error}</div>}
 
         <div className="sessions-page__body">
-          {!loaded ? (
-            <div className="empty">
-              <div className="empty__icon spin" aria-hidden="true">
-                <RefreshIcon />
-              </div>
-              <p className="empty__title">Loading sessions…</p>
-            </div>
-          ) : visibleSessions.length === 0 ? (
-            // Sessions is a single-column list page, so the empty / no-match
-            // states render in place of the list (there is no detail pane to
-            // fill). Show the rich "No sessions yet" zero-state with its CTA
-            // only when the workspace is genuinely empty AND no filter is
-            // constraining the list; when a filter is active, keep the
-            // standard filter-empty copy so the user sees what's hiding the
-            // rows. Either way `.sessions-page__body` centers the card in the
-            // remaining height instead of letting it float at the top.
-            sessions.length === 0 && !filtersActive ? (
-              <div className="empty tasks-pane__zero" data-testid="sessions-empty-zero">
-                <div className="empty__icon" aria-hidden="true">
-                  📂
-                </div>
-                <p className="empty__title">No sessions yet</p>
-                <p className="empty__hint">
+          {sessionsState === "loading" ? (
+            <EmptyState
+              icon={<RefreshIcon className="spin" />}
+              title="Loading sessions…"
+              testId="sessions-loading"
+            />
+          ) : sessionsState === "zero" ? (
+            <EmptyState
+              icon="📂"
+              title="No sessions yet"
+              hint={
+                <>
                   Create a session to bake an agent into a workdir, then launch <code>copilot</code>{" "}
                   there.
-                </p>
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={() => setCreateOpen(true)}
-                  disabled={createAgents.length === 0}
-                  title={
-                    createAgents.length === 0
-                      ? "Install at least one ready agent in the Catalog first"
-                      : "Create a new session"
-                  }
-                  data-testid="sessions-empty-zero-cta"
-                >
-                  <PlusIcon />
-                  <span>New session</span>
-                </button>
-              </div>
-            ) : (
-              <div className="empty">
-                <div className="empty__icon">📂</div>
-                <p className="empty__title">No matches</p>
-                <p className="empty__hint">Adjust the filters above to see more sessions.</p>
-              </div>
-            )
+                </>
+              }
+              testId="sessions-empty-zero"
+              cta={{
+                label: "New session",
+                onClick: () => setCreateOpen(true),
+                icon: <PlusIcon />,
+                disabled: createAgents.length === 0,
+                disabledTitle:
+                  createAgents.length === 0
+                    ? "Install at least one ready agent in the Catalog first"
+                    : "Create a new session",
+                testId: "sessions-empty-zero-cta",
+              }}
+            />
+          ) : sessionsState === "nomatch" ? (
+            <EmptyState
+              icon="🔍"
+              title="No matches"
+              hint="Adjust the filters above to see more sessions, or clear them all."
+              testId="sessions-empty-nomatch"
+              cta={{
+                label: "Clear filters",
+                onClick: clearFilters,
+                variant: "secondary",
+                testId: "sessions-empty-nomatch-cta",
+              }}
+            />
           ) : (
             <ul className="session-list" aria-label="Sessions">
               {visibleSessions.map((s) => (

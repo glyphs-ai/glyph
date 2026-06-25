@@ -255,21 +255,18 @@ describe("SchedulesPage — New schedule CTA + zero-state copy", () => {
   const agents = [makeAgent("official/engineer"), makeAgent("official/reviewer")];
 
   // ── Zero-state copy regression: the old "Create one from the CLI"
-  // sentence for creation has been replaced with a CTA pointing at
-  // the New schedule button. The empty-state copy still mentions
-  // `glyph schedule patch` as the scripted equivalent for editing
-  // an existing schedule, so the assertion below pins that the CLI
-  // command name stays visible to users.
+  // sentence has been replaced with a wired New schedule CTA. The unified
+  // empty-state card keeps its copy short (no embedded CLI command), so we
+  // pin the CTA label/button and the absence of the old sentence.
   it("zero-state copy reflects the new CTA, not the old CLI-only sentence", async () => {
     mockListSchedules.mockResolvedValue([]);
     renderSchedules("/workspaces/ws-1/runtime/schedules", agents);
     await waitFor(() => expect(screen.getByTestId("schedules-empty-zero")).toBeTruthy());
     expect(screen.getAllByText(/New schedule/i).length).toBeGreaterThan(0);
+    // The CTA is wired into the zero-state card.
+    expect(screen.getByTestId("schedules-empty-zero-cta")).toBeTruthy();
     // The pre- sentence "Create one from the CLI" must not be there.
     expect(screen.queryByText(/Create one from the CLI/i)).toBeNull();
-    // The `glyph schedule patch` reference is the scripted-edit
-    // hint — this assertion pins it stays visible in the empty state.
-    expect(screen.getByText(/glyph schedule patch/)).toBeTruthy();
   });
 
   // ── The CTA must be present in all four (loaded, empty/filter)

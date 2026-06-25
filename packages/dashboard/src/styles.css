@@ -960,6 +960,10 @@ button {
   border-radius: 4px;
 }
 
+.empty__cta {
+  margin-top: var(--space-4);
+}
+
 /* ─── Alerts ────────────────────────────────────────────────────── */
 
 .alert {
@@ -3055,19 +3059,6 @@ button {
   margin: 0;
 }
 
-/* Lightweight, text-only rail hint for the workspace-empty case. The rich
-   card (icon + title + hint + CTA) lives in the detail pane and is the
-   visual anchor; the rail only needs a calm one-liner so the two empty
-   signals don't read as a doubled card. No border, no background, no icon. */
-.tasks-pane__list-hint {
-  margin: 0;
-  padding: var(--space-5) var(--space-4);
-  color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 1.5;
-  text-align: center;
-}
-
 /* The right detail pane fills the grid row's height so the inner
    `.overview-tab` flex chain has a known parent height to resolve
    `flex: 1 + min-height: 0` against. The Overview body is a flex
@@ -3119,9 +3110,8 @@ button {
 }
 
 /* When the workspace itself is empty (not a filter-narrowed result),
-   the page collapses the two-column grid into a single full-width empty
-   state. Used by Tasks / Sessions / Agents for the shared empty /
-   filtered-empty / populated state machine. */
+   the Agents list page collapses its two-column grid into a single
+   full-width empty state. */
 .tasks-pane--zero {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -5864,6 +5854,82 @@ button {
   width: 70%;
 }
 .workflow-detail-skeleton__line--short {
+  width: 48%;
+}
+
+/* ─── Shared list / detail loading skeletons ────────────────────────
+   Generic placeholder shapes used by the Tasks and Schedules pages
+   (rail + detail right-pane) while their fetches are in flight. Both
+   reuse the `.skeleton` shimmer block (single source of truth for the
+   animation primitive) — no new keyframe is introduced here. */
+.list-skeleton {
+  display: block;
+  width: 100%;
+}
+.list-skeleton__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* Override the populated row's two-column grid: placeholder bars stack
+   as a calm vertical column instead of flowing into label/action slots. */
+.list-skeleton__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+.list-skeleton__headline {
+  width: 70%;
+  height: 13px;
+}
+.list-skeleton__meta {
+  width: 45%;
+  height: 11px;
+}
+.list-skeleton__id {
+  width: 30%;
+  height: 10px;
+}
+
+.detail-skeleton__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+.detail-skeleton__title {
+  width: 60%;
+  height: 18px;
+}
+.detail-skeleton__meta-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.detail-skeleton__chip {
+  width: 72px;
+  height: 18px;
+  border-radius: 999px;
+}
+.detail-skeleton__chip--wide {
+  width: 140px;
+}
+.detail-skeleton__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+.detail-skeleton__line {
+  height: 12px;
+}
+.detail-skeleton__line--long {
+  width: 92%;
+}
+.detail-skeleton__line--med {
+  width: 70%;
+}
+.detail-skeleton__line--short {
   width: 48%;
 }
 

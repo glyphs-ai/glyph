@@ -1,0 +1,166 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Workflows page — state matrix > Loading: rail + detail both render skeletons during the initial list load > detail 1`] = `
+<aside
+  aria-busy="true"
+  aria-label="Loading workflow"
+  aria-live="polite"
+  class="tasks-pane__detail workflow-detail-skeleton"
+  data-testid="workflow-detail-skeleton"
+  role="status"
+>
+  <div
+    aria-hidden="true"
+    class="workflow-detail-skeleton__inner"
+  >
+    <header
+      class="task-detail__head workflow-detail-skeleton__head"
+    >
+      <div
+        class="task-detail__title-row"
+      >
+        <span
+          class="skeleton workflow-detail-skeleton__title"
+        />
+      </div>
+      <div
+        class="task-detail__meta-row workflow-detail-skeleton__meta-row"
+      >
+        <span
+          class="skeleton workflow-detail-skeleton__chip"
+        />
+        <span
+          class="skeleton workflow-detail-skeleton__chip workflow-detail-skeleton__chip--wide"
+        />
+      </div>
+      <div
+        class="task-detail__statbar workflow-detail-skeleton__statbar"
+      >
+        <span
+          class="skeleton workflow-detail-skeleton__stat"
+        />
+        <span
+          class="skeleton workflow-detail-skeleton__stat"
+        />
+        <span
+          class="skeleton workflow-detail-skeleton__stat"
+        />
+      </div>
+    </header>
+    <div
+      class="task-tabs workflow-detail-skeleton__tabs"
+    >
+      <span
+        class="skeleton workflow-detail-skeleton__tab"
+      />
+      <span
+        class="skeleton workflow-detail-skeleton__tab"
+      />
+      <span
+        class="skeleton workflow-detail-skeleton__tab"
+      />
+    </div>
+    <div
+      class="workflow-detail-skeleton__body"
+    >
+      <span
+        class="skeleton workflow-detail-skeleton__line workflow-detail-skeleton__line--long"
+      />
+      <span
+        class="skeleton workflow-detail-skeleton__line workflow-detail-skeleton__line--med"
+      />
+      <span
+        class="skeleton workflow-detail-skeleton__line workflow-detail-skeleton__line--short"
+      />
+      <span
+        class="skeleton workflow-detail-skeleton__line workflow-detail-skeleton__line--med"
+      />
+    </div>
+  </div>
+</aside>
+`;
+
+exports[`Workflows page — state matrix > No-match: an active filter with no rows renders the 🔍 EmptyState + Clear filters CTA 1`] = `
+<div
+  class="empty"
+  data-testid="workflows-empty-nomatch"
+>
+  <div
+    aria-hidden="true"
+    class="empty__icon"
+  >
+    🔍
+  </div>
+  <p
+    class="empty__title"
+  >
+    No matches
+  </p>
+  <p
+    class="empty__hint"
+  >
+    Adjust the filters above to see more workflows, or clear them all.
+  </p>
+  <button
+    class="btn empty__cta"
+    data-testid="workflows-empty-nomatch-cta"
+    type="button"
+  >
+    <span>
+      Clear filters
+    </span>
+  </button>
+</div>
+`;
+
+exports[`Workflows page — state matrix > Zero: empty workspace renders the 🪄 EmptyState with a wired New workflow CTA 1`] = `
+<div
+  class="empty"
+  data-testid="workflows-empty-zero"
+>
+  <div
+    aria-hidden="true"
+    class="empty__icon"
+  >
+    🪄
+  </div>
+  <p
+    class="empty__title"
+  >
+    No workflows yet
+  </p>
+  <p
+    class="empty__hint"
+  >
+    Click 
+    <strong>
+      New workflow
+    </strong>
+     to dispatch a coordinator-driven multi-step run. The coordinator decides which task and follow-up coordinator nodes to spawn next — each phase wakes the next one when the previous worker terminates.
+  </p>
+  <button
+    class="btn btn--primary empty__cta"
+    data-testid="workflows-empty-zero-cta"
+    title="Create a new workflow"
+    type="button"
+  >
+    <svg
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.5"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M12 4.5v15m7.5-7.5h-15"
+      />
+    </svg>
+    <span>
+      New workflow
+    </span>
+  </button>
+</div>
+`;

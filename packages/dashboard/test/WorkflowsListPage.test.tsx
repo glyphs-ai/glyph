@@ -181,7 +181,7 @@ describe("WorkflowsPage — list rendering + sort", () => {
     mockListWorkflows.mockResolvedValue([]);
     renderWorkflows("/workspaces/ws-1/runtime/workflows?q=missing&range=all", agents);
     await waitFor(() => {
-      expect(screen.getByTestId("workflows-empty-filtered")).toBeTruthy();
+      expect(screen.getByTestId("workflows-empty-nomatch")).toBeTruthy();
     });
   });
 
