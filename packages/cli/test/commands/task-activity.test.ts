@@ -17,7 +17,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { followTaskActivity } from "../src/commands/task.js";
+import { followTaskActivity } from "../../src/commands/task.js";
 
 const BASE_URL = "http://test.local";
 

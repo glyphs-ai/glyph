@@ -17,7 +17,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { taskCancel } from "../src/commands/task.js";
+import { taskCancel } from "../../src/commands/task.js";
 
 const SERVER_URL = "http://test.local";
 const WSID = "ws-abc";

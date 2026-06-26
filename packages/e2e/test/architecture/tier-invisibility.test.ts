@@ -11,7 +11,7 @@
  * Canonical package tiers:
  *   - T0 Foundations: workspace, runtime, schedule, terminal, catalog
  *   - T1 Modes: session, task, workflow
- *   - T2 Application: contracts, api
+ *   - T2 Application: contracts, api, sdk
  *   - T3 Host: server
  *   - T_top Surfaces: dashboard, cli
  *
@@ -44,11 +44,15 @@
  *     graph to Node-only modules, defeating the whole point of having
  *     a separate wire-types pkg.
  *
- *   cli:       { "@glyphs-ai/contracts", "@glyphs-ai/server" }
+ *   cli:       { "@glyphs-ai/contracts", "@glyphs-ai/sdk", "@glyphs-ai/server" }
  *     The `glyph` binary bundles both the client CLI and the server
- *     lifecycle path. `@glyphs-ai/server` owns the in-process boot
- *     entry plus server runtime-file helpers, so this package-level
- *     edge is legitimate while every T0/T1 package remains fenced.
+ *     lifecycle path. `@glyphs-ai/sdk` is the generated, typed HTTP
+ *     client (T2 Application) the CLI uses for every server call — a
+ *     downward T_top → T2 edge alongside `@glyphs-ai/contracts`, which
+ *     still owns the wire DTOs the SDK and CLI exchange. `@glyphs-ai/server`
+ *     owns the in-process boot entry plus server runtime-file helpers, so
+ *     that package-level edge is legitimate too while every T0/T1 package
+ *     remains fenced.
  *
  * Hosting: lives in `@glyphs-ai/e2e/test/architecture/` alongside the
  * other repo-wide architectural audits (`inter-service-imports`,
@@ -96,7 +100,7 @@ const CONSUMERS: readonly Consumer[] = [
   },
   {
     pkg: "cli",
-    allowed: new Set(["@glyphs-ai/contracts", "@glyphs-ai/server"]),
+    allowed: new Set(["@glyphs-ai/contracts", "@glyphs-ai/sdk", "@glyphs-ai/server"]),
   },
 ];
 

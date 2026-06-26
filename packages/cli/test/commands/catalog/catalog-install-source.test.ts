@@ -22,8 +22,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { catalogResourceUrl } from "../src/commands/catalog/_helpers.js";
-import { runCli } from "./_helpers/run-cli.js";
+import { catalogResourceUrl } from "../../../src/commands/catalog/_helpers.js";
+import { runCli } from "../../_helpers/run-cli.js";
 
 let home: string;
 
