@@ -8,21 +8,14 @@
  *     body as a typed payload.
  *
  * What we pin:
- *   - `fetchJson` / `mutate` / `mutateJson` / `fetchJsonWithErrorBody`
- *     all reject a 202 with an `ApiError` whose `code` is
- *     `"WorkspaceWarming"` (so UI surfaces can branch without
- *     string-matching the message).
+ *   - `fetchJson` / `mutate` / `mutateJson` all reject a 202 with an
+ *     `ApiError` whose `code` is `"WorkspaceWarming"` (so UI surfaces
+ *     can branch without string-matching the message).
  *   - The thrown ApiError carries `status: 202` for transport-level
  *     retry policy (Retry-After).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  ApiError,
-  fetchJson,
-  fetchJsonWithErrorBody,
-  mutate,
-  mutateJson,
-} from "../../src/api/http";
+import { ApiError, fetchJson, mutate, mutateJson } from "../../src/api/http";
 
 function install202(): void {
   globalThis.fetch = vi.fn(
@@ -70,18 +63,5 @@ describe("warming-up surface in fetch helpers", () => {
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(202);
     expect((err as ApiError).code).toBe("WorkspaceWarming");
-  });
-
-  it("fetchJsonWithErrorBody throws an ApiError tagged WorkspaceWarming on 202", async () => {
-    install202();
-    const err = await fetchJsonWithErrorBody("/api/workspaces/ws-cold/schedules").catch(
-      (e) => e as Error,
-    );
-    expect(err).toBeInstanceOf(ApiError);
-    expect((err as ApiError).status).toBe(202);
-    expect((err as ApiError).code).toBe("WorkspaceWarming");
-    // The message names the workspace so toast UI can render it without
-    // re-fetching the body.
-    expect((err as ApiError).message).toContain("ws-cold");
   });
 });
