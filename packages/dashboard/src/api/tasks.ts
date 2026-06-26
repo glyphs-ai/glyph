@@ -74,6 +74,13 @@ export interface TaskRecord {
   details?: string;
   /** Who launched this task. */
   origin: TaskOrigin;
+  /**
+   * Typed routing id for the originating integration (e.g. the schedule
+   * id when `origin === "schedule"`, or the workflow node id when
+   * `origin === "workflow"`). Projected from the `origin_id` column;
+   * absent for `standalone` tasks.
+   */
+  originId?: string;
   status: TaskStatus;
   /**
    * Open-shape metadata. Includes runtime bookkeeping fields like
@@ -136,7 +143,7 @@ export interface ListScheduledTasksOpts {
   createdSince?: string;
   /** Statuses to include. The server joins with `,` for the query. */
   statuses?: TaskStatus[];
-  /** Exact match on `metadata.scheduleId`. */
+  /** Exact match on the schedule's `origin_id` (wire param `scheduleId`). */
   scheduleId?: string;
 }
 

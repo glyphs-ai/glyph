@@ -499,10 +499,9 @@ export function schedulesRoutes(
                 const workflowScheduleIds = list
                   .filter((s) => s.target.kind === "workflow")
                   .map((s) => s.id);
-                const aggregated = await workflowService.aggregateByOriginMetadataKey({
+                const aggregated = await workflowService.aggregateByOrigin({
                   origin: "schedule",
-                  metadataKey: "scheduleId",
-                  metadataValues: workflowScheduleIds,
+                  originIds: workflowScheduleIds,
                   statusIn: ["running"],
                 });
                 return collectWorkflowFireStats(aggregated);
@@ -678,10 +677,9 @@ export function schedulesRoutes(
           | undefined;
         if (found.target.kind === "workflow" && resolveWorkflowService !== undefined) {
           const workflowService = resolveWorkflowService(c);
-          const aggregated = await workflowService.aggregateByOriginMetadataKey({
+          const aggregated = await workflowService.aggregateByOrigin({
             origin: "schedule",
-            metadataKey: "scheduleId",
-            metadataValues: [found.id],
+            originIds: [found.id],
             statusIn: ["running"],
           });
           workflowFireStats = collectWorkflowFireStats(aggregated);

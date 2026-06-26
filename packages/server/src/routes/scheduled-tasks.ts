@@ -44,7 +44,7 @@ export function scheduledTasksRoutes(resolveTaskService: TaskServiceResolver): O
   // server-side; callers cannot widen.
   //
   // Optional server-side filters:
-  //   ?scheduleId=<id>          — exact match on metadata.scheduleId
+  //   ?scheduleId=<id>          — exact match on the typed origin_id column
   //   ?agent=<name>             — exact match on Task.agent
   //   ?runtime=<kind>           — exact match on metadata.runtime
   //   ?createdSince=<iso8601>   — drop tasks older than the cutoff
@@ -104,7 +104,7 @@ export function scheduledTasksRoutes(resolveTaskService: TaskServiceResolver): O
       if (runtime !== undefined) opts.runtime = runtime;
       if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
       if (statuses !== undefined) opts.statuses = statuses;
-      if (scheduleId !== undefined) opts.metadataEquals = { key: "scheduleId", value: scheduleId };
+      if (scheduleId !== undefined) opts.originId = scheduleId;
 
       try {
         const list = await getManager(c).list(opts);

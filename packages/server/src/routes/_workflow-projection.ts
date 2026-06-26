@@ -63,6 +63,7 @@ export function projectWorkflowHeader(
     coordinatorAgent: wf.coordinatorAgent,
     status: wf.status,
     origin: wf.origin,
+    ...(wf.originId !== undefined ? { originId: wf.originId } : {}),
     metadata: wf.metadata,
     ...(iterationCount !== undefined ? { iterationCount } : {}),
     awaitingHumanCount,
@@ -135,14 +136,14 @@ function projectWorkflowNodeSync(node: WorkflowNodeEntity): WorkflowNode {
 /**
  * Async variant that enriches the wire-shape node with the
  * dispatched task id pulled from the task service's reverse-lookup
- * (`task.metadata.workflowNodeId === node.id`).
+ * (`task.origin === "workflow" && task.originId === node.id`).
  *
  * Both worker AND coordinator kinds get enriched — the substrate
  * dispatches coord agents as tasks via
  * `workflow-coord-task-runner.ts`, which writes the same
- * `metadata.workflowNodeId` key. The dashboard's Mode B drill-down
- * uses `taskId` to navigate to either a worker run or a coord run
- * uniformly.
+ * `(origin = "workflow", origin_id = node.id)` column pair. The
+ * dashboard's Mode B drill-down uses `taskId` to navigate to either
+ * a worker run or a coord run uniformly.
  *
  * `taskId` is omitted (not `null`, not present) on a node that has
  * no dispatched task yet (a tight window between insert and

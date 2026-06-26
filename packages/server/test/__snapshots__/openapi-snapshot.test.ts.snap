@@ -5837,6 +5837,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         ],
                         "type": "string",
                       },
+                      "originId": {
+                        "type": "string",
+                      },
                       "startedAt": {
                         "type": "string",
                       },
@@ -6014,10 +6017,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "object",
                       },
                       "origin": {
-                        "enum": [
-                          "standalone",
-                          "schedule",
-                        ],
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "originId": {
                         "type": "string",
                       },
                       "startedAt": {
@@ -7941,6 +7944,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         ],
                         "type": "string",
                       },
+                      "originId": {
+                        "type": "string",
+                      },
                       "startedAt": {
                         "type": "string",
                       },
@@ -8162,6 +8168,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "workflow",
                         "schedule",
                       ],
+                      "type": "string",
+                    },
+                    "originId": {
                       "type": "string",
                     },
                     "startedAt": {
@@ -8433,6 +8442,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "workflow",
                         "schedule",
                       ],
+                      "type": "string",
+                    },
+                    "originId": {
                       "type": "string",
                     },
                     "startedAt": {
@@ -9205,6 +9217,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                       "type": "string",
                     },
+                    "originId": {
+                      "type": "string",
+                    },
                     "startedAt": {
                       "type": "string",
                     },
@@ -9402,10 +9417,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "object",
                       },
                       "origin": {
-                        "enum": [
-                          "standalone",
-                          "schedule",
-                        ],
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "originId": {
                         "type": "string",
                       },
                       "startedAt": {
@@ -9566,10 +9581,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "schedule",
-                      ],
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "originId": {
                       "type": "string",
                     },
                     "startedAt": {
@@ -9784,10 +9799,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "schedule",
-                      ],
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "originId": {
                       "type": "string",
                     },
                     "startedAt": {
@@ -10126,10 +10141,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "schedule",
-                      ],
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "originId": {
                       "type": "string",
                     },
                     "startedAt": {
@@ -10488,10 +10503,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "type": "object",
                         },
                         "origin": {
-                          "enum": [
-                            "standalone",
-                            "schedule",
-                          ],
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "originId": {
                           "type": "string",
                         },
                         "startedAt": {
@@ -10776,10 +10791,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "schedule",
-                      ],
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "originId": {
                       "type": "string",
                     },
                     "startedAt": {

@@ -11,7 +11,7 @@ import { z } from "zod";
 
 export const WorkflowStatusSchema = z.enum(["running", "succeeded", "failed", "cancelled"]);
 
-export const WorkflowOriginSchema = z.enum(["standalone", "schedule"]);
+export const WorkflowOriginSchema = z.string().min(1);
 
 export const WorkflowNodeStatusSchema = z.enum([
   "not_started",
@@ -83,6 +83,7 @@ export const WorkflowHeaderSchema = z.object({
   coordinatorAgent: z.string(),
   status: WorkflowStatusSchema,
   origin: WorkflowOriginSchema,
+  originId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()),
   iterationCount: z.number().optional(),
   awaitingHumanCount: z.number(),

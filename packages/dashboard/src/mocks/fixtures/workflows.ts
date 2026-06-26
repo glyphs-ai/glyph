@@ -37,7 +37,7 @@ function iso(offsetMinutes: number): string {
  * chip in `WorkflowDagView` renders distinct labels.
  *
  * Cross-file refs: `workflow-artifacts.ts` keys `node` artifacts by the
- * same UUIDs, and `tasks.ts` references them via `metadata.workflowNodeId`.
+ * same UUIDs, and `tasks.ts` references them via the task's `originId`.
  * Keep all three files in sync when changing a node id.
  */
 const NODE_ID_MIG_COORD_0 = "c000aaaa-1f3a-4b9c-8a00-20260608c000";
@@ -178,7 +178,7 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     endedAt: iso(-4200),
     iterationCount: 2,
   },
-  // Schedule-launched workflow fires. Each `metadata.scheduleId` matches
+  // Schedule-launched workflow fires. Each `originId` matches
   // the workflow-kind entry in `fixtureSchedules` (`sched-release-workflow`)
   // so the per-schedule "Recent fires" panel on the schedule detail
   // surface renders workflow rows. The succeeded + running pair keeps the
@@ -192,7 +192,8 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     status: "succeeded",
     origin: "schedule",
     coordinatorAgent: "official/engineer",
-    metadata: { scheduleId: "sched-release-workflow", firedAt: "2026-05-27T18:00:00.000Z" },
+    originId: "sched-release-workflow",
+    metadata: { firedAt: "2026-05-27T18:00:00.000Z" },
     awaitingHumanCount: 0,
     createdAt: iso(-360),
     startedAt: iso(-360),
@@ -207,7 +208,8 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     status: "running",
     origin: "schedule",
     coordinatorAgent: "official/engineer",
-    metadata: { scheduleId: "sched-release-workflow", firedAt: "2026-05-27T22:00:00.000Z" },
+    originId: "sched-release-workflow",
+    metadata: { firedAt: "2026-05-27T22:00:00.000Z" },
     awaitingHumanCount: 0,
     createdAt: iso(-30),
     startedAt: iso(-30),
