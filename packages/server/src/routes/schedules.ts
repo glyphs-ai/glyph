@@ -61,6 +61,14 @@ import type {
   WorkflowTargetPatch,
 } from "@glyphs-ai/api";
 import {
+  PreviewScheduleResultSchema,
+  ScheduleDeleteResponseSchema,
+  ScheduleGetResponseSchema,
+  ScheduleHeaderSchema,
+  SchedulePreviewQuerySchema,
+  ScheduleRunResponseSchema,
+} from "@glyphs-ai/api";
+import {
   describeCron,
   type Schedule,
   ScheduleError,
@@ -73,8 +81,9 @@ import type { WorkflowService } from "@glyphs-ai/workflow";
 // `ScheduleError` is used by both the `/:sid/preview` n-bound check
 // and the new `/preview-cron` n-bound check for a typed
 // envelope on rejection.
-import { Hono } from "hono";
+import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { schedulesErrorPolicy } from "./_error-policies/schedules.js";
+import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
 import { respondError } from "./_respond-error.js";
 import {
   errorBody,
@@ -435,63 +444,79 @@ function projectScheduleHeader(
 export function schedulesRoutes(
   resolve: ScheduleServiceResolver,
   resolveWorkflowService?: WorkflowServiceResolver,
-): Hono {
-  const app = new Hono();
+): OpenAPIHono {
+  const app = createApiApp();
 
   // ── GET / — list with optional agent / enabled filters ────────────
   // Query params `?agent=` and `?enabled=` are retained for CLI and
   // direct-API consumers. The dashboard now filters client-side
   // (kind tabs + search + chips) and does not send them, but they
   // remain part of the public contract.
-  app.get("/", async (c) => {
-    const agent = c.req.query("agent");
-    const enabledRaw = c.req.query("enabled");
-    let enabled: boolean | undefined;
-    if (enabledRaw !== undefined) {
-      if (enabledRaw !== "true" && enabledRaw !== "false") {
-        return c.json({ error: 'enabled must be "true" or "false"' }, 400);
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/",
+      tags: ["schedules"],
+      summary: "List schedules",
+      request: {
+        query: z.object({ agent: z.string().optional(), enabled: z.string().optional() }),
+      },
+      responses: {
+        200: jsonResponse(ScheduleHeaderSchema.array(), "Schedules"),
+        400: errorResponse("Malformed query"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const agent = c.req.query("agent");
+      const enabledRaw = c.req.query("enabled");
+      let enabled: boolean | undefined;
+      if (enabledRaw !== undefined) {
+        if (enabledRaw !== "true" && enabledRaw !== "false") {
+          return c.json({ error: 'enabled must be "true" or "false"' }, 400);
+        }
+        enabled = enabledRaw === "true";
       }
-      enabled = enabledRaw === "true";
-    }
-    try {
-      // The schedule pkg's list opts are kind-agnostic: the wire's
-      // `?agent=` query maps to `{ kind: "task", dataEquals: {
-      // path: "$.agent", value: agent } }`. The combination
-      // engages the partial JSON-extract index
-      // `schedules_target_agent_idx` (defined `WHERE
-      // target_kind='task'`); both predicates must appear in the
-      // WHERE clause for SQLite's planner to use it.
-      const list = await resolve(c).list({
-        ...(agent !== undefined
-          ? { kind: "task" as const, dataEquals: { path: "$.agent", value: agent } }
-          : {}),
-        ...(enabled !== undefined ? { enabled } : {}),
-      });
-      const workflowFireStats =
-        resolveWorkflowService !== undefined &&
-        list.some((schedule) => schedule.target.kind === "workflow")
-          ? await (async () => {
-              const workflowService = resolveWorkflowService(c);
-              const workflowScheduleIds = list
-                .filter((s) => s.target.kind === "workflow")
-                .map((s) => s.id);
-              const aggregated = await workflowService.aggregateByOriginMetadataKey({
-                origin: "schedule",
-                metadataKey: "scheduleId",
-                metadataValues: workflowScheduleIds,
-                statusIn: ["running"],
-              });
-              return collectWorkflowFireStats(aggregated);
-            })()
-          : undefined;
-      return c.json(list.map((schedule) => projectScheduleHeader(schedule, workflowFireStats)));
-    } catch (err) {
-      return respondError(c, err, {
-        route: "schedules.list",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+      try {
+        // The schedule pkg's list opts are kind-agnostic: the wire's
+        // `?agent=` query maps to `{ kind: "task", dataEquals: {
+        // path: "$.agent", value: agent } }`. The combination
+        // engages the partial JSON-extract index
+        // `schedules_target_agent_idx` (defined `WHERE
+        // target_kind='task'`); both predicates must appear in the
+        // WHERE clause for SQLite's planner to use it.
+        const list = await resolve(c).list({
+          ...(agent !== undefined
+            ? { kind: "task" as const, dataEquals: { path: "$.agent", value: agent } }
+            : {}),
+          ...(enabled !== undefined ? { enabled } : {}),
+        });
+        const workflowFireStats =
+          resolveWorkflowService !== undefined &&
+          list.some((schedule) => schedule.target.kind === "workflow")
+            ? await (async () => {
+                const workflowService = resolveWorkflowService(c);
+                const workflowScheduleIds = list
+                  .filter((s) => s.target.kind === "workflow")
+                  .map((s) => s.id);
+                const aggregated = await workflowService.aggregateByOriginMetadataKey({
+                  origin: "schedule",
+                  metadataKey: "scheduleId",
+                  metadataValues: workflowScheduleIds,
+                  statusIn: ["running"],
+                });
+                return collectWorkflowFireStats(aggregated);
+              })()
+            : undefined;
+        return c.json(list.map((schedule) => projectScheduleHeader(schedule, workflowFireStats)));
+      } catch (err) {
+        return respondError(c, err, {
+          route: "schedules.list",
+          policy: schedulesErrorPolicy,
+        });
+      }
+    },
+  );
 
   // ── POST /task — create a task-kind schedule ──────────────────────
   // URL-discriminated: the body carries no `target.kind` (the URL
@@ -499,50 +524,64 @@ export function schedulesRoutes(
   // `TaskTargetData` and forwards as `{ kind: "task", data: ... }`;
   // the registered task kind handler validates the shape again +
   // performs the async catalog existence lookup.
-  app.post("/task", async (c) => {
-    const parsed = await parseJsonBody<Record<string, unknown>>(c);
-    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const body = parsed.body;
-    if (body === null || typeof body !== "object" || Array.isArray(body)) {
-      return c.json({ error: "request body must be an object" }, 400);
-    }
-    for (const k of Object.keys(body)) {
-      if (!ALLOWED_TASK_CREATE_KEYS.has(k)) {
-        return c.json({ error: `request body has unknown key "${k}"` }, 400);
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/task",
+      tags: ["schedules"],
+      summary: "Create a task-kind schedule",
+      responses: {
+        201: jsonResponse(ScheduleHeaderSchema, "Created schedule"),
+        400: errorResponse("Malformed request body"),
+        404: errorResponse("Agent not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const parsed = await parseJsonBody<Record<string, unknown>>(c);
+      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+      const body = parsed.body;
+      if (body === null || typeof body !== "object" || Array.isArray(body)) {
+        return c.json({ error: "request body must be an object" }, 400);
       }
-    }
-    const { name, target, trigger, enabled } = body;
+      for (const k of Object.keys(body)) {
+        if (!ALLOWED_TASK_CREATE_KEYS.has(k)) {
+          return c.json({ error: `request body has unknown key "${k}"` }, 400);
+        }
+      }
+      const { name, target, trigger, enabled } = body;
 
-    if (typeof name !== "string" || name.trim().length === 0) {
-      return c.json({ error: "name must be a non-empty string" }, 400);
-    }
-    if (enabled !== undefined && typeof enabled !== "boolean") {
-      return c.json({ error: "enabled, when set, must be a boolean" }, 400);
-    }
-    const targetResult = validateTaskTargetData(target);
-    if (!targetResult.ok) return c.json({ error: targetResult.error }, 400);
-    const triggerResult = validateTrigger(trigger);
-    if (!triggerResult.ok) return c.json({ error: triggerResult.error }, 400);
+      if (typeof name !== "string" || name.trim().length === 0) {
+        return c.json({ error: "name must be a non-empty string" }, 400);
+      }
+      if (enabled !== undefined && typeof enabled !== "boolean") {
+        return c.json({ error: "enabled, when set, must be a boolean" }, 400);
+      }
+      const targetResult = validateTaskTargetData(target);
+      if (!targetResult.ok) return c.json({ error: targetResult.error }, 400);
+      const triggerResult = validateTrigger(trigger);
+      if (!triggerResult.ok) return c.json({ error: triggerResult.error }, 400);
 
-    try {
-      const created = await resolve(c).create({
-        name,
-        trigger: triggerResult.value,
-        target: { kind: "task", data: targetResult.value },
-        ...(enabled !== undefined ? { enabled } : {}),
-      });
-      logEvent(c, "schedule.create", {
-        scheduleId: created.id,
-        agent: targetResult.value.agent,
-      });
-      return c.json(projectScheduleHeader(created), 201);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "schedules.task.create",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+      try {
+        const created = await resolve(c).create({
+          name,
+          trigger: triggerResult.value,
+          target: { kind: "task", data: targetResult.value },
+          ...(enabled !== undefined ? { enabled } : {}),
+        });
+        logEvent(c, "schedule.create", {
+          scheduleId: created.id,
+          agent: targetResult.value.agent,
+        });
+        return c.json(projectScheduleHeader(created), 201);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "schedules.task.create",
+          policy: schedulesErrorPolicy,
+        });
+      }
+    },
+  );
 
   // ── GET /preview-cron — preview an arbitrary (expr, tz) ──────────
   // Unscoped sibling of `/:sid/preview` for the "still being
@@ -554,81 +593,115 @@ export function schedulesRoutes(
   // Defaults: `n = 5` (matches the modal's preview count). Same
   // `[1, 100]` integer bound + strict parse as `/:sid/preview` so
   // `?n=1abc` is rejected (not silently accepted as `1`).
-  app.get("/preview-cron", async (c) => {
-    const expr = c.req.query("expr");
-    const tz = c.req.query("tz");
-    if (typeof expr !== "string" || expr.trim() === "") {
-      return c.json({ error: "expr query param is required" }, 400);
-    }
-    if (typeof tz !== "string" || tz.trim() === "") {
-      return c.json({ error: "tz query param is required" }, 400);
-    }
-    // Modal default of 5; picked 5 over the /:sid/preview
-    // default of 3 because the modal has more vertical space and
-    // 5 fires is a clearer "what does this cron actually mean"
-    // signal for the user.
-    let n = 5;
-    const nRaw = c.req.query("n");
-    if (nRaw !== undefined) {
-      const parsed = Number.parseInt(nRaw, 10);
-      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100 || `${parsed}` !== nRaw) {
-        return c.json(errorBody(new ScheduleError("n must be an integer in [1, 100]")), 400);
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/preview-cron",
+      tags: ["schedules"],
+      summary: "Preview an arbitrary cron expression",
+      request: {
+        query: z.object({
+          expr: z.string().optional(),
+          tz: z.string().optional(),
+          n: z.string().optional(),
+        }),
+      },
+      responses: {
+        200: jsonResponse(PreviewScheduleResultSchema, "Cron preview"),
+        400: errorResponse("Missing or malformed query"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const expr = c.req.query("expr");
+      const tz = c.req.query("tz");
+      if (typeof expr !== "string" || expr.trim() === "") {
+        return c.json({ error: "expr query param is required" }, 400);
       }
-      n = parsed;
-    }
-    try {
-      const preview = await resolve(c).preview({ expr, tz, n });
-      return c.json(preview);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "schedules.previewCron",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+      if (typeof tz !== "string" || tz.trim() === "") {
+        return c.json({ error: "tz query param is required" }, 400);
+      }
+      // Modal default of 5; picked 5 over the /:sid/preview
+      // default of 3 because the modal has more vertical space and
+      // 5 fires is a clearer "what does this cron actually mean"
+      // signal for the user.
+      let n = 5;
+      const nRaw = c.req.query("n");
+      if (nRaw !== undefined) {
+        const parsed = Number.parseInt(nRaw, 10);
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100 || `${parsed}` !== nRaw) {
+          return c.json(errorBody(new ScheduleError("n must be an integer in [1, 100]")), 400);
+        }
+        n = parsed;
+      }
+      try {
+        const preview = await resolve(c).preview({ expr, tz, n });
+        return c.json(preview);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "schedules.previewCron",
+          policy: schedulesErrorPolicy,
+        });
+      }
+    },
+  );
 
   // ── GET /:sid — get one ───────────────────────────────────────────
-  app.get("/:sid", async (c) => {
-    const sid = c.req.param("sid");
-    try {
-      const found = await resolve(c).get(sid);
-      if (found === null) {
-        // `ScheduleService.get` returns `Schedule | null`; project the
-        // null branch into the same typed-error envelope every other
-        // route uses, so callers can branch on `code`.
-        const notFound = new ScheduleNotFoundError(sid);
-        return c.json(errorBody(notFound), 404);
-      }
-      // Compute fireStats for workflow-kind schedules (spec: MUST on
-      // both list and single-get endpoints).
-      let workflowFireStats:
-        | ReadonlyMap<string, NonNullable<ScheduleHeader["fireStats"]>>
-        | undefined;
-      if (found.target.kind === "workflow" && resolveWorkflowService !== undefined) {
-        const workflowService = resolveWorkflowService(c);
-        const aggregated = await workflowService.aggregateByOriginMetadataKey({
-          origin: "schedule",
-          metadataKey: "scheduleId",
-          metadataValues: [found.id],
-          statusIn: ["running"],
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/{sid}",
+      tags: ["schedules"],
+      summary: "Get a schedule",
+      request: { params: z.object({ sid: z.string() }) },
+      responses: {
+        200: jsonResponse(ScheduleGetResponseSchema, "Schedule"),
+        404: errorResponse("Schedule not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const sid = c.req.param("sid");
+      try {
+        const found = await resolve(c).get(sid);
+        if (found === null) {
+          // `ScheduleService.get` returns `Schedule | null`; project the
+          // null branch into the same typed-error envelope every other
+          // route uses, so callers can branch on `code`.
+          const notFound = new ScheduleNotFoundError(sid);
+          return c.json(errorBody(notFound), 404);
+        }
+        // Compute fireStats for workflow-kind schedules (spec: MUST on
+        // both list and single-get endpoints).
+        let workflowFireStats:
+          | ReadonlyMap<string, NonNullable<ScheduleHeader["fireStats"]>>
+          | undefined;
+        if (found.target.kind === "workflow" && resolveWorkflowService !== undefined) {
+          const workflowService = resolveWorkflowService(c);
+          const aggregated = await workflowService.aggregateByOriginMetadataKey({
+            origin: "schedule",
+            metadataKey: "scheduleId",
+            metadataValues: [found.id],
+            statusIn: ["running"],
+          });
+          workflowFireStats = collectWorkflowFireStats(aggregated);
+        }
+        // Enrich with derived cron `describe` so dashboards / CLI `show`
+        // can render the human-readable text without a second round-trip.
+        // NOT persisted on the entity — `trigger.expr` is the single
+        // source of truth.
+        return c.json({
+          ...projectScheduleHeader(found, workflowFireStats),
+          describe: describeCron(found.trigger.expr),
         });
-        workflowFireStats = collectWorkflowFireStats(aggregated);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "schedules.get",
+          policy: schedulesErrorPolicy,
+        });
       }
-      // Enrich with derived cron `describe` so dashboards / CLI `show`
-      // can render the human-readable text without a second round-trip.
-      // NOT persisted on the entity — `trigger.expr` is the single
-      // source of truth.
-      return c.json({
-        ...projectScheduleHeader(found, workflowFireStats),
-        describe: describeCron(found.trigger.expr),
-      });
-    } catch (err) {
-      return respondError(c, err, {
-        route: "schedules.get",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+    },
+  );
 
   // ── PATCH /task/:sid — patch a task-kind schedule ─────────────────
   // Body semantics (RFC 7396 deep-merge for `target`):
@@ -645,236 +718,309 @@ export function schedulesRoutes(
   // `:sid` exists but its `target.kind !== "task"` — the resource at
   // this kind-discriminated URL is logically absent and the wire
   // shape must not leak the actual kind.
-  app.patch("/task/:sid", async (c) => {
-    const sid = c.req.param("sid");
-    const parsed = await parseJsonBody<Record<string, unknown>>(c);
-    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const body = parsed.body;
-    if (body === null || typeof body !== "object" || Array.isArray(body)) {
-      return c.json({ error: "request body must be an object" }, 400);
-    }
-    for (const k of Object.keys(body)) {
-      if (!ALLOWED_TASK_PATCH_KEYS.has(k)) {
-        return c.json({ error: `request body has unknown key "${k}"` }, 400);
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/task/{sid}",
+      tags: ["schedules"],
+      summary: "Patch a task-kind schedule",
+      request: { params: z.object({ sid: z.string() }) },
+      responses: {
+        200: jsonResponse(ScheduleHeaderSchema, "Updated schedule"),
+        400: errorResponse("Malformed request body"),
+        404: errorResponse("Schedule not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const sid = c.req.param("sid");
+      const parsed = await parseJsonBody<Record<string, unknown>>(c);
+      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+      const body = parsed.body;
+      if (body === null || typeof body !== "object" || Array.isArray(body)) {
+        return c.json({ error: "request body must be an object" }, 400);
       }
-    }
-
-    const patch: {
-      name?: string;
-      enabled?: boolean;
-      trigger?: ScheduleTrigger;
-      target?: TaskTargetPatch;
-    } = {};
-
-    if ("name" in body) {
-      const v = body.name;
-      if (typeof v !== "string" || v.trim().length === 0) {
-        return c.json({ error: "name must be a non-empty string" }, 400);
+      for (const k of Object.keys(body)) {
+        if (!ALLOWED_TASK_PATCH_KEYS.has(k)) {
+          return c.json({ error: `request body has unknown key "${k}"` }, 400);
+        }
       }
-      patch.name = v;
-    }
-    if ("enabled" in body) {
-      const v = body.enabled;
-      if (typeof v !== "boolean") {
-        return c.json({ error: "enabled must be a boolean" }, 400);
-      }
-      patch.enabled = v;
-    }
-    if ("trigger" in body) {
-      const r = validateTrigger(body.trigger);
-      if (!r.ok) return c.json({ error: r.error }, 400);
-      patch.trigger = r.value;
-    }
-    if ("target" in body) {
-      const r = validateTaskTargetPatch(body.target);
-      if (!r.ok) return c.json({ error: r.error }, 400);
-      patch.target = r.value;
-    }
 
-    try {
-      // `expectedKind: "task"` lets the service throw
-      // `ScheduleKindMismatchError` (rather than blindly merging into
-      // a non-task envelope) when `:sid` resolves to a schedule of a
-      // different kind. We project the mismatch to a generic
-      // `ScheduleNotFoundError` envelope below so the wire shape
-      // doesn't leak the actual kind to the client.
-      const updated = await resolve(c).patch(sid, {
-        ...(patch.name !== undefined ? { name: patch.name } : {}),
-        ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-        ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
-        ...(patch.target !== undefined ? { target: { patch: patch.target } } : {}),
-        expectedKind: "task",
-      });
-      logEvent(c, "schedule.patch", { scheduleId: sid });
-      return c.json(projectScheduleHeader(updated));
-    } catch (err) {
-      // Project `ScheduleKindMismatchError` to the standard
-      // `ScheduleNotFoundError` envelope so the wire shape does not
-      // leak whether the schedule exists under another kind. The
-      // server log still carries the original error for debugging.
-      if (err instanceof ScheduleKindMismatchError) {
-        logEvent(c, "schedule.patch.kind_mismatch", {
-          scheduleId: sid,
-          expected: err.expected,
-          actual: err.actual,
+      const patch: {
+        name?: string;
+        enabled?: boolean;
+        trigger?: ScheduleTrigger;
+        target?: TaskTargetPatch;
+      } = {};
+
+      if ("name" in body) {
+        const v = body.name;
+        if (typeof v !== "string" || v.trim().length === 0) {
+          return c.json({ error: "name must be a non-empty string" }, 400);
+        }
+        patch.name = v;
+      }
+      if ("enabled" in body) {
+        const v = body.enabled;
+        if (typeof v !== "boolean") {
+          return c.json({ error: "enabled must be a boolean" }, 400);
+        }
+        patch.enabled = v;
+      }
+      if ("trigger" in body) {
+        const r = validateTrigger(body.trigger);
+        if (!r.ok) return c.json({ error: r.error }, 400);
+        patch.trigger = r.value;
+      }
+      if ("target" in body) {
+        const r = validateTaskTargetPatch(body.target);
+        if (!r.ok) return c.json({ error: r.error }, 400);
+        patch.target = r.value;
+      }
+
+      try {
+        // `expectedKind: "task"` lets the service throw
+        // `ScheduleKindMismatchError` (rather than blindly merging into
+        // a non-task envelope) when `:sid` resolves to a schedule of a
+        // different kind. We project the mismatch to a generic
+        // `ScheduleNotFoundError` envelope below so the wire shape
+        // doesn't leak the actual kind to the client.
+        const updated = await resolve(c).patch(sid, {
+          ...(patch.name !== undefined ? { name: patch.name } : {}),
+          ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+          ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
+          ...(patch.target !== undefined ? { target: { patch: patch.target } } : {}),
+          expectedKind: "task",
         });
-        return c.json(errorBody(new ScheduleNotFoundError(sid)), 404);
+        logEvent(c, "schedule.patch", { scheduleId: sid });
+        return c.json(projectScheduleHeader(updated));
+      } catch (err) {
+        // Project `ScheduleKindMismatchError` to the standard
+        // `ScheduleNotFoundError` envelope so the wire shape does not
+        // leak whether the schedule exists under another kind. The
+        // server log still carries the original error for debugging.
+        if (err instanceof ScheduleKindMismatchError) {
+          logEvent(c, "schedule.patch.kind_mismatch", {
+            scheduleId: sid,
+            expected: err.expected,
+            actual: err.actual,
+          });
+          return c.json(errorBody(new ScheduleNotFoundError(sid)), 404);
+        }
+        return respondError(c, err, {
+          route: "schedules.task.patch",
+          policy: schedulesErrorPolicy,
+        });
       }
-      return respondError(c, err, {
-        route: "schedules.task.patch",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+    },
+  );
 
   // ── POST /workflow — create a workflow-kind schedule ───────────────
-  app.post("/workflow", async (c) => {
-    const parsed = await parseJsonBody<Record<string, unknown>>(c);
-    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const body = parsed.body;
-    if (body === null || typeof body !== "object" || Array.isArray(body)) {
-      return c.json({ error: "request body must be an object" }, 400);
-    }
-    for (const k of Object.keys(body)) {
-      if (!ALLOWED_WORKFLOW_CREATE_KEYS.has(k)) {
-        return c.json({ error: `request body has unknown key "${k}"` }, 400);
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/workflow",
+      tags: ["schedules"],
+      summary: "Create a workflow-kind schedule",
+      responses: {
+        201: jsonResponse(ScheduleHeaderSchema, "Created schedule"),
+        400: errorResponse("Malformed request body"),
+        404: errorResponse("Coordinator agent not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const parsed = await parseJsonBody<Record<string, unknown>>(c);
+      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+      const body = parsed.body;
+      if (body === null || typeof body !== "object" || Array.isArray(body)) {
+        return c.json({ error: "request body must be an object" }, 400);
       }
-    }
-    const { name, target, trigger, enabled } = body;
-
-    if (typeof name !== "string" || name.trim().length === 0) {
-      return c.json({ error: "name must be a non-empty string" }, 400);
-    }
-    if (enabled !== undefined && typeof enabled !== "boolean") {
-      return c.json({ error: "enabled, when set, must be a boolean" }, 400);
-    }
-    const targetResult = validateWorkflowTargetData(target);
-    if (!targetResult.ok) return c.json({ error: targetResult.error }, 400);
-    const triggerResult = validateTrigger(trigger);
-    if (!triggerResult.ok) return c.json({ error: triggerResult.error }, 400);
-
-    try {
-      const created = await resolve(c).create({
-        name,
-        trigger: triggerResult.value,
-        target: { kind: "workflow", data: targetResult.value },
-        ...(enabled !== undefined ? { enabled } : {}),
-      });
-      logEvent(c, "schedule.create", {
-        scheduleId: created.id,
-        coordinatorAgent: targetResult.value.coordinatorAgent,
-      });
-      return c.json(projectScheduleHeader(created), 201);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "schedules.workflow.create",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
-
-  // ── PATCH /workflow/:sid — patch a workflow-kind schedule ──────────
-  app.patch("/workflow/:sid", async (c) => {
-    const sid = c.req.param("sid");
-    const parsed = await parseJsonBody<Record<string, unknown>>(c);
-    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const body = parsed.body;
-    if (body === null || typeof body !== "object" || Array.isArray(body)) {
-      return c.json({ error: "request body must be an object" }, 400);
-    }
-    for (const k of Object.keys(body)) {
-      if (!ALLOWED_WORKFLOW_PATCH_KEYS.has(k)) {
-        return c.json({ error: `request body has unknown key "${k}"` }, 400);
+      for (const k of Object.keys(body)) {
+        if (!ALLOWED_WORKFLOW_CREATE_KEYS.has(k)) {
+          return c.json({ error: `request body has unknown key "${k}"` }, 400);
+        }
       }
-    }
+      const { name, target, trigger, enabled } = body;
 
-    const patch: {
-      name?: string;
-      enabled?: boolean;
-      trigger?: ScheduleTrigger;
-      target?: WorkflowTargetPatch;
-    } = {};
-
-    if ("name" in body) {
-      const v = body.name;
-      if (typeof v !== "string" || v.trim().length === 0) {
+      if (typeof name !== "string" || name.trim().length === 0) {
         return c.json({ error: "name must be a non-empty string" }, 400);
       }
-      patch.name = v;
-    }
-    if ("enabled" in body) {
-      const v = body.enabled;
-      if (typeof v !== "boolean") {
-        return c.json({ error: "enabled must be a boolean" }, 400);
+      if (enabled !== undefined && typeof enabled !== "boolean") {
+        return c.json({ error: "enabled, when set, must be a boolean" }, 400);
       }
-      patch.enabled = v;
-    }
-    if ("trigger" in body) {
-      const r = validateTrigger(body.trigger);
-      if (!r.ok) return c.json({ error: r.error }, 400);
-      patch.trigger = r.value;
-    }
-    if ("target" in body) {
-      const r = validateWorkflowTargetPatch(body.target);
-      if (!r.ok) return c.json({ error: r.error }, 400);
-      patch.target = r.value;
-    }
+      const targetResult = validateWorkflowTargetData(target);
+      if (!targetResult.ok) return c.json({ error: targetResult.error }, 400);
+      const triggerResult = validateTrigger(trigger);
+      if (!triggerResult.ok) return c.json({ error: triggerResult.error }, 400);
 
-    try {
-      const updated = await resolve(c).patch(sid, {
-        ...(patch.name !== undefined ? { name: patch.name } : {}),
-        ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-        ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
-        ...(patch.target !== undefined ? { target: { patch: patch.target } } : {}),
-        expectedKind: "workflow",
-      });
-      logEvent(c, "schedule.patch", { scheduleId: sid });
-      return c.json(projectScheduleHeader(updated));
-    } catch (err) {
-      if (err instanceof ScheduleKindMismatchError) {
-        logEvent(c, "schedule.patch.kind_mismatch", {
-          scheduleId: sid,
-          expected: err.expected,
-          actual: err.actual,
+      try {
+        const created = await resolve(c).create({
+          name,
+          trigger: triggerResult.value,
+          target: { kind: "workflow", data: targetResult.value },
+          ...(enabled !== undefined ? { enabled } : {}),
         });
-        return c.json(errorBody(new ScheduleNotFoundError(sid)), 404);
+        logEvent(c, "schedule.create", {
+          scheduleId: created.id,
+          coordinatorAgent: targetResult.value.coordinatorAgent,
+        });
+        return c.json(projectScheduleHeader(created), 201);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "schedules.workflow.create",
+          policy: schedulesErrorPolicy,
+        });
       }
-      return respondError(c, err, {
-        route: "schedules.workflow.patch",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+    },
+  );
+
+  // ── PATCH /workflow/:sid — patch a workflow-kind schedule ──────────
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/workflow/{sid}",
+      tags: ["schedules"],
+      summary: "Patch a workflow-kind schedule",
+      request: { params: z.object({ sid: z.string() }) },
+      responses: {
+        200: jsonResponse(ScheduleHeaderSchema, "Updated schedule"),
+        400: errorResponse("Malformed request body"),
+        404: errorResponse("Schedule not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const sid = c.req.param("sid");
+      const parsed = await parseJsonBody<Record<string, unknown>>(c);
+      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+      const body = parsed.body;
+      if (body === null || typeof body !== "object" || Array.isArray(body)) {
+        return c.json({ error: "request body must be an object" }, 400);
+      }
+      for (const k of Object.keys(body)) {
+        if (!ALLOWED_WORKFLOW_PATCH_KEYS.has(k)) {
+          return c.json({ error: `request body has unknown key "${k}"` }, 400);
+        }
+      }
+
+      const patch: {
+        name?: string;
+        enabled?: boolean;
+        trigger?: ScheduleTrigger;
+        target?: WorkflowTargetPatch;
+      } = {};
+
+      if ("name" in body) {
+        const v = body.name;
+        if (typeof v !== "string" || v.trim().length === 0) {
+          return c.json({ error: "name must be a non-empty string" }, 400);
+        }
+        patch.name = v;
+      }
+      if ("enabled" in body) {
+        const v = body.enabled;
+        if (typeof v !== "boolean") {
+          return c.json({ error: "enabled must be a boolean" }, 400);
+        }
+        patch.enabled = v;
+      }
+      if ("trigger" in body) {
+        const r = validateTrigger(body.trigger);
+        if (!r.ok) return c.json({ error: r.error }, 400);
+        patch.trigger = r.value;
+      }
+      if ("target" in body) {
+        const r = validateWorkflowTargetPatch(body.target);
+        if (!r.ok) return c.json({ error: r.error }, 400);
+        patch.target = r.value;
+      }
+
+      try {
+        const updated = await resolve(c).patch(sid, {
+          ...(patch.name !== undefined ? { name: patch.name } : {}),
+          ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+          ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
+          ...(patch.target !== undefined ? { target: { patch: patch.target } } : {}),
+          expectedKind: "workflow",
+        });
+        logEvent(c, "schedule.patch", { scheduleId: sid });
+        return c.json(projectScheduleHeader(updated));
+      } catch (err) {
+        if (err instanceof ScheduleKindMismatchError) {
+          logEvent(c, "schedule.patch.kind_mismatch", {
+            scheduleId: sid,
+            expected: err.expected,
+            actual: err.actual,
+          });
+          return c.json(errorBody(new ScheduleNotFoundError(sid)), 404);
+        }
+        return respondError(c, err, {
+          route: "schedules.workflow.patch",
+          policy: schedulesErrorPolicy,
+        });
+      }
+    },
+  );
 
   // ── DELETE /:sid ──────────────────────────────────────────────────
-  app.delete("/:sid", async (c) => {
-    const sid = c.req.param("sid");
-    try {
-      const { deletedDispatchCount } = await resolve(c).delete(sid);
-      logEvent(c, "schedule.delete", { scheduleId: sid, deletedDispatchCount });
-      return c.json({ ok: true as const, deletedDispatchCount });
-    } catch (err) {
-      return respondError(c, err, {
-        route: "schedules.delete",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/{sid}",
+      tags: ["schedules"],
+      summary: "Delete a schedule",
+      request: { params: z.object({ sid: z.string() }) },
+      responses: {
+        200: jsonResponse(ScheduleDeleteResponseSchema, "Delete outcome"),
+        404: errorResponse("Schedule not found"),
+        409: errorResponse("Schedule has in-flight dispatch"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const sid = c.req.param("sid");
+      try {
+        const { deletedDispatchCount } = await resolve(c).delete(sid);
+        logEvent(c, "schedule.delete", { scheduleId: sid, deletedDispatchCount });
+        return c.json({ ok: true as const, deletedDispatchCount });
+      } catch (err) {
+        return respondError(c, err, {
+          route: "schedules.delete",
+          policy: schedulesErrorPolicy,
+        });
+      }
+    },
+  );
 
   // ── POST /:sid/run — manual fire-now ──────────────────────────────
-  app.post("/:sid/run", async (c) => {
-    const sid = c.req.param("sid");
-    try {
-      const { dispatchId } = await resolve(c).run(sid);
-      logEvent(c, "schedule.run", { scheduleId: sid, dispatchId });
-      return c.json({ dispatchId });
-    } catch (err) {
-      return respondError(c, err, {
-        route: "schedules.run",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/{sid}/run",
+      tags: ["schedules"],
+      summary: "Manually fire a schedule",
+      request: { params: z.object({ sid: z.string() }) },
+      responses: {
+        200: jsonResponse(ScheduleRunResponseSchema, "Dispatch id"),
+        404: errorResponse("Schedule not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const sid = c.req.param("sid");
+      try {
+        const { dispatchId } = await resolve(c).run(sid);
+        logEvent(c, "schedule.run", { scheduleId: sid, dispatchId });
+        return c.json({ dispatchId });
+      } catch (err) {
+        return respondError(c, err, {
+          route: "schedules.run",
+          policy: schedulesErrorPolicy,
+        });
+      }
+    },
+  );
 
   // ── GET /:sid/preview ─────────────────────────────────────────────
   // `?n=` is bounded in `[1, 100]` here AND inside
@@ -882,37 +1028,55 @@ export function schedulesRoutes(
   // check. Out-of-range emits a typed 400 envelope (code:
   // `ScheduleError`) before the service is touched; in-range plumbs
   // straight through.
-  app.get("/:sid/preview", async (c) => {
-    const sid = c.req.param("sid");
-    const nRaw = c.req.query("n");
-    let n: number | undefined;
-    if (nRaw !== undefined) {
-      const parsed = Number.parseInt(nRaw, 10);
-      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100 || `${parsed}` !== nRaw) {
-        return c.json(errorBody(new ScheduleError("n must be an integer in [1, 100]")), 400);
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/{sid}/preview",
+      tags: ["schedules"],
+      summary: "Preview a schedule's upcoming fires",
+      request: {
+        params: z.object({ sid: z.string() }),
+        query: SchedulePreviewQuerySchema,
+      },
+      responses: {
+        200: jsonResponse(PreviewScheduleResultSchema, "Schedule preview"),
+        400: errorResponse("Malformed query"),
+        404: errorResponse("Schedule not found"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const sid = c.req.param("sid");
+      const nRaw = c.req.query("n");
+      let n: number | undefined;
+      if (nRaw !== undefined) {
+        const parsed = Number.parseInt(nRaw, 10);
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100 || `${parsed}` !== nRaw) {
+          return c.json(errorBody(new ScheduleError("n must be an integer in [1, 100]")), 400);
+        }
+        n = parsed;
       }
-      n = parsed;
-    }
-    try {
-      const service = resolve(c);
-      const entity = await service.get(sid);
-      if (entity === null) {
-        const notFound = new ScheduleNotFoundError(sid);
-        return c.json(errorBody(notFound), 404);
+      try {
+        const service = resolve(c);
+        const entity = await service.get(sid);
+        if (entity === null) {
+          const notFound = new ScheduleNotFoundError(sid);
+          return c.json(errorBody(notFound), 404);
+        }
+        const preview = await service.preview({
+          expr: entity.trigger.expr,
+          tz: entity.trigger.tz,
+          n: n ?? 3,
+        });
+        return c.json(preview);
+      } catch (err) {
+        return respondError(c, err, {
+          route: "schedules.preview",
+          policy: schedulesErrorPolicy,
+        });
       }
-      const preview = await service.preview({
-        expr: entity.trigger.expr,
-        tz: entity.trigger.tz,
-        n: n ?? 3,
-      });
-      return c.json(preview);
-    } catch (err) {
-      return respondError(c, err, {
-        route: "schedules.preview",
-        policy: schedulesErrorPolicy,
-      });
-    }
-  });
+    },
+  );
 
   return app;
 }

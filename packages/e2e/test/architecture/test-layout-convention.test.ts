@@ -194,6 +194,11 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
   },
   // server
   {
+    file: "packages/server/test/openapi-snapshot.test.ts",
+    rationale:
+      "umbrella reflection test that mounts every route group to assemble the OpenAPI document + assert its operation count against the route manifest. Imports happen to share subdir 'routes' but the test is the spec's umbrella, not a route subject — kept flat to mirror its scope (sibling of route-manifest.test.ts).",
+  },
+  {
     file: "packages/server/test/route-manifest.test.ts",
     rationale:
       "umbrella reflection test that mounts every route group + middleware to compare Hono's app.routes against ROUTES. Imports happen to share subdir 'routes' but the test is the manifest's umbrella, not a route subject — kept flat to mirror its scope.",

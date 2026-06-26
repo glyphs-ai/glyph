@@ -1,5 +1,7 @@
 import type { ServerConfig } from "@glyphs-ai/api";
-import { Hono } from "hono";
+import { ServerConfigSchema } from "@glyphs-ai/api";
+import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
 
 /**
  * GET /api/config — returns the resolved server config. The deps are read
@@ -24,18 +26,31 @@ export function configRoutes(deps: {
    * or raise it for very large workspaces.
    */
   taskPollIntervalMs?: number;
-}): Hono {
-  const app = new Hono();
+}): OpenAPIHono {
+  const app = createApiApp();
   const taskPollIntervalMs = deps.taskPollIntervalMs ?? 4000;
-  app.get("/", async (c) =>
-    c.json<ServerConfig>({
-      glyphHome: deps.glyphHome,
-      currentWorkspaceId: await deps.currentWorkspaceId(),
-      host: deps.host,
-      port: deps.port,
-      pathSeparator: deps.pathSeparator,
-      tasks: { pollIntervalMs: taskPollIntervalMs },
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/",
+      tags: ["system"],
+      summary: "Resolved server configuration",
+      responses: {
+        200: jsonResponse(ServerConfigSchema, "Resolved server config"),
+        500: errorResponse("Internal error"),
+      },
     }),
+    async (c) =>
+      c.json<ServerConfig>({
+        glyphHome: deps.glyphHome,
+        currentWorkspaceId: await deps.currentWorkspaceId(),
+        host: deps.host,
+        port: deps.port,
+        pathSeparator: deps.pathSeparator,
+        tasks: { pollIntervalMs: taskPollIntervalMs },
+      }),
   );
+
   return app;
 }

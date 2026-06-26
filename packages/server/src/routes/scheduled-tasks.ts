@@ -1,6 +1,8 @@
+import { ScheduledTaskListQuerySchema, TaskSchema } from "@glyphs-ai/api";
 import type { ListTaskOpts, TaskService, TaskStatus } from "@glyphs-ai/task";
-import { Hono } from "hono";
+import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import { tasksErrorPolicy } from "./_error-policies/tasks.js";
+import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
 import { respondError } from "./_respond-error.js";
 
 /**
@@ -33,8 +35,8 @@ type TaskServiceResolver = (c: import("hono").Context) => TaskService;
  * caller fetching a single task does not need to know the origin
  * up-front.
  */
-export function scheduledTasksRoutes(resolveTaskService: TaskServiceResolver): Hono {
-  const app = new Hono();
+export function scheduledTasksRoutes(resolveTaskService: TaskServiceResolver): OpenAPIHono {
+  const app = createApiApp();
   const getManager = resolveTaskService;
 
   // List schedule-launched tasks in this workspace, newest-first per
@@ -47,64 +49,78 @@ export function scheduledTasksRoutes(resolveTaskService: TaskServiceResolver): H
   //   ?runtime=<kind>           — exact match on metadata.runtime
   //   ?createdSince=<iso8601>   — drop tasks older than the cutoff
   //   ?status=running,succeeded — include only listed statuses (CSV)
-  app.get("/", async (c) => {
-    const agent = c.req.query("agent");
-    const runtime = c.req.query("runtime");
-    const createdSince = c.req.query("createdSince");
-    const status = c.req.query("status");
-    const scheduleId = c.req.query("scheduleId");
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/",
+      tags: ["scheduled-tasks"],
+      summary: "List schedule-launched tasks",
+      request: { query: ScheduledTaskListQuerySchema },
+      responses: {
+        200: jsonResponse(TaskSchema.array(), "Tasks"),
+        400: errorResponse("Malformed query"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const agent = c.req.query("agent");
+      const runtime = c.req.query("runtime");
+      const createdSince = c.req.query("createdSince");
+      const status = c.req.query("status");
+      const scheduleId = c.req.query("scheduleId");
 
-    let createdSinceIso: string | undefined;
-    if (createdSince !== undefined) {
-      const t = Date.parse(createdSince);
-      if (Number.isNaN(t)) {
-        return c.json({ error: "createdSince must be an ISO 8601 timestamp" }, 400);
+      let createdSinceIso: string | undefined;
+      if (createdSince !== undefined) {
+        const t = Date.parse(createdSince);
+        if (Number.isNaN(t)) {
+          return c.json({ error: "createdSince must be an ISO 8601 timestamp" }, 400);
+        }
+        createdSinceIso = new Date(t).toISOString();
       }
-      createdSinceIso = new Date(t).toISOString();
-    }
 
-    let statuses: TaskStatus[] | undefined;
-    if (status !== undefined) {
-      const valid = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
-      const parts = status
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      const bad = parts.find((s) => !valid.has(s as TaskStatus));
-      if (bad !== undefined) {
-        return c.json(
-          {
-            error: `unknown status: ${JSON.stringify(bad)} (expected running, succeeded, failed, cancelled)`,
-          },
-          400,
-        );
+      let statuses: TaskStatus[] | undefined;
+      if (status !== undefined) {
+        const valid = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
+        const parts = status
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        const bad = parts.find((s) => !valid.has(s as TaskStatus));
+        if (bad !== undefined) {
+          return c.json(
+            {
+              error: `unknown status: ${JSON.stringify(bad)} (expected running, succeeded, failed, cancelled)`,
+            },
+            400,
+          );
+        }
+        statuses = parts as TaskStatus[];
       }
-      statuses = parts as TaskStatus[];
-    }
 
-    const opts: { -readonly [K in keyof ListTaskOpts]: ListTaskOpts[K] } = {
-      origin: ["schedule"],
-    };
-    if (agent !== undefined) opts.agent = agent;
-    if (runtime !== undefined) opts.runtime = runtime;
-    if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
-    if (statuses !== undefined) opts.statuses = statuses;
-    if (scheduleId !== undefined) opts.metadataEquals = { key: "scheduleId", value: scheduleId };
+      const opts: { -readonly [K in keyof ListTaskOpts]: ListTaskOpts[K] } = {
+        origin: ["schedule"],
+      };
+      if (agent !== undefined) opts.agent = agent;
+      if (runtime !== undefined) opts.runtime = runtime;
+      if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
+      if (statuses !== undefined) opts.statuses = statuses;
+      if (scheduleId !== undefined) opts.metadataEquals = { key: "scheduleId", value: scheduleId };
 
-    try {
-      const list = await getManager(c).list(opts);
-      return c.json(list);
-    } catch (err) {
-      // scheduled-tasks shares the canonical task error policy — same
-      // TaskService surface, same error classes, no schedule-package
-      // errors leak through this route (the listing operation never
-      // touches the schedule layer).
-      return respondError(c, err, {
-        route: "scheduled-tasks.list",
-        policy: tasksErrorPolicy,
-      });
-    }
-  });
+      try {
+        const list = await getManager(c).list(opts);
+        return c.json(list);
+      } catch (err) {
+        // scheduled-tasks shares the canonical task error policy — same
+        // TaskService surface, same error classes, no schedule-package
+        // errors leak through this route (the listing operation never
+        // touches the schedule layer).
+        return respondError(c, err, {
+          route: "scheduled-tasks.list",
+          policy: tasksErrorPolicy,
+        });
+      }
+    },
+  );
 
   return app;
 }

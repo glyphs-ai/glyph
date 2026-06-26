@@ -18,7 +18,8 @@ import {
 import { globalDbPath, workspacesParentDir } from "@glyphs-ai/workspace";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Hono } from "hono";
+import { swaggerUI } from "@hono/swagger-ui";
+import { OpenAPIHono } from "@hono/zod-openapi";
 import { assertBindIsSafe, isLoopbackBind } from "./auth.js";
 import { logsDir, resolveGlyphHome } from "./glyph-home.js";
 import { buildLogger, type Logger, type LogLevel } from "./log/build-logger.js";
@@ -26,6 +27,7 @@ import { accessLog } from "./middleware/access-log.js";
 import { requestId } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { type WorkspaceVars, workspaceContextMiddleware } from "./middleware/workspace-context.js";
+import { createApiApp } from "./routes/_openapi.js";
 import { catalogRoutes } from "./routes/catalog/index.js";
 import { configRoutes } from "./routes/config.js";
 import { healthRoutes } from "./routes/health.js";
@@ -209,7 +211,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   const workspaceService = composition.workspaceService;
   const application = composition;
 
-  const app = new Hono();
+  const app = new OpenAPIHono();
 
   // Observability middleware chain. Order matters:
   //   1. requestId      — mints/honours x-request-id header
@@ -259,7 +261,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // `:id` workspace once and stashes the whole `WorkspaceContext` on
   // c.var; each route family reads the bits it needs. 404 if id is not
   // registered; 5xx if workspace.db cannot be opened.
-  const sessionsApp = new Hono<{ Variables: WorkspaceVars }>();
+  const sessionsApp = createApiApp<{ Variables: WorkspaceVars }>();
   sessionsApp.use("/:id/sessions/*", workspaceContextMiddleware(application, logger));
   sessionsApp.route(
     "/:id/sessions",
@@ -267,7 +269,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   );
   app.route("/api/workspaces", sessionsApp);
 
-  const tasksApp = new Hono<{ Variables: WorkspaceVars }>();
+  const tasksApp = createApiApp<{ Variables: WorkspaceVars }>();
   tasksApp.use("/:id/tasks/*", workspaceContextMiddleware(application, logger));
   tasksApp.route(
     "/:id/tasks",
@@ -281,7 +283,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // dispatch all observe one in-memory state — splitting at the route
   // layer, not the service layer, keeps the seam at the URL where it
   // belongs.
-  const scheduledTasksApp = new Hono<{ Variables: WorkspaceVars }>();
+  const scheduledTasksApp = createApiApp<{ Variables: WorkspaceVars }>();
   scheduledTasksApp.use("/:id/scheduled-tasks/*", workspaceContextMiddleware(application, logger));
   scheduledTasksApp.route(
     "/:id/scheduled-tasks",
@@ -292,7 +294,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // `/scheduled-workflows` is the schedule-origin sibling of
   // `/workflows`. Returns workflows launched by cron triggers,
   // filtered by `metadata.scheduleId`.
-  const scheduledWorkflowsApp = new Hono<{ Variables: WorkspaceVars }>();
+  const scheduledWorkflowsApp = createApiApp<{ Variables: WorkspaceVars }>();
   scheduledWorkflowsApp.use(
     "/:id/scheduled-workflows/*",
     workspaceContextMiddleware(application, logger),
@@ -307,7 +309,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // that route is read-only over the dispatched task list; this
   // route owns the trigger entities themselves. Both share the same
   // workspace-scoped per-context state via the middleware.
-  const schedulesApp = new Hono<{ Variables: WorkspaceVars }>();
+  const schedulesApp = createApiApp<{ Variables: WorkspaceVars }>();
   schedulesApp.use("/:id/schedules/*", workspaceContextMiddleware(application, logger));
   schedulesApp.route(
     "/:id/schedules",
@@ -322,7 +324,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // and stores nodes as `{ kind, spec: unknown }`; the wire-layer
   // projection in `routes/_workflow-projection.ts` flattens the
   // per-kind shapes for the dashboard / CLI.
-  const workflowsApp = new Hono<{ Variables: WorkspaceVars }>();
+  const workflowsApp = createApiApp<{ Variables: WorkspaceVars }>();
   workflowsApp.use("/:id/workflows/*", workspaceContextMiddleware(application, logger));
   workflowsApp.route(
     "/:id/workflows",
@@ -334,13 +336,24 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   );
   app.route("/api/workspaces", workflowsApp);
 
-  const catalogApp = new Hono<{ Variables: WorkspaceVars }>();
+  const catalogApp = createApiApp<{ Variables: WorkspaceVars }>();
   catalogApp.use("/:id/catalog/*", workspaceContextMiddleware(application, logger));
   catalogApp.route(
     "/:id/catalog",
     catalogRoutes((c) => c.get("workspaceContext").catalog),
   );
   app.route("/api/workspaces", catalogApp);
+
+  // OpenAPI: assemble the 3.1 document from every mounted OpenAPIHono
+  // sub-app and serve it, plus a Swagger UI page. Registered after all
+  // route families (so the spec carries every operation) and before the
+  // static/SPA fallback (so `/api/docs` and `/api/openapi.json` are not
+  // shadowed by the catch-all GET handler below).
+  app.doc31("/api/openapi.json", {
+    openapi: "3.1.0",
+    info: { title: serverName, version: serverVersion },
+  });
+  app.get("/api/docs", swaggerUI({ url: "/api/openapi.json" }));
 
   if (serveStaticFiles) {
     app.use("/*", serveStatic({ root: staticDir }));
