@@ -22,6 +22,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { catalogResourceUrl } from "../src/commands/catalog/_helpers.js";
 import { runCli } from "./_helpers/run-cli.js";
 
 let home: string;
@@ -182,6 +183,9 @@ for (const cmd of COMMANDS) {
       expect(cap.method).toBe("POST");
       expect(cap.url).toBe(expectedUrl(cmd));
       expect(cap.body?.origin).toBe("https://github.com/o/r/tree/main/x");
+      // The wire body is EXACTLY `{ origin }` -- no `name` smuggled in
+      // (the mcp fqn is derived server-side from `_meta.name`).
+      expect(Object.keys(cap.body ?? {})).toEqual(["origin"]);
     });
 
     it("--file prepends file: prefix to absolute path", async () => {
@@ -220,5 +224,23 @@ describe("catalog skill install --file with Windows paths", () => {
     const r = await runCli(["catalog", "skill", "install", "--file", "C:\\foo\\bar"], env());
     expect(r.exitCode, r.stderr).toBe(0);
     expect(cap.body?.origin).toBe("file:C:\\foo\\bar");
+  });
+});
+
+describe("catalogResourceUrl percent-encoding", () => {
+  // Byte-equivalence pin for the catalog `:name` routes: the slash-spanning
+  // FQN segment is `encodeURIComponent`-escaped (`/`->`%2F`, ` `->`%20`),
+  // matching the wire the former hand-rolled client produced. A regression
+  // here would silently change every `catalog * show|sync|enable|...` URL.
+  it("escapes the workspace id and the resource name", () => {
+    expect(catalogResourceUrl("ws-1", "skills", "scope/skill name")).toBe(
+      "/api/workspaces/ws-1/catalog/skills/scope%2Fskill%20name",
+    );
+  });
+
+  it("appends a literal, already-safe route suffix", () => {
+    expect(catalogResourceUrl("ws-1", "agents", "official/writer", "/sync/resolve")).toBe(
+      "/api/workspaces/ws-1/catalog/agents/official%2Fwriter/sync/resolve",
+    );
   });
 });

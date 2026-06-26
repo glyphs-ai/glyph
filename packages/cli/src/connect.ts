@@ -15,7 +15,6 @@
  */
 
 import { resolveGlyphHome } from "@glyphs-ai/server";
-import { ApiClient } from "./api-client.js";
 import { readRuntimeFile } from "./runtime-file.js";
 import { configureClient, type SdkClient } from "./sdk-client.js";
 
@@ -65,22 +64,15 @@ export async function resolveConnection(flags: ConnectFlags = {}): Promise<Conne
 }
 
 /**
- * Build a typed {@link ApiClient} for a CLI command. Wraps
- * {@link resolveConnection} and the constructor in one call so each
- * command stays one line.
- */
-export async function makeClient(flags: ConnectFlags = {}): Promise<ApiClient> {
-  const conn = await resolveConnection(flags);
-  return new ApiClient({ baseUrl: conn.baseUrl });
-}
-
-/**
  * Configure the shared `@glyphs-ai/sdk` client for a CLI command and return a
  * {@link SdkClient} handle. Wraps {@link resolveConnection} and
- * {@link configureClient} so each command stays one line. Commands call the
- * generated SDK operations (which use the configured singleton) directly; the
- * returned handle is only needed where an operation can't be used — the SSE
- * stream and the catalog `:name` routes (see `sdk-client.ts`).
+ * {@link configureClient} so each command stays one line.
+ *
+ * Param-less routes (config/health/runtime) and the top-level `workspaces.*`
+ * routes call the generated SDK operations directly. Every workspace-nested
+ * route uses the handle's typed low-level `client`, because the generated
+ * operations' `path` types omit the middleware-injected workspace `{id}`. The
+ * `baseUrl` also backs the raw SSE stream in `commands/task.ts`.
  */
 export async function makeSdkClient(flags: ConnectFlags = {}): Promise<SdkClient> {
   const conn = await resolveConnection(flags);

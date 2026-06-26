@@ -218,9 +218,9 @@ describe("workflowList — filter flags map to HTTP query slots", () => {
     });
     expect(r.exitCode, r.stderr).toBe(0);
     // URLSearchParams preserves insertion order in the appended-query
-    // string the ApiClient builds; pin that order so the test detects
-    // accidental shuffles (which would still be wire-equivalent but
-    // would be a surprise in HTTP traces).
+    // string the SDK querySerializer builds; pin that order so the test
+    // detects accidental shuffles (which would still be wire-equivalent
+    // but would be a surprise in HTTP traces).
     expect(calls[0]?.url).toBe(
       `${LIST_URL}?q=abc&coordinatorAgent=official%2Fcoordinator&createdSince=2026-06-01T00%3A00%3A00.000Z`,
     );

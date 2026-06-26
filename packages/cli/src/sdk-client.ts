@@ -5,19 +5,19 @@
  * result tuple (they default to `throwOnError: false`). This module owns the
  * three pieces the CLI layers on top of that:
  *
- *  - {@link ApiError} — the CLI's HTTP error type. Re-homed here unchanged from
- *    the former hand-rolled `ApiClient` so `output.ts` can keep pattern-matching
+ *  - {@link ApiError} — the CLI's HTTP error type. `output.ts` pattern-matches
  *    on `err.status` / `err.body` (the parsed error envelope: `code`,
- *    `transition`, the `EntryNotReadyError` reason tree, …).
+ *    `transition`, the `EntryNotReadyError` reason tree, …), so the throw path
+ *    must carry the full parsed body.
  *  - {@link unwrap} — turns a result tuple into the success payload or throws,
- *    reproducing the exact status → message → body mapping and the
+ *    pinning the exact status → message → body mapping and the
  *    transport-error passthrough the CLI's exit-code policy depends on. The
  *    SDK's own `unwrap`/`GlyphError` are deliberately NOT used: `GlyphError`
  *    drops the full error body the CLI renders.
  *  - {@link configureClient} — points the shared SDK `client` singleton at the
- *    resolved base URL and pins request serialization to be byte-identical to
- *    the former client (URLSearchParams query encoding + a blanket
- *    `Accept: application/json`).
+ *    resolved base URL and pins request serialization (URLSearchParams query
+ *    encoding + a blanket `Accept: application/json`) so the wire stays
+ *    byte-identical to the contract `dashboard` and `server` agree on.
  */
 
 import { client } from "@glyphs-ai/sdk";
@@ -53,7 +53,7 @@ export interface SdkResult<T> {
 
 /**
  * Turn a generated operation's result tuple into its success payload, or
- * throw — reproducing the former `ApiClient.call` semantics exactly:
+ * throw — the return/throw contract the CLI's exit-code policy depends on:
  *
  *  - no `response` (fetch threw: ECONNREFUSED, DNS, abort) → rethrow the
  *    original transport error so `formatError` maps it to exit code 3;
@@ -81,11 +81,11 @@ export function unwrap<T>(result: SdkResult<T>): NonNullable<T> {
 }
 
 /**
- * Query serializer matching the former `ApiClient`'s `URLSearchParams`
- * encoding (spaces → `+`), keeping query strings byte-identical. hey-api's
+ * Query serializer pinning `URLSearchParams` encoding (spaces → `+`),
+ * keeping query strings byte-identical to the wire contract. hey-api's
  * default serializer uses `encodeURIComponent` (spaces → `%20`), which would
  * diverge on free-text params such as `glyph workflow list -q "foo bar"`.
- * Skips `undefined` / `null` and stringifies primitives, exactly as before.
+ * Skips `undefined` / `null` and stringifies primitives.
  */
 function querySerializer(query: Record<string, unknown>): string {
   const usp = new URLSearchParams();
@@ -100,8 +100,10 @@ function querySerializer(query: Record<string, unknown>): string {
  * Handle returned by {@link configureClient}: the configured SDK client plus
  * the resolved base URL. `baseUrl` is needed by the SSE path in
  * `commands/task.ts` (raw streaming, which the SDK does not cover); `client`
- * is used directly for the catalog `:name` routes, whose generated operations
- * cannot express the server's slash-spanning `{name{.+}}` path params.
+ * is the typed low-level entry point used by every workspace-nested route,
+ * whose generated operations omit the middleware-injected workspace `{id}`
+ * (and, for the catalog `:name` routes, cannot express the server's
+ * slash-spanning `{name{.+}}` path params).
  */
 export interface SdkClient {
   readonly client: typeof client;

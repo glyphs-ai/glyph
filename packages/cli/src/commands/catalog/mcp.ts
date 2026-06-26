@@ -76,8 +76,8 @@ export async function catalogMcpInstall(opts: CatalogMcpInstallOpts): Promise<Co
   // Server contract is `{ origin }` only -- the fqn is derived from
   // the fetched JSON's `_meta.name` at install time, not from the
   // request body (see `validateMcpInstallInput`). The defense-in-depth
-  // test at `cli/test/api-client.test.ts:249` pins this contract;
-  // sending an extra `name` field would violate it.
+  // test in `cli/test/catalog-install-source.test.ts` pins this
+  // contract; sending an extra `name` field would violate it.
   const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
