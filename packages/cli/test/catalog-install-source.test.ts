@@ -63,10 +63,11 @@ function stubFetchCapture(responseBody: string): Capture {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     if (called) return new Response("unexpected second fetch", { status: 500 });
     called = true;
-    cap.url = String(input);
-    cap.method = String(init?.method ?? "GET");
-    const raw = init?.body;
-    if (typeof raw === "string") {
+    const isRequest = input instanceof Request;
+    cap.url = isRequest ? input.url : String(input);
+    cap.method = isRequest ? input.method : String(init?.method ?? "GET");
+    const raw = isRequest ? await input.text() : init?.body;
+    if (typeof raw === "string" && raw.length > 0) {
       try {
         cap.body = JSON.parse(raw) as { origin?: string };
       } catch {

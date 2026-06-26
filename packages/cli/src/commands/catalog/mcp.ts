@@ -3,19 +3,32 @@
  * sync over the workspace-scoped catalog MCPs HTTP surface.
  */
 
-import { makeClient, resolveWorkspace } from "../../connect.js";
+import type {
+  GetApiWorkspacesByIdCatalogMcpsByNameResponses,
+  GetApiWorkspacesByIdCatalogMcpsResponses,
+  PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses,
+  PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogMcpsResponses,
+} from "@glyphs-ai/sdk";
+import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
-import { buildInstallOrigin, type InstallSourceFlags } from "./_helpers.js";
+import { unwrap } from "../../sdk-client.js";
+import { buildInstallOrigin, catalogResourceUrl, type InstallSourceFlags } from "./_helpers.js";
 
 export type CatalogMcpListOpts = WorkspaceFlagOpts;
 
 export async function catalogMcpList(opts: CatalogMcpListOpts = {}): Promise<CommandResult> {
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const list = await client.call("catalog.mcps.list", { params: { id: workspaceId } });
+    const list = unwrap(
+      await client.get<GetApiWorkspacesByIdCatalogMcpsResponses>({
+        url: "/api/workspaces/{id}/catalog/mcps",
+        path: { id: workspaceId },
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
     return {
@@ -39,12 +52,14 @@ export async function catalogMcpShow(
   if (typeof fqn !== "string" || fqn.trim() === "") {
     return { exitCode: 2, stderr: "mcp fqn is required\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const mcp = await client.call("catalog.mcps.get", {
-      params: { id: workspaceId, name: fqn },
-    });
+    const mcp = unwrap(
+      await client.get<GetApiWorkspacesByIdCatalogMcpsByNameResponses>({
+        url: catalogResourceUrl(workspaceId, "mcps", fqn),
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(mcp) };
   } catch (err) {
     return formatError(err);
@@ -63,13 +78,16 @@ export async function catalogMcpInstall(opts: CatalogMcpInstallOpts): Promise<Co
   // request body (see `validateMcpInstallInput`). The defense-in-depth
   // test at `cli/test/api-client.test.ts:249` pins this contract;
   // sending an extra `name` field would violate it.
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const result = await client.call("catalog.mcps.install", {
-      params: { id: workspaceId },
-      body: { origin: built.origin },
-    });
+    const result = unwrap(
+      await client.post<PostApiWorkspacesByIdCatalogMcpsResponses>({
+        url: "/api/workspaces/{id}/catalog/mcps",
+        path: { id: workspaceId },
+        body: { origin: built.origin },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(result) };
   } catch (err) {
     return formatError(err);
@@ -85,12 +103,16 @@ export async function catalogMcpRm(
   if (typeof fqn !== "string" || fqn.trim() === "") {
     return { exitCode: 2, stderr: "mcp fqn is required\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    await client.call("catalog.mcps.delete", {
-      params: { id: workspaceId, name: fqn },
-    });
+    // unwrap() even though the value is unused: it preserves the
+    // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
+    unwrap(
+      await client.delete({
+        url: catalogResourceUrl(workspaceId, "mcps", fqn),
+      }),
+    );
     return { exitCode: 0, stdout: `mcp ${fqn} removed\n` };
   } catch (err) {
     return formatError(err);
@@ -107,12 +129,14 @@ export async function catalogMcpSyncResolve(
   if (typeof fqn !== "string" || fqn.trim() === "") {
     return { exitCode: 2, stderr: "mcp fqn is required\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const plan = await client.call("catalog.mcps.sync.resolve", {
-      params: { id: workspaceId, name: fqn },
-    });
+    const plan = unwrap(
+      await client.post<PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses>({
+        url: catalogResourceUrl(workspaceId, "mcps", fqn, "/sync/resolve"),
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(plan) };
   } catch (err) {
     return formatError(err);
@@ -133,13 +157,15 @@ export async function catalogMcpSync(
   if (typeof planToken !== "string" || planToken.trim() === "") {
     return { exitCode: 2, stderr: "--plan-token is required (mint with `mcp sync-resolve`)\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const result = await client.call("catalog.mcps.sync", {
-      params: { id: workspaceId, name: fqn },
-      body: { planToken },
-    });
+    const result = unwrap(
+      await client.post<PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses>({
+        url: catalogResourceUrl(workspaceId, "mcps", fqn, "/sync"),
+        body: { planToken },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(result) };
   } catch (err) {
     return formatError(err);

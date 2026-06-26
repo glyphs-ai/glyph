@@ -56,3 +56,28 @@ export function buildInstallOrigin(
   }
   return { origin: file.startsWith("file:") ? file : `file:${file}` };
 }
+
+/** Catalog resource family segment used in the workspace-scoped URL. */
+export type CatalogKind = "skills" | "agents" | "mcps";
+
+/**
+ * Build a workspace-scoped catalog resource URL with the `:name`
+ * segment pre-encoded.
+ *
+ * The catalog `:name` routes use a slash-spanning `{name{.+}}` path
+ * pattern (the resource FQN may contain `/`). The SDK's generated path
+ * serializer cannot substitute that nested-brace token, so these sites
+ * hand-build the URL -- workspace id and name are each escaped with
+ * `encodeURIComponent` (the server matches the segment greedily and
+ * percent-decodes it) -- and pass it to the low-level client with no
+ * `path` map. `suffix` is the literal route tail (e.g. `/anchor`,
+ * `/sync/resolve`), already URL-safe.
+ */
+export function catalogResourceUrl(
+  workspaceId: string,
+  kind: CatalogKind,
+  name: string,
+  suffix = "",
+): string {
+  return `/api/workspaces/${encodeURIComponent(workspaceId)}/catalog/${kind}/${encodeURIComponent(name)}${suffix}`;
+}
