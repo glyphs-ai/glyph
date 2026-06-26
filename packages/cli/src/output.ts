@@ -15,8 +15,8 @@
  * than terminals, so deterministic columns beat fancy formatting.
  */
 
-import { ApiError } from "./api-client.js";
 import type { CommandResult } from "./result.js";
+import { ApiError } from "./sdk-client.js";
 
 export type OutputFormat = "table" | "json";
 

@@ -138,6 +138,9 @@ importers:
       '@glyphs-ai/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@glyphs-ai/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       '@glyphs-ai/server':
         specifier: workspace:*
         version: link:../server

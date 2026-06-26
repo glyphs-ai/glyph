@@ -15,8 +15,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ApiError } from "../src/api-client.js";
 import { formatError } from "../src/output.js";
+import { ApiError } from "../src/sdk-client.js";
 
 describe("formatError", () => {
   it("plain ApiError without `code` renders as a single-line HTTP message", () => {

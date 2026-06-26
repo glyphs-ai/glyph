@@ -32,6 +32,7 @@
  */
 
 import { ROUTES, type RouteKey, type RouteReq, type RouteRes } from "@glyphs-ai/contracts";
+import { ApiError } from "./sdk-client.js";
 
 /** Extract the request `body` type for route key `K`, or `never` when absent. */
 export type BodyOf<K extends RouteKey> =
@@ -67,22 +68,10 @@ export type CallOpts<K extends RouteKey> = ([BodyOf<K>] extends [never]
     readonly headers?: Record<string, string>;
   };
 
-/**
- * Thrown when the server responds with a non-2xx / non-204 status.
- * `body` is the parsed response payload (JSON when the response was
- * `application/json`; raw text otherwise) so callers can pattern-match
- * on `body.code` / `body.error` from the standard error envelope.
- */
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-    public readonly body?: unknown,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
+// `ApiError` is owned by `sdk-client.ts`; re-exported so the existing
+// `import { ApiError } from "./api-client.js"` sites resolve the single
+// canonical class.
+export { ApiError };
 
 export interface ApiClientOpts {
   /** Base URL the server is listening on (no trailing slash). */

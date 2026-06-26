@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@glyphs-ai/contracts": "workspace:*",
+    "@glyphs-ai/sdk": "workspace:*",
     "@glyphs-ai/server": "workspace:*",
     "commander": "^12.1.0",
     "write-file-atomic": "^5.0.1"
