@@ -30,9 +30,9 @@ import { useMounted } from "../hooks/useMounted";
 import { useUrlSearchValue } from "../hooks/useUrlState";
 import { useWorkflowDetail } from "../hooks/useWorkflowDetail";
 import { useWorkflows } from "../hooks/useWorkflows";
+import { pickDrillTarget } from "./workflows/drill";
 import { WorkflowDetail } from "./workflows/WorkflowDetail";
-import { WorkflowNodeHumanPane } from "./workflows/WorkflowNodeHumanPane";
-import { WorkflowNodeTaskPane } from "./workflows/WorkflowNodeTaskPane";
+import { WorkflowDrillPane } from "./workflows/WorkflowDrillPane";
 
 export interface WorkflowsPageProps {
   agents: AgentEntry[];
@@ -365,21 +365,33 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
   // Only "all" is non-constraining; every bounded window narrows the list.
   const filtersActive = idQuery !== "" || agentFilter !== ALL_AGENTS || timeFilter !== "all";
-  // The detail pane is branched inline at the JSX site below, in order: node /
-  // human drill-down panes; `!loaded` → skeleton; empty list + no active
-  // filter → empty-workspace card; empty list + active filter → no-match card;
-  // a selected row → its detail (or, while that detail loads, a skeleton; on
-  // error, the error card); otherwise the no-selection card. `workflows` is
-  // already server-filtered (by `createdSince` among others), so `visible` ===
-  // `workflows` — its length is both the item count and the visible count. The
-  // genuinely-empty workspace is split from a filter-narrowed result via
-  // `filtersActive`; because a bounded time window counts as an active filter,
-  // a populated-but-stale workspace (every workflow older than the window)
-  // resolves to the no-match card with a working Clear-filters recovery rather
-  // than the misleading empty-workspace card.
+  // Right-pane render strategy (two layers):
+  //
+  // Layer A (drill router): when the URL specifies a node-task or human
+  // node, `pickDrillTarget()` picks the active drill and `WorkflowDrillPane`
+  // renders the corresponding node pane. NodeTask wins if both URL slots are
+  // somehow populated.
+  //
+  // Layer B (list × detail state machine): when no drill is active, the pane
+  // falls through to the standard 7-state chain shared in spirit (NOT in code)
+  // with Tasks/Schedules — initial-load skeleton / zero / no-match /
+  // detail-loaded / detail-error / per-row detail-loading / unselected
+  // fallback. Each branch is pinned by `test/workflows-states.test.tsx`.
+  // `workflows` is already server-filtered (by `createdSince` among others),
+  // so `visible` === `workflows` — its length is both the item count and the
+  // visible count. The genuinely-empty workspace is split from a
+  // filter-narrowed result via `filtersActive`; because a bounded time window
+  // counts as an active filter, a populated-but-stale workspace (every
+  // workflow older than the window) resolves to the no-match card with a
+  // working Clear-filters recovery rather than the misleading empty-workspace
+  // card.
+  //
+  // The two layers are intentionally NOT extracted into a cross-page generic;
+  // only the Workflows page has Layer A, and forcing Tasks / Schedules through
+  // a shared state-machine container would over-couple pages whose evolution
+  // should stay independent.
   const detailWorkflow = detail.workflow;
-  const showNodeTaskPane = nodeTaskId !== null && effectiveSelectedId !== null;
-  const showHumanNodePane = humanNodeId !== null && effectiveSelectedId !== null;
+  const drill = pickDrillTarget(nodeTaskId, humanNodeId);
 
   return (
     <>
@@ -439,24 +451,21 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             // and crashes the root). The hook's typed shape is
             // `WorkflowHeader | null`, but accepting `undefined` here keeps the
             // page robust against contract violations.
-            showNodeTaskPane && detailWorkflow != null ? (
-              <WorkflowNodeTaskPane
-                key={`${effectiveSelectedId}:${nodeTaskId}`}
+            //
+            // Layer A (drill) takes priority: when a drill slot is active, a
+            // row is selected, and the workflow header has loaded, render the
+            // drilled node pane. Otherwise fall through to the Layer B list ×
+            // detail branches below.
+            drill !== null && effectiveSelectedId !== null && detailWorkflow != null ? (
+              <WorkflowDrillPane
+                target={drill}
                 workflow={detailWorkflow}
                 dag={detail.dag}
-                nodeTaskId={nodeTaskId as string}
+                effectiveSelectedId={effectiveSelectedId}
                 pollIntervalMs={nodeTaskPollIntervalMs}
                 onBack={onBackToWorkflow}
-                onNavigate={onNavigateNode}
-              />
-            ) : showHumanNodePane && detailWorkflow != null ? (
-              <WorkflowNodeHumanPane
-                key={`${effectiveSelectedId}:human:${humanNodeId}`}
-                workflow={detailWorkflow}
-                dag={detail.dag}
-                nodeId={humanNodeId as string}
-                onBack={onBackToWorkflow}
-                onNavigate={onNavigateHumanNode}
+                onNavigateNode={onNavigateNode}
+                onNavigateHumanNode={onNavigateHumanNode}
               />
             ) : !loaded ? (
               // Initial list load: keep the detail pane skeletonised too,
