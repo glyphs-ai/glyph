@@ -9,6 +9,7 @@ import {
   type ServerConfig,
   type TaskRecord,
 } from "../api";
+import { DetailSkeleton } from "../components/common/DetailSkeleton";
 import { EmptyState } from "../components/common/EmptyState";
 import { ListSkeleton } from "../components/common/ListSkeleton";
 import { HeaderActions } from "../components/HeaderActions";
@@ -23,7 +24,6 @@ import {
 } from "../components/tasks/shared";
 import { TaskConfirmModalsHost } from "../components/tasks/TaskConfirmModals";
 import { TaskDetail } from "../components/tasks/TaskDetail";
-import { TaskDetailSkeleton } from "../components/tasks/TaskDetailSkeleton";
 import { TaskFilters } from "../components/tasks/TaskFilters";
 import { TaskList } from "../components/tasks/TaskList";
 import { TasksToolbar } from "../components/tasks/TasksChrome";
@@ -241,13 +241,14 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
     });
   }, [navigate, location.pathname, location.search, location.hash]);
 
-  // Empty-state branching (Loading | Zero | No-match | Unselected | Normal)
-  // is inlined at each JSX site below on the page's own `loaded` /
-  // `tasks.length` / `filtersActive` / `visibleTasks.length` /
-  // `effectiveSelectedId`. The rail keeps its filter chrome mounted for
-  // Zero / No-match; the detail pane carries the rich card. Auto-binding the
-  // first visible row makes "unselected" effectively unreachable here, but
-  // it's spelled out for completeness.
+  // The detail pane is branched inline at the JSX site below, in order:
+  // `!loaded` → skeleton; `tasks.length === 0 && !filtersActive` →
+  // empty-workspace card; `visibleTasks.length === 0` → no-match card;
+  // `effectiveSelectedId === null` → no-selection card; otherwise the
+  // selected task's detail. The rail keeps its filter chrome mounted in the
+  // two empty-list cases. Auto-binding the first visible row makes the
+  // no-selection branch effectively unreachable, but it's spelled out for
+  // completeness.
 
   if (currentWorkspaceId === null) {
     return (
@@ -308,7 +309,7 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
           </div>
 
           {!loaded ? (
-            <TaskDetailSkeleton />
+            <DetailSkeleton ariaLabel="Loading task" testId="task-detail-skeleton" />
           ) : tasks.length === 0 && !filtersActive ? (
             <EmptyState
               asDetailPane

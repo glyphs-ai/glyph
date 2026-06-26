@@ -37,7 +37,8 @@
     "@glyphs-ai/terminal": "workspace:*",
     "@glyphs-ai/workflow": "workspace:*",
     "@glyphs-ai/workspace": "workspace:*",
-    "pino": "^9.5.0"
+    "pino": "^9.5.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

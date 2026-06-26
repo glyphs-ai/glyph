@@ -15,6 +15,7 @@ import {
   type ServerConfig,
   type WorkflowHeader,
 } from "../api";
+import { DetailSkeleton } from "../components/common/DetailSkeleton";
 import { EmptyState } from "../components/common/EmptyState";
 import { ListSkeleton } from "../components/common/ListSkeleton";
 import { Segmented } from "../components/common/Segmented";
@@ -25,8 +26,7 @@ import { EditScheduleModal } from "../components/schedules/EditScheduleModal";
 import { FireTaskDetailPane } from "../components/schedules/FireTaskDetailPane";
 import { FireWorkflowDetailPane } from "../components/schedules/FireWorkflowDetailPane";
 import { DeleteScheduleModal } from "../components/schedules/ScheduleConfirmModals";
-import { ScheduleDetail } from "../components/schedules/ScheduleDetail";
-import { ScheduleDetailSkeleton } from "../components/schedules/ScheduleDetailSkeleton";
+import { ScheduleDetail, type ScheduleDetailTab } from "../components/schedules/ScheduleDetail";
 import { ScheduleList } from "../components/schedules/ScheduleList";
 import { SchedulesFilters } from "../components/schedules/SchedulesFilters";
 import {
@@ -60,6 +60,7 @@ export interface SchedulesPageProps {
 
 const DEFAULT_FIRE_TASK_POLL_INTERVAL_MS = 4000;
 const SEARCH_DEBOUNCE_MS = 200;
+const DEFAULT_SCHEDULE_DETAIL_TAB: ScheduleDetailTab = "fires";
 
 /**
  * Schedules page — workspace-scoped cron-trigger surface. Master-detail:
@@ -75,6 +76,7 @@ const SEARCH_DEBOUNCE_MS = 200;
  *   - `?state=all|enabled|paused` — enabled-state chips
  *   - `?activity=all|awaiting|running|idle` — workflow activity chips
  *   - `?scheduleId=<scheduleId>` — master-detail selection
+ *   - `?tab=fires|spec` — schedule detail body tab (default `fires`)
  *   - `?fireTaskId=<taskId>` — Mode B drill-down (task-kind schedule)
  *   - `?fireWorkflowId=<workflowId>` — Mode B drill-down (workflow-kind schedule)
  *   - `?fireNodeId=<nodeId>` — node drill-down within a workflow fire
@@ -98,10 +100,12 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   const [fireTaskIdRaw] = useUrlSearchValue("fireTaskId", "");
   const [fireWorkflowIdRaw] = useUrlSearchValue("fireWorkflowId", "");
   const [fireNodeIdRaw] = useUrlSearchValue("fireNodeId", "");
+  const [detailTabRaw] = useUrlSearchValue("tab", DEFAULT_SCHEDULE_DETAIL_TAB);
 
   const kindFilter = coerceScheduleKind(kindRaw);
   const stateFilter = coerceStateFilter(stateFilterRaw);
   const activityFilter = coerceActivityFilter(activityFilterRaw);
+  const detailTab = coerceScheduleDetailTab(detailTabRaw);
   const setStateFilter = useCallback(
     (next: ScheduleStateFilter) => setStateFilterRaw(next),
     [setStateFilterRaw],
@@ -135,6 +139,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       fireTaskId?: string | null;
       fireWorkflowId?: string | null;
       fireNodeId?: string | null;
+      tab?: ScheduleDetailTab;
     }) => {
       const params = new URLSearchParams(location.search);
       if (next.kind !== undefined) {
@@ -170,6 +175,10 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
         if (next.fireNodeId === null || next.fireNodeId === "") params.delete("fireNodeId");
         else params.set("fireNodeId", next.fireNodeId);
       }
+      if (next.tab !== undefined) {
+        if (next.tab === DEFAULT_SCHEDULE_DETAIL_TAB) params.delete("tab");
+        else params.set("tab", next.tab);
+      }
       const search = params.toString();
       navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
         replace: true,
@@ -187,6 +196,11 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     }) => {
       setPageUrl(next);
     },
+    [setPageUrl],
+  );
+
+  const setDetailTab = useCallback(
+    (next: ScheduleDetailTab) => setPageUrl({ tab: next }),
     [setPageUrl],
   );
 
@@ -354,16 +368,6 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     // ScheduleDetail does its own optimistic merge.
     setRefreshToken((n) => n + 1);
   }, []);
-
-  // Close the Edit modal when the user switches to a different
-  // schedule (URL flip clears the modal's target so it doesn't fight
-  // ScheduleDetail's incoming new selection). Idempotent: no-op when
-  // editTarget is already null.
-  useEffect(() => {
-    if (editTarget !== null && editTarget.id !== effectiveSelectedId) {
-      setEditTarget(null);
-    }
-  }, [effectiveSelectedId, editTarget]);
 
   // Only honour `?fireTaskId=` / `?fireWorkflowId=` when a schedule is
   // actually selected AND its kind matches the param. Without the
@@ -705,10 +709,12 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     stateFilter !== DEFAULT_SCHEDULE_STATE_FILTER ||
     activityFilter !== DEFAULT_WORKFLOW_ACTIVITY_FILTER;
 
-  // Atomic "Clear filters" reset. `setPageUrl` already writes every key
-  // in a single `navigate()`, so resetting q / state / activity together
-  // can't race. The `kind` Segmented tab is a primary navigation control,
-  // not a filter, so it (and the current selection) is left untouched.
+  // Atomic "Clear filters" reset. `setPageUrl` already writes every key in a
+  // single `navigate(..., { replace: true })`, so resetting q / state /
+  // activity together can't race and — like the other list pages' direct
+  // `navigate(..., { replace: true })` — doesn't leave a throwaway history
+  // entry. The `kind` Segmented tab is a primary navigation control, not a
+  // filter, so it (and the current selection) is left untouched.
   const clearFilters = () => {
     setPageUrl({
       q: "",
@@ -717,12 +723,14 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     });
   };
 
-  // Empty-state branching (Loading | Zero | No-match | Unselected | Normal)
-  // is inlined at each JSX site below on `loaded` / `schedules.length` /
-  // `filtersActive` / `visible.length` / `effectiveSelectedId`. `itemCount`
-  // is the whole schedule list (all kinds) so the genuinely-empty workspace
-  // still resolves to "zero"; an empty kind tab or filter-narrowed result
-  // resolves to "nomatch".
+  // The detail pane is branched inline at the JSX site below, in order:
+  // fire-task / fire-workflow drill-down panes; `!loaded` → skeleton;
+  // `schedules.length === 0 && !filtersActive` → empty-workspace card;
+  // `visible.length === 0` → no-match card; `effectiveSelectedId === null` →
+  // no-selection card; otherwise the selected schedule's detail.
+  // `schedules.length` counts the whole schedule list (all kinds), so the
+  // genuinely-empty workspace still shows the empty-workspace card; an empty
+  // kind tab or filter-narrowed result shows the no-match card.
 
   return (
     <>
@@ -821,7 +829,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
               onBackFromNode={handleBackFromFireNode}
             />
           ) : !loaded ? (
-            <ScheduleDetailSkeleton />
+            <DetailSkeleton ariaLabel="Loading schedule" testId="schedule-detail-skeleton" />
           ) : schedules.length === 0 && !filtersActive ? (
             <EmptyState
               asDetailPane
@@ -865,7 +873,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
             // Loaded + populated but no row selected. Mirrors the other list
             // pages' explicit "no selection" detail-pane card.
             <EmptyState asDetailPane icon="📅" title="No schedule selected" />
-          ) : effectiveSelectedId ? (
+          ) : (
             <ScheduleDetail
               key={effectiveSelectedId}
               scheduleId={effectiveSelectedId}
@@ -876,9 +884,9 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
               onSelectFire={handleSelectFire}
               onCancelTaskFire={handleCancelTaskFire}
               onCancelWorkflowFire={handleCancelWorkflowFire}
+              tab={detailTab}
+              onTabChange={setDetailTab}
             />
-          ) : (
-            <EmptyState asDetailPane icon="📅" title="No schedule selected" />
           )}
         </div>
       </div>
@@ -959,4 +967,8 @@ function coerceStateFilter(raw: string): ScheduleStateFilter {
 function coerceActivityFilter(raw: string): WorkflowActivityFilter {
   if (raw === "awaiting" || raw === "running" || raw === "idle") return raw;
   return DEFAULT_WORKFLOW_ACTIVITY_FILTER;
+}
+
+function coerceScheduleDetailTab(raw: string): ScheduleDetailTab {
+  return raw === "spec" ? "spec" : DEFAULT_SCHEDULE_DETAIL_TAB;
 }

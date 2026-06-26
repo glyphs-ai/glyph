@@ -135,6 +135,40 @@ service, and the outcome is a small ADT rather than thrown control flow.
   anything unmapped collapses to a generic internal error so host paths
   and `fs` strings never leak.
 
+## OpenAPI surface
+
+Routes are declared with `createRoute` + `app.openapi(...)` from
+[`@hono/zod-openapi`](https://github.com/honojs/middleware/tree/main/packages/zod-openapi),
+so the mounted app is self-describing. The assembled spec and a
+browsable UI are served from two unauthenticated endpoints:
+
+- **`GET /api/openapi.json`** — the OpenAPI **3.1** document for the
+  whole mount tree, assembled from every route's `createRoute` metadata.
+- **`GET /api/docs`** — [Swagger UI](https://github.com/honojs/middleware/tree/main/packages/swagger-ui)
+  pointed at `/api/openapi.json`.
+
+The wire shapes are zod schemas that live in
+[`@glyphs-ai/api`](../api)'s `src/schemas/` — plain, transport-agnostic
+zod, pinned 1:1 to the `@glyphs-ai/contracts` wire types by a parity
+test. A route's `responses` declare the success body via its schema
+(the documented shape) and at least one description-only error status;
+`request.body` / `request.query` schemas additionally drive **runtime
+400 validation**. A failed request validation is converted by the
+shared `defaultHook` (`src/routes/_openapi.ts`) into a structured
+envelope — `{ error, code: "ValidationError", issues }` — consistent
+with the `respondError` envelope for business errors.
+
+Two invariants are pinned by tests:
+
+- **`test/openapi-snapshot.test.ts`** snapshots the assembled document
+  and asserts one documented operation per `ROUTES` manifest entry, so
+  any method / path / param / body / response change surfaces as a
+  reviewable diff.
+- Response bodies are **not** runtime-validated — the schema is the
+  documented shape only, so wire JSON stays byte-identical to the
+  hand-rolled `c.json(...)` payloads (the e2e golden-body tests pin
+  this).
+
 ## Per-workspace context
 
 The server holds one `WorkspaceService` process-wide (via

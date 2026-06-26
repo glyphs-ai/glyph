@@ -22,6 +22,13 @@ export interface ScheduleRecentFiresProps {
   onSelectFire?: (fireId: string) => void;
   onCancelTaskFire?: (taskId: string) => Promise<void> | void;
   onCancelWorkflowFire?: (workflow: WorkflowHeader) => Promise<void> | void;
+  /**
+   * Reports the resolved fire count up to the parent so the detail tab
+   * can render a `Recent fires (N)` badge. `null` means "not resolved
+   * yet" (initial load) so the badge can omit the count rather than
+   * flash a misleading `(0)` while the fetch is in flight.
+   */
+  onCountChange?: (count: number | null) => void;
 }
 
 const MAX_ROWS = 10;
@@ -31,7 +38,6 @@ type CloseReason = "escape" | "menuitem" | "outside";
 export function ScheduleRecentFires(props: ScheduleRecentFiresProps) {
   return (
     <section className="schedule-detail__recent" aria-label="Recent fires">
-      <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 8px 0" }}>Recent fires</h3>
       {props.kind === "workflow" ? (
         <WorkflowFiresBody {...props} />
       ) : props.kind === "task" ? (
@@ -51,9 +57,14 @@ function TaskFiresBody({
   refreshToken,
   onSelectFire,
   onCancelTaskFire,
+  onCountChange,
 }: ScheduleRecentFiresProps) {
   const [rows, setRows] = useState<TaskRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onCountChange?.(rows === null ? null : rows.length);
+  }, [rows, onCountChange]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is intentionally part of the re-fetch trigger set
   useEffect(() => {
@@ -99,9 +110,14 @@ function WorkflowFiresBody({
   refreshToken,
   onSelectFire,
   onCancelWorkflowFire,
+  onCountChange,
 }: ScheduleRecentFiresProps) {
   const [rows, setRows] = useState<WorkflowHeader[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onCountChange?.(rows === null ? null : rows.length);
+  }, [rows, onCountChange]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is intentionally part of the re-fetch trigger set
   useEffect(() => {

@@ -33,6 +33,8 @@ packages/api/src/
 ├── application.ts            ← Application interface + composeApplication
 ├── route-manifest.ts         ← flat route inventory (listRoutes over ROUTES) for the server reflection test
 ├── workspace-context.ts      ← WorkspaceContext + WorkspaceContextRegistry
+├── schemas/                  ← zod wire schemas, one module per domain; transport-agnostic source of truth for the server's OpenAPI spec, pinned 1:1 to @glyphs-ai/contracts by test/wire-schema-parity.test.ts
+│   └── index.ts              ← schemas barrel (re-exported from the package root)
 ├── wiring/                   ← per-kind handler wiring (cross-package glue)
 │   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskService
 │   ├── schedule-workflow-handler.ts     ← schedule "workflow" kind → WorkflowService
@@ -57,6 +59,8 @@ The package exports:
 - Workflow public validation errors: `WorkflowCoordAgentNotCapableError`,
   `WorkflowCoordSpecError`, and `WorkflowWorkerSpecError`.
 - Every public wire contract from `@glyphs-ai/contracts`.
+- Every wire **schema** from `src/schemas/` (the zod source of truth
+  the server projects to OpenAPI; see [Wire schemas](#wire-schemas)).
 
 ```ts
 import { composeApplication } from "@glyphs-ai/api";
@@ -147,6 +151,33 @@ SSE event buses. It is **not** an optimisation cache that can be
 silently dropped — dropping entries without `close()` leaks live
 resources. The class is intentionally not exported from
 `@glyphs-ai/api`; all access goes through `Application` methods.
+
+## Wire schemas
+
+`src/schemas/` holds the [zod](https://zod.dev) schemas for every HTTP
+wire shape, one module per domain (`health`, `runtimes`,
+`server-config`, `workspaces`, `sessions`, `tasks`, `schedules`,
+`workflows`, `catalog`). They are **plain, transport-agnostic zod** —
+no `hono` or `@hono/zod-openapi` import — so this package stays free of
+any HTTP-transport dependency. `@glyphs-ai/server` imports them and
+projects them to an OpenAPI 3.1 document (served at `/api/openapi.json`,
+with Swagger UI at `/api/docs`); the schemas are the single source of
+truth for both the documented response shapes and the runtime 400
+request validation.
+
+Each schema is pinned 1:1 to its `@glyphs-ai/contracts` wire type by
+`test/wire-schema-parity.test.ts`, a **compile-time** parity guard:
+`z.infer<typeof FooSchema>` must equal the contract interface in both
+directions. Dropping or renaming a field on either side fails
+`pnpm --filter @glyphs-ai/api typecheck`, so the schemas can never
+silently drift from the contracts.
+
+```ts
+import { HealthResponseSchema, type HealthResponse } from "@glyphs-ai/api";
+
+HealthResponseSchema.parse(payload); // runtime validation
+type T = typeof HealthResponseSchema; // OpenAPI projection input (in server)
+```
 
 ## Tier
 

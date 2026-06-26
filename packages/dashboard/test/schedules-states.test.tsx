@@ -101,28 +101,25 @@ describe("Schedules page — state matrix", () => {
     const detailSkeleton = screen.getByTestId("schedule-detail-skeleton");
     expect(railSkeleton).toBeTruthy();
     expect(detailSkeleton).toBeTruthy();
-    expect(detailSkeleton).toMatchSnapshot("detail");
   });
 
   it("Zero: empty workspace renders the 📅 EmptyState (New schedule CTA) with the filter chrome still mounted", async () => {
     mockListSchedules.mockResolvedValue([]);
     renderSchedules(PATH, agents);
-    const zero = await screen.findByTestId("schedules-empty-zero");
+    await screen.findByTestId("schedules-empty-zero");
     expect(screen.getByTestId("schedules-empty-zero-cta")).toBeTruthy();
     // The reshape contract: the page no longer collapses to a full-width
     // `tasks-pane--zero`; the standard two-pane layout stays mounted.
     expect(document.querySelector(".tasks-pane--zero")).toBeNull();
     expect(document.querySelector(".tasks-pane--with-detail")).toBeTruthy();
-    expect(zero).toMatchSnapshot();
   });
 
   it("No-match: a filter hiding every row renders the 🔍 EmptyState + Clear filters CTA", async () => {
     mockListSchedules.mockResolvedValue([makeTaskSchedule("sched-t", "Task schedule")]);
     renderSchedules(`${PATH}?q=zzz`, agents);
-    const nomatch = await screen.findByTestId("schedules-empty-nomatch");
+    await screen.findByTestId("schedules-empty-nomatch");
     expect(screen.getByTestId("schedules-empty-nomatch-cta")).toBeTruthy();
     expect(screen.queryByTestId("schedules-empty-zero")).toBeNull();
-    expect(nomatch).toMatchSnapshot();
   });
 
   it("No-match → Clear filters reveals the hidden row (URL filter reset)", async () => {

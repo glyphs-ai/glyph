@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import type { ScheduleTarget } from "@glyphs-ai/contracts";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   getSchedule,
   previewSchedule,
@@ -9,6 +10,9 @@ import {
 import { formatAbsolute, formatRelative } from "../../utils/time";
 import { ScheduleRecentFires } from "./ScheduleRecentFires";
 import { targetAgent, targetBrief, targetDetails, targetRuntime } from "./shared";
+
+/** Which body tab the schedule detail pane is showing. */
+export type ScheduleDetailTab = "fires" | "spec";
 
 export interface ScheduleDetailProps {
   scheduleId: string;
@@ -36,6 +40,13 @@ export interface ScheduleDetailProps {
   onSelectFire: (taskId: string) => void;
   onCancelTaskFire: (taskId: string) => Promise<void> | void;
   onCancelWorkflowFire: (workflow: WorkflowHeader) => Promise<void> | void;
+  /**
+   * Active body tab. URL-driven at the page level (`?tab=fires|spec`)
+   * so it survives reload and is shareable; `fires` is the default.
+   */
+  tab: ScheduleDetailTab;
+  /** Switch the active body tab — writes `?tab=` via the page's atomic URL writer. */
+  onTabChange: (tab: ScheduleDetailTab) => void;
 }
 
 const PREVIEW_COUNT = 1;
@@ -47,10 +58,12 @@ const PREVIEW_COUNT = 1;
  * (name + enabled badge, cron expr + tz + describe, agent + runtime),
  * right side carries the temporal facts (next fire, last fired).
  *
- * Body: brief, optional details, recent fires. We do NOT render a
- * "Next N fires" list anymore — the single next-fire fact lives in
- * the header where users actually look for it, and the body stays
- * focused on "what is this schedule for" + "what has it produced".
+ * Body: a task-style `header + tabs + body` shell. Two tabs —
+ * `Recent fires (N)` (default) shows the fire history full-width;
+ * `Spec` stacks the Brief and (optional) Details cards. The active
+ * tab is URL-driven via `?tab=fires|spec` so it survives reload. We
+ * do NOT render a "Next N fires" list — the single next-fire fact
+ * lives in the header where users actually look for it.
  *
  * Row-level actions (Edit / Pause-Resume / Run-now / Delete) now live
  * exclusively in the list's per-row `⋯` menu (see `ScheduleListItem`).
@@ -73,10 +86,16 @@ export function ScheduleDetail({
   onSelectFire,
   onCancelTaskFire,
   onCancelWorkflowFire,
+  tab,
+  onTabChange,
 }: ScheduleDetailProps) {
   const [detail, setDetail] = useState<ScheduleDetailType | null>(null);
   const [preview, setPreview] = useState<SchedulePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Resolved recent-fires count, surfaced by `<ScheduleRecentFires>` via
+  // `onCountChange`. `null` until the first fetch resolves so the tab
+  // badge can read "Recent fires" rather than a misleading "(0)".
+  const [firesCount, setFiresCount] = useState<number | null>(null);
 
   // Fetch detail + preview together so the header always renders with
   // a consistent describe / next-fire pair.
@@ -183,43 +202,109 @@ export function ScheduleDetail({
         </div>
       </header>
 
-      <div
-        className="task-detail__body"
-        style={{ display: "flex", flexDirection: "column", gap: 16 }}
+      <nav
+        className="task-tabs"
+        aria-label="Schedule detail sections"
+        data-testid="schedule-detail-tabs"
       >
-        <section aria-label="Brief">
-          <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 8px 0" }}>Brief</h3>
-          <p
-            className="muted"
-            style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.45, margin: 0 }}
-          >
-            {targetBrief(detail.target)}
-          </p>
-        </section>
+        <button
+          type="button"
+          className={`task-tabs__btn${tab === "fires" ? " task-tabs__btn--active" : ""}`}
+          aria-pressed={tab === "fires"}
+          data-testid="schedule-detail-tab-fires"
+          onClick={() => onTabChange("fires")}
+        >
+          {firesCount === null ? "Recent fires" : `Recent fires (${firesCount})`}
+        </button>
+        <button
+          type="button"
+          className={`task-tabs__btn${tab === "spec" ? " task-tabs__btn--active" : ""}`}
+          aria-pressed={tab === "spec"}
+          data-testid="schedule-detail-tab-spec"
+          onClick={() => onTabChange("spec")}
+        >
+          Spec
+        </button>
+      </nav>
 
-        {targetDetails(detail.target) && (
-          <section aria-label="Details">
-            <h3 style={{ fontSize: 14, fontWeight: 600, margin: "12px 0 8px 0" }}>Details</h3>
-            <p
-              className="muted"
-              style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.45, margin: 0 }}
-            >
-              {targetDetails(detail.target)}
-            </p>
-          </section>
-        )}
-
-        <ScheduleRecentFires
-          scheduleId={scheduleId}
-          kind={detail.target.kind}
-          currentWorkspaceId={currentWorkspaceId}
-          refreshToken={recentFiresToken}
-          onSelectFire={onSelectFire}
-          onCancelTaskFire={onCancelTaskFire}
-          onCancelWorkflowFire={onCancelWorkflowFire}
-        />
-      </div>
+      {tab === "fires" ? (
+        <div className="task-detail__body" data-testid="schedule-detail-panel-fires">
+          <ScheduleRecentFires
+            scheduleId={scheduleId}
+            kind={detail.target.kind}
+            currentWorkspaceId={currentWorkspaceId}
+            refreshToken={recentFiresToken}
+            onSelectFire={onSelectFire}
+            onCancelTaskFire={onCancelTaskFire}
+            onCancelWorkflowFire={onCancelWorkflowFire}
+            onCountChange={setFiresCount}
+          />
+        </div>
+      ) : (
+        <SpecPanel target={detail.target} />
+      )}
     </aside>
+  );
+}
+
+/**
+ * `Spec` tab body — Brief on top, optional Details below, reusing the
+ * `TaskDetail/OverviewTab` card primitives (`.overview-tab` +
+ * `.overview-card*`). Each card is `flex: 1` with an internally
+ * scrolling body, so a long Details prompt scrolls inside its card
+ * instead of pushing the layout. When Details is empty the Brief card
+ * fills the whole body height (matches Overview's "Details only"
+ * branch).
+ */
+function SpecPanel({ target }: { target: ScheduleTarget }) {
+  const details = targetDetails(target)?.trim() ?? "";
+  const hasDetails = details.length > 0;
+  return (
+    <div className="overview-tab" data-testid="schedule-detail-panel-spec">
+      <SpecCard title="Brief" className="overview-card--brief" testId="schedule-detail-brief-card">
+        <p
+          className="muted"
+          style={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.45, margin: 0 }}
+        >
+          {targetBrief(target)}
+        </p>
+      </SpecCard>
+      {hasDetails && (
+        <SpecCard
+          title="Details"
+          className="overview-card--details"
+          testId="schedule-detail-details-card"
+        >
+          <pre className="overview-card__pre">{details}</pre>
+        </SpecCard>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Pinned-title card with an internally-scrolling body — the same chrome
+ * `OverviewTab` uses for its Summary / Details cards so the two surfaces
+ * read as equals.
+ */
+function SpecCard({
+  title,
+  className,
+  testId,
+  children,
+}: {
+  title: string;
+  className: string;
+  testId: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`overview-card ${className}`} data-testid={testId}>
+      <header className="overview-card__head">
+        <h3 className="overview-card__title">{title}</h3>
+      </header>
+      <div className="overview-card__body">{children}</div>
+    </section>
   );
 }
 

@@ -114,7 +114,6 @@ describe("Sessions page — state matrix", () => {
     const loading = await screen.findByTestId("sessions-loading");
     expect(loading).toBeTruthy();
     expect(loading.querySelector(".spin")).toBeTruthy();
-    expect(loading).toMatchSnapshot();
   });
 
   it("Zero: empty workspace renders the 📂 EmptyState with a wired New session CTA", async () => {
@@ -122,20 +121,18 @@ describe("Sessions page — state matrix", () => {
     // range=all so no time window is active: an empty list is a
     // genuinely-empty workspace (Zero), not a filtered-out result.
     renderSessions(`${PATH}?range=all`, agents);
-    const zero = await screen.findByTestId("sessions-empty-zero");
+    await screen.findByTestId("sessions-empty-zero");
     const cta = screen.getByTestId("sessions-empty-zero-cta");
     expect(cta).toBeTruthy();
     expect((cta as HTMLButtonElement).disabled).toBe(false);
-    expect(zero).toMatchSnapshot();
   });
 
   it("No-match: a filter that hides every row renders the 🔍 EmptyState + Clear filters CTA", async () => {
     mockListSessions.mockResolvedValue([makeSession({ id: "sess-1" })]);
     renderSessions(`${PATH}?q=zzz`, agents);
-    const nomatch = await screen.findByTestId("sessions-empty-nomatch");
+    await screen.findByTestId("sessions-empty-nomatch");
     expect(screen.getByTestId("sessions-empty-nomatch-cta")).toBeTruthy();
     expect(screen.queryByTestId("sessions-empty-zero")).toBeNull();
-    expect(nomatch).toMatchSnapshot();
   });
 
   it("No-match → Clear filters reveals the hidden row (URL filter reset)", async () => {

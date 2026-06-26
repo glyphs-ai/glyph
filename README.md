@@ -209,7 +209,7 @@ Glyph is a pnpm monorepo with strict tier-based layering. The design
 contract — repository pattern, atomic-write seam, REST URL scheme,
 package boundaries — lives in [`docs/architecture.md`](./docs/architecture.md).
 The conceptual model behind why glyph is shaped this way lives in the
-paper [*What we believe about agentic systems*](https://glyphs-ai.github.io/glyph/);
+paper [*What we believe about agentic systems*](docs/paradigm.md);
 it's a short read.
 
 ## First-party catalog

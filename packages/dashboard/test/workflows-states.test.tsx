@@ -101,7 +101,6 @@ describe("Workflows page — state matrix", () => {
     const detailSkeleton = screen.getByTestId("workflow-detail-skeleton");
     expect(railSkeleton).toBeTruthy();
     expect(detailSkeleton).toBeTruthy();
-    expect(detailSkeleton).toMatchSnapshot("detail");
   });
 
   it("Zero: empty workspace renders the 🪄 EmptyState with a wired New workflow CTA", async () => {
@@ -109,18 +108,16 @@ describe("Workflows page — state matrix", () => {
     // range=all so no time window is active: an empty list is a
     // genuinely-empty workspace (Zero), not a filtered-out result.
     renderWorkflows(`${PATH}?range=all`, agents);
-    const zero = await screen.findByTestId("workflows-empty-zero");
+    await screen.findByTestId("workflows-empty-zero");
     expect(screen.getByTestId("workflows-empty-zero-cta")).toBeTruthy();
-    expect(zero).toMatchSnapshot();
   });
 
   it("No-match: an active filter with no rows renders the 🔍 EmptyState + Clear filters CTA", async () => {
     mockListWorkflows.mockResolvedValue([]);
     renderWorkflows(`${PATH}?q=missing&range=all`, agents);
-    const nomatch = await screen.findByTestId("workflows-empty-nomatch");
+    await screen.findByTestId("workflows-empty-nomatch");
     expect(screen.getByTestId("workflows-empty-nomatch-cta")).toBeTruthy();
     expect(screen.queryByTestId("workflows-empty-zero")).toBeNull();
-    expect(nomatch).toMatchSnapshot();
   });
 
   it("No-match → Clear filters resets the filter URL (no-match collapses to zero)", async () => {

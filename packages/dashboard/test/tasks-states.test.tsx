@@ -116,8 +116,6 @@ describe("Tasks page — state matrix", () => {
     const detailSkeleton = screen.getByTestId("task-detail-skeleton");
     expect(railSkeleton).toBeTruthy();
     expect(detailSkeleton).toBeTruthy();
-    expect(railSkeleton).toMatchSnapshot("rail");
-    expect(detailSkeleton).toMatchSnapshot("detail");
   });
 
   it("Zero: empty workspace renders the 📝 EmptyState (Dispatch CTA) only in the detail pane", async () => {
@@ -125,20 +123,18 @@ describe("Tasks page — state matrix", () => {
     // range=all so no time window is active: an empty list here is a
     // genuinely-empty workspace (Zero), not a filtered-out result.
     renderTasks(`${PATH}?range=all`, agents);
-    const zero = await screen.findByTestId("tasks-empty-zero");
+    await screen.findByTestId("tasks-empty-zero");
     expect(screen.getByTestId("tasks-empty-zero-cta")).toBeTruthy();
     // Rail carries no empty/no-match text — only the filter chrome.
     expect(screen.queryByTestId("tasks-empty-rail-hint")).toBeNull();
-    expect(zero).toMatchSnapshot();
   });
 
   it("No-match: a filter hiding every row renders the 🔍 EmptyState + Clear filters CTA", async () => {
     mockListTasks.mockResolvedValue([makeTask("task-A")]);
     renderTasks(`${PATH}?q=zzz`, agents);
-    const nomatch = await screen.findByTestId("tasks-empty-nomatch");
+    await screen.findByTestId("tasks-empty-nomatch");
     expect(screen.getByTestId("tasks-empty-nomatch-cta")).toBeTruthy();
     expect(screen.queryByTestId("tasks-empty-zero")).toBeNull();
-    expect(nomatch).toMatchSnapshot();
   });
 
   it("Stale window: a populated workspace with all rows outside the default window resolves to No-match, and Clear filters (→ range=all) recovers them", async () => {

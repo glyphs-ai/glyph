@@ -4,7 +4,7 @@ This document is for **contributors** — people writing code in this repo
 or adding a new runtime adapter. End-user docs live in the root
 [`README.md`](../README.md). The conceptual rationale — *why* glyph is
 shaped the way it is — lives in the paper
-[*What we believe about agentic systems*](https://glyphs-ai.github.io/glyph/).
+[*What we believe about agentic systems*](./paradigm.md).
 
 Alongside the TypeScript packages, the repo ships a
 [`first-party/`](../first-party/) subtree of bundled agents and skills
@@ -769,7 +769,7 @@ hand-rolls a `fetch`.
 ## Where to look next
 
 - **The paper:
-  [*What we believe about agentic systems*](https://glyphs-ai.github.io/glyph/)** —
+  [*What we believe about agentic systems*](./paradigm.md)** —
   the paradigm glyph implements. Three beliefs, three commitments,
   one extension surface. Read this before proposing architectural
   changes that touch the boundary between code and AI.

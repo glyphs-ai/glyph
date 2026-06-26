@@ -342,9 +342,11 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
     });
   }, [navigate, location.pathname, location.search, location.hash]);
 
-  // Single-column page: the empty-state branching below collapses to
-  // Loading | Zero | No-match | Normal. There's no detail pane, so there's
-  // no "unselected" branch at all.
+  // Single-column page: the list area is branched inline below in order:
+  // `!loaded` → spinner; `sessions.length === 0 && !filtersActive` →
+  // empty-workspace card; `visibleSessions.length === 0` → no-match card;
+  // otherwise the rows. There's no detail pane, so there's no no-selection
+  // branch at all.
 
   if (currentWorkspaceId === null) {
     return (
