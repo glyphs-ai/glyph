@@ -867,6 +867,13 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
                 testId: "schedules-empty-nomatch-cta",
               }}
             />
+          ) : schedulesState === "unselected" ? (
+            // Explicit "unselected" branch mirrors Tasks.tsx for cross-page
+            // consistency. By elimination this is reached only when the
+            // resolver returned "unselected" (loaded + populated + no row
+            // currently selected), but spelling it out keeps the mapping
+            // from state → UI 1:1 with the other list pages.
+            <EmptyState asDetailPane icon="📅" title="No schedule selected" />
           ) : effectiveSelectedId ? (
             <ScheduleDetail
               key={effectiveSelectedId}

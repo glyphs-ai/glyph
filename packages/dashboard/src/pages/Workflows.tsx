@@ -545,7 +545,15 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             if (effectiveSelectedId !== null) {
               return <WorkflowDetailSkeleton />;
             }
-            return <EmptyState asDetailPane icon="🪄" title="No workflow selected" />;
+            // Explicit "unselected" branch mirrors Tasks.tsx for cross-page
+            // consistency. By elimination this is reached only when the
+            // resolver returned "unselected" (loaded + populated + no row
+            // currently selected), but spelling it out keeps the mapping
+            // from state → UI 1:1 with the other list pages.
+            if (workflowsState === "unselected") {
+              return <EmptyState asDetailPane icon="🪄" title="No workflow selected" />;
+            }
+            return null;
           })()}
         </div>
       </div>
