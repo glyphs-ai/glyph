@@ -20,7 +20,8 @@ where `<wsid>` is the workspace's opaque UUID — stable for the
 lifetime of the registry entry, so dashboard URLs survive workspace
 renames.
 
-The canonical list lives in `@glyphs-ai/contracts`'s `ROUTES` manifest;
+The canonical list lives in `@glyphs-ai/api`'s `ROUTES` manifest (under
+its `wire/` surface);
 `test/route-manifest.test.ts` pins the registered handlers against it.
 If this overview drifts from the manifest, the test stays green --
 prefer the manifest. Braced rows below group sibling manifest entries.
@@ -149,7 +150,7 @@ browsable UI are served from two unauthenticated endpoints:
 
 The wire shapes are zod schemas that live in
 [`@glyphs-ai/api`](../api)'s `src/schemas/` — plain, transport-agnostic
-zod, pinned 1:1 to the `@glyphs-ai/contracts` wire types by a parity
+zod, pinned 1:1 to the `@glyphs-ai/api` wire types by a parity
 test. A route's `responses` declare the success body via its schema
 (the documented shape) and at least one description-only error status;
 `request.body` / `request.query` schemas additionally drive **runtime
@@ -236,8 +237,8 @@ logsDir(home: string): string;
 
 `@glyphs-ai/cli` consumes every member of the "CLI lifecycle helpers"
 group for `glyph start` / `status` / `stop` / `connect` / `logs`;
-they cannot live in `@glyphs-ai/contracts` because they value-import
-`node:os` / `node:path`, and contracts is the SPA-safe surface.
+they cannot live in `@glyphs-ai/sdk` because they value-import
+`node:os` / `node:path`, and the sdk is the SPA-safe surface.
 
 ## Graceful shutdown
 

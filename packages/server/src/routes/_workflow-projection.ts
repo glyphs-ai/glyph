@@ -4,13 +4,13 @@
  * The substrate stores `WorkflowEntity` (header) and
  * `WorkflowNodeEntity` (per-node) with an opaque `spec: unknown` on
  * the node — only the per-kind `WorkflowNodeRunner` knows the typed
- * shape. The wire DTOs in `@glyphs-ai/contracts` project that envelope
+ * shape. The wire DTOs in `@glyphs-ai/api` project that envelope
  * flat for the two shipped kinds (`task` / `coordinator`) and pass
  * unrecognised kinds through verbatim.
  *
  * Lives in the server pkg (not the substrate) because the projection
  * is wire-layer-specific — the substrate stays kind-agnostic and
- * takes no workspace dep on `@glyphs-ai/contracts`.
+ * takes no workspace dep on the api wire surface.
  */
 
 import type {

@@ -11,11 +11,12 @@ import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
  * `serverNow` — nothing a network observer couldn't already derive
  * from the running socket.
  *
- * The `HealthResponse` wire shape lives in `@glyphs-ai/contracts`
- * (re-exported via `@glyphs-ai/api`) so the dashboard, CLI, and
- * external monitors can typecheck against it without value-importing
- * `@glyphs-ai/server`. The matching `HealthResponseSchema` is the
- * OpenAPI source of truth for the response body.
+ * The `HealthResponse` wire shape lives in `@glyphs-ai/api` (its `wire/`
+ * surface, reached by the dashboard / CLI through `@glyphs-ai/sdk`) so
+ * the dashboard, CLI, and external monitors can typecheck against it
+ * without value-importing `@glyphs-ai/server`. The matching
+ * `HealthResponseSchema` is the OpenAPI source of truth for the
+ * response body.
  *
  * `deps.now` is injected so tests can pin uptime; production passes
  * `() => Date.now()`.

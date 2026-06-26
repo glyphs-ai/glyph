@@ -1,7 +1,7 @@
 /**
  * zod schemas for the `/api/workspaces/:id/workflows` +
- * `/scheduled-workflows` wire shapes. Mirrors the DTOs in
- * `@glyphs-ai/contracts` (`workflows.ts` + `routes/workflows.ts`) plus
+ * `/scheduled-workflows` wire shapes. Mirrors the DTOs in the api
+ * `wire/` surface (`wire/workflows.ts` + `wire/routes/workflows.ts`) plus
  * the re-exported workflow domain enums / terminal payloads from
  * `@glyphs-ai/workflow`; parity pinned by the wire-schema parity test.
  */

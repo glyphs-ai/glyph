@@ -1,8 +1,8 @@
 /**
  * zod schemas for the `/api/workspaces/:id/schedules` wire shapes.
  * Mirrors the per-kind target DTOs + route request/response shapes in
- * `@glyphs-ai/contracts` (`schedules.ts` + `routes/schedules.ts`) plus
- * the re-exported `Schedule` / `PreviewScheduleResult` domain types
+ * the api `wire/` surface (`wire/schedules.ts` + `wire/routes/schedules.ts`)
+ * plus the re-exported `Schedule` / `PreviewScheduleResult` domain types
  * from `@glyphs-ai/schedule`; parity pinned by the wire-schema parity
  * test.
  */

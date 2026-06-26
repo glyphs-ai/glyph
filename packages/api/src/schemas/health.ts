@@ -1,7 +1,7 @@
 /**
  * zod schema for the `GET /api/health` wire shape. Single source of
  * truth for the OpenAPI projection in `@glyphs-ai/server`; structurally
- * mirrors `HealthResponse` from `@glyphs-ai/contracts` (parity is pinned
+ * mirrors `HealthResponse` from the api `wire/` surface (parity is pinned
  * by `packages/api/test/wire-schema-parity.test.ts`).
  *
  * Plain `zod` only — no `hono` / `@hono/zod-openapi` imports. Schemas are

@@ -1,6 +1,6 @@
 /**
  * zod schemas for the `/api/workspaces/:id/sessions` wire shapes.
- * Mirrors the DTOs in `@glyphs-ai/contracts` (`routes/sessions.ts`)
+ * Mirrors the DTOs in the api `wire/` surface (`wire/routes/sessions.ts`)
  * plus the re-exported `Session` domain type; parity pinned by the
  * wire-schema parity test.
  */

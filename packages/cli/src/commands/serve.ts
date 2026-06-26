@@ -11,8 +11,8 @@
  * That's why this file is the one place in `@glyphs-ai/cli` allowed to
  * value-import from `@glyphs-ai/server`: this *is* the server boot path.
  * Every other cli↔server interaction goes over HTTP through the
- * `@glyphs-ai/sdk` client (see `sdk-client.ts`) using wire contracts from
- * `@glyphs-ai/contracts`.
+ * `@glyphs-ai/sdk` client (see `sdk-client.ts`), which carries the wire
+ * contracts the CLI needs.
  *
  * This function does NOT return — once the server is listening, the
  * process stays alive on the open http handle until SIGTERM / SIGINT

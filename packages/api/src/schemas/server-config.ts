@@ -1,6 +1,6 @@
 /**
  * zod schema for the `GET /api/config` wire shape. Mirrors
- * `ServerConfig` from `@glyphs-ai/contracts`; parity pinned by the
+ * `ServerConfig` from the api `wire/` surface; parity pinned by the
  * wire-schema parity test.
  */
 import { z } from "zod";

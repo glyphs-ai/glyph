@@ -1,6 +1,6 @@
 /**
- * Shape returned by `GET /api/health`. Lives in `@glyphs-ai/contracts`
- * because both ends of the wire — the server route handler that
+ * Shape returned by `GET /api/health`. Lives in `@glyphs-ai/api`'s wire
+ * surface because both ends of the wire — the server route handler that
  * produces it AND the CLI / dashboard clients that consume it — need
  * to agree on the shape without one package value-importing the other.
  *

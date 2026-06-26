@@ -49,9 +49,6 @@ importers:
       '@glyphs-ai/catalog':
         specifier: workspace:*
         version: link:../catalog
-      '@glyphs-ai/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       '@glyphs-ai/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -135,9 +132,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@glyphs-ai/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       '@glyphs-ai/sdk':
         specifier: workspace:*
         version: link:../sdk
@@ -157,36 +151,6 @@ importers:
       '@types/write-file-atomic':
         specifier: ^4.0.3
         version: 4.0.3
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^4.1.5
-        version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(msw@2.14.6(@types/node@22.19.17)(typescript@5.9.3))(vite@8.0.11(@types/node@22.19.17)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
-
-  packages/contracts:
-    devDependencies:
-      '@glyphs-ai/catalog':
-        specifier: workspace:*
-        version: link:../catalog
-      '@glyphs-ai/runtime':
-        specifier: workspace:*
-        version: link:../runtime
-      '@glyphs-ai/schedule':
-        specifier: workspace:*
-        version: link:../schedule
-      '@glyphs-ai/session':
-        specifier: workspace:*
-        version: link:../session
-      '@glyphs-ai/task':
-        specifier: workspace:*
-        version: link:../task
-      '@glyphs-ai/workflow':
-        specifier: workspace:*
-        version: link:../workflow
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.17
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

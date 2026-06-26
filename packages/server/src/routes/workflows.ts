@@ -975,6 +975,6 @@ export function workflowsRoutes(
 }
 
 // Re-export the wire-shape type so `index.ts` doesn't have to thread
-// it from `@glyphs-ai/contracts` separately. Matches the schedules
+// it from `@glyphs-ai/api` separately. Matches the schedules
 // route pattern.
 export type { WorkflowStatus };

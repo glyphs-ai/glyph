@@ -14,12 +14,12 @@ their own schema / service / repository / drizzle module:
 
 | Package                  | Role                                                                       |
 | ------------------------ | -------------------------------------------------------------------------- |
-| `@glyphs-ai/contracts`   | Types-only: wire shapes, route catalog, pure path helpers. No runtime.     |
 | `@glyphs-ai/runtime`     | Runtime adapter registry (`copilot`, ...).                                 |
 | `@glyphs-ai/terminal`    | Thin PTY / shell wrapper: spawn / quoting / platform primitives.           |
-| `@glyphs-ai/api`         | Composition root that wires T0 / T1 modules into per-workspace contexts.   |
+| `@glyphs-ai/api`         | Composition root that wires T0 / T1 modules into per-workspace contexts; also owns the wire contracts under its `wire/` surface. |
 | `@glyphs-ai/server`      | Transport adapter: Hono routes + middleware over the api composition.     |
 | `@glyphs-ai/cli`         | Surface: command registrars over the typed HTTP client.                    |
+| `@glyphs-ai/sdk`         | Generated, browser-safe HTTP client + re-derived wire types. No `src` hand-written beyond thin helpers. |
 | `@glyphs-ai/dashboard`   | Surface: browser SPA (Vite + React); tests use MSW.                       |
 | `@glyphs-ai/e2e`         | Tests-only: no `src/`, no published API.                                   |
 
@@ -259,33 +259,34 @@ tree in order:
 | Kind of type | Lives in | One-line test |
 |---|---|---|
 | A single BC's entity / DTO / error / option shape | the owning domain pkg's `types.ts` / `errors.ts` | "Does it belong to one BC only? Would you delete it if you deleted that BC?" |
-| HTTP wire contract OR cross-package path / route constant the surfaces need at compile time | `@glyphs-ai/contracts` | "Will it appear in a Network tab payload, OR is it a pure type / side-effect-free constant the dashboard / cli reaches for?" |
+| HTTP wire contract OR cross-package path / route constant the surfaces need at compile time | `@glyphs-ai/api`'s `wire/` surface (fenced consumers see it via `@glyphs-ai/sdk`) | "Will it appear in a Network tab payload, OR is it a pure type / side-effect-free constant the dashboard / cli reaches for?" |
 | In-process composition / runtime container holding live service instances or callbacks | `@glyphs-ai/api` | "Does it own `Promise<Service>` / a `(c) => Service` resolver, OR a cross-BC composition shape constructed once per workspace?" |
 | HTTP-transport-internal type (`Hono.Context`-flavoured, route-resolver, middleware) | `@glyphs-ai/server` | "Does its signature reference `Hono.Context`, request bodies, or Express-style middleware?" |
 
 ### Decision rules (sharp edges)
 
-1. **Types crossing the public boundary → `@glyphs-ai/contracts`. Cross-BC composition / live-instance shapes → `@glyphs-ai/api`.**
-   The 0.6.0 split separates the two: `@glyphs-ai/contracts` holds
-   wire types + path helpers (pure types, side-effect-free
-   constants, zero orchestration), and `@glyphs-ai/api` holds the
-   composition root that wires T0/T1 into per-workspace contexts.
-   `@glyphs-ai/api` re-exports the contracts barrel so the in-process
-   server can import both via a single specifier; the fenced
-   consumers (`@glyphs-ai/dashboard`, `@glyphs-ai/cli`) MUST go through
-   `@glyphs-ai/contracts` directly. Domain pkgs can `import type` from
-   `@glyphs-ai/contracts` when projecting their internal DTOs to wire
-   shape — the inverse (a contracts file importing values from a
-   domain pkg) is also fine because contracts is type-only and the
-   value graph stays clean.
+1. **Types crossing the public boundary → `@glyphs-ai/api`'s `wire/` surface. Cross-BC composition / live-instance shapes → the rest of `@glyphs-ai/api`.**
+   `@glyphs-ai/api` holds both halves: the `wire/` surface (pure types,
+   side-effect-free route / path constants, zero orchestration) and the
+   composition root that wires T0/T1 into per-workspace contexts. The
+   api barrel re-exports `wire/` so the in-process server imports both
+   via a single specifier; the fenced consumers
+   (`@glyphs-ai/dashboard`, `@glyphs-ai/cli`) never import `api` — they
+   get the same wire types from `@glyphs-ai/sdk`, whose self-contained
+   `wire.ts` re-derives them from the generated client. Domain pkgs can
+   `import type` from the api `wire/` surface when projecting their
+   internal DTOs to wire shape — the inverse (a `wire/` file importing
+   values from a domain pkg) is also fine because the wire surface is
+   type-only and the value graph stays clean.
 
-2. **Single domain's entity / DTO / error → that domain's pkg, never `api` or `contracts`.**
+2. **Single domain's entity / DTO / error → that domain's pkg, never the api `wire/` surface.**
    If `Task` only makes sense as part of the task BC, it lives in
-   `packages/task/src/types.ts`. `@glyphs-ai/contracts` re-exports the
+   `packages/task/src/types.ts`. The api `wire/` surface re-exports the
    subset of domain types that actually appear on the HTTP wire
-   (it depends on the domain pkgs for the type-only re-export). The
-   server / cli `import { type Task } from "@glyphs-ai/contracts"`,
-   the domain pkg owns the definition. `@glyphs-ai/api` owns
+   (api depends on the domain pkgs for the type-only re-export). The
+   server `import { type Task } from "@glyphs-ai/api"` and the surfaces
+   `import { type Task } from "@glyphs-ai/sdk"`, while the domain pkg
+   owns the definition. `@glyphs-ai/api`'s composition layer owns
    *cross-BC composition* types only — never single-domain DTOs.
 
 3. **Transport-specific glue → `server` (or the future transport pkg), never `api`.**
@@ -304,10 +305,10 @@ tree in order:
    composer" invariant. Enforced mechanically by
    `packages/e2e/test/architecture/inter-service-imports.test.ts`.
 
-5. **Surface (`dashboard`, `cli`) imports go through `@glyphs-ai/contracts`.**
+5. **Surface (`dashboard`, `cli`) imports go through `@glyphs-ai/sdk`.**
    The fenced consumers MUST NOT import from `@glyphs-ai/api`, any T0
    pkg, or any T1 pkg. Their entire glyph-workspace surface is
-   `@glyphs-ai/contracts` (plus, for `cli`, `@glyphs-ai/server` for the
+   `@glyphs-ai/sdk` (plus, for `cli`, `@glyphs-ai/server` for the
    in-process server boot — the cli binary IS the server bundle).
    Enforced mechanically by
    `packages/e2e/test/architecture/tier-invisibility.test.ts`.
@@ -317,13 +318,13 @@ tree in order:
 - **Wire types vs domain types: when they diverge.** A domain pkg's
   internal `XxxEntity` and the wire `Xxx` DTO drift over time
   (`createdAt: Date` → `createdAt: string`, soft-delete fields hidden).
-  When that happens, the wire shape moves to `@glyphs-ai/contracts`;
+  When that happens, the wire shape moves to the api `wire/` surface;
   the entity stays in the domain. The service in the domain pkg owns
   the projection.
 
 - **Errors that cross the wire.** If an error name appears in an HTTP
   error response (i.e. the client branches on it), its `name` literal
-  is wire-shape and should be re-declared in `@glyphs-ai/contracts`. The
+  is wire-shape and should be re-declared in the api `wire/` surface. The
   Error *class* stays in the domain pkg's `errors.ts`. Cross-pkg
   consumers that need to discriminate the error should branch on
   `err.name === "AgentNotFoundError"` rather than `import`ing the
@@ -345,18 +346,18 @@ tree in order:
 
 - Putting a wire shape in the originating domain pkg "because it's
   defined there" — couples the wire to the domain. **Fix:** move it
-  to `@glyphs-ai/contracts`; have the domain pkg `import type` it for
+  to the api `wire/` surface; have the domain pkg `import type` it for
   projection.
 
 - Putting an in-process resolver type in `@glyphs-ai/api` "because it's
   used by routes" — pollutes the api pkg with `Hono.Context`.
   **Fix:** keep in `server`.
 
-- Adding a type to `@glyphs-ai/api` or `@glyphs-ai/contracts` "because
-  multiple downstreams use it" when it's actually a single-domain
-  concept — bloats T2. **Fix:** put it in the owning domain pkg;
-  re-export from `@glyphs-ai/contracts` only if it genuinely appears
-  in a Network-tab payload.
+- Adding a type to `@glyphs-ai/api` (its composition layer or `wire/`
+  surface) "because multiple downstreams use it" when it's actually a
+  single-domain concept — bloats T2. **Fix:** put it in the owning
+  domain pkg; re-export from the api `wire/` surface only if it
+  genuinely appears in a Network-tab payload.
 
 - A domain pkg value-importing another domain pkg's service or error
   class — silently builds a runtime cross-BC dep. **Fix:** use
@@ -576,10 +577,10 @@ NEVER use these suffixes:
 
 ## Wire / HTTP layer conventions
 
-> Applies to `@glyphs-ai/contracts` — the wire / HTTP layer. The
-> `## Naming conventions` rules above govern *pkg-internal* types
+> Applies to `@glyphs-ai/api`'s `wire/` surface — the wire / HTTP layer.
+> The `## Naming conventions` rules above govern *pkg-internal* types
 > (`*Row` / `*Entity` / bare-noun DTO). This section governs the
-> *cross-the-wire* types that live in `@glyphs-ai/contracts`: HTTP
+> *cross-the-wire* types that live under `packages/api/src/wire/`: HTTP
 > request / response bodies and the per-endpoint projections of pkg
 > DTOs.
 
@@ -590,8 +591,8 @@ NEVER use these suffixes:
 > `Dto` as a *role*, not a suffix. None of them mark the serialized
 > form with a `Wire` tag — wire format is the default, not a variant.
 
-The contracts package is **only** JSON-over-HTTP: there is no
-rich-in-memory counterpart for a contracts type to contrast with, so a
+The wire surface is **only** JSON-over-HTTP: there is no
+rich-in-memory counterpart for a wire type to contrast with, so a
 `Wire` suffix disambiguates nothing. Four rules replace it.
 
 ### Rule 1 — Same shape as the owning pkg DTO → re-export, don't redefine
@@ -601,7 +602,7 @@ domain pkg, **re-export it** instead of hand-copying a second
 definition.
 
 ```ts
-// packages/contracts/src/workflows.ts
+// packages/api/src/wire/workflows.ts
 import type {
   WorkflowStatus,
   WorkflowSuccess,
@@ -612,7 +613,7 @@ export type { WorkflowStatus, WorkflowSuccess } from "@glyphs-ai/workflow";
 
 Re-export keeps the wire layer DRY and turns any drift in the owning
 pkg into a `tsc` error here, immediately. A second `interface
-Workflow` in contracts that is byte-identical to the pkg DTO is the
+Workflow` in the wire surface that is byte-identical to the pkg DTO is the
 anti-pattern (`WorkflowStatusWire = "running" | …` vs the pkg's
 `WorkflowStatus` — two names for exactly one thing). All re-exports are
 `type`-only, so no runtime dep crosses into the dashboard / CLI
@@ -699,7 +700,7 @@ the `Parent.Child` import friction a `namespace` introduces.
 
 ### Why no `Wire` suffix?
 
-- **Disambiguates nothing** — contracts is *only* the JSON-over-HTTP
+- **Disambiguates nothing** — the wire surface is *only* the JSON-over-HTTP
   layer. There is no rich in-memory form for it to contrast with.
 - **Industry never adopted it** — the protobuf-style stack treats the
   wire format as the default and never tags it.

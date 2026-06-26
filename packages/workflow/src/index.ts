@@ -13,8 +13,9 @@
  *
  * Per-kind wire DTOs (`WorkflowWorkerNodeSpec`,
  * `WorkflowCoordinatorNodeSpec`, `WorkflowNodeSpec`, …) are owned
- * by and imported directly from `@glyphs-ai/contracts`; the substrate
- * stays kind-agnostic and takes no workspace dep on the wire pkg.
+ * by and imported directly from `@glyphs-ai/api`'s wire surface; the
+ * substrate stays kind-agnostic and takes no workspace dep on the wire
+ * layer.
  */
 
 // ─── Stuck-recovery cap ─────────────────────────────────────────────

@@ -12,7 +12,7 @@
  *
  * Per-kind wire DTOs (`WorkflowWorkerNodeSpec`,
  * `WorkflowCoordinatorNodeSpec`, `WorkflowNodeSpec`, …) live in
- * `@glyphs-ai/contracts`; this file owns only substrate-side types
+ * `@glyphs-ai/api`'s wire surface; this file owns only substrate-side types
  * (`WorkflowNodeKind`, `WorkflowStatus`, `WorkflowNodeStatus`,
  * `WorkflowNodeSpecEnvelope`, `WorkflowNodeValidateCtx`,
  * `WorkflowNodeDispatchOpts`, `WorkflowNodeRunner`,

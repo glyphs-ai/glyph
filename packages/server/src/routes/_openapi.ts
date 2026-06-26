@@ -24,7 +24,7 @@
  * one contentless response keeps the handler return type permissive
  * (`... | Response`) so `respondError` stays valid without per-call-site
  * casts. Success-body shape is still locked: handlers annotate their
- * `c.json<Wire>(…)` payloads against the `@glyphs-ai/contracts` types,
+ * `c.json<Wire>(…)` payloads against the `@glyphs-ai/api` wire types,
  * which the wire-schema parity test pins to these very schemas.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";

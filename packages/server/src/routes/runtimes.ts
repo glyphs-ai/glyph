@@ -11,9 +11,10 @@ import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
  * button only renders enabled when the active runtime sets
  * `capabilities.remoteSession === true`).
  *
- * The `RuntimeInfo` wire shape lives in `@glyphs-ai/contracts`
- * (re-exported via `@glyphs-ai/api`) so dashboard / CLI consumers can
- * typecheck against it without value-importing `@glyphs-ai/server`.
+ * The `RuntimeInfo` wire shape lives in `@glyphs-ai/api` (its `wire/`
+ * surface, reached by dashboard / CLI through `@glyphs-ai/sdk`) so those
+ * consumers can typecheck against it without value-importing
+ * `@glyphs-ai/server`.
  */
 export function runtimesRoutes(registry: RuntimeRegistry): OpenAPIHono {
   const app = createApiApp();

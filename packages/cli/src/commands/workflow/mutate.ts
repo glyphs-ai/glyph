@@ -12,14 +12,12 @@ import type {
   AddEdgeRequest,
   AddNodeRequest,
   FinishWorkflowRequest,
-  ReplaceNodeSpecRequest,
-} from "@glyphs-ai/contracts";
-import type {
   PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses,
   PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses,
   PostApiWorkspacesByIdWorkflowsByWfidFinishResponses,
   PostApiWorkspacesByIdWorkflowsByWfidNodesResponses,
   PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses,
+  ReplaceNodeSpecRequest,
 } from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByTo,

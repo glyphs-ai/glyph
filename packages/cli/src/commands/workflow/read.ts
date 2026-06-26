@@ -5,8 +5,9 @@
  * `../../registrars/workflow.ts`.
  */
 
-import type { CancelWorkflowRequest, CreateWorkflowRequest } from "@glyphs-ai/contracts";
 import type {
+  CancelWorkflowRequest,
+  CreateWorkflowRequest,
   PostApiWorkspacesByIdWorkflowsByWfidCancelResponses,
   PostApiWorkspacesByIdWorkflowsResponses,
 } from "@glyphs-ai/sdk";

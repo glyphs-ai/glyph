@@ -1,9 +1,10 @@
 /**
- * Public surface of `@glyphs-ai/contracts`.
+ * Public wire surface of `@glyphs-ai/api` (the `./wire` subtree).
  *
  * Pure types plus the route manifest (`ROUTES` / `defineRoute`). No
- * orchestration, no DB handles, no subprocess spawning. Safe for the
- * SPA bundle and the CLI alike.
+ * orchestration, no DB handles, no subprocess spawning. The api barrel
+ * re-exports this subtree; the SPA and CLI consume the same shapes
+ * through the generated `@glyphs-ai/sdk`.
  *
  * Re-exports are grouped by source file rather than by category so the
  * "where does `Foo` live?" answer is one `grep` away. The cross-pkg

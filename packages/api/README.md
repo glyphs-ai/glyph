@@ -7,22 +7,23 @@ root that wires T0 foundations (`workspace`, `catalog`, `runtime`,
 `schedule`, `terminal`) and T1 execution modes (`session`, `task`,
 `workflow`) into per-workspace runtime contexts. Cross-package wire
 contracts (HTTP route catalog, request / response DTOs, out-of-band IPC
-files, `GLYPH_HOME` resolution) live in the sibling T2 package
-`@glyphs-ai/contracts`; `@glyphs-ai/api` re-exports the whole
-`@glyphs-ai/contracts` barrel so the in-process server boot path
-(`@glyphs-ai/server`) imports orchestration and contracts from one
-specifier.
+files, `GLYPH_HOME` resolution) live in this package's own `wire/`
+surface; the `@glyphs-ai/api` barrel re-exports `wire/` so the
+in-process server boot path (`@glyphs-ai/server`) imports orchestration
+and contracts from one specifier.
 
 `@glyphs-ai/dashboard` and `@glyphs-ai/cli` must NOT import from
 `@glyphs-ai/api` — they use the HTTP transport and import wire shapes
-from `@glyphs-ai/contracts` (the structural fence is enforced by
+from the generated `@glyphs-ai/sdk` client (the structural fence is
+enforced by
 `packages/e2e/test/architecture/tier-invisibility.test.ts`).
 
 Orchestration (`composeApplication`, `WorkspaceContext`) and wire
-contracts (routes, request / response shapes, path helpers) live in
-sibling T2 pkgs: orchestration here, contracts in `@glyphs-ai/contracts`.
-The split gives the surfaces (`@glyphs-ai/dashboard`, `@glyphs-ai/cli`)
-a structural fence against pulling orchestration code into their
+contracts (routes, request / response shapes, path helpers) both live
+in this package: orchestration in `src/`, the wire surface in
+`src/wire/`. The surfaces (`@glyphs-ai/dashboard`, `@glyphs-ai/cli`)
+reach the wire shapes through the generated `@glyphs-ai/sdk` client, a
+structural fence against pulling orchestration code into their
 bundles. See
 [`docs/architecture.md § Tier model`](../../docs/architecture.md#tier-model).
 
@@ -33,7 +34,7 @@ packages/api/src/
 ├── application.ts            ← Application interface + composeApplication
 ├── route-manifest.ts         ← flat route inventory (listRoutes over ROUTES) for the server reflection test
 ├── workspace-context.ts      ← WorkspaceContext + WorkspaceContextRegistry
-├── schemas/                  ← zod wire schemas, one module per domain; transport-agnostic source of truth for the server's OpenAPI spec, pinned 1:1 to @glyphs-ai/contracts by test/wire-schema-parity.test.ts
+├── schemas/                  ← zod wire schemas, one module per domain; transport-agnostic source of truth for the server's OpenAPI spec, pinned 1:1 to the wire/ types by test/wire-schema-parity.test.ts
 │   └── index.ts              ← schemas barrel (re-exported from the package root)
 ├── wiring/                   ← per-kind handler wiring (cross-package glue)
 │   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskService
@@ -41,13 +42,13 @@ packages/api/src/
 │   ├── workflow-coord-task-runner.ts    ← workflow coordinator node → TaskService
 │   ├── workflow-human-node-runner.ts    ← workflow human node → gate awaiting the respond API
 │   └── workflow-worker-task-runner.ts   ← workflow worker node → TaskService
-└── index.ts                  ← public barrel (orchestration + re-exports
-                                of @glyphs-ai/contracts)
+└── index.ts                  ← public barrel (orchestration + the
+                                wire/ surface)
 ```
 
 Wire contracts (routes, response shapes, path helpers, etc.) live in
-`packages/contracts/src/` — see `@glyphs-ai/contracts/README.md` for
-that package's internal layout.
+`packages/api/src/wire/` — the barrel re-exports them so `server` can
+import orchestration and wire types from a single specifier.
 
 ## Public API
 
@@ -58,7 +59,7 @@ The package exports:
 - Schedule validation error: `TaskScheduleTargetError`.
 - Workflow public validation errors: `WorkflowCoordAgentNotCapableError`,
   `WorkflowCoordSpecError`, and `WorkflowWorkerSpecError`.
-- Every public wire contract from `@glyphs-ai/contracts`.
+- Every public wire contract from the `wire/` surface.
 - Every wire **schema** from `src/schemas/` (the zod source of truth
   the server projects to OpenAPI; see [Wire schemas](#wire-schemas)).
 
@@ -165,12 +166,12 @@ with Swagger UI at `/api/docs`); the schemas are the single source of
 truth for both the documented response shapes and the runtime 400
 request validation.
 
-Each schema is pinned 1:1 to its `@glyphs-ai/contracts` wire type by
+Each schema is pinned 1:1 to its `wire/` surface type by
 `test/wire-schema-parity.test.ts`, a **compile-time** parity guard:
-`z.infer<typeof FooSchema>` must equal the contract interface in both
+`z.infer<typeof FooSchema>` must equal the wire interface in both
 directions. Dropping or renaming a field on either side fails
 `pnpm --filter @glyphs-ai/api typecheck`, so the schemas can never
-silently drift from the contracts.
+silently drift from the wire contracts.
 
 ```ts
 import { HealthResponseSchema, type HealthResponse } from "@glyphs-ai/api";
@@ -184,7 +185,7 @@ type T = typeof HealthResponseSchema; // OpenAPI projection input (in server)
 `@glyphs-ai/api` is the **T2 Application layer (orchestration)** in
 glyph's tier model
 (see [`docs/architecture.md § Tier model`](../../docs/architecture.md#tier-model)).
-Its sibling at T2 is `@glyphs-ai/contracts` (wire types). T0
+Its sibling at T2 is `@glyphs-ai/sdk` (the generated client). T0
 (foundations: `catalog`, `runtime`, `schedule`, `terminal`,
 `workspace`) and T1 (execution modes: `session`, `task`, `workflow`)
 sit below; T3 (`server`) and T_top (`dashboard`, `cli`) sit above.
@@ -193,7 +194,7 @@ sit below; T3 (`server`) and T_top (`dashboard`, `cli`) sit above.
 
 `@glyphs-ai/api` MAY import (value or type):
 
-- `@glyphs-ai/contracts` (re-exported from the public barrel).
+- Its own `wire/` surface (re-exported from the public barrel).
 - T0/T1 packages it composes: `@glyphs-ai/workspace`,
   `@glyphs-ai/catalog`, `@glyphs-ai/session`, `@glyphs-ai/task`,
   `@glyphs-ai/workflow`, `@glyphs-ai/runtime`, `@glyphs-ai/schedule`,
@@ -204,7 +205,7 @@ sit below; T3 (`server`) and T_top (`dashboard`, `cli`) sit above.
 
 - `@glyphs-ai/server` — server depends on api, not the reverse.
 - `@glyphs-ai/dashboard`, `@glyphs-ai/cli` — surfaces use HTTP and
-  `@glyphs-ai/contracts`; they must not depend on api.
+  `@glyphs-ai/sdk`; they must not depend on api.
 
 ## Testing
 

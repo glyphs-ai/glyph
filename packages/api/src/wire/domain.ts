@@ -1,15 +1,14 @@
 /**
  * Re-exports of the domain types that cross the HTTP wire.
  *
- * Hosted here so dashboard and CLI can pull every shape they need
- * through `@glyphs-ai/contracts` without taking a workspace dep on
- * the underlying domain pkg. Importing the source pkg would let the
+ * Hosted here so the SDK (and through it, dashboard and CLI) can pull
+ * every shape they need without taking a workspace dep on the
+ * underlying domain pkg. Importing the source pkg would let the
  * consumer accidentally pull non-wire surfaces (DB handles, service
  * classes) into its module graph.
  *
- * All re-exports MUST be type-only. Value re-exports belong in
- * `@glyphs-ai/api` (the orchestration root), which has fewer caller
- * categories and tighter audit.
+ * All re-exports MUST be type-only. Value re-exports belong in the
+ * orchestration barrel proper (`../index.ts`), not this wire subtree.
  */
 
 export type {

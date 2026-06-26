@@ -1,7 +1,7 @@
 /**
  * Per-runtime info advertised over `GET /api/runtimes`. Lives in
- * `@glyphs-ai/contracts` so both the server's `runtimesRoutes` handler
- * and the dashboard / CLI clients can typecheck against the same
+ * `@glyphs-ai/api`'s wire surface so both the server's `runtimesRoutes`
+ * handler and the dashboard / CLI clients can typecheck against the same
  * shape without one package value-importing the other.
  *
  * Wire shape: `[{ kind: string, capabilities: object }]`. Capabilities

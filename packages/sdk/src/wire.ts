@@ -99,6 +99,9 @@ export type WorkflowNodeSpec = WorkflowNode["spec"];
 /** The `human`-kind arm of {@link WorkflowNodeSpec}. */
 export type WorkflowHumanNodeSpec = Extract<WorkflowNodeSpec, { kind: "human" }>;
 
+/** Discriminator over the workflow node kinds the substrate ships. */
+export type WorkflowNodeKind = "coordinator" | "worker" | "human";
+
 /** Response shape for the workflow artifacts listing. */
 export type WorkflowArtifactsResponse = GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponse;
 
@@ -130,6 +133,63 @@ export interface RespondHumanNodeRequest {
   readonly choiceId?: string;
   readonly input?: string;
 }
+
+// ─── Workflow mutation bodies (coord-callback routes, hand-validated) ─
+
+/** POST `/workflows/:wfid/nodes` body — insert one node under `parents`. */
+export interface AddNodeRequest {
+  readonly kind: WorkflowNodeKind;
+  readonly spec: unknown;
+  readonly parents: readonly string[];
+}
+
+/** POST `/workflows/:wfid/edges` body — link `fromNodeId` → `toNodeId`. */
+export interface AddEdgeRequest {
+  readonly fromNodeId: string;
+  readonly toNodeId: string;
+}
+
+/**
+ * Reference to a node in an `addSubgraph` batch — either an existing
+ * node (`nodeId`) or a temp node declared in the same batch (`tempId`).
+ */
+export type WorkflowNodeRef = { readonly nodeId: string } | { readonly tempId: string };
+
+/** One declared temp node in an `addSubgraph` batch. */
+export interface AddSubgraphRequestNode {
+  readonly tempId: string;
+  readonly kind: WorkflowNodeKind;
+  readonly spec: unknown;
+  readonly existingParents?: readonly string[];
+}
+
+/** One declared edge in an `addSubgraph` batch. */
+export interface AddSubgraphRequestEdge {
+  readonly from: WorkflowNodeRef;
+  readonly to: WorkflowNodeRef;
+}
+
+/** POST `/workflows/:wfid/subgraph` body — insert a batch of nodes + edges. */
+export interface AddSubgraphRequest {
+  readonly nodes: readonly AddSubgraphRequestNode[];
+  readonly edges: readonly AddSubgraphRequestEdge[];
+}
+
+/** PATCH `/workflows/:wfid/nodes/:nid/spec` body — re-validate + replace spec. */
+export interface ReplaceNodeSpecRequest {
+  readonly newSpec: unknown;
+}
+
+/** POST `/workflows/:wfid/finish` body — flip the workflow terminal. */
+export type FinishWorkflowRequest =
+  | {
+      readonly kind: "succeeded";
+      readonly success?: { readonly output?: string | null };
+    }
+  | {
+      readonly kind: "failed";
+      readonly failure: { readonly kind: "coordinator"; readonly message: string };
+    };
 
 // ─── Schedule domain shapes (sliced from list / preview payloads) ────
 

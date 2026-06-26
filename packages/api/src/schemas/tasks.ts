@@ -1,7 +1,7 @@
 /**
  * zod schemas for the `/api/workspaces/:id/tasks` + `/scheduled-tasks`
- * wire shapes. Mirrors the DTOs in `@glyphs-ai/contracts`
- * (`routes/tasks.ts`) plus the re-exported `Task` domain type and the
+ * wire shapes. Mirrors the DTOs in the api `wire/` surface
+ * (`wire/routes/tasks.ts`) plus the re-exported `Task` domain type and the
  * `ActivityItem` / `TruncationInfo` runtime types; parity pinned by the
  * wire-schema parity test.
  */

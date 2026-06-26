@@ -5,9 +5,9 @@
  * user the truth even when an env override like `GLYPH_HOME` is in
  * effect.
  *
- * Lives in `@glyphs-ai/contracts` so both the server's `configRoutes`
- * handler and the dashboard / CLI clients can typecheck against the
- * same shape without one package value-importing the other.
+ * Lives in `@glyphs-ai/api`'s wire surface so both the server's
+ * `configRoutes` handler and the dashboard / CLI clients can typecheck
+ * against the same shape without one package value-importing the other.
  *
  * Sensitive values are NOT exposed: the dashboard runs in single-user
  * mode on the same host as the server, so absolute paths are

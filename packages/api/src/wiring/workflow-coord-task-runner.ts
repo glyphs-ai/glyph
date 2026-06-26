@@ -65,7 +65,6 @@
  */
 
 import type { CatalogService } from "@glyphs-ai/catalog";
-import type { WorkflowCoordinatorNodeSpec } from "@glyphs-ai/contracts";
 import {
   AgentNotFoundError,
   AgentResolutionFailedError,
@@ -80,6 +79,7 @@ import {
   workflowDir,
 } from "@glyphs-ai/workflow";
 import pino, { type Logger } from "pino";
+import type { WorkflowCoordinatorNodeSpec } from "../wire/index.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 

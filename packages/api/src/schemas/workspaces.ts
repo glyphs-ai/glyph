@@ -1,7 +1,7 @@
 /**
  * zod schemas for the `/api/workspaces` wire shapes. Mirrors the DTOs in
- * `@glyphs-ai/contracts` (`routes/workspaces.ts`); parity pinned by the
- * wire-schema parity test.
+ * the api `wire/` surface (`wire/routes/workspaces.ts`); parity pinned by
+ * the wire-schema parity test.
  */
 import { z } from "zod";
 

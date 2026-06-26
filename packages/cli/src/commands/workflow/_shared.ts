@@ -5,7 +5,7 @@
  * Consumed by the read / mutate / respond concern modules.
  */
 
-import type { WorkflowHeader } from "@glyphs-ai/contracts";
+import type { WorkflowHeader } from "@glyphs-ai/sdk";
 import { formatJson, formatRecord, pickFormat } from "../../output.js";
 
 /** Render a {@link WorkflowHeader} via either JSON or the record formatter. */

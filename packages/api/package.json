@@ -2,7 +2,7 @@
   "name": "@glyphs-ai/api",
   "private": true,
   "version": "0.0.0",
-  "description": "Application layer for glyph: orchestration of T0/T1 packages into a composable runtime. Re-exports `@glyphs-ai/contracts` so server has a single import site; dashboard / cli should depend on `@glyphs-ai/contracts` directly.",
+  "description": "Application layer for glyph: orchestration of T0/T1 packages into a composable runtime, plus the wire contracts under its `wire/` surface (re-exported from the barrel so server has a single import site). Dashboard / cli depend on `@glyphs-ai/sdk` instead.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -29,7 +29,6 @@
   },
   "dependencies": {
     "@glyphs-ai/catalog": "workspace:*",
-    "@glyphs-ai/contracts": "workspace:*",
     "@glyphs-ai/runtime": "workspace:*",
     "@glyphs-ai/schedule": "workspace:*",
     "@glyphs-ai/session": "workspace:*",

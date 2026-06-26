@@ -1,7 +1,7 @@
 /**
  * Wire shape consumed by the dashboard's `ResolveTree` component for
- * the install + sync flows. Lives in `@glyphs-ai/contracts` so both the
- * server's `planToManifest` projection AND the dashboard / CLI
+ * the install + sync flows. Lives in `@glyphs-ai/api`'s wire surface so
+ * both the server's `planToManifest` projection AND the dashboard / CLI
  * clients can typecheck against the same shape without one package
  * value-importing the other.
  *

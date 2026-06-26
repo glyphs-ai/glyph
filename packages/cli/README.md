@@ -19,10 +19,10 @@ The CLI surface is organized into:
   dedicated file under `src/registrars/`. Handler functions for every
   subtree live under `src/commands/`; there is no inline wiring.
 
-Every API-mapping command goes through `ApiClient` (see
-`api-client.ts`), which is keyed by the `ROUTES` manifest exported
-from `@glyphs-ai/contracts`. A typo or stale request shape fails to
-compile rather than 404-ing at runtime.
+Every API-mapping command calls a generated operation from the
+`@glyphs-ai/sdk` client (see `sdk-client.ts` for the CLI-side glue).
+The operations are typed from the server's OpenAPI spec, so a typo or
+stale request shape fails to compile rather than 404-ing at runtime.
 
 ## Layout
 
@@ -44,7 +44,7 @@ packages/cli/src/
                     (`workspace`, `session`, `schedule`, `task`,
                     `workflow`, `catalog`) — plus `_shared.ts`
                     (connect / workspace flag parsing + helpers).
-  api-client.ts     Typed HTTP client over the `ROUTES` manifest.
+  sdk-client.ts     CLI-side glue over the `@glyphs-ai/sdk` client.
   connect.ts        Resolve `baseUrl` + `workspaceId` from flags, env,
                     and `<GLYPH_HOME>/runtime.json`.
   health-probe.ts   Poll `/api/health` (used by `start` and `status`).
@@ -173,7 +173,7 @@ The CLI ships many grouped commands across the resource subtrees
 (workspace, session, task, workflow, catalog, schedule, runtime, plus
 lifecycle and singleton commands) — each wrapping a server route via
 the typed `client.call(...)` helper from
-`packages/contracts/src/routes.ts` (`workspace list`,
+`packages/api/src/wire/routes.ts` (`workspace list`,
 `catalog skill install`, ...). `cac` matches commands by single argv
 tokens, so `cli.command("workspace list", ...)` would register a
 literal `"workspace list"` name that nothing can invoke. Commander
@@ -230,7 +230,7 @@ another handle holds the target); it does not reproduce on Linux/macOS.
 ## Tier
 
 Top-level surface tier alongside `@glyphs-ai/dashboard`. Depends on
-`@glyphs-ai/contracts` (DTOs + the `ROUTES` manifest) and
+`@glyphs-ai/sdk` (generated client + wire DTOs) and
 `@glyphs-ai/server` (for the bundled embed path and the shared
 `runtime.json` shape). It does NOT import any other package; the
 tier-invisibility fence is enforced by

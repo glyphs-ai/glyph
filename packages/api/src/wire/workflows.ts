@@ -4,7 +4,7 @@
  * The workflow substrate (`@glyphs-ai/workflow`) stores nodes as an
  * opaque `{ kind: string, spec: unknown }` envelope and is
  * deliberately kind-agnostic. The per-kind wire DTOs live here, in
- * the cross-cutting `@glyphs-ai/contracts` package, so the substrate
+ * `@glyphs-ai/api`'s cross-cutting wire surface, so the substrate
  * stays free of kind knowledge and so the same shapes can be
  * imported by the SPA, the CLI, and the server without dragging in
  * `@glyphs-ai/workflow`'s implementation modules.

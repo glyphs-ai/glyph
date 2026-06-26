@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROUTES, type RouteKey } from "../src/routes.js";
+import { ROUTES, type RouteKey } from "../../src/wire/routes.js";
 
 /**
  * Manifest lock for the HTTP route table.

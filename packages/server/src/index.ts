@@ -41,16 +41,17 @@ import { workflowsRoutes } from "./routes/workflows.js";
 import { workspacesRoutes } from "./routes/workspaces.js";
 import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-env.js";
 
-// Route manifest and wire types live in `@glyphs-ai/contracts`,
-// re-exported via `@glyphs-ai/api`; CLI and dashboard import them
-// directly from api. Server's public surface is strictly its
-// transport (`runServer`, `RunServerOpts`) + the auth helpers below
-// + the CLI lifecycle breadcrumb helpers (`resolveGlyphHome`,
-// `logsDir`, `runtimeFilePath`, the `RuntimeFile` shape) re-exported
-// here for the CLI process-management commands (`glyph start`,
-// `status`, `stop`, `logs`, `connect`). Those helpers cannot live in
-// `@glyphs-ai/contracts` because they value-import `node:os` /
-// `node:path`, and the contracts pkg is the SPA-safe surface.
+// Route manifest and wire types live in `@glyphs-ai/api` (its `wire/`
+// surface); the server imports them via the api barrel, while CLI and
+// dashboard consume the same shapes through `@glyphs-ai/sdk`. Server's
+// public surface is strictly its transport (`runServer`,
+// `RunServerOpts`) + the auth helpers below + the CLI lifecycle
+// breadcrumb helpers (`resolveGlyphHome`, `logsDir`, `runtimeFilePath`,
+// the `RuntimeFile` shape) re-exported here for the CLI
+// process-management commands (`glyph start`, `status`, `stop`, `logs`,
+// `connect`). Those helpers cannot live in the wire surface because
+// they value-import `node:os` / `node:path`, and the wire surface is
+// the SPA-safe layer.
 export * from "./glyph-home.js";
 
 /**

@@ -64,7 +64,6 @@
  */
 
 import type { CatalogService } from "@glyphs-ai/catalog";
-import type { WorkflowWorkerNodeSpec } from "@glyphs-ai/contracts";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type {
   WorkflowNodeRunner,
@@ -72,6 +71,7 @@ import type {
   WorkflowNodeValidateCtx,
 } from "@glyphs-ai/workflow";
 import pino, { type Logger } from "pino";
+import type { WorkflowWorkerNodeSpec } from "../wire/index.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 

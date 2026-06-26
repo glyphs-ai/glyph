@@ -4,8 +4,10 @@
  * `./_shared.ts`.
  */
 
-import type { RespondHumanNodeRequest } from "@glyphs-ai/contracts";
-import type { PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses } from "@glyphs-ai/sdk";
+import type {
+  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses,
+  RespondHumanNodeRequest,
+} from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";

@@ -1,7 +1,7 @@
 /**
  * Barrel for the transport-agnostic zod wire schemas.
  *
- * Each schema mirrors a wire DTO exported from `@glyphs-ai/contracts`
+ * Each schema mirrors a wire DTO exported from the api `wire/` surface
  * and is the single source of truth for the OpenAPI projection in
  * `@glyphs-ai/server`. Bidirectional `z.infer` ↔ interface parity is
  * pinned by `packages/api/test/wire-schema-parity.test.ts`.

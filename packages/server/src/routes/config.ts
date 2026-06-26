@@ -8,9 +8,10 @@ import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
  * fresh on each request so dynamic fields (currently `currentWorkspaceId`)
  * stay accurate as the registry mutates.
  *
- * The `ServerConfig` wire shape lives in `@glyphs-ai/contracts`
- * (re-exported via `@glyphs-ai/api`) so the dashboard and CLI can
- * typecheck against it without value-importing `@glyphs-ai/server`.
+ * The `ServerConfig` wire shape lives in `@glyphs-ai/api` (its `wire/`
+ * surface, reached by the dashboard / CLI through `@glyphs-ai/sdk`) so
+ * the dashboard and CLI can typecheck against it without value-importing
+ * `@glyphs-ai/server`.
  */
 export function configRoutes(deps: {
   glyphHome: string;

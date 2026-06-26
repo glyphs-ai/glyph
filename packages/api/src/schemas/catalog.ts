@@ -1,10 +1,10 @@
 /**
  * zod schemas for the `/api/workspaces/:id/catalog/**` wire shapes.
- * Mirrors the catalog DTOs re-exported from `@glyphs-ai/contracts`
+ * Mirrors the catalog DTOs re-exported through the api `wire/` surface
  * (`Skill` / `Agent` / `Mcp` / entries / install + sync results from
- * `@glyphs-ai/catalog`), the contracts-local route wrappers in
- * `routes/catalog.ts`, and the `ResolveManifest` projection in
- * `plan-to-manifest.ts`; parity pinned by the wire-schema parity test.
+ * `@glyphs-ai/catalog`), the wire-local route wrappers in
+ * `wire/routes/catalog.ts`, and the `ResolveManifest` projection in
+ * `wire/plan-to-manifest.ts`; parity pinned by the wire-schema parity test.
  */
 import { z } from "zod";
 

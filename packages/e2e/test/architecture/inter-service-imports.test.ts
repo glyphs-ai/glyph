@@ -26,7 +26,7 @@
  * scenarios. This audit targets production code (and its non-test
  * fixtures) only.
  *
- * Importing from `@glyphs-ai/contracts`, `@glyphs-ai/api`,
+ * Importing from `@glyphs-ai/api`,
  * `@glyphs-ai/dev-conventions`, `@glyphs-ai/server`, `@glyphs-ai/cli`,
  * `@glyphs-ai/dashboard`, or any other non-T0/T1 pkg is OUT OF SCOPE
  * — the rule constrains only the closed set of bounded-context pkgs.

@@ -1,6 +1,6 @@
 /**
  * Runtime validation of the highest-fanout GET response bodies against
- * their `@glyphs-ai/contracts` wire shapes.
+ * their `@glyphs-ai/api` wire shapes.
  *
  * TypeScript's `c.json<T>(value)` only checks the handler's object
  * literal at compile time; response tests that cast parsed JSON

@@ -1,7 +1,7 @@
 import type { CatalogService } from "@glyphs-ai/catalog";
-import type { TaskTargetData, TaskTargetPatch } from "@glyphs-ai/contracts";
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import type { TaskTargetData, TaskTargetPatch } from "../wire/index.js";
 
 /**
  * Sole module knowing about all of `@glyphs-ai/schedule`,

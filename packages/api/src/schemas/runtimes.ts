@@ -1,6 +1,6 @@
 /**
  * zod schema for the `GET /api/runtimes` wire shape. Mirrors
- * `RuntimeInfo` from `@glyphs-ai/contracts`; parity pinned by the
+ * `RuntimeInfo` from the api `wire/` surface; parity pinned by the
  * wire-schema parity test.
  */
 import { z } from "zod";

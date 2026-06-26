@@ -11,7 +11,7 @@ import type {
   AddSubgraphRequestNode,
   WorkflowNodeKind,
   WorkflowNodeRef,
-} from "@glyphs-ai/contracts";
+} from "@glyphs-ai/sdk";
 
 export const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker", "human"];
 export const KNOWN_FINISH_OUTCOMES: readonly ("succeeded" | "failed")[] = ["succeeded", "failed"];

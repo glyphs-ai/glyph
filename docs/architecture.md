@@ -24,7 +24,7 @@ in a follow-up doc**.
 | --------- | ----------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | **T0**    | Foundations | `catalog`, `runtime`, `schedule`, `terminal`, `workspace` | Who / Where / When / Scope + leaf infrastructure — irreducible primitives                |
 | **T1**    | Modes       | `session`, `task`, `workflow`                       | How work runs — Interactive (`session`) / Headless single-shot (`task`) / Multi-task DAG (`workflow`) |
-| **T2**    | Application | `contracts` (wire types), `api` (orchestration), `sdk` (generated client) | Three siblings: cross-pkg wire contracts + composition of T0/T1 into business capabilities + a generated typed HTTP client |
+| **T2**    | Application | `api` (orchestration + wire contracts), `sdk` (generated client) | Two siblings: T0/T1 composed into business capabilities, with the cross-pkg wire contracts living under api's wire/ surface, plus a generated typed HTTP client |
 | **T3**    | Host        | `server`                                            | HTTP transport that exposes T2 capabilities over the wire                               |
 | **T_top** | Surfaces    | `dashboard`, `cli`                                  | Platform-specific UI on top of T3                                                       |
 
@@ -56,28 +56,26 @@ wire format is a separate axis (see "Dependency invariants" — TBD).
     edges, coordinated by `coordinator` task nodes that mutate the DAG
     based on parent terminal state)
 - T2 — what can the system *do*, and how is that spelled? Split
-  across three siblings:
-  - `contracts` — the *what is on the wire*: route catalog, request /
-    response DTO shapes, leaf path helpers (`GLYPH_HOME`,
-    `runtime.json`). Pure types + side-effect-free constants. The
-    universal surface that crosses the public boundary; consumed by
-    `server`, `dashboard`, `cli`, and downstream HTTP / IPC clients.
-  - `api` — the *how it's built*: `composeApplication`,
-    `WorkspaceContext`, per-workspace registries, schedule-task
-    wiring. Node-only orchestration that assembles T0/T1 services to
-    implement the contracts. Consumed by `server`. Re-exports the
-    contracts barrel as a convenience for the in-process server
-    composition root that needs both layers in one import site.
+  across two siblings:
+  - `api` — the *how it's built* AND the *what is on the wire*:
+    `composeApplication`, `WorkspaceContext`, per-workspace registries,
+    schedule-task wiring (Node-only orchestration that assembles T0/T1
+    services), plus the wire contracts under its `wire/` surface — the
+    route catalog, request / response DTO shapes, and leaf path helpers
+    (`GLYPH_HOME`, `runtime.json`). The api barrel re-exports the wire
+    surface so the in-process server composition root gets both layers
+    from one import site. Consumed by `server`.
   - `sdk` — the *typed client for the wire*: a fully-generated fetch
     client (`@hey-api/openapi-ts`) over `server`'s `/api/openapi.json`,
-    plus thin `unwrap` / `GlyphError` helpers we own. Self-contained at
-    runtime (zero `@glyphs-ai/*` imports — the generated output inlines
-    its own fetch client), so it ships to browser surfaces just like
-    `contracts`. Codegen is devtime-only tooling under `scripts/` that
-    reads `server` source to assemble the spec; that devtime edge is not
-    a runtime tier dependency (enforced by
-    `sdk-no-server-runtime-import.test.ts`). Strictly additive today —
-    no surface consumes it yet.
+    plus thin `unwrap` / `GlyphError` helpers we own, and a hand-kept
+    `wire.ts` that re-derives the named wire DTOs from the generated
+    operation envelopes. Self-contained at runtime (zero `@glyphs-ai/*`
+    imports — the generated output inlines its own fetch client), so it
+    ships safely to browser surfaces. Codegen is devtime-only tooling
+    under `scripts/` that reads `server` source to assemble the spec;
+    that devtime edge is not a runtime tier dependency (enforced by
+    `sdk-no-server-runtime-import.test.ts`). The strict-isolation surface
+    for `dashboard` and `cli`.
 - T3 — how do remote clients invoke T2? `server` is a thin HTTP
   binding.
 - T_top — how does a human (or another agent) interact?
@@ -88,23 +86,23 @@ machine-enforced**:
 - **Strictly enforced** (lint test
   `packages/e2e/test/architecture/tier-invisibility.test.ts`):
   `@glyphs-ai/dashboard` source + tests may only reference
-  `@glyphs-ai/contracts`; `@glyphs-ai/cli` may only reference
-  `@glyphs-ai/contracts` and `@glyphs-ai/server`. Pkg-manifest deps are
+  `@glyphs-ai/sdk`; `@glyphs-ai/cli` may only reference
+  `@glyphs-ai/sdk` and `@glyphs-ai/server`. Pkg-manifest deps are
   audited alongside source imports — a dangling devDep that hoists
   an orchestration pkg into the consumer's `node_modules` is
   flagged even when no source file imports it.
 - **Convention only** (not machine-enforced): T0/T1 packages SHOULD
   NOT be imported by T3 or T_top (server or other surfaces).
   `server` may import T0/T1 directly today; the dashboard / cli
-  fence above is the strict half. `@glyphs-ai/api` re-exports the
-  contracts barrel for server's convenience.
+  fence above is the strict half. `@glyphs-ai/api` exposes the wire
+  contracts (its `wire/` surface) for server's convenience.
 
 The fenced consumers' allowed edges:
 
 ```text
                        ┌──────────────────────────────┐
-@glyphs-ai/dashboard ──▶ │ @glyphs-ai/contracts (T2)      │
-@glyphs-ai/cli       ──▶ │   wire types + path helpers  │
+@glyphs-ai/dashboard ──▶ │ @glyphs-ai/sdk (T2)            │
+@glyphs-ai/cli       ──▶ │   generated client + wire types │
                        └──────────────────────────────┘
 @glyphs-ai/cli       ──▶ @glyphs-ai/server  (the cli binary IS the
                                          server bundle; `glyph
@@ -113,8 +111,8 @@ The fenced consumers' allowed edges:
 ```
 
 **`api` is the orchestration composition root.** New cross-cutting
-features land in `api` (or split into `contracts` if they are
-wire-only); transport (`server`) and UI (`dashboard` / `cli`)
+features land in `api` (wire-only shapes go under its `wire/` surface);
+transport (`server`) and UI (`dashboard` / `cli`)
 stay thin. The leaf infrastructure pkgs (`terminal` and the runtime
 adapters) carry no orchestration of their own — `api` is the only
 in-process consumer that wires them together.
@@ -132,16 +130,16 @@ gives each box a name.
                 └───────────┬────────────┘
                             │ HTTP /api/*      ┌────────────────┐
                             │           ┌─────▶│ @glyphs-ai/      │
-                            │           │      │   contracts    │
-                ┌───────────▼────────────┤      │  (T2 — wire    │
-                │ @glyphs-ai/cli           │      │   types only)  │
-                │ (lifecycle commands)   │      └───────▲────────┘
-                └───────────┬────────────┘              │
-                            │ HTTP /api/*               │  re-exports
-                ┌───────────▼────────────┐              │
-                │ @glyphs-ai/server        │              │
-                │ (routes + middleware)  │  T3 Host     │
-                └───────────▲────────────┘              │
+                            │           │      │   sdk          │
+                ┌───────────▼────────────┤      │  (T2 — gen     │
+                │ @glyphs-ai/cli           │      │   client +     │
+                │ (lifecycle commands)   │      │   wire types)  │
+                └───────────┬────────────┘      └───────▲────────┘
+                            │ HTTP /api/*               │
+                ┌───────────▼────────────┐              │  generated
+                │ @glyphs-ai/server        │──────────────┘  from spec
+                │ (routes + middleware)  │  T3 Host        (devtime)
+                └───────────▲────────────┘
                             │  composes T0/T1           │
                 ┌───────────┴────────────┐    ┌─────────┴──────┐
                 │ @glyphs-ai/api           │───▶│ @glyphs-ai/      │
@@ -161,13 +159,13 @@ gives each box a name.
    └──────┴── runtime adapters consumed by task + session
 ```
 
-`@glyphs-ai/contracts` is the strict-isolation surface for the fenced
-consumers: pure types + side-effect-free path / route constants,
-zero orchestration code. `@glyphs-ai/api` depends on it and
-re-exports the whole barrel, so the in-process server boot path can
-import "both halves" from a single specifier (`@glyphs-ai/api`).
-Dashboard and CLI MUST go through `@glyphs-ai/contracts` directly —
-the structural fence is enforced by
+`@glyphs-ai/sdk` is the strict-isolation surface for the fenced
+consumers: a generated, browser-safe HTTP client plus the wire types
+it exchanges, zero orchestration code. The wire contracts themselves
+live under `@glyphs-ai/api`'s `wire/` surface; the api barrel re-exports
+them, so the in-process server boot path can import "both halves" from a
+single specifier (`@glyphs-ai/api`). Dashboard and CLI MUST go through
+`@glyphs-ai/sdk` directly — the structural fence is enforced by
 `packages/e2e/test/architecture/tier-invisibility.test.ts`.
 
 `@glyphs-ai/terminal` is consumed **only by `@glyphs-ai/api`** at
@@ -730,16 +728,16 @@ them up.
 
 ## Adding a new HTTP route
 
-A route is a **contracts manifest + server handler + test** trio. The
+A route is a **wire manifest + server handler + test** trio. The
 three sides are reconciled by a reflection test, so skipping one fails
 CI rather than drifting silently.
 
-1. **Declare it in `@glyphs-ai/contracts`.** Add a `defineRoute<...>(...)`
+1. **Declare it in `@glyphs-ai/api`'s wire surface.** Add a `defineRoute<...>(...)`
    entry to the relevant per-domain slice in
-   `packages/contracts/src/routes/<domain>.ts` with typed request and
-   response shapes. New DTOs live in `contracts` (never inline in the
-   handler); the `routes.ts` facade aggregates every slice into the
-   `ROUTES` manifest that both server and CLI read.
+   `packages/api/src/wire/routes/<domain>.ts` with typed request and
+   response shapes. New DTOs live under `wire/` (never inline in the
+   handler); the `wire/routes.ts` facade aggregates every slice into the
+   `ROUTES` manifest that the server reads and the SDK is generated from.
 2. **Implement the handler in `@glyphs-ai/server`.** In
    `packages/server/src/routes/<domain>.ts`, parse + validate the request
    (return a `ValidationResult` on bad input — see § Validation pipeline

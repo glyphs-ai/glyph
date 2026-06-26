@@ -21,7 +21,7 @@
  *
  * Why AST over regex: a regex scan both false-positives on specifiers
  * mentioned inside comments / string literals and false-negatives on
- * subpath specifiers (`@glyphs-ai/contracts/routes`). The AST walk has
+ *     subpath specifiers (`@glyphs-ai/api/wire`). The AST walk has
  * neither failure mode.
  */
 

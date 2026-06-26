@@ -3,22 +3,21 @@
  *
  * Pins the canonical tier-visibility decision from `docs/architecture.md`:
  * `@glyphs-ai/dashboard` and `@glyphs-ai/cli` may only see T0/T1
- * packages through the T2 wire surface — the dashboard through
- * `@glyphs-ai/sdk`, the CLI through `@glyphs-ai/sdk` and (still)
- * `@glyphs-ai/contracts`. The documented exception is the bundled
- * server edge: the `glyph` binary includes the server boot and
- * lifecycle path, so `@glyphs-ai/cli` may reference
+ * packages through the T2 wire surface — both the dashboard and the
+ * CLI go through `@glyphs-ai/sdk`. The documented exception is the
+ * bundled server edge: the `glyph` binary includes the server boot
+ * and lifecycle path, so `@glyphs-ai/cli` may reference
  * `@glyphs-ai/server`.
  *
  * Canonical package tiers:
  *   - T0 Foundations: workspace, runtime, schedule, terminal, catalog
  *   - T1 Modes: session, task, workflow
- *   - T2 Application: contracts, api, sdk
+ *   - T2 Application: api, sdk
  *   - T3 Host: server
  *   - T_top Surfaces: dashboard, cli
  *
  * `workflow` is a T1 execution mode alongside `task` and `session`;
- * top-level apps consume workflow data through contracts and server
+ * top-level apps consume workflow data through the SDK and server
  * routes rather than importing `@glyphs-ai/workflow` directly.
  *
  * The rule applies at two layers:
@@ -47,15 +46,14 @@
  *     modules, defeating the whole point of routing the browser through
  *     a browser-safe client pkg.
  *
- *   cli:       { "@glyphs-ai/contracts", "@glyphs-ai/sdk", "@glyphs-ai/server" }
+ *   cli:       { "@glyphs-ai/sdk", "@glyphs-ai/server" }
  *     The `glyph` binary bundles both the client CLI and the server
  *     lifecycle path. `@glyphs-ai/sdk` is the generated, typed HTTP
  *     client (T2 Application) the CLI uses for every server call — a
- *     downward T_top → T2 edge alongside `@glyphs-ai/contracts`, which
- *     still owns the wire DTOs the SDK and CLI exchange. `@glyphs-ai/server`
- *     owns the in-process boot entry plus server runtime-file helpers, so
- *     that package-level edge is legitimate too while every T0/T1 package
- *     remains fenced.
+ *     downward T_top → T2 edge that also carries the wire DTOs the SDK
+ *     and CLI exchange. `@glyphs-ai/server` owns the in-process boot
+ *     entry plus server runtime-file helpers, so that package-level edge
+ *     is legitimate too while every T0/T1 package remains fenced.
  *
  * Hosting: lives in `@glyphs-ai/e2e/test/architecture/` alongside the
  * other repo-wide architectural audits (`inter-service-imports`,
@@ -78,7 +76,7 @@ const ARCHITECTURE_DOC = path.join(REPO_ROOT, "docs", "architecture.md");
 const NON_TIERED_PKGS = new Set(["_template", "e2e"]);
 const T0_PKGS = ["workspace", "runtime", "schedule", "terminal", "catalog"] as const;
 const T1_PKGS = ["session", "task", "workflow"] as const;
-const T2_PKGS = ["contracts", "api", "sdk"] as const;
+const T2_PKGS = ["api", "sdk"] as const;
 const T3_PKGS = ["server"] as const;
 const T_TOP_PKGS = ["dashboard", "cli"] as const;
 const TIER_SUMMARY = [
@@ -103,7 +101,7 @@ const CONSUMERS: readonly Consumer[] = [
   },
   {
     pkg: "cli",
-    allowed: new Set(["@glyphs-ai/contracts", "@glyphs-ai/sdk", "@glyphs-ai/server"]),
+    allowed: new Set(["@glyphs-ai/sdk", "@glyphs-ai/server"]),
   },
 ];
 
@@ -133,8 +131,8 @@ function relPosix(absFile: string): string {
  *   - `export ... from "@glyphs-ai/x"` (re-export),
  *   - dynamic `import("@glyphs-ai/x")` calls.
  *
- * Subpath specifiers (`@glyphs-ai/contracts/routes`) collapse to their
- * package root (`@glyphs-ai/contracts`) so the fence check compares
+ * Subpath specifiers (`@glyphs-ai/api/wire`) collapse to their
+ * package root (`@glyphs-ai/api`) so the fence check compares
  * against package names. Uses the shared AST extractor, so a specifier
  * mentioned only inside a comment or string literal is never matched.
  */
@@ -201,8 +199,8 @@ describe("tier-invisibility specifier parser", () => {
   it("root-normalizes import, export, and dynamic specifiers and ignores comments + strings", () => {
     const specs = extractGlyphSpecifiers(
       `
-      import { ROUTES } from "@glyphs-ai/contracts";
-      import type { Plan } from "@glyphs-ai/contracts/routes";
+      import { ROUTES } from "@glyphs-ai/api";
+      import type { Plan } from "@glyphs-ai/api/wire";
       export { runServer } from "@glyphs-ai/server";
       const server = await import("@glyphs-ai/server");
       const label = "@glyphs-ai/catalog";
@@ -211,8 +209,8 @@ describe("tier-invisibility specifier parser", () => {
       "sample.ts",
     );
     expect(specs).toEqual([
-      "@glyphs-ai/contracts",
-      "@glyphs-ai/contracts",
+      "@glyphs-ai/api",
+      "@glyphs-ai/api",
       "@glyphs-ai/server",
       "@glyphs-ai/server",
     ]);

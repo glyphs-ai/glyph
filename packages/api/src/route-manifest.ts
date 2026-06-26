@@ -1,19 +1,17 @@
 /**
  * Flat-enumeration helper over the shipped HTTP API surface.
  *
- * Lives in `@glyphs-ai/api` (not `@glyphs-ai/contracts`) because the
- * single consumer is the server-side reflection test
- * (`packages/server/test/route-manifest.test.ts`), which already
- * imports through the api barrel. Keeping it here trims one symbol
- * off the contracts public surface; the contracts pkg still owns the
- * canonical {@link ROUTES} declaration that this helper iterates.
+ * The single consumer is the server-side reflection test
+ * (`packages/server/test/route-manifest.test.ts`), which imports it
+ * through the api barrel. The canonical {@link ROUTES} declaration
+ * this helper iterates lives alongside it under `./wire`.
  *
  * External tooling (docs generators, OpenAPI exporters, MCP wrappers)
  * that wants the inventory should import it via
  * `import { listRoutes } from "@glyphs-ai/api"`.
  */
 
-import { type HttpMethod, ROUTES, type RouteKey } from "@glyphs-ai/contracts";
+import { type HttpMethod, ROUTES, type RouteKey } from "./wire/index.js";
 
 /**
  * Flat enumeration of `{ method, path }` pairs for every entry in
