@@ -1,5 +1,6 @@
 import type { AgentEntry } from "@glyphs-ai/sdk";
 import { useCallback, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   cancelTask,
   type DispatchTaskOpts,
@@ -8,7 +9,11 @@ import {
   type ServerConfig,
   type TaskRecord,
 } from "../api";
+import { DetailSkeleton } from "../components/common/DetailSkeleton";
+import { EmptyState } from "../components/common/EmptyState";
+import { ListSkeleton } from "../components/common/ListSkeleton";
 import { HeaderActions } from "../components/HeaderActions";
+import { PlusIcon } from "../components/Icons";
 import { DispatchModal } from "../components/tasks/DispatchModal";
 import {
   ALL_AGENTS,
@@ -21,12 +26,7 @@ import { TaskConfirmModalsHost } from "../components/tasks/TaskConfirmModals";
 import { TaskDetail } from "../components/tasks/TaskDetail";
 import { TaskFilters } from "../components/tasks/TaskFilters";
 import { TaskList } from "../components/tasks/TaskList";
-import {
-  TaskDetailPlaceholder,
-  TasksEmptyState,
-  TasksToolbar,
-  TasksZeroState,
-} from "../components/tasks/TasksChrome";
+import { TasksToolbar } from "../components/tasks/TasksChrome";
 import { useMounted } from "../hooks/useMounted";
 import { useSelectedTask } from "../hooks/useSelectedTask";
 import { useTasks } from "../hooks/useTasks";
@@ -54,6 +54,9 @@ const DEFAULT_POLL_INTERVAL_MS = 4000;
  */
 export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
   const pollIntervalMs = config?.tasks?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // URL-driven filter state.
   const [idQuery, setIdQuery] = useUrlSearchValue("q", "");
@@ -202,19 +205,50 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
   }, [agents, tasks]);
 
   // True when any filter chrome is constraining the list. Distinguishes a
-  // genuinely empty workspace (zero tasks, no filter) from a
+  // genuinely empty workspace (zero tasks, no filter at all) from a
   // filter-narrowed result: the former surfaces the "No tasks yet" zero
-  // state (with the Dispatch CTA) in the right detail pane, the latter the
-  // "No matches" hint. Either way the filter rail stays mounted so the
-  // user can always see and clear the filter chrome.
+  // state (with the Dispatch CTA), the latter the "No matches" hint with a
+  // Clear-filters recovery. A bounded time window counts as an active
+  // filter (only "all" is unconstrained) — `tasks` is server-filtered by
+  // `createdSince`, so without this a populated-but-stale workspace (every
+  // task older than the window) would masquerade as genuinely empty.
+  // Either way the filter rail stays mounted so the user can see and clear
+  // the chrome.
   const filtersActive =
     idQuery.trim() !== "" ||
     agentFilterUrl !== ALL_AGENTS ||
     runtimeFilter !== ALL_RUNTIMES ||
-    timeFilter !== DEFAULT_TIME_PRESET;
+    // Only "all" is non-constraining; every bounded window narrows the list.
+    timeFilter !== "all";
 
-  // Genuinely empty workspace: loaded, zero tasks, and nothing filtered.
-  const workspaceEmpty = loaded && tasks.length === 0 && !filtersActive;
+  // Atomic "Clear filters" reset. Chaining the individual
+  // `useUrlSearchValue` setters would clobber one another (each reads the
+  // same stale `location.search` snapshot), so wipe every filter key in a
+  // single `navigate()`. The time range is widened to "all" (not merely
+  // deleted, which would fall back to the bounded default) so clearing
+  // filters actually surfaces tasks that predate the default window. The
+  // `?taskId=` selection is intentionally kept so clearing is
+  // non-destructive to the current detail view.
+  const clearFilters = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    params.delete("q");
+    params.delete("agent");
+    params.delete("runtime");
+    params.set("range", "all");
+    const search = params.toString();
+    navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
+      replace: true,
+    });
+  }, [navigate, location.pathname, location.search, location.hash]);
+
+  // The detail pane is branched inline at the JSX site below, in order:
+  // `!loaded` → skeleton; `tasks.length === 0 && !filtersActive` →
+  // empty-workspace card; `visibleTasks.length === 0` → no-match card;
+  // `effectiveSelectedId === null` → no-selection card; otherwise the
+  // selected task's detail. The rail keeps its filter chrome mounted in the
+  // two empty-list cases. Auto-binding the first visible row makes the
+  // no-selection branch effectively unreachable, but it's spelled out for
+  // completeness.
 
   if (currentWorkspaceId === null) {
     return (
@@ -260,18 +294,8 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
             />
             <div className="tasks-pane__list-scroll">
               {!loaded ? (
-                <TasksEmptyState loading />
-              ) : workspaceEmpty ? (
-                <TasksEmptyState
-                  variant="rail-hint"
-                  title="No tasks yet. Dispatch one to get started."
-                />
-              ) : visibleTasks.length === 0 ? (
-                <TasksEmptyState
-                  title="No matches"
-                  hint="Adjust the filters above to see more tasks."
-                />
-              ) : (
+                <ListSkeleton ariaLabel="Loading tasks" testId="tasks-list-skeleton" />
+              ) : visibleTasks.length === 0 ? null : (
                 <TaskList
                   tasks={visibleTasks}
                   selectedId={effectiveSelectedId}
@@ -284,26 +308,47 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
             </div>
           </div>
 
-          {effectiveSelectedId ? (
-            <TaskDetail taskId={effectiveSelectedId} pollIntervalMs={pollIntervalMs} />
-          ) : workspaceEmpty ? (
-            // Genuinely empty workspace: the rich zero-state (with the
-            // Dispatch CTA) lives in the detail pane while the rail keeps
-            // the filter chrome plus a short "No tasks yet" list hint.
-            <TasksZeroState
-              dispatchDisabled={dispatchAgents.length === 0}
-              dispatchDisabledTitle={
-                dispatchAgents.length === 0
-                  ? "Install at least one ready agent in the Catalog first"
-                  : "Dispatch a new task"
-              }
-              onDispatch={() => setDispatchOpen(true)}
+          {!loaded ? (
+            <DetailSkeleton ariaLabel="Loading task" testId="task-detail-skeleton" />
+          ) : tasks.length === 0 && !filtersActive ? (
+            <EmptyState
+              asDetailPane
+              icon="📝"
+              title="No tasks yet"
+              hint="Dispatch a task to run an agent autonomously and read the result here when it finishes."
+              testId="tasks-empty-zero"
+              cta={{
+                label: "Dispatch task",
+                onClick: () => setDispatchOpen(true),
+                icon: <PlusIcon />,
+                disabled: dispatchAgents.length === 0,
+                disabledTitle:
+                  dispatchAgents.length === 0
+                    ? "Install at least one ready agent in the Catalog first"
+                    : "Dispatch a new task",
+                testId: "tasks-empty-zero-cta",
+              }}
             />
+          ) : visibleTasks.length === 0 ? (
+            <EmptyState
+              asDetailPane
+              icon="🔍"
+              title="No matches"
+              hint="Adjust the filters above to see more tasks, or clear them all."
+              testId="tasks-empty-nomatch"
+              cta={{
+                label: "Clear filters",
+                onClick: clearFilters,
+                variant: "secondary",
+                testId: "tasks-empty-nomatch-cta",
+              }}
+            />
+          ) : effectiveSelectedId === null ? (
+            <EmptyState asDetailPane icon="📝" title="No task selected" />
           ) : (
-            // Either the filter narrowed the list to zero, or there are
-            // rows but none is selected (rare: effectiveSelectedId auto-
-            // binds the first row). Both show the calm detail placeholder.
-            <TaskDetailPlaceholder />
+            effectiveSelectedId && (
+              <TaskDetail taskId={effectiveSelectedId} pollIntervalMs={pollIntervalMs} />
+            )
           )}
         </div>
       </div>

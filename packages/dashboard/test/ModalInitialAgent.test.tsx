@@ -323,7 +323,9 @@ describe("TasksPage wires DispatchModal.initialAgent from its `?agent=` filter s
 
   it("with filter=all, opening Dispatch seeds the modal with `agents[0]` (existing behaviour preserved)", async () => {
     mockListTasks.mockResolvedValue([] as TaskRecord[]);
-    renderTasks("/workspaces/ws-1/runtime/tasks", agents);
+    // range=all → no time window, so the empty workspace resolves to the
+    // Zero state and renders its Dispatch CTA directly.
+    renderTasks("/workspaces/ws-1/runtime/tasks?range=all", agents);
 
     await waitFor(() => {
       expect(mockListTasks).toHaveBeenCalled();
@@ -378,7 +380,9 @@ describe("SessionsPage wires CreateModal.initialAgent from its `?agent=` filter 
 
   it("with filter=all, opening New session seeds the modal with `agents[0]`", async () => {
     mockListSessions.mockResolvedValue([] as SessionView[]);
-    renderSessions("/workspaces/ws-1/runtime/sessions", agents);
+    // range=all → no time window, so the empty workspace resolves to the
+    // Zero state and renders its New session CTA directly.
+    renderSessions("/workspaces/ws-1/runtime/sessions?range=all", agents);
 
     await waitFor(() => {
       expect(mockListSessions).toHaveBeenCalled();

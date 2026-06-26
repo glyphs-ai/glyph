@@ -166,23 +166,24 @@ afterEach(() => {
 describe("Tasks page empty-state layout", () => {
   it("shows the zero-state in the detail pane while keeping the filter rail mounted when the workspace has no tasks", async () => {
     mockListTasks.mockResolvedValue([] as TaskRecord[]);
-    renderTasks("/workspaces/ws-1/runtime/tasks", [makeAgent("official/engineer")]);
+    // range=all so no time window is active: an empty list is a genuinely
+    // empty workspace (Zero), not a filtered-out result.
+    renderTasks("/workspaces/ws-1/runtime/tasks?range=all", [makeAgent("official/engineer")]);
 
     // The detail-pane zero-state shows up once `loaded` flips.
     const zero = await screen.findByTestId("tasks-empty-zero");
     expect(zero).toBeTruthy();
     // The CTA button is wired and labelled.
     expect(screen.getByTestId("tasks-empty-zero-cta")).toBeTruthy();
-    // The filter rail stays mounted but now carries a lightweight text-only
-    // hint (no icon, no `.empty` card chrome) instead of a second full card.
-    // This is the F1 doubled-empty fix: rail = calm one-liner, detail =
-    // the rich anchor card.
-    const railHint = screen.getByTestId("tasks-empty-rail-hint");
-    expect(railHint.textContent).toMatch(/Dispatch one to get started/i);
-    expect(railHint.classList.contains("empty")).toBe(false);
-    expect(railHint.querySelector(".empty__icon")).toBeNull();
-    // The emoji icon now renders once (in the detail card), not twice.
+    // The two-pane layout stays — the filter rail is never collapsed away,
+    // but the rail list area is now blank: the rich zero-state card lives
+    // solely in the detail pane, so no second card or text hint echoes it.
+    expect(document.querySelector(".tasks-pane--with-detail")).toBeTruthy();
+    expect(document.querySelector(".tasks-pane__list")).toBeTruthy();
+    expect(screen.queryByTestId("tasks-empty-rail-hint")).toBeNull();
+    // The emoji icon renders once (in the detail card), not twice.
     expect(zero.querySelectorAll(".empty__icon")).toHaveLength(1);
+    expect(screen.getAllByText("No tasks yet")).toHaveLength(1);
     // The calm "No task selected" placeholder must NOT render — the
     // detail pane carries the richer zero-state instead.
     expect(screen.queryByText(/No task selected/i)).toBeNull();
@@ -196,19 +197,19 @@ describe("Tasks page empty-state layout", () => {
     await waitFor(() => {
       expect(mockListTasks).toHaveBeenCalled();
     });
-    // The list-side filter-empty surfaces (with the "No matches" wording).
-    await waitFor(() => {
-      expect(screen.getAllByText(/No matches/i).length).toBeGreaterThan(0);
-    });
+    // The "No matches" no-match state now surfaces in the DETAIL pane (the
+    // rail list area goes blank while the filter chrome stays mounted).
+    const nomatch = await screen.findByTestId("tasks-empty-nomatch");
+    expect(nomatch).toBeTruthy();
+    // Its "Clear filters" CTA is wired.
+    expect(screen.getByTestId("tasks-empty-nomatch-cta")).toBeTruthy();
     // The zero-state CTA must NOT render — the workspace isn't empty,
     // it's just filtered down to zero rows.
     expect(screen.queryByTestId("tasks-empty-zero")).toBeNull();
-    // The rail stays mounted and the right detail pane now shows the calm
-    // "No task selected" placeholder (rail + placeholder, never a
-    // full-width collapse).
-    expect(screen.getByText(/No task selected/i)).toBeTruthy();
-    // The "No matches" copy surfaces exactly once, in the list rail; the
-    // detail placeholder uses different wording so it doesn't echo it.
+    // The old "No task selected" placeholder is gone — the unified
+    // no-match card replaces it.
+    expect(screen.queryByText(/No task selected/i)).toBeNull();
+    // The "No matches" copy surfaces exactly once, in the detail card.
     expect(screen.getAllByText(/No matches/i)).toHaveLength(1);
   });
 
@@ -234,7 +235,9 @@ describe("Tasks page empty-state layout", () => {
 describe("Sessions page empty-state CTA wiring", () => {
   it("renders the single zero-state with a wired '+ New session' CTA when the workspace has no sessions", async () => {
     mockListSessions.mockResolvedValue([] as SessionView[]);
-    renderSessions("/workspaces/ws-1/runtime/sessions", [makeAgent("official/engineer")]);
+    // range=all so no time window is active: an empty list is a genuinely
+    // empty workspace (Zero), not a filtered-out result.
+    renderSessions("/workspaces/ws-1/runtime/sessions?range=all", [makeAgent("official/engineer")]);
 
     const zero = await screen.findByTestId("sessions-empty-zero");
     expect(zero).toBeTruthy();

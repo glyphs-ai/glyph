@@ -8,6 +8,7 @@ import {
   type WorkflowHeader,
   type WorkflowNode,
 } from "../api";
+import { EmptyState } from "../components/common/EmptyState";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
 import {
@@ -29,9 +30,9 @@ import { useMounted } from "../hooks/useMounted";
 import { useUrlSearchValue } from "../hooks/useUrlState";
 import { useWorkflowDetail } from "../hooks/useWorkflowDetail";
 import { useWorkflows } from "../hooks/useWorkflows";
+import { pickDrillTarget } from "./workflows/drill";
 import { WorkflowDetail } from "./workflows/WorkflowDetail";
-import { WorkflowNodeHumanPane } from "./workflows/WorkflowNodeHumanPane";
-import { WorkflowNodeTaskPane } from "./workflows/WorkflowNodeTaskPane";
+import { WorkflowDrillPane } from "./workflows/WorkflowDrillPane";
 
 export interface WorkflowsPageProps {
   agents: AgentEntry[];
@@ -131,6 +132,23 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     agentFilter,
     timeFilter,
   });
+
+  // Atomic "Clear filters" reset. The selection keys (`workflowId`,
+  // `nodeTaskId`, `humanNodeId`) are intentionally preserved so clearing
+  // filters is non-destructive to the open detail view. The time range is
+  // widened to "all" (not merely deleted, which would fall back to the
+  // bounded default) so clearing actually surfaces workflows that predate
+  // the default window.
+  const clearFilters = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    params.delete("q");
+    params.delete("agent");
+    params.set("range", "all");
+    const search = params.toString();
+    navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
+      replace: true,
+    });
+  }, [navigate, location.pathname, location.search, location.hash]);
 
   const visible = workflows;
 
@@ -345,13 +363,35 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     );
   }
 
-  const filtersActive =
-    idQuery !== "" || agentFilter !== ALL_AGENTS || timeFilter !== DEFAULT_TIME_PRESET;
-  // Genuinely empty workspace: loaded, zero workflows, nothing filtered.
-  const workspaceEmpty = loaded && workflows.length === 0 && !filtersActive;
+  // Only "all" is non-constraining; every bounded window narrows the list.
+  const filtersActive = idQuery !== "" || agentFilter !== ALL_AGENTS || timeFilter !== "all";
+  // Right-pane render strategy (two layers):
+  //
+  // Layer A (drill router): when the URL specifies a node-task or human
+  // node, `pickDrillTarget()` picks the active drill and `WorkflowDrillPane`
+  // renders the corresponding node pane. NodeTask wins if both URL slots are
+  // somehow populated.
+  //
+  // Layer B (list × detail state machine): when no drill is active, the pane
+  // falls through to the standard 7-state chain shared in spirit (NOT in code)
+  // with Tasks/Schedules — initial-load skeleton / zero / no-match /
+  // detail-loaded / detail-error / per-row detail-loading / unselected
+  // fallback. Each branch is pinned by `test/workflows-states.test.tsx`.
+  // `workflows` is already server-filtered (by `createdSince` among others),
+  // so `visible` === `workflows` — its length is both the item count and the
+  // visible count. The genuinely-empty workspace is split from a
+  // filter-narrowed result via `filtersActive`; because a bounded time window
+  // counts as an active filter, a populated-but-stale workspace (every
+  // workflow older than the window) resolves to the no-match card with a
+  // working Clear-filters recovery rather than the misleading empty-workspace
+  // card.
+  //
+  // The two layers are intentionally NOT extracted into a cross-page generic;
+  // only the Workflows page has Layer A, and forcing Tasks / Schedules through
+  // a shared state-machine container would over-couple pages whose evolution
+  // should stay independent.
   const detailWorkflow = detail.workflow;
-  const showNodeTaskPane = nodeTaskId !== null && effectiveSelectedId !== null;
-  const showHumanNodePane = humanNodeId !== null && effectiveSelectedId !== null;
+  const drill = pickDrillTarget(nodeTaskId, humanNodeId);
 
   return (
     <>
@@ -389,18 +429,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             <div className="tasks-pane__list-scroll">
               {!loaded ? (
                 <WorkflowListSkeleton />
-              ) : workspaceEmpty ? (
-                <p className="tasks-pane__list-hint" data-testid="workflows-empty-list">
-                  No workflows yet. Create one to get started.
-                </p>
-              ) : visible.length === 0 ? (
-                <div className="empty" data-testid="workflows-empty-filtered">
-                  <p className="empty__title">No matches</p>
-                  <p className="empty__hint">
-                    Adjust the search, agent, or time filter above to see more workflows.
-                  </p>
-                </div>
-              ) : (
+              ) : visible.length === 0 ? null : (
                 <WorkflowList
                   workflows={visible}
                   selectedId={effectiveSelectedId}
@@ -414,93 +443,101 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             </div>
           </div>
 
-          {(() => {
+          {
             // `!= null` (loose) rather than `!== null` (strict) so an
-            // out-of-contract `undefined` from a buggy mock or server
-            // falls through to the
-            // `<WorkflowDetailSkeleton />` branch instead of being
-            // handed to `<WorkflowView>` (which dereferences
-            // `workflow.brief` and crashes the root). The hook's
-            // typed shape is `WorkflowHeader | null`, but
-            // accepting `undefined` here keeps the page robust
-            // against contract violations.
-            if (showNodeTaskPane && detailWorkflow != null) {
-              return (
-                <WorkflowNodeTaskPane
-                  key={`${effectiveSelectedId}:${nodeTaskId}`}
-                  workflow={detailWorkflow}
-                  dag={detail.dag}
-                  nodeTaskId={nodeTaskId as string}
-                  pollIntervalMs={nodeTaskPollIntervalMs}
-                  onBack={onBackToWorkflow}
-                  onNavigate={onNavigateNode}
-                />
-              );
-            }
-            if (showHumanNodePane && detailWorkflow != null) {
-              return (
-                <WorkflowNodeHumanPane
-                  key={`${effectiveSelectedId}:human:${humanNodeId}`}
-                  workflow={detailWorkflow}
-                  dag={detail.dag}
-                  nodeId={humanNodeId as string}
-                  onBack={onBackToWorkflow}
-                  onNavigate={onNavigateHumanNode}
-                />
-              );
-            }
-            if (effectiveSelectedId !== null && detailWorkflow != null) {
-              return (
-                <WorkflowDetail
-                  key={effectiveSelectedId}
-                  workflow={detailWorkflow}
-                  dag={detail.dag}
-                  dagError={detail.dagError}
-                  selectedNodeId={selectedNodeId}
-                  onSelectNode={onSelectNode}
-                />
-              );
-            }
-            if (effectiveSelectedId !== null && detail.error !== null) {
-              return (
-                <aside className="tasks-pane__detail tasks-pane__detail--empty">
-                  <div className="alert alert--error">⚠️ {detail.error}</div>
-                </aside>
-              );
-            }
-            if (effectiveSelectedId !== null) {
-              return <WorkflowDetailSkeleton />;
-            }
-            if (workspaceEmpty) {
-              // Genuinely empty workspace: the rich zero-state lives in
-              // the detail pane while the rail keeps the filter chrome
-              // plus a short "No workflows yet" list hint.
-              return (
-                <aside className="tasks-pane__detail tasks-pane__detail--empty">
-                  <div className="empty" data-testid="workflows-empty-zero">
-                    <div className="empty__icon" aria-hidden="true">
-                      🪄
-                    </div>
-                    <p className="empty__title">No workflows yet</p>
-                    <p className="empty__hint">
-                      Click <strong>New workflow</strong> to dispatch a coordinator-driven
-                      multi-step run. The coordinator decides which task and follow-up coordinator
-                      nodes to spawn next — each phase wakes the next one when the previous worker
-                      terminates.
-                    </p>
-                  </div>
-                </aside>
-              );
-            }
-            return (
+            // out-of-contract `undefined` from a buggy mock or server falls
+            // through to a `<WorkflowDetailSkeleton />` branch instead of being
+            // handed to `<WorkflowView>` (which dereferences `workflow.brief`
+            // and crashes the root). The hook's typed shape is
+            // `WorkflowHeader | null`, but accepting `undefined` here keeps the
+            // page robust against contract violations.
+            //
+            // Layer A (drill) takes priority: when a drill slot is active, a
+            // row is selected, and the workflow header has loaded, render the
+            // drilled node pane. Otherwise fall through to the Layer B list ×
+            // detail branches below.
+            drill !== null && effectiveSelectedId !== null && detailWorkflow != null ? (
+              <WorkflowDrillPane
+                target={drill}
+                workflow={detailWorkflow}
+                dag={detail.dag}
+                effectiveSelectedId={effectiveSelectedId}
+                pollIntervalMs={nodeTaskPollIntervalMs}
+                onBack={onBackToWorkflow}
+                onNavigateNode={onNavigateNode}
+                onNavigateHumanNode={onNavigateHumanNode}
+              />
+            ) : !loaded ? (
+              // Initial list load: keep the detail pane skeletonised too,
+              // rather than flashing the "No workflow selected" placeholder
+              // before the auto-selected first row resolves.
+              <WorkflowDetailSkeleton />
+            ) : workflows.length === 0 && !filtersActive ? (
+              <EmptyState
+                asDetailPane
+                icon="🪄"
+                title="No workflows yet"
+                hint={
+                  <>
+                    Click <strong>New workflow</strong> to dispatch a coordinator-driven multi-step
+                    run. The coordinator decides which task and follow-up coordinator nodes to spawn
+                    next — each phase wakes the next one when the previous worker terminates.
+                  </>
+                }
+                testId="workflows-empty-zero"
+                cta={{
+                  label: "New workflow",
+                  onClick: () => setCreateOpen(true),
+                  icon: <PlusIcon />,
+                  disabled: agents.length === 0,
+                  disabledTitle:
+                    agents.length === 0
+                      ? "Install at least one agent in the Catalog before creating workflows"
+                      : "Create a new workflow",
+                  testId: "workflows-empty-zero-cta",
+                }}
+              />
+            ) : visible.length === 0 ? (
+              <EmptyState
+                asDetailPane
+                icon="🔍"
+                title="No matches"
+                hint="Adjust the filters above to see more workflows, or clear them all."
+                testId="workflows-empty-nomatch"
+                cta={{
+                  label: "Clear filters",
+                  onClick: clearFilters,
+                  variant: "secondary",
+                  testId: "workflows-empty-nomatch-cta",
+                }}
+              />
+            ) : effectiveSelectedId !== null && detailWorkflow != null ? (
+              <WorkflowDetail
+                key={effectiveSelectedId}
+                workflow={detailWorkflow}
+                dag={detail.dag}
+                dagError={detail.dagError}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={onSelectNode}
+              />
+            ) : effectiveSelectedId !== null && detail.error !== null ? (
               <aside className="tasks-pane__detail tasks-pane__detail--empty">
-                <div className="empty">
-                  <div className="empty__icon">🪄</div>
-                  <p className="empty__title">No workflow selected</p>
-                </div>
+                <div className="alert alert--error">⚠️ {detail.error}</div>
               </aside>
-            );
-          })()}
+            ) : effectiveSelectedId !== null ? (
+              // Per-workflow detail fetch in flight: the row is selected but its
+              // detail (`detailWorkflow`) hasn't resolved yet. Distinct from the
+              // top `!loaded` branch, which skeletonises the pane during the
+              // initial *list* load.
+              <WorkflowDetailSkeleton />
+            ) : (
+              // Loaded + populated but no row currently selected. Reached only
+              // by elimination (the branches above already handle loading /
+              // empty / per-selection states); spelled out so the state → UI
+              // mapping stays 1:1 with the other list pages.
+              <EmptyState asDetailPane icon="🪄" title="No workflow selected" />
+            )
+          }
         </div>
       </div>
 
