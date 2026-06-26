@@ -1,4 +1,4 @@
-import type { CatalogKind } from "@glyphs-ai/contracts";
+import type { CatalogKind } from "@glyphs-ai/sdk";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import type { InstallProvider, InstallSource, ResolveManifest } from "../../api";
 import { Modal } from "../../components/Modal";

@@ -1,4 +1,4 @@
-import type { CatalogKind } from "@glyphs-ai/contracts";
+import type { CatalogKind } from "@glyphs-ai/sdk";
 import {
   deleteAgent,
   deleteMcp,

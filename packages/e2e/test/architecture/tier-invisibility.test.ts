@@ -3,9 +3,11 @@
  *
  * Pins the canonical tier-visibility decision from `docs/architecture.md`:
  * `@glyphs-ai/dashboard` and `@glyphs-ai/cli` may only see T0/T1
- * packages through `@glyphs-ai/contracts`. The documented exception is
- * the bundled server edge: the `glyph` binary includes the server boot
- * and lifecycle path, so `@glyphs-ai/cli` may reference
+ * packages through the T2 wire surface — the dashboard through
+ * `@glyphs-ai/sdk`, the CLI through `@glyphs-ai/sdk` and (still)
+ * `@glyphs-ai/contracts`. The documented exception is the bundled
+ * server edge: the `glyph` binary includes the server boot and
+ * lifecycle path, so `@glyphs-ai/cli` may reference
  * `@glyphs-ai/server`.
  *
  * Canonical package tiers:
@@ -36,13 +38,14 @@
  *
  * Allowlists (per consumer):
  *
- *   dashboard: { "@glyphs-ai/contracts" }
- *     Browser code must stay on wire contracts. Orchestration
- *     value-imports (CatalogService, the composeApplication factory,
- *     db handles) would be runtime nonsense; even type-imports from
- *     `@glyphs-ai/api` would couple the dashboard's static module
- *     graph to Node-only modules, defeating the whole point of having
- *     a separate wire-types pkg.
+ *   dashboard: { "@glyphs-ai/sdk" }
+ *     Browser code must stay on the generated, typed HTTP client and
+ *     its wire types (T2 Application). Orchestration value-imports
+ *     (CatalogService, the composeApplication factory, db handles)
+ *     would be runtime nonsense; even type-imports from `@glyphs-ai/api`
+ *     would couple the dashboard's static module graph to Node-only
+ *     modules, defeating the whole point of routing the browser through
+ *     a browser-safe client pkg.
  *
  *   cli:       { "@glyphs-ai/contracts", "@glyphs-ai/sdk", "@glyphs-ai/server" }
  *     The `glyph` binary bundles both the client CLI and the server
@@ -96,7 +99,7 @@ interface Consumer {
 const CONSUMERS: readonly Consumer[] = [
   {
     pkg: "dashboard",
-    allowed: new Set(["@glyphs-ai/contracts"]),
+    allowed: new Set(["@glyphs-ai/sdk"]),
   },
   {
     pkg: "cli",

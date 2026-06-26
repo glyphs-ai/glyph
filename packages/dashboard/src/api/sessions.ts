@@ -1,4 +1,14 @@
-import { fetchJson, jsonInit, mutate, mutateJson, workspacePrefix } from "./http.js";
+import type {
+  PostApiWorkspacesByIdSessionsBySidSpawnResponses,
+  PostApiWorkspacesByIdSessionsResponses,
+} from "@glyphs-ai/sdk";
+import {
+  client,
+  deleteApiWorkspacesByIdSessionsBySid,
+  getApiWorkspacesByIdSessions,
+  getApiWorkspacesByIdSessionsBySid,
+} from "@glyphs-ai/sdk";
+import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 
 export interface SessionView {
   id: string;
@@ -41,19 +51,19 @@ export interface ListSessionsOpts {
   activeSince?: string;
 }
 
-export const listSessions = (opts: ListSessionsOpts = {}): Promise<SessionView[]> => {
-  const params = new URLSearchParams();
-  if (opts.agent) params.set("agent", opts.agent);
-  if (opts.createdSince) params.set("createdSince", opts.createdSince);
-  if (opts.activeSince) params.set("activeSince", opts.activeSince);
-  const qs = params.toString();
-  return fetchJson<SessionView[]>(`${workspacePrefix()}/sessions${qs ? `?${qs}` : ""}`, "sessions");
+export const listSessions = async (opts: ListSessionsOpts = {}): Promise<SessionView[]> => {
+  const query: { agent?: string; createdSince?: string; activeSince?: string } = {};
+  if (opts.agent) query.agent = opts.agent;
+  if (opts.createdSince) query.createdSince = opts.createdSince;
+  if (opts.activeSince) query.activeSince = opts.activeSince;
+  return unwrap(await getApiWorkspacesByIdSessions({ path: { id: requireWorkspaceId() }, query }));
 };
 
-export const getSession = (sessionId: string): Promise<SessionView> =>
-  fetchJson<SessionView>(
-    `${workspacePrefix()}/sessions/${encodeURIComponent(sessionId)}`,
-    "session",
+export const getSession = async (sessionId: string): Promise<SessionView> =>
+  unwrap(
+    await getApiWorkspacesByIdSessionsBySid({
+      path: { id: requireWorkspaceId(), sid: sessionId },
+    }),
   );
 
 export interface CreateSessionOpts {
@@ -63,22 +73,35 @@ export interface CreateSessionOpts {
 
 export const createSession = async (opts: CreateSessionOpts): Promise<SessionView> => {
   const { agent, runtime } = opts;
-  const body: Record<string, string> = { agent };
+  const body: { agent: string; runtime?: string } = { agent };
   if (runtime !== undefined) body.runtime = runtime;
-  return mutateJson<SessionView>(`${workspacePrefix()}/sessions`, jsonInit("POST", body));
+  return unwrap(
+    await client.post<PostApiWorkspacesByIdSessionsResponses>({
+      url: "/api/workspaces/{id}/sessions",
+      path: { id: requireWorkspaceId() },
+      body,
+    }),
+  );
 };
 
-export const deleteSession = (sessionId: string, opts?: { purge?: boolean }) => {
+export const deleteSession = async (
+  sessionId: string,
+  opts?: { purge?: boolean },
+): Promise<void> => {
   // Default ("archive") removes only the session metadata row — workdir
   // contents (AGENTS.md + agent-produced files) and the runtime
   // adapter's per-session state both stay on disk so the user can
   // recover or inspect them later. `{ purge: true }` is the hard-delete
   // path: row + workdir + runtime state, all gone. The confirm modal
   // exposes this as a single checkbox.
-  const qs = opts?.purge ? "?purge=1" : "";
-  return mutate(`${workspacePrefix()}/sessions/${encodeURIComponent(sessionId)}${qs}`, {
-    method: "DELETE",
-  });
+  const query: { purge?: "1" } = {};
+  if (opts?.purge) query.purge = "1";
+  unwrap(
+    await deleteApiWorkspacesByIdSessionsBySid({
+      path: { id: requireWorkspaceId(), sid: sessionId },
+      query,
+    }),
+  );
 };
 
 export interface SpawnSuccess {
@@ -100,8 +123,10 @@ export const spawnSession = async (
   sessionId: string,
   opts: { remote?: boolean } = {},
 ): Promise<SpawnResult> =>
-  mutateJson<SpawnResult>(`${workspacePrefix()}/sessions/${encodeURIComponent(sessionId)}/spawn`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...(opts.remote === true ? { remote: true } : {}) }),
-  });
+  unwrap(
+    await client.post<PostApiWorkspacesByIdSessionsBySidSpawnResponses>({
+      url: "/api/workspaces/{id}/sessions/{sid}/spawn",
+      path: { id: requireWorkspaceId(), sid: sessionId },
+      body: opts.remote === true ? { remote: true } : {},
+    }),
+  );

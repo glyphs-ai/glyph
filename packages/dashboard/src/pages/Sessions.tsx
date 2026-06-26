@@ -1,4 +1,4 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry } from "@glyphs-ai/sdk";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {

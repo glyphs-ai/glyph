@@ -21,7 +21,7 @@ import type {
   PatchWorkflowScheduleRequest,
   SkillEntry,
   TaskScheduleTarget,
-} from "@glyphs-ai/contracts";
+} from "@glyphs-ai/sdk";
 import { type DefaultBodyType, HttpResponse, http } from "msw";
 import type {
   CreateWorkflowRequest,
@@ -243,7 +243,7 @@ export const handlers = [
   http.get("/api/config", () =>
     HttpResponse.json({
       glyphHome: "/mock/glyph-home",
-      currentWorkspace: fixtureActiveWorkspaceId,
+      currentWorkspaceId: fixtureActiveWorkspaceId,
       host: "localhost",
       port: 41817,
       pathSeparator: "/",
@@ -918,8 +918,8 @@ export const handlers = [
     );
   }),
   // Uninstall agent
-  http.delete(`/api/workspaces/${W}/catalog/agents/:fqn`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.delete(`/api/workspaces/${W}/catalog/agents/:scope/:name`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const idx = store.agents.findIndex((a) => a.agent.fqn === fqn);
     if (idx === -1) return notFound("agent not found");
     store.agents.splice(idx, 1);
@@ -957,8 +957,8 @@ export const handlers = [
     );
   }),
   // Uninstall skill
-  http.delete(`/api/workspaces/${W}/catalog/skills/:fqn`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.delete(`/api/workspaces/${W}/catalog/skills/:scope/:name`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const idx = store.skills.findIndex((s) => s.skill.fqn === fqn);
     if (idx === -1) return notFound("skill not found");
     store.skills.splice(idx, 1);
@@ -990,16 +990,16 @@ export const handlers = [
     );
   }),
   // Uninstall mcp
-  http.delete(`/api/workspaces/${W}/catalog/mcps/:fqn`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.delete(`/api/workspaces/${W}/catalog/mcps/:scope/:name`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const idx = store.mcps.findIndex((m) => m.fqn === fqn);
     if (idx === -1) return notFound("mcp not found");
     store.mcps.splice(idx, 1);
     return new HttpResponse(null, { status: 204 });
   }),
   // Sync resolve (agents)
-  http.post(`/api/workspaces/${W}/catalog/agents/:fqn/sync/resolve`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.post(`/api/workspaces/${W}/catalog/agents/:scope/:name/sync/resolve`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const entry = store.agents.find((a) => a.agent.fqn === fqn);
     if (!entry) return notFound("agent not found");
     return HttpResponse.json({
@@ -1022,8 +1022,8 @@ export const handlers = [
     });
   }),
   // Sync apply (agents)
-  http.post(`/api/workspaces/${W}/catalog/agents/:fqn/sync`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.post(`/api/workspaces/${W}/catalog/agents/:scope/:name/sync`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const entry = store.agents.find((a) => a.agent.fqn === fqn);
     if (!entry) return notFound("agent not found");
     return HttpResponse.json({
@@ -1034,8 +1034,8 @@ export const handlers = [
     });
   }),
   // Sync resolve (skills)
-  http.post(`/api/workspaces/${W}/catalog/skills/:fqn/sync/resolve`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.post(`/api/workspaces/${W}/catalog/skills/:scope/:name/sync/resolve`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const entry = store.skills.find((s) => s.skill.fqn === fqn);
     if (!entry) return notFound("skill not found");
     return HttpResponse.json({
@@ -1058,8 +1058,8 @@ export const handlers = [
     });
   }),
   // Sync apply (skills)
-  http.post(`/api/workspaces/${W}/catalog/skills/:fqn/sync`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.post(`/api/workspaces/${W}/catalog/skills/:scope/:name/sync`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const entry = store.skills.find((s) => s.skill.fqn === fqn);
     if (!entry) return notFound("skill not found");
     return HttpResponse.json({

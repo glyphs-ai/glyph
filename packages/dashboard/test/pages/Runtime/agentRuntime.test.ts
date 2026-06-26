@@ -1,4 +1,4 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry } from "@glyphs-ai/sdk";
 import { describe, expect, it } from "vitest";
 import type { TaskRecord } from "../../../src/api";
 import { agentDetailUrl, computeAgentRuntimeViews } from "../../../src/pages/Runtime/agent-runtime";

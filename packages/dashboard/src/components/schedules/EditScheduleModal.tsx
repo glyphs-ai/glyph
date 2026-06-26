@@ -2,7 +2,7 @@ import type {
   AgentEntry,
   PatchTaskScheduleRequest,
   PatchWorkflowScheduleRequest,
-} from "@glyphs-ai/contracts";
+} from "@glyphs-ai/sdk";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { getSchedule, patchSchedule, patchWorkflowSchedule, type ScheduleDetail } from "../../api";
 import { Modal } from "../Modal";

@@ -1,4 +1,4 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry } from "@glyphs-ai/sdk";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ApiError,

@@ -3,11 +3,7 @@
  * (`pages/Schedules.tsx`, `components/schedules/*.tsx`).
  */
 
-import type {
-  ScheduleTarget,
-  TaskScheduleTarget,
-  WorkflowScheduleTarget,
-} from "@glyphs-ai/contracts";
+import type { ScheduleTarget, TaskScheduleTarget, WorkflowScheduleTarget } from "@glyphs-ai/sdk";
 import type { ScheduleView } from "../../api";
 
 export const DEFAULT_SCHEDULE_KIND = "task";

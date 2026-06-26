@@ -1,4 +1,4 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry } from "@glyphs-ai/sdk";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleDetail } from "../src/api";

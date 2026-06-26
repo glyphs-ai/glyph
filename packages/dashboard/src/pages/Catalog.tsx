@@ -1,4 +1,4 @@
-import type { AgentEntry, CatalogKind, SkillEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry, CatalogKind, SkillEntry } from "@glyphs-ai/sdk";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { InstallSource, McpItem } from "../api";
 import { DetailDialog } from "../components/DetailDialog";

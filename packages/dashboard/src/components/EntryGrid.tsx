@@ -1,4 +1,4 @@
-import type { BlockedReason, MissingDep } from "@glyphs-ai/contracts";
+import type { BlockedReason, MissingDep } from "@glyphs-ai/sdk";
 import type { ReactNode } from "react";
 import { type EntityKind, KIND_ICON, KIND_TAG } from "../kind-meta";
 import { splitFqnForDisplay } from "../utils/fqn";

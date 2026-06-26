@@ -1,4 +1,4 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry } from "@glyphs-ai/sdk";
 import type { TaskRecord } from "../../api";
 
 export type AgentRuntimeStatus = "running" | "idle";

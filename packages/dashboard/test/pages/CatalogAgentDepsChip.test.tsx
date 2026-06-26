@@ -1,4 +1,4 @@
-import type { AgentEntry, SkillEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry, SkillEntry } from "@glyphs-ai/sdk";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";

@@ -1,4 +1,12 @@
-import { fetchJson, jsonInit, mutate, mutateJson } from "./http.js";
+import {
+  deleteApiWorkspacesById,
+  getApiWorkspaces,
+  getApiWorkspacesCurrent,
+  patchApiWorkspacesById,
+  postApiWorkspaces,
+  putApiWorkspacesCurrent,
+} from "@glyphs-ai/sdk";
+import { unwrap } from "./sdk-client.js";
 
 /**
  * A registered workspace, as returned by the `/api/workspaces` family of
@@ -19,14 +27,15 @@ export interface WorkspaceListItem {
   workspaceDir: string;
 }
 
-export const listWorkspaces = (): Promise<WorkspaceListItem[]> =>
-  fetchJson<WorkspaceListItem[]>("/api/workspaces", "workspaces");
+export const listWorkspaces = async (): Promise<WorkspaceListItem[]> =>
+  unwrap(await getApiWorkspaces());
 
-export const getServerCurrentWorkspace = (): Promise<{ id: string | null }> =>
-  fetchJson<{ id: string | null }>("/api/workspaces/current", "current-workspace");
+export const getServerCurrentWorkspace = async (): Promise<{ id: string | null }> =>
+  unwrap(await getApiWorkspacesCurrent());
 
-export const setServerCurrentWorkspace = (workspaceId: string): Promise<void> =>
-  mutate("/api/workspaces/current", jsonInit("PUT", { id: workspaceId }));
+export const setServerCurrentWorkspace = async (workspaceId: string): Promise<void> => {
+  unwrap(await putApiWorkspacesCurrent({ body: { id: workspaceId } }));
+};
 
 export const addWorkspace = async (opts: {
   name: string;
@@ -34,10 +43,10 @@ export const addWorkspace = async (opts: {
    *  `<GLYPH_HOME>/workspaces/<uuid>/` directory. */
   workspaceDir?: string;
 }): Promise<WorkspaceListItem> => {
-  const body: Record<string, unknown> = { name: opts.name };
+  const body: { name: string; workspaceDir?: string } = { name: opts.name };
   if (opts.workspaceDir !== undefined && opts.workspaceDir !== "")
     body.workspaceDir = opts.workspaceDir;
-  return mutateJson<WorkspaceListItem>("/api/workspaces", jsonInit("POST", body));
+  return unwrap(await postApiWorkspaces({ body }));
 };
 
 /**
@@ -51,16 +60,17 @@ export const addWorkspace = async (opts: {
  * the workspace's workspaceDir. The workspaceDir itself is never removed —
  * that's user-owned and outside the manager's purview.
  */
-export const removeWorkspace = (workspaceId: string, opts?: { purge?: boolean }) => {
-  const qs = opts?.purge ? "?purge=1" : "";
-  return mutate(`/api/workspaces/${encodeURIComponent(workspaceId)}${qs}`, { method: "DELETE" });
+export const removeWorkspace = async (
+  workspaceId: string,
+  opts?: { purge?: boolean },
+): Promise<void> => {
+  const query: { purge?: "1" } = {};
+  if (opts?.purge) query.purge = "1";
+  unwrap(await deleteApiWorkspacesById({ path: { id: workspaceId }, query }));
 };
 
 export const updateWorkspaceMetadata = async (
   workspaceId: string,
   patch: { name?: string },
 ): Promise<WorkspaceListItem> =>
-  mutateJson<WorkspaceListItem>(
-    `/api/workspaces/${encodeURIComponent(workspaceId)}`,
-    jsonInit("PATCH", patch),
-  );
+  unwrap(await patchApiWorkspacesById({ path: { id: workspaceId }, body: patch }));

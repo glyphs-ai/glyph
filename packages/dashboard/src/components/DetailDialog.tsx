@@ -1,4 +1,4 @@
-import type { BlockedReason } from "@glyphs-ai/contracts";
+import type { BlockedReason } from "@glyphs-ai/sdk";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {

@@ -5,7 +5,7 @@
  * `components/schedules/shared.ts` so each component file stays narrow.
  */
 
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry } from "@glyphs-ai/sdk";
 import type { WorkflowHeader, WorkflowNode } from "../../api";
 
 /**

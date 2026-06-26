@@ -151,7 +151,7 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
   },
   {
     id: "20260606-3d5c9dbe",
-    brief: "Bump @glyphs-ai/contracts to 0.42 and update downstream callers",
+    brief: "Bump @glyphs-ai/runtime to 0.42 and update downstream callers",
     details: "Bump the version, run typecheck, then surface any breaking imports.",
     status: "failed",
     origin: "standalone",

@@ -1,4 +1,4 @@
-import type { ScheduleTarget } from "@glyphs-ai/contracts";
+import type { ScheduleTarget } from "@glyphs-ai/sdk";
 import { type ReactNode, useEffect, useState } from "react";
 import {
   getSchedule,

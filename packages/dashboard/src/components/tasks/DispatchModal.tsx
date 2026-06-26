@@ -1,4 +1,4 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry } from "@glyphs-ai/sdk";
 import { type FormEvent, useEffect, useState } from "react";
 import type { DispatchTaskOpts, TaskRecord } from "../../api";
 import { Modal } from "../Modal";

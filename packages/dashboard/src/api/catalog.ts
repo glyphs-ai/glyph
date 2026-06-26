@@ -6,10 +6,35 @@ import type {
   InstallSkillRequest,
   Mcp,
   MissingDep,
+  PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogAgentsResponses,
+  PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogMcpsResponses,
+  PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogSkillsResponses,
   Skill,
   SkillEntry,
-} from "@glyphs-ai/contracts";
-import { fetchJson, jsonInit, mutate, mutateJson, workspacePrefix } from "./http.js";
+} from "@glyphs-ai/sdk";
+import {
+  client,
+  deleteApiWorkspacesByIdCatalogAgentsByScopeByName,
+  deleteApiWorkspacesByIdCatalogMcpsByScopeByName,
+  deleteApiWorkspacesByIdCatalogSkillsByScopeByName,
+  getApiWorkspacesByIdCatalogAgents,
+  getApiWorkspacesByIdCatalogAgentsByScopeByName,
+  getApiWorkspacesByIdCatalogAgentsByScopeByNameFiles,
+  getApiWorkspacesByIdCatalogMcps,
+  getApiWorkspacesByIdCatalogOverview,
+  getApiWorkspacesByIdCatalogSkills,
+  getApiWorkspacesByIdCatalogSkillsByScopeByName,
+  getApiWorkspacesByIdCatalogSkillsByScopeByNameFiles,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqs,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameDisable,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameEnable,
+  postApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqs,
+} from "@glyphs-ai/sdk";
+import { fetchJson, jsonInit, mutateJson, workspacePrefix } from "./http.js";
+import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 
 export interface OverviewData {
   counts: {
@@ -38,15 +63,37 @@ function catalogPrefix(): string {
   return `${workspacePrefix()}/catalog`;
 }
 
+/**
+ * Split a catalog resource FQN into its `{scope}/{name}` path segments.
+ *
+ * Catalog resources are addressed by a two-segment `{scope}/{name}` route
+ * (e.g. `official/git-pr`). The FQN carries exactly one slash separating
+ * the scope from the short name; split on that first slash so each half can
+ * ride as a discrete typed `path` param (the generated SDK ops percent-encode
+ * each segment individually). Mirrors the CLI's `splitCatalogFqn`.
+ */
+function splitFqn(fqn: string): { scope: string; name: string } {
+  const slash = fqn.indexOf("/");
+  if (slash === -1) {
+    return { scope: fqn, name: "" };
+  }
+  return { scope: fqn.slice(0, slash), name: fqn.slice(slash + 1) };
+}
+
 export async function fetchAll(): Promise<CatalogData> {
-  const base = catalogPrefix();
+  const path = { id: requireWorkspaceId() };
   const [overview, skills, agents, mcps] = await Promise.all([
-    fetchJson<OverviewData>(`${base}/overview`, "overview"),
-    fetchJson<SkillEntry[]>(`${base}/skills`, "skills"),
-    fetchJson<AgentEntry[]>(`${base}/agents`, "agents"),
-    fetchJson<McpItem[]>(`${base}/mcps`, "mcps"),
+    getApiWorkspacesByIdCatalogOverview({ path }),
+    getApiWorkspacesByIdCatalogSkills({ path }),
+    getApiWorkspacesByIdCatalogAgents({ path }),
+    getApiWorkspacesByIdCatalogMcps({ path }),
   ]);
-  return { overview, skills, agents, mcps };
+  return {
+    overview: unwrap(overview),
+    skills: unwrap(skills),
+    agents: unwrap(agents),
+    mcps: unwrap(mcps),
+  };
 }
 
 /**
@@ -76,23 +123,6 @@ export interface InstallSource {
    */
   location: string;
 }
-
-/**
- * Wire body for every catalog install / install-resolve route. The
- * `origin` field is the canonical URI the server's fetcher dispatches
- * on; it is identical to what `dependencies:` blocks reference inside
- * SKILL.md / AGENTS.md. CLI users type one of these directly; the
- * dashboard assembles it from its UI form via
- * {@link buildOriginFromSource}.
- */
-// Each install / resolve route satisfies its own contracts
-// `Install*Request` type. The shapes happen to be byte-identical
-// today (`{ readonly origin: string }`), but the *semantics* differ
-// per route — abstracting them into one alias would say "these are
-// the same thing" when they aren't. MCP's contracts type isn't
-// re-exported from the barrel, so its installer uses an inline
-// `{ readonly origin: string }` literal that mirrors the route's
-// inline declaration in `packages/contracts/src/routes/catalog.ts`.
 
 /**
  * Assemble a canonical origin URI from the dashboard's UI form.
@@ -170,25 +200,36 @@ interface SyncResult extends InstallResult {
  *
  * On partial failure the server returns 207 with a populated
  * `failed[]` (and possibly `installed[]`) — both are surfaced to the
- * caller through {@link InstallResult}; the shared `extractError`
- * helper formats the error string the user sees.
+ * caller through {@link InstallResult}.
  *
  * Scope is determined entirely by each entry's frontmatter (or the
  * default `public`). There is intentionally no per-install
  * `scopeHints` field: forking into a different scope means editing
  * the upstream's frontmatter, not flipping a UI toggle.
+ *
+ * The install / resolve routes are hand-validated (the generated op
+ * types their body as `never`), so they go through the low-level
+ * `client.post` with the operation's response type; the `satisfies`
+ * pins the body to its named request DTO. MCP carries no re-exported
+ * request type, so its installer uses an inline `{ origin }` literal.
  */
-export const installAgent = (src: InstallSource): Promise<InstallResult> =>
-  mutateJson<InstallResult>(
-    `${catalogPrefix()}/agents`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallAgentRequest),
+export const installAgent = async (src: InstallSource): Promise<InstallResult> =>
+  unwrap(
+    await client.post<PostApiWorkspacesByIdCatalogAgentsResponses>({
+      url: "/api/workspaces/{id}/catalog/agents",
+      path: { id: requireWorkspaceId() },
+      body: { origin: buildOriginFromSource(src) } satisfies InstallAgentRequest,
+    }),
   );
 
 /** See {@link installAgent}. */
-export const installSkill = (src: InstallSource): Promise<InstallResult> =>
-  mutateJson<InstallResult>(
-    `${catalogPrefix()}/skills`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallSkillRequest),
+export const installSkill = async (src: InstallSource): Promise<InstallResult> =>
+  unwrap(
+    await client.post<PostApiWorkspacesByIdCatalogSkillsResponses>({
+      url: "/api/workspaces/{id}/catalog/skills",
+      path: { id: requireWorkspaceId() },
+      body: { origin: buildOriginFromSource(src) } satisfies InstallSkillRequest,
+    }),
   );
 
 /**
@@ -196,17 +237,18 @@ export const installSkill = (src: InstallSource): Promise<InstallResult> =>
  * JSON's `_meta.name` at install time, so callers don't need to
  * supply a name.
  */
-export const installMcp = (src: InstallSource): Promise<InstallResult> =>
-  mutateJson<InstallResult>(
-    `${catalogPrefix()}/mcps`,
-    jsonInit("POST", {
-      origin: buildOriginFromSource(src),
-    } satisfies { readonly origin: string }),
+export const installMcp = async (src: InstallSource): Promise<InstallResult> =>
+  unwrap(
+    await client.post<PostApiWorkspacesByIdCatalogMcpsResponses>({
+      url: "/api/workspaces/{id}/catalog/mcps",
+      path: { id: requireWorkspaceId() },
+      body: { origin: buildOriginFromSource(src) } satisfies { readonly origin: string },
+    }),
   );
 
 /**
  * Resolve manifest returned by `POST /catalog/{kind}/resolve` (install)
- * and `POST /catalog/{kind}/:fqn/sync/resolve` (sync). Read-only
+ * and `POST /catalog/{kind}/{scope}/{name}/sync/resolve` (sync). Read-only
  * preview of the dep graph the operation will create. Used by the
  * dashboard's two-phase install/sync dialog.
  *
@@ -286,6 +328,11 @@ export interface ResolveManifest {
  * Resolve an install (`POST /catalog/{kind}/resolve`) — returns the
  * read-only `ResolveManifest` so the user can preview the tree before
  * committing.
+ *
+ * Kept on the raw JSON helper: the generated response projects each
+ * `nodes[]` entry with the wire's own field names, which the dashboard's
+ * `ResolveNode` shape does not line up with one-for-one, so the named
+ * `ResolveManifest` return type is preserved via the helper's generic.
  */
 export const resolveSkillInstall = (src: InstallSource): Promise<ResolveManifest> =>
   mutateJson<ResolveManifest>(
@@ -302,27 +349,38 @@ export const resolveAgentInstall = (src: InstallSource): Promise<ResolveManifest
 /**
  * Resolve a sync from upstream for an already-installed entry. The
  * server reads the entry's local origin from the row; the dashboard
- * passes only the local fqn / mcp name in the URL.
+ * passes only the local fqn / mcp name as `{scope}/{name}` path params.
  *
  * Sync resolve emits a richer manifest than install resolve:
  *  - `upToDate` short-circuits the apply button when nothing changed
  *  - `identityChange` warns when upstream renamed under the same URL
  *  - `orphans` lists deps that the new closure dropped
+ *
+ * On the raw JSON helper for the same reason as {@link resolveSkillInstall}.
  */
-export const resolveSkillSync = (fqn: string): Promise<ResolveManifest> =>
-  mutateJson<ResolveManifest>(`${catalogPrefix()}/skills/${encodeURIComponent(fqn)}/sync/resolve`, {
-    method: "POST",
-  });
+export const resolveSkillSync = (fqn: string): Promise<ResolveManifest> => {
+  const { scope, name } = splitFqn(fqn);
+  return mutateJson<ResolveManifest>(
+    `${catalogPrefix()}/skills/${encodeURIComponent(scope)}/${encodeURIComponent(name)}/sync/resolve`,
+    { method: "POST" },
+  );
+};
 
-export const resolveAgentSync = (fqn: string): Promise<ResolveManifest> =>
-  mutateJson<ResolveManifest>(`${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/sync/resolve`, {
-    method: "POST",
-  });
+export const resolveAgentSync = (fqn: string): Promise<ResolveManifest> => {
+  const { scope, name } = splitFqn(fqn);
+  return mutateJson<ResolveManifest>(
+    `${catalogPrefix()}/agents/${encodeURIComponent(scope)}/${encodeURIComponent(name)}/sync/resolve`,
+    { method: "POST" },
+  );
+};
 
-export const resolveMcpSync = (name: string): Promise<ResolveManifest> =>
-  mutateJson<ResolveManifest>(`${catalogPrefix()}/mcps/${encodeURIComponent(name)}/sync/resolve`, {
-    method: "POST",
-  });
+export const resolveMcpSync = (name: string): Promise<ResolveManifest> => {
+  const { scope, name: shortName } = splitFqn(name);
+  return mutateJson<ResolveManifest>(
+    `${catalogPrefix()}/mcps/${encodeURIComponent(scope)}/${encodeURIComponent(shortName)}/sync/resolve`,
+    { method: "POST" },
+  );
+};
 
 /**
  * Apply a previously-previewed sync. The `planToken` MUST come from
@@ -332,51 +390,107 @@ export const resolveMcpSync = (name: string): Promise<ResolveManifest> =>
  * installed). Token is single-use; a 410 means it expired (default
  * 5 min) or was already consumed, and the dashboard should
  * re-preview.
+ *
+ * Hand-validated `{ planToken }` body, so it goes through the
+ * low-level `client.post` with the operation's response type.
  */
-export const applySkillSync = (fqn: string, planToken: string): Promise<SyncResult> =>
-  mutateJson<SyncResult>(
-    `${catalogPrefix()}/skills/${encodeURIComponent(fqn)}/sync`,
-    jsonInit("POST", { planToken }),
+export const applySkillSync = async (fqn: string, planToken: string): Promise<SyncResult> => {
+  const { scope, name } = splitFqn(fqn);
+  return unwrap(
+    await client.post<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses>({
+      url: "/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync",
+      path: { id: requireWorkspaceId(), scope, name },
+      body: { planToken },
+    }),
   );
+};
 
-export const applyAgentSync = (fqn: string, planToken: string): Promise<SyncResult> =>
-  mutateJson<SyncResult>(
-    `${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/sync`,
-    jsonInit("POST", { planToken }),
+export const applyAgentSync = async (fqn: string, planToken: string): Promise<SyncResult> => {
+  const { scope, name } = splitFqn(fqn);
+  return unwrap(
+    await client.post<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses>({
+      url: "/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync",
+      path: { id: requireWorkspaceId(), scope, name },
+      body: { planToken },
+    }),
   );
+};
 
-export const applyMcpSync = (name: string, planToken: string): Promise<SyncResult> =>
-  mutateJson<SyncResult>(
-    `${catalogPrefix()}/mcps/${encodeURIComponent(name)}/sync`,
-    jsonInit("POST", { planToken }),
+export const applyMcpSync = async (name: string, planToken: string): Promise<SyncResult> => {
+  const { scope, name: shortName } = splitFqn(name);
+  return unwrap(
+    await client.post<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses>({
+      url: "/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync",
+      path: { id: requireWorkspaceId(), scope, name: shortName },
+      body: { planToken },
+    }),
   );
+};
 
 /** Acknowledge prereqs: flips `prereqsAck=true` so the entry can run again. */
-export const acknowledgeSkillPrereqs = (fqn: string) =>
-  mutate(`${catalogPrefix()}/skills/${encodeURIComponent(fqn)}/acknowledge-prereqs`, {
-    method: "POST",
-  });
+export const acknowledgeSkillPrereqs = async (fqn: string): Promise<void> => {
+  const { scope, name } = splitFqn(fqn);
+  unwrap(
+    await postApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqs({
+      path: { id: requireWorkspaceId(), scope, name },
+    }),
+  );
+};
 
-export const acknowledgeAgentPrereqs = (fqn: string) =>
-  mutate(`${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/acknowledge-prereqs`, {
-    method: "POST",
-  });
+export const acknowledgeAgentPrereqs = async (fqn: string): Promise<void> => {
+  const { scope, name } = splitFqn(fqn);
+  unwrap(
+    await postApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqs({
+      path: { id: requireWorkspaceId(), scope, name },
+    }),
+  );
+};
 
 /** Disable / enable an agent (user-controlled toggle; agents only). */
-export const disableAgent = (fqn: string) =>
-  mutate(`${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/disable`, { method: "POST" });
+export const disableAgent = async (fqn: string): Promise<void> => {
+  const { scope, name } = splitFqn(fqn);
+  unwrap(
+    await postApiWorkspacesByIdCatalogAgentsByScopeByNameDisable({
+      path: { id: requireWorkspaceId(), scope, name },
+    }),
+  );
+};
 
-export const enableAgent = (fqn: string) =>
-  mutate(`${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/enable`, { method: "POST" });
+export const enableAgent = async (fqn: string): Promise<void> => {
+  const { scope, name } = splitFqn(fqn);
+  unwrap(
+    await postApiWorkspacesByIdCatalogAgentsByScopeByNameEnable({
+      path: { id: requireWorkspaceId(), scope, name },
+    }),
+  );
+};
 
-export const deleteAgent = (name: string) =>
-  mutate(`${catalogPrefix()}/agents/${encodeURIComponent(name)}`, { method: "DELETE" });
+export const deleteAgent = async (name: string): Promise<void> => {
+  const { scope, name: shortName } = splitFqn(name);
+  unwrap(
+    await deleteApiWorkspacesByIdCatalogAgentsByScopeByName({
+      path: { id: requireWorkspaceId(), scope, name: shortName },
+    }),
+  );
+};
 
-export const deleteSkill = (name: string) =>
-  mutate(`${catalogPrefix()}/skills/${encodeURIComponent(name)}`, { method: "DELETE" });
+export const deleteSkill = async (name: string): Promise<void> => {
+  const { scope, name: shortName } = splitFqn(name);
+  unwrap(
+    await deleteApiWorkspacesByIdCatalogSkillsByScopeByName({
+      path: { id: requireWorkspaceId(), scope, name: shortName },
+    }),
+  );
+};
 
-export const deleteMcp = (name: string) =>
-  mutate(`${catalogPrefix()}/mcps/${encodeURIComponent(name)}`, { method: "DELETE" });
+export const deleteMcp = async (name: string): Promise<void> => {
+  const { scope, name: shortName } = splitFqn(name);
+  unwrap(
+    await deleteApiWorkspacesByIdCatalogMcpsByScopeByName({
+      path: { id: requireWorkspaceId(), scope, name: shortName },
+    }),
+  );
+};
 
 export interface McpDetail {
   name: string;
@@ -386,8 +500,16 @@ export interface McpDetail {
   content: string;
 }
 
-export const getMcp = (name: string): Promise<McpDetail> =>
-  fetchJson<McpDetail>(`${catalogPrefix()}/mcps/${encodeURIComponent(name)}`, "mcp");
+export const getMcp = (name: string): Promise<McpDetail> => {
+  const { scope, name: shortName } = splitFqn(name);
+  // Raw JSON helper: the generated MCP detail response names its fields
+  // differently from the dashboard's `McpDetail`, so the named return type
+  // is preserved via the helper's generic.
+  return fetchJson<McpDetail>(
+    `${catalogPrefix()}/mcps/${encodeURIComponent(scope)}/${encodeURIComponent(shortName)}`,
+    "mcp",
+  );
+};
 
 export interface SkillDetail {
   skill: Skill;
@@ -397,8 +519,14 @@ export interface SkillDetail {
   content: string;
 }
 
-export const getSkill = (name: string): Promise<SkillDetail> =>
-  fetchJson<SkillDetail>(`${catalogPrefix()}/skills/${encodeURIComponent(name)}`, "skill");
+export const getSkill = async (name: string): Promise<SkillDetail> => {
+  const { scope, name: shortName } = splitFqn(name);
+  return unwrap(
+    await getApiWorkspacesByIdCatalogSkillsByScopeByName({
+      path: { id: requireWorkspaceId(), scope, name: shortName },
+    }),
+  );
+};
 
 export interface AgentDetail {
   agent: Agent;
@@ -408,8 +536,14 @@ export interface AgentDetail {
   content: string;
 }
 
-export const getAgent = (name: string): Promise<AgentDetail> =>
-  fetchJson<AgentDetail>(`${catalogPrefix()}/agents/${encodeURIComponent(name)}`, "agent");
+export const getAgent = async (name: string): Promise<AgentDetail> => {
+  const { scope, name: shortName } = splitFqn(name);
+  return unwrap(
+    await getApiWorkspacesByIdCatalogAgentsByScopeByName({
+      path: { id: requireWorkspaceId(), scope, name: shortName },
+    }),
+  );
+};
 
 // ── File browser API ────────────────────────────────────────────────
 
@@ -419,21 +553,37 @@ export interface CatalogFileEntry {
   size: number;
 }
 
-export const listSkillFiles = (fqn: string): Promise<CatalogFileEntry[]> =>
-  fetchJson<CatalogFileEntry[]>(
-    `${catalogPrefix()}/skills/${encodeURIComponent(fqn)}/files`,
-    "skill-files",
+export const listSkillFiles = async (fqn: string): Promise<CatalogFileEntry[]> => {
+  const { scope, name } = splitFqn(fqn);
+  return unwrap(
+    await getApiWorkspacesByIdCatalogSkillsByScopeByNameFiles({
+      path: { id: requireWorkspaceId(), scope, name },
+    }),
   );
+};
 
-export const listAgentFiles = (fqn: string): Promise<CatalogFileEntry[]> =>
-  fetchJson<CatalogFileEntry[]>(
-    `${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/files`,
-    "agent-files",
+export const listAgentFiles = async (fqn: string): Promise<CatalogFileEntry[]> => {
+  const { scope, name } = splitFqn(fqn);
+  return unwrap(
+    await getApiWorkspacesByIdCatalogAgentsByScopeByNameFiles({
+      path: { id: requireWorkspaceId(), scope, name },
+    }),
   );
+};
 
+/**
+ * Fetch one catalog file's raw bytes. The same `{scope}/{name}/files`
+ * endpoint that lists files streams a single file's bytes when `?path=`
+ * is set, so the relative path rides as a query param (it is itself
+ * slash-bearing and of arbitrary depth, which a single path segment
+ * can't carry). Kept on raw `fetch` because the response is binary,
+ * not the JSON the generated op parses.
+ */
 export const getSkillFile = (fqn: string, relPath: string): Promise<ArrayBuffer> => {
-  const encoded = relPath.split("/").map(encodeURIComponent).join("/");
-  const url = `${catalogPrefix()}/skills/${encodeURIComponent(fqn)}/files/${encoded}`;
+  const { scope, name } = splitFqn(fqn);
+  const url = `${catalogPrefix()}/skills/${encodeURIComponent(scope)}/${encodeURIComponent(
+    name,
+  )}/files?path=${encodeURIComponent(relPath)}`;
   return fetch(url).then((r) => {
     if (!r.ok) throw new Error(`skill file: ${r.status}`);
     return r.arrayBuffer();
@@ -441,8 +591,10 @@ export const getSkillFile = (fqn: string, relPath: string): Promise<ArrayBuffer>
 };
 
 export const getAgentFile = (fqn: string, relPath: string): Promise<ArrayBuffer> => {
-  const encoded = relPath.split("/").map(encodeURIComponent).join("/");
-  const url = `${catalogPrefix()}/agents/${encodeURIComponent(fqn)}/files/${encoded}`;
+  const { scope, name } = splitFqn(fqn);
+  const url = `${catalogPrefix()}/agents/${encodeURIComponent(scope)}/${encodeURIComponent(
+    name,
+  )}/files?path=${encodeURIComponent(relPath)}`;
   return fetch(url).then((r) => {
     if (!r.ok) throw new Error(`agent file: ${r.status}`);
     return r.arrayBuffer();

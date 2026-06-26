@@ -33,7 +33,7 @@ function makeNode(id: string, phase: number, status: NodeStatus): WorkflowNode {
   };
 }
 
-function makeDag(nodes: readonly WorkflowNode[], wf?: WorkflowHeader): WorkflowDag {
+function makeDag(nodes: WorkflowNode[], wf?: WorkflowHeader): WorkflowDag {
   const workflow = wf ?? makeWorkflow();
   return { workflow, nodes, edges: [] };
 }
