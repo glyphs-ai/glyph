@@ -42,10 +42,17 @@ import { workflowsRoutes } from "../../server/src/routes/workflows.js";
 import { workspacesRoutes } from "../../server/src/routes/workspaces.js";
 
 /**
- * Pinned to `0.0.0` (not the real package version) so the emitted spec —
- * and therefore the generated client — is stable across release bumps.
- * Only the API surface, never the version string, drives a codegen diff.
- * Matches the snapshot test's `info.version`.
+ * Codegen-only identity for the assembled spec — NOT the runtime `info`.
+ *
+ * At runtime the real OpenAPI `info` block is supplied by the production
+ * `@glyphs-ai/server` boot path; this constant is never read there. It
+ * exists solely to give the codegen a stable identity: pinning `version`
+ * to `0.0.0` (not the real package version) keeps the generated client's
+ * filenames and symbols from churning across release bumps — only the API
+ * surface, never the version string, drives a codegen diff. The drift CI
+ * job is what catches accidental skew between this constant and what
+ * `@glyphs-ai/server` actually emits. Matches the snapshot test's
+ * `info.version`.
  */
 export const OPENAPI_INFO = { title: "@glyphs-ai/server", version: "0.0.0" } as const;
 

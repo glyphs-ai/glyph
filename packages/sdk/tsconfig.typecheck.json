@@ -9,6 +9,6 @@
     // pure type-only program (noEmit) so there is no output-layout impact.
     "rootDir": "../.."
   },
-  "include": ["src/**/*", "test/**/*", "scripts/**/*", "openapi-ts.config.ts"],
+  "include": ["src/**/*", "test/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -2,7 +2,7 @@
  * Public surface of `@glyphs-ai/sdk`.
  *
  * Everything under `./generated/` is emitted by `@hey-api/openapi-ts`
- * (see `openapi-ts.config.ts` + `scripts/generate.ts`) and committed; the
+ * (see `scripts/generate.ts`) and committed; the
  * only hand-written code is the `unwrap` / `GlyphError` ergonomics layered
  * on top. The package has zero runtime dependencies — the generated fetch
  * client is inlined — so it is safe to bundle for the browser.
