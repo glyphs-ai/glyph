@@ -9,7 +9,7 @@
  *   - `agent-resolver.ts`  — catalog/runtime resolution + spawn
  *                             internals shared by dispatch
  *   - `mutations.ts`       — write-side (dispatch, cancel, delete,
- *                             deleteTerminalByOriginMetadata, recoverOrphaned)
+ *                             deleteTerminalByOrigin, recoverOrphaned)
  *   - `shutdown.ts`        — lifecycle hooks
  *
  * Shared state lives in a single `TaskServiceCtx` object built in
@@ -31,7 +31,7 @@ import { getTaskActivity, getTaskActivityStream } from "./task-service/activity-
 import {
   cancelTask,
   deleteTask,
-  deleteTerminalByOriginMetadata,
+  deleteTerminalByOrigin,
   dispatchTask,
   recoverOrphaned,
 } from "./task-service/mutations.js";
@@ -161,23 +161,23 @@ export class TaskService {
     return (await listTasks(this.ctx, opts)).map(toTask);
   }
 
-  async hasInFlightByOriginMetadata(opts: {
+  async hasInFlightByOrigin(opts: {
     readonly origin: string;
-    readonly metadataKey: string;
-    readonly metadataValue: string;
+    readonly originId: string;
   }): Promise<boolean> {
-    return this.ctx.repository.hasInFlightByOriginMetadata(opts);
+    return this.ctx.repository.hasInFlightByOrigin(opts);
   }
 
   /**
-   * True if any non-terminal task originated from the workflow with
-   * `metadata.workflowNodeId === nodeId`. Narrow surface used by
-   * `@glyphs-ai/api/src/wiring/workflow-worker-task-runner.ts` to implement
-   * `WorkflowNodeRunner.hasInFlightForNode` for worker nodes without
-   * broadening {@link ListTaskOpts} with a generic metadata filter.
+   * True if any non-terminal task originated from the workflow node
+   * `nodeId` (i.e. `origin='workflow'` and `originId === nodeId`).
+   * Narrow surface used by
+   * `@glyphs-ai/api/src/wiring/workflow-worker-task-runner.ts` to
+   * implement `WorkflowNodeRunner.hasInFlightForNode` for worker nodes
+   * without broadening {@link ListTaskOpts} with a generic filter.
    *
-   * The metadata key `workflowNodeId` matches the canonical reverse-
-   * lookup contract in `packages/workflow/src/types.ts:222`.
+   * The node id is carried by the typed `origin_id` column, not
+   * `metadata`.
    */
   async hasInFlightForWorkflowNode(nodeId: string): Promise<boolean> {
     return hasInFlightForWorkflowNode(this.ctx, nodeId);
@@ -207,21 +207,19 @@ export class TaskService {
     return task === null ? null : toTask(task);
   }
 
-  async deleteTerminalByOriginMetadata(opts: {
+  async deleteTerminalByOrigin(opts: {
     readonly origin: string;
-    readonly metadataKey: string;
-    readonly metadataValue: string;
+    readonly originId: string;
   }): Promise<{ deletedCount: number }> {
-    return deleteTerminalByOriginMetadata(this.ctx, opts);
+    return deleteTerminalByOrigin(this.ctx, opts);
   }
 
-  async aggregateByOriginMetadataKey(opts: {
+  async aggregateByOrigin(opts: {
     readonly origin: string;
-    readonly metadataKey: string;
-    readonly metadataValues: readonly string[];
+    readonly originIds: readonly string[];
     readonly statusIn?: readonly string[];
   }): Promise<ReadonlyMap<string, { readonly totalCount: number; readonly runningCount: number }>> {
-    return this.ctx.repository.aggregateByOriginMetadataKey(opts);
+    return this.ctx.repository.aggregateByOrigin(opts);
   }
 
   async get(id: string): Promise<Task | null> {

@@ -156,6 +156,14 @@ export interface Task {
   readonly brief: string;
   readonly details?: string;
   readonly origin: TaskOrigin;
+  /**
+   * Routing id for a cross-package origin: the schedule id for
+   * `origin = 'schedule'`, the workflow-node id for `origin =
+   * 'workflow'`. Omitted for standalone tasks. Backed by the typed
+   * `origin_id` column; downstream surfaces (CLI / dashboard) map it
+   * to their domain label (e.g. the schedule-id column).
+   */
+  readonly originId?: string;
   readonly status: TaskStatus;
   readonly metadata: Readonly<Record<string, unknown>>;
   readonly createdAt: string;
@@ -220,6 +228,14 @@ export interface DispatchOpts {
    * tasks on demand.
    */
   readonly origin?: TaskOrigin;
+  /**
+   * First-class routing id for a cross-package origin — the schedule
+   * id for `origin = 'schedule'`, the workflow-node id for `origin =
+   * 'workflow'`. Persisted in the typed `origin_id` column, never in
+   * `metadata`. Omit for standalone dispatches. Callers pass this
+   * instead of stashing the id under a `metadata` key.
+   */
+  readonly originId?: string;
   /**
    * Optional caller-supplied metadata to shallow-merge into the initial
    * Task.metadata bag. Kernel-supplied keys (workdir, runtime) take
@@ -302,9 +318,11 @@ export interface ListTaskOpts {
    */
   readonly origin?: TaskOrigin | readonly TaskOrigin[];
   /**
-   * Filter to tasks whose top-level metadata key matches the given value.
-   * Combined with the other filters via AND. When the key matches a known
-   * partial expression index, the query engages it.
+   * Filter to tasks whose typed `origin_id` column matches this exact
+   * value. AND-combined with the other filters. Almost always paired
+   * with an `origin` filter — e.g. `{ origin: 'schedule', originId:
+   * scheduleId }` is how the public `?scheduleId=` wire filter maps to
+   * the substrate, engaging the `(origin, origin_id)` partial index.
    */
-  readonly metadataEquals?: { readonly key: string; readonly value: string };
+  readonly originId?: string;
 }

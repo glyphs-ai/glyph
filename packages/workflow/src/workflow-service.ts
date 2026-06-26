@@ -305,10 +305,9 @@ export class WorkflowService {
     return this.repo.countAwaitingHumanByWorkflow();
   }
 
-  async aggregateByOriginMetadataKey(opts: {
+  async aggregateByOrigin(opts: {
     readonly origin: string;
-    readonly metadataKey: string;
-    readonly metadataValues: readonly string[];
+    readonly originIds: readonly string[];
     readonly statusIn?: readonly string[];
   }): Promise<
     ReadonlyMap<
@@ -316,7 +315,7 @@ export class WorkflowService {
       { readonly totalCount: number; readonly runningCount: number; readonly awaitingCount: number }
     >
   > {
-    return this.repo.aggregateByOriginMetadataKey(opts);
+    return this.repo.aggregateByOrigin(opts);
   }
 
   async getDag(workflowId: string): Promise<WorkflowDagSnapshot> {
@@ -414,6 +413,7 @@ export class WorkflowService {
           details: opts.details,
           coordinatorAgent: validatedSpec.agent,
           ...(opts.origin !== undefined ? { origin: opts.origin } : {}),
+          ...(opts.originId !== undefined ? { originId: opts.originId } : {}),
           ...(opts.metadata !== undefined ? { metadata: opts.metadata } : {}),
           nowIso,
         });
