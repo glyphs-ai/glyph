@@ -13,7 +13,6 @@ import {
   type WorkspaceListItem,
 } from "../api";
 import { EmptyState } from "../components/common/EmptyState";
-import { resolveListPageState } from "../components/common/listPageState";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon, RefreshIcon } from "../components/Icons";
 import { Modal } from "../components/Modal";
@@ -21,7 +20,6 @@ import { CreateModal } from "../components/sessions/CreateModal";
 import { DeleteModalBody } from "../components/sessions/DeleteModalBody";
 import { FallbackModalBody } from "../components/sessions/FallbackModalBody";
 import { SessionListItem } from "../components/sessions/SessionListItem";
-import { isTimeFilterActive } from "../components/tasks/shared";
 import { useMounted } from "../hooks/useMounted";
 import { useUrlSearchValue } from "../hooks/useUrlState";
 import { serverNow } from "../server-clock";
@@ -322,7 +320,8 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
     idQuery.trim() !== "" ||
     agentFilterUrl !== ALL_AGENTS ||
     runtimeFilter !== ALL_RUNTIMES ||
-    isTimeFilterActive(timeFilter);
+    // Only "all" is non-constraining; every bounded window narrows the list.
+    timeFilter !== "all";
 
   // Atomic "Clear filters" reset. Chaining the individual
   // `useUrlSearchValue` setters would clobber one another (each reads
@@ -343,17 +342,9 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
     });
   }, [navigate, location.pathname, location.search, location.hash]);
 
-  // Single-column page: the empty-state machine collapses to
-  // Loading | Zero | No-match | Normal (no detail pane → no "unselected"
-  // branch). Feed a non-null selection sentinel whenever the visible
-  // list is populated so the shared resolver never returns "unselected".
-  const sessionsState = resolveListPageState({
-    loaded,
-    itemCount: sessions.length,
-    filtersActive,
-    visibleCount: visibleSessions.length,
-    effectiveSelectedId: visibleSessions.length > 0 ? "__list__" : null,
-  });
+  // Single-column page: the empty-state branching below collapses to
+  // Loading | Zero | No-match | Normal. There's no detail pane, so there's
+  // no "unselected" branch at all.
 
   if (currentWorkspaceId === null) {
     return (
@@ -461,13 +452,13 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
         {error && <div className="alert alert--error">⚠️ {error}</div>}
 
         <div className="sessions-page__body">
-          {sessionsState === "loading" ? (
+          {!loaded ? (
             <EmptyState
               icon={<RefreshIcon className="spin" />}
               title="Loading sessions…"
               testId="sessions-loading"
             />
-          ) : sessionsState === "zero" ? (
+          ) : sessions.length === 0 && !filtersActive ? (
             <EmptyState
               icon="📂"
               title="No sessions yet"
@@ -490,7 +481,7 @@ export function SessionsPage({ agents, config, currentWorkspaceId, workspaces }:
                 testId: "sessions-empty-zero-cta",
               }}
             />
-          ) : sessionsState === "nomatch" ? (
+          ) : visibleSessions.length === 0 ? (
             <EmptyState
               icon="🔍"
               title="No matches"

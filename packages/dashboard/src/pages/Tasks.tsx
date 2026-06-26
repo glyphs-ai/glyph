@@ -11,7 +11,6 @@ import {
 } from "../api";
 import { EmptyState } from "../components/common/EmptyState";
 import { ListSkeleton } from "../components/common/ListSkeleton";
-import { resolveListPageState } from "../components/common/listPageState";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
 import { DispatchModal } from "../components/tasks/DispatchModal";
@@ -20,7 +19,6 @@ import {
   ALL_RUNTIMES,
   coerceTimePreset,
   DEFAULT_TIME_PRESET,
-  isTimeFilterActive,
   type TimePreset,
 } from "../components/tasks/shared";
 import { TaskConfirmModalsHost } from "../components/tasks/TaskConfirmModals";
@@ -220,7 +218,8 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
     idQuery.trim() !== "" ||
     agentFilterUrl !== ALL_AGENTS ||
     runtimeFilter !== ALL_RUNTIMES ||
-    isTimeFilterActive(timeFilter);
+    // Only "all" is non-constraining; every bounded window narrows the list.
+    timeFilter !== "all";
 
   // Atomic "Clear filters" reset. Chaining the individual
   // `useUrlSearchValue` setters would clobber one another (each reads the
@@ -242,18 +241,13 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
     });
   }, [navigate, location.pathname, location.search, location.hash]);
 
-  // Shared empty-state machine: Loading | Zero | No-match | Unselected |
-  // Normal. The rail keeps its filter chrome mounted for Zero / No-match;
-  // the detail pane carries the rich card. `effectiveSelectedId` auto-binds
-  // the first visible row, so "unselected" is effectively unreachable here
-  // but is handled for completeness.
-  const tasksState = resolveListPageState({
-    loaded,
-    itemCount: tasks.length,
-    filtersActive,
-    visibleCount: visibleTasks.length,
-    effectiveSelectedId,
-  });
+  // Empty-state branching (Loading | Zero | No-match | Unselected | Normal)
+  // is inlined at each JSX site below on the page's own `loaded` /
+  // `tasks.length` / `filtersActive` / `visibleTasks.length` /
+  // `effectiveSelectedId`. The rail keeps its filter chrome mounted for
+  // Zero / No-match; the detail pane carries the rich card. Auto-binding the
+  // first visible row makes "unselected" effectively unreachable here, but
+  // it's spelled out for completeness.
 
   if (currentWorkspaceId === null) {
     return (
@@ -298,9 +292,9 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
               hideAgentFilter={false}
             />
             <div className="tasks-pane__list-scroll">
-              {tasksState === "loading" ? (
+              {!loaded ? (
                 <ListSkeleton ariaLabel="Loading tasks" testId="tasks-list-skeleton" />
-              ) : tasksState === "zero" || tasksState === "nomatch" ? null : (
+              ) : visibleTasks.length === 0 ? null : (
                 <TaskList
                   tasks={visibleTasks}
                   selectedId={effectiveSelectedId}
@@ -313,9 +307,9 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
             </div>
           </div>
 
-          {tasksState === "loading" ? (
+          {!loaded ? (
             <TaskDetailSkeleton />
-          ) : tasksState === "zero" ? (
+          ) : tasks.length === 0 && !filtersActive ? (
             <EmptyState
               asDetailPane
               icon="📝"
@@ -334,7 +328,7 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
                 testId: "tasks-empty-zero-cta",
               }}
             />
-          ) : tasksState === "nomatch" ? (
+          ) : visibleTasks.length === 0 ? (
             <EmptyState
               asDetailPane
               icon="🔍"
@@ -348,7 +342,7 @@ export function TasksPage({ agents, currentWorkspaceId, config }: TasksProps) {
                 testId: "tasks-empty-nomatch-cta",
               }}
             />
-          ) : tasksState === "unselected" ? (
+          ) : effectiveSelectedId === null ? (
             <EmptyState asDetailPane icon="📝" title="No task selected" />
           ) : (
             effectiveSelectedId && (

@@ -9,14 +9,12 @@ import {
   type WorkflowNode,
 } from "../api";
 import { EmptyState } from "../components/common/EmptyState";
-import { resolveListPageState } from "../components/common/listPageState";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
 import {
   ALL_AGENTS,
   coerceTimePreset,
   DEFAULT_TIME_PRESET,
-  isTimeFilterActive,
   type TimePreset,
 } from "../components/tasks/shared";
 import { CreateWorkflowModal } from "../components/workflows/CreateWorkflowModal";
@@ -365,23 +363,17 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     );
   }
 
-  const filtersActive =
-    idQuery !== "" || agentFilter !== ALL_AGENTS || isTimeFilterActive(timeFilter);
-  // Shared empty-state machine: Loading | Zero | No-match | Unselected |
-  // Normal. `workflows` is already server-filtered (by `createdSince` among
-  // others), so its length is both the item count and the visible count.
-  // The genuinely-empty workspace ("zero") is split from a filter-narrowed
-  // result ("nomatch") via `filtersActive` — and because a bounded time
-  // window counts as an active filter, a populated-but-stale workspace
-  // (every workflow older than the window) resolves to "nomatch" with a
-  // working Clear-filters recovery rather than the misleading "zero" state.
-  const workflowsState = resolveListPageState({
-    loaded,
-    itemCount: workflows.length,
-    filtersActive,
-    visibleCount: visible.length,
-    effectiveSelectedId,
-  });
+  // Only "all" is non-constraining; every bounded window narrows the list.
+  const filtersActive = idQuery !== "" || agentFilter !== ALL_AGENTS || timeFilter !== "all";
+  // Empty-state branching (Loading | Zero | No-match | Unselected | Normal)
+  // is inlined at each JSX site below. `workflows` is already server-filtered
+  // (by `createdSince` among others), so `visible` === `workflows` — its
+  // length is both the item count and the visible count. The genuinely-empty
+  // workspace ("zero") is split from a filter-narrowed result ("nomatch") via
+  // `filtersActive`; because a bounded time window counts as an active filter,
+  // a populated-but-stale workspace (every workflow older than the window)
+  // resolves to "nomatch" with a working Clear-filters recovery rather than
+  // the misleading "zero" state.
   const detailWorkflow = detail.workflow;
   const showNodeTaskPane = nodeTaskId !== null && effectiveSelectedId !== null;
   const showHumanNodePane = humanNodeId !== null && effectiveSelectedId !== null;
@@ -420,9 +412,9 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
               filterAgentNames={filterAgentNames}
             />
             <div className="tasks-pane__list-scroll">
-              {workflowsState === "loading" ? (
+              {!loaded ? (
                 <WorkflowListSkeleton />
-              ) : workflowsState === "zero" || workflowsState === "nomatch" ? null : (
+              ) : visible.length === 0 ? null : (
                 <WorkflowList
                   workflows={visible}
                   selectedId={effectiveSelectedId}
@@ -474,10 +466,10 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             // Initial list load: keep the detail pane skeletonised too,
             // rather than flashing the "No workflow selected" placeholder
             // before the auto-selected first row resolves.
-            if (workflowsState === "loading") {
+            if (!loaded) {
               return <WorkflowDetailSkeleton />;
             }
-            if (workflowsState === "zero") {
+            if (workflows.length === 0 && !filtersActive) {
               return (
                 <EmptyState
                   asDetailPane
@@ -506,7 +498,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
                 />
               );
             }
-            if (workflowsState === "nomatch") {
+            if (visible.length === 0) {
               return (
                 <EmptyState
                   asDetailPane
@@ -545,12 +537,11 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
             if (effectiveSelectedId !== null) {
               return <WorkflowDetailSkeleton />;
             }
-            // Explicit "unselected" branch mirrors Tasks.tsx for cross-page
-            // consistency. By elimination this is reached only when the
-            // resolver returned "unselected" (loaded + populated + no row
-            // currently selected), but spelling it out keeps the mapping
-            // from state → UI 1:1 with the other list pages.
-            if (workflowsState === "unselected") {
+            // Loaded + populated but no row currently selected. Reached only
+            // by elimination (the branches above already handle loading /
+            // empty / per-selection states); spelled out so the state → UI
+            // mapping stays 1:1 with the other list pages.
+            if (effectiveSelectedId === null) {
               return <EmptyState asDetailPane icon="🪄" title="No workflow selected" />;
             }
             return null;

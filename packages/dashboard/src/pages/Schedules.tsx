@@ -17,7 +17,6 @@ import {
 } from "../api";
 import { EmptyState } from "../components/common/EmptyState";
 import { ListSkeleton } from "../components/common/ListSkeleton";
-import { resolveListPageState } from "../components/common/listPageState";
 import { Segmented } from "../components/common/Segmented";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
@@ -718,17 +717,12 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     });
   };
 
-  // Shared empty-state machine: Loading | Zero | No-match | Unselected |
-  // Normal. `itemCount` is the whole schedule list (all kinds) so the
-  // genuinely-empty workspace still resolves to "zero" exactly as before;
-  // an empty kind tab or filter-narrowed result resolves to "nomatch".
-  const schedulesState = resolveListPageState({
-    loaded,
-    itemCount: schedules.length,
-    filtersActive,
-    visibleCount: visible.length,
-    effectiveSelectedId,
-  });
+  // Empty-state branching (Loading | Zero | No-match | Unselected | Normal)
+  // is inlined at each JSX site below on `loaded` / `schedules.length` /
+  // `filtersActive` / `visible.length` / `effectiveSelectedId`. `itemCount`
+  // is the whole schedule list (all kinds) so the genuinely-empty workspace
+  // still resolves to "zero"; an empty kind tab or filter-narrowed result
+  // resolves to "nomatch".
 
   return (
     <>
@@ -785,9 +779,9 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
               showActivityFilters={kindFilter === "workflow"}
             />
             <div className="tasks-pane__list-scroll">
-              {schedulesState === "loading" ? (
+              {!loaded ? (
                 <ListSkeleton ariaLabel="Loading schedules" testId="schedules-list-skeleton" />
-              ) : schedulesState === "zero" || schedulesState === "nomatch" ? null : (
+              ) : visible.length === 0 ? null : (
                 <ScheduleList
                   schedules={visible}
                   selectedId={effectiveSelectedId}
@@ -826,9 +820,9 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
               onSelectNode={handleSelectFireNode}
               onBackFromNode={handleBackFromFireNode}
             />
-          ) : schedulesState === "loading" ? (
+          ) : !loaded ? (
             <ScheduleDetailSkeleton />
-          ) : schedulesState === "zero" ? (
+          ) : schedules.length === 0 && !filtersActive ? (
             <EmptyState
               asDetailPane
               icon="📅"
@@ -853,7 +847,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
                 testId: "schedules-empty-zero-cta",
               }}
             />
-          ) : schedulesState === "nomatch" ? (
+          ) : visible.length === 0 ? (
             <EmptyState
               asDetailPane
               icon="🔍"
@@ -867,12 +861,9 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
                 testId: "schedules-empty-nomatch-cta",
               }}
             />
-          ) : schedulesState === "unselected" ? (
-            // Explicit "unselected" branch mirrors Tasks.tsx for cross-page
-            // consistency. By elimination this is reached only when the
-            // resolver returned "unselected" (loaded + populated + no row
-            // currently selected), but spelling it out keeps the mapping
-            // from state → UI 1:1 with the other list pages.
+          ) : effectiveSelectedId === null ? (
+            // Loaded + populated but no row selected. Mirrors the other list
+            // pages' explicit "no selection" detail-pane card.
             <EmptyState asDetailPane icon="📅" title="No schedule selected" />
           ) : effectiveSelectedId ? (
             <ScheduleDetail
