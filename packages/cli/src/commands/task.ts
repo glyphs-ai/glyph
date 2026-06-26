@@ -6,7 +6,14 @@
  * JSON — runtime-neutral.
  */
 
-import { makeClient, resolveWorkspace } from "../connect.js";
+import type {
+  GetApiWorkspacesByIdTasksByTidActivityResponses,
+  GetApiWorkspacesByIdTasksByTidResponses,
+  GetApiWorkspacesByIdTasksResponses,
+  PostApiWorkspacesByIdTasksByTidCancelResponses,
+  PostApiWorkspacesByIdTasksResponses,
+} from "@glyphs-ai/sdk";
+import { makeSdkClient, resolveWorkspace } from "../connect.js";
 import {
   formatError,
   formatJson,
@@ -18,6 +25,7 @@ import {
 } from "../output.js";
 import type { WorkspaceFlagOpts } from "../registrars/_shared.js";
 import type { CommandResult } from "../result.js";
+import { unwrap } from "../sdk-client.js";
 
 // ─── list ──────────────────────────────────────────────────────────────
 export interface TaskListOpts extends WorkspaceFlagOpts {
@@ -37,7 +45,7 @@ export interface TaskListOpts extends WorkspaceFlagOpts {
  * `/scheduled-tasks` surface, not through this command.
  */
 export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> {
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: {
@@ -50,7 +58,13 @@ export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> 
     if (opts.runtime !== undefined) query.runtime = opts.runtime;
     if (opts.createdSince !== undefined) query.createdSince = opts.createdSince;
     if (opts.status !== undefined) query.status = opts.status;
-    const list = await client.call("tasks.list", { params: { id: workspaceId }, query });
+    const list = unwrap(
+      await client.get<GetApiWorkspacesByIdTasksResponses>({
+        url: "/api/workspaces/{id}/tasks",
+        path: { id: workspaceId },
+        query,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
     return {
@@ -98,7 +112,7 @@ export async function taskDispatch(opts: TaskDispatchOpts): Promise<CommandResul
   if (opts.brief.trim().length > 200) {
     return { exitCode: 2, stderr: "--brief must be 200 characters or fewer\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: { agent: string; brief: string; details?: string; runtime?: string } = {
@@ -107,7 +121,13 @@ export async function taskDispatch(opts: TaskDispatchOpts): Promise<CommandResul
     };
     if (opts.details !== undefined) body.details = opts.details;
     if (opts.runtime !== undefined) body.runtime = opts.runtime;
-    const task = await client.call("tasks.dispatch", { params: { id: workspaceId }, body });
+    const task = unwrap(
+      await client.post<PostApiWorkspacesByIdTasksResponses>({
+        url: "/api/workspaces/{id}/tasks",
+        path: { id: workspaceId },
+        body,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     const stdout = fmt === "json" ? formatJson(task) : formatRecord({ ...task });
     return { exitCode: 0, stdout };
@@ -123,10 +143,15 @@ export async function taskShow(taskId: string, opts: TaskShowOpts = {}): Promise
   if (typeof taskId !== "string" || taskId.trim() === "") {
     return { exitCode: 2, stderr: "task id is required\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const task = await client.call("tasks.get", { params: { id: workspaceId, tid: taskId } });
+    const task = unwrap(
+      await client.get<GetApiWorkspacesByIdTasksByTidResponses>({
+        url: "/api/workspaces/{id}/tasks/{tid}",
+        path: { id: workspaceId, tid: taskId },
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     const stdout = fmt === "json" ? formatJson(task) : formatRecord({ ...task });
     return { exitCode: 0, stdout };
@@ -144,12 +169,20 @@ export async function taskRm(taskId: string, opts: TaskRmOpts = {}): Promise<Com
   if (typeof taskId !== "string" || taskId.trim() === "") {
     return { exitCode: 2, stderr: "task id is required\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: { purge?: "1" } = {};
     if (opts.purge) query.purge = "1";
-    await client.call("tasks.delete", { params: { id: workspaceId, tid: taskId }, query });
+    // unwrap() even though the value is unused: it preserves the
+    // throw-on-non-2xx behavior (a 409 must surface, not be swallowed).
+    unwrap(
+      await client.delete({
+        url: "/api/workspaces/{id}/tasks/{tid}",
+        path: { id: workspaceId, tid: taskId },
+        query,
+      }),
+    );
     return { exitCode: 0, stdout: `task ${taskId} removed\n` };
   } catch (err) {
     // `task rm` on a non-terminal task surfaces a 409 with
@@ -184,10 +217,15 @@ export async function taskCancel(
   if (typeof taskId !== "string" || taskId.trim() === "") {
     return { exitCode: 2, stderr: "task id is required\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const task = await client.call("tasks.cancel", { params: { id: workspaceId, tid: taskId } });
+    const task = unwrap(
+      await client.post<PostApiWorkspacesByIdTasksByTidCancelResponses>({
+        url: "/api/workspaces/{id}/tasks/{tid}/cancel",
+        path: { id: workspaceId, tid: taskId },
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(task) };
     return { exitCode: 0, stdout: `task ${taskId} cancelled\n` };
@@ -236,13 +274,13 @@ export async function taskActivity(
         "--before cannot be combined with --follow (--follow resumes forward only; pass --after instead)\n",
     };
   }
-  const client = await makeClient(opts);
+  const { client, baseUrl } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
 
     if (opts.follow === true) {
       return await followTaskActivity(
-        client,
+        baseUrl,
         workspaceId,
         taskId,
         opts.after !== undefined ? { after: opts.after } : {},
@@ -253,10 +291,13 @@ export async function taskActivity(
     if (opts.before !== undefined) query.before = String(opts.before);
     if (opts.after !== undefined) query.after = String(opts.after);
     if (opts.limit !== undefined) query.limit = String(opts.limit);
-    const payload = await client.call("tasks.activity.list", {
-      params: { id: workspaceId, tid: taskId },
-      query,
-    });
+    const payload = unwrap(
+      await client.get<GetApiWorkspacesByIdTasksByTidActivityResponses>({
+        url: "/api/workspaces/{id}/tasks/{tid}/activity",
+        path: { id: workspaceId, tid: taskId },
+        query,
+      }),
+    );
     // Activity is intrinsically structured (variant ActivityItem types);
     // human-readable rendering is left to higher layers. Always JSON.
     return { exitCode: 0, stdout: formatJson(payload) };
@@ -289,16 +330,19 @@ export async function taskActivity(
  * own `seq`.
  */
 export async function followTaskActivity(
-  client: import("../api-client.js").ApiClient,
+  baseUrl: string,
   workspaceId: string,
   taskId: string,
   opts: { readonly after?: number } = {},
 ): Promise<CommandResult> {
-  const headers = opts.after !== undefined ? { "Last-Event-ID": String(opts.after) } : undefined;
-  const res = await client.callRaw("tasks.activity.stream", {
-    params: { id: workspaceId, tid: taskId },
-    ...(headers !== undefined ? { headers } : {}),
-  });
+  // SSE is out of the SDK's scope (it parses/buffers JSON bodies), so the
+  // streaming path stays on raw fetch. URL + headers mirror the JSON surface's
+  // wire format: workspace-scoped path with encodeURIComponent'd ids,
+  // Accept: application/json, and Last-Event-ID only when resuming.
+  const url = `${baseUrl}/api/workspaces/${encodeURIComponent(workspaceId)}/tasks/${encodeURIComponent(taskId)}/activity/stream`;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (opts.after !== undefined) headers["Last-Event-ID"] = String(opts.after);
+  const res = await fetch(url, { method: "GET", headers });
   if (res.status === 404) {
     return {
       exitCode: 1,

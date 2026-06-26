@@ -3,19 +3,23 @@
  * `glyph task activity <task-id> --follow`.
  *
  * The test feeds a synthetic SSE Response (built around a
- * `ReadableStream` of UTF-8 frames) into a mock-fetch ApiClient, and
- * asserts:
+ * `ReadableStream` of UTF-8 frames) into a stubbed `globalThis.fetch`
+ * and asserts:
  *  - `Last-Event-ID` is sent on the request iff the caller passes
  *    `after`.
  *  - Each printed item lands on its own NDJSON line.
  *  - `event: end` exits 0; `event: error` exits 1 with stderr.
  *  - Whenever at least one frame carried `id:`, the result's stderr
  *    ends with `last seq: <N>` so the user can resume next time.
+ *
+ * SSE is out of the `@glyphs-ai/sdk` scope, so `followTaskActivity`
+ * uses raw `fetch`; these tests stub `globalThis.fetch` directly.
  */
 
-import { describe, expect, it } from "vitest";
-import { ApiClient } from "../src/api-client.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { followTaskActivity } from "../src/commands/task.js";
+
+const BASE_URL = "http://test.local";
 
 interface Captured {
   url: string;
@@ -63,18 +67,22 @@ function activityFrame(seq: number, payload: object): string {
 }
 
 describe("followTaskActivity", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("does NOT send Last-Event-ID when called without `after`", async () => {
     const { fetchFn, captured } = makeSseFetch(["event: end\ndata: {}"]);
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    const r = await followTaskActivity(client, "ws-1", "20260601-abcd1234");
+    vi.stubGlobal("fetch", fetchFn);
+    const r = await followTaskActivity(BASE_URL, "ws-1", "20260601-abcd1234");
     expect(r.exitCode).toBe(0);
     expect(captured[0]?.headers["Last-Event-ID"]).toBeUndefined();
   });
 
   it("sends Last-Event-ID: <after> when a `after` is provided", async () => {
     const { fetchFn, captured } = makeSseFetch(["event: end\ndata: {}"]);
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    await followTaskActivity(client, "ws-1", "20260601-abcd1234", { after: 1234 });
+    vi.stubGlobal("fetch", fetchFn);
+    await followTaskActivity(BASE_URL, "ws-1", "20260601-abcd1234", { after: 1234 });
     expect(captured[0]?.headers["Last-Event-ID"]).toBe("1234");
   });
 
@@ -84,8 +92,8 @@ describe("followTaskActivity", () => {
       activityFrame(2, { kind: "stdout", text: "world" }),
       "event: end\ndata: {}",
     ]);
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    const r = await followTaskActivity(client, "ws-1", "tid");
+    vi.stubGlobal("fetch", fetchFn);
+    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
     expect(r.exitCode).toBe(0);
     const lines = (r.stdout ?? "").trimEnd().split("\n");
     expect(lines).toHaveLength(2);
@@ -99,8 +107,8 @@ describe("followTaskActivity", () => {
       activityFrame(8, { kind: "stdout", text: "y" }),
       "event: end\nid: 9\ndata: {}",
     ]);
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    const r = await followTaskActivity(client, "ws-1", "tid");
+    vi.stubGlobal("fetch", fetchFn);
+    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
     expect(r.exitCode).toBe(0);
     // The `end` frame's id wins because parseSseFrame updates lastSeq
     // BEFORE branching on event type — that's the most informative
@@ -113,15 +121,15 @@ describe("followTaskActivity", () => {
     // hint should still echo the `after` value so the user can re-resume
     // from the same point next time.
     const { fetchFn } = makeSseFetch(["event: end\ndata: {}"]);
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    const r = await followTaskActivity(client, "ws-1", "tid", { after: 42 });
+    vi.stubGlobal("fetch", fetchFn);
+    const r = await followTaskActivity(BASE_URL, "ws-1", "tid", { after: 42 });
     expect(r.stderr).toBe("last seq: 42\n");
   });
 
   it("does NOT print a resume hint when no `after` and no frames had id", async () => {
     const { fetchFn } = makeSseFetch(["event: end\ndata: {}"]);
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    const r = await followTaskActivity(client, "ws-1", "tid");
+    vi.stubGlobal("fetch", fetchFn);
+    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
     expect(r.exitCode).toBe(0);
     expect(r.stderr ?? "").toBe("");
   });
@@ -131,8 +139,8 @@ describe("followTaskActivity", () => {
       activityFrame(5, { kind: "stdout", text: "before fault" }),
       `event: error\ndata: ${JSON.stringify({ error: "runtime crashed" })}`,
     ]);
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    const r = await followTaskActivity(client, "ws-1", "tid");
+    vi.stubGlobal("fetch", fetchFn);
+    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("stream error:");
     expect(r.stderr).toContain("runtime crashed");
@@ -145,8 +153,8 @@ describe("followTaskActivity", () => {
         status: 404,
         headers: { "content-type": "text/plain" },
       });
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    const r = await followTaskActivity(client, "ws-1", "missing", { after: 99 });
+    vi.stubGlobal("fetch", fetchFn);
+    const r = await followTaskActivity(BASE_URL, "ws-1", "missing", { after: 99 });
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("no streaming activity");
     // Resume hint suppressed — no events were ever delivered.
@@ -157,15 +165,7 @@ describe("followTaskActivity", () => {
     // Real network reads don't honour frame boundaries; the parser
     // has to buffer until \n\n shows up. Simulate by chopping a
     // single frame in half.
-    const captured: Captured[] = [];
-    const fetchFn: typeof fetch = async (input, init) => {
-      const headers: Record<string, string> = {};
-      if (init?.headers) {
-        for (const [k, v] of Object.entries(init.headers as Record<string, string>)) {
-          headers[k] = v;
-        }
-      }
-      captured.push({ url: String(input), headers });
+    const fetchFn: typeof fetch = async () => {
       const full = `${activityFrame(11, { text: "split" })}\n\nevent: end\ndata: {}\n\n`;
       const half = Math.floor(full.length / 2);
       const encoder = new TextEncoder();
@@ -181,8 +181,8 @@ describe("followTaskActivity", () => {
         headers: { "content-type": "text/event-stream" },
       });
     };
-    const client = new ApiClient({ baseUrl: "http://test.local", fetch: fetchFn });
-    const r = await followTaskActivity(client, "ws-1", "tid");
+    vi.stubGlobal("fetch", fetchFn);
+    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
     expect(r.exitCode).toBe(0);
     const lines = (r.stdout ?? "").trimEnd().split("\n");
     expect(lines).toHaveLength(1);

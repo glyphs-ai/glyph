@@ -67,7 +67,20 @@ function stubFetchMulti(responses: readonly MockResponse[]): { calls: Call[] } {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const r = responses[i];
     i += 1;
-    const rawBody = init?.body;
+    // `@glyphs-ai/sdk` operations call `fetch(new Request(url, init))`
+    // (single Request arg); read url/method/body off the Request.
+    let url: string;
+    let method: string;
+    let rawBody: string | undefined;
+    if (input instanceof Request) {
+      url = input.url;
+      method = input.method;
+      rawBody = await input.text();
+    } else {
+      url = String(input);
+      method = String(init?.method ?? "GET");
+      rawBody = typeof init?.body === "string" ? init.body : undefined;
+    }
     let parsed: unknown;
     if (typeof rawBody === "string" && rawBody.length > 0) {
       try {
@@ -77,12 +90,12 @@ function stubFetchMulti(responses: readonly MockResponse[]): { calls: Call[] } {
       }
     }
     calls.push({
-      url: String(input),
-      method: String(init?.method ?? "GET"),
+      url,
+      method,
       body: parsed,
     });
     if (r === undefined) {
-      return new Response(`unexpected request #${i}: ${String(input)}`, { status: 500 });
+      return new Response(`unexpected request #${i}: ${url}`, { status: 500 });
     }
     return new Response(r.body, {
       status: r.status,

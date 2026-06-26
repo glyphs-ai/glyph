@@ -55,7 +55,20 @@ interface Capture {
 function stubFetch(response: { status: number; body: string }): { calls: Capture[] } {
   const calls: Capture[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-    const rawBody = init?.body;
+    // `@glyphs-ai/sdk` operations call `fetch(new Request(url, init))`
+    // (single Request arg); read url/method/body off the Request.
+    let url: string;
+    let method: string;
+    let rawBody: string | undefined;
+    if (input instanceof Request) {
+      url = input.url;
+      method = input.method;
+      rawBody = await input.text();
+    } else {
+      url = String(input);
+      method = String(init?.method ?? "GET");
+      rawBody = typeof init?.body === "string" ? init.body : undefined;
+    }
     let parsed: unknown;
     if (typeof rawBody === "string" && rawBody.length > 0) {
       try {
@@ -65,8 +78,8 @@ function stubFetch(response: { status: number; body: string }): { calls: Capture
       }
     }
     calls.push({
-      url: String(input),
-      method: String(init?.method ?? "GET"),
+      url,
+      method,
       body: parsed,
     });
     return new Response(response.body, {
