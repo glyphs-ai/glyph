@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-06-26)
+
+- Repoint **Project knowledge** and the consistency-review criterion off the deleted `@glyphs-ai/contracts` package: tier layering T2 is now `api` + `sdk`, wire DTOs live in `packages/api/src/wire/`, and the fenced surfaces (`dashboard` / `cli`) import wire types from `@glyphs-ai/sdk`.
+
 ## 0.2.0 (2026-06-12)
 
 - Add **MODE selection** at the top of the prompt: `MODE: code` (default — analyse PR diff, produce verdict + inline comments) or `MODE: ci` (block on `gh pr checks --watch`, produce a verdict capturing pass/fail per CI job, no diff reading, no inline comments). Default-to-`code` keeps pre-MODE briefs producing identical reviews.

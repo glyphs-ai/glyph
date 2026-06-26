@@ -32,10 +32,10 @@ not by their origin package.
 
 Architecture audits follow the canonical tier model: T0 foundations are
 workspace, runtime, schedule, terminal, and catalog; T1 modes are
-session, task, and workflow; T2 is contracts + api; T3 is server; and
-T_top is dashboard + cli. Top-level apps consume workflow through
-contracts and server routes, not by importing `@glyphs-ai/workflow`
-directly.
+session, task, and workflow; T2 is api + sdk; T3 is server; and
+T_top is dashboard + cli. Top-level apps consume workflow through the
+`@glyphs-ai/sdk` client and server routes, not by importing
+`@glyphs-ai/workflow` directly.
 
 ## Why a separate package
 
