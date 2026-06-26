@@ -152,7 +152,9 @@ describe("WorkflowsPage — list rendering + sort", () => {
 
   it("renders the zero-state when no workflows and no active filters", async () => {
     mockListWorkflows.mockResolvedValue([]);
-    renderWorkflows("/workspaces/ws-1/runtime/workflows", agents);
+    // range=all so no time window is active: an empty list is a genuinely
+    // empty workspace (Zero), not a filtered-out result.
+    renderWorkflows("/workspaces/ws-1/runtime/workflows?range=all", agents);
     await waitFor(() => {
       expect(screen.getByTestId("workflows-empty-zero")).toBeTruthy();
     });
@@ -181,7 +183,7 @@ describe("WorkflowsPage — list rendering + sort", () => {
     mockListWorkflows.mockResolvedValue([]);
     renderWorkflows("/workspaces/ws-1/runtime/workflows?q=missing&range=all", agents);
     await waitFor(() => {
-      expect(screen.getByTestId("workflows-empty-filtered")).toBeTruthy();
+      expect(screen.getByTestId("workflows-empty-nomatch")).toBeTruthy();
     });
   });
 
