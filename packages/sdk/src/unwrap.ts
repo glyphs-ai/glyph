@@ -60,12 +60,21 @@ function toGlyphError(error: unknown, response: Response): GlyphError {
 
 /** Return the success payload, or throw a normalised {@link GlyphError}. */
 export function unwrap<T>(result: ResultLike<T>): T {
+  // Branch order matters:
+  //   1. transport-level Error in `error` → re-throw untouched (no response)
+  //   2. no `response` object             → request never completed; throw the original error
+  //   3. `response.ok`                     → return the success payload
+  //   4. non-2xx response                 → normalise the error envelope into a GlyphError
+  //
   // A transport-level failure (offline, DNS, abort, request-build error) is
   // surfaced by hey-api as a thrown `Error` in the `error` slot, usually with
-  // no `response` — re-throw it untouched rather than wrapping it.
+  // no `response`, so it must be caught before the `response`-based branches.
   if (result.error instanceof Error) throw result.error;
   const { response } = result;
   if (!response) throw result.error ?? new Error("request did not complete");
+  // A 2xx with no body (204, or any `void`-typed route) leaves `data`
+  // undefined; the generated operation types already model those routes as
+  // returning `void`, so the `as T` stays honest for callers.
   if (response.ok) return result.data as T;
   throw toGlyphError(result.error, response);
 }

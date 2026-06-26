@@ -8,6 +8,11 @@ produced by [`@hey-api/openapi-ts`](https://heyapi.dev) and committed under
 `src/generated/`; the only hand-written code is a thin `unwrap` /
 `GlyphError` ergonomics layer.
 
+> **Node 22 is a devtime requirement only.** `package.json` declares
+> `engines.node >=22` because codegen and the test suite run on Node 22.
+> The *published* output is runtime-agnostic and safe to bundle for the
+> browser — see *Browser safety* below.
+
 What this is — and is not
 -------------------------
 

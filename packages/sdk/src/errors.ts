@@ -34,6 +34,13 @@ export class GlyphError extends Error {
     this.code = opts.code;
     this.issues = opts.issues;
     this.response = opts.response;
+
+    // Drop this constructor frame from the stack so the top frame is the
+    // throwing call site. `captureStackTrace` is V8-only (undefined in
+    // browsers); the typeof guard makes it a safe no-op elsewhere.
+    if (typeof Error.captureStackTrace === "function") {
+      Error.captureStackTrace(this, GlyphError);
+    }
   }
 }
 

@@ -1,9 +1,10 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
  * Browser-safety probe. The dashboard (React 19 + Vite) will eventually
@@ -31,6 +32,20 @@ const NODE_LEAK_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 
 describe("@glyphs-ai/sdk browser bundle safety", () => {
   let workDir = "";
+
+  // This probe bundles the SHIPPED artifact at `dist/index.js`, so it only
+  // makes sense after a build. Fail fast with an actionable message instead
+  // of a confusing ENOENT when run standalone (`pnpm -F @glyphs-ai/sdk test`)
+  // without a prior build.
+  beforeAll(() => {
+    if (!existsSync(SDK_ENTRY)) {
+      throw new Error(
+        `${SDK_ENTRY} not found. Run \`pnpm -F @glyphs-ai/sdk build\` first ` +
+          "(or `pnpm build` at the repo root), then re-run this test.",
+      );
+    }
+  });
+
   afterAll(async () => {
     if (workDir) await rm(workDir, { recursive: true, force: true });
   });

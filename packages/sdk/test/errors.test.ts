@@ -32,6 +32,17 @@ describe("GlyphError", () => {
     expect(err).toBeInstanceOf(GlyphError);
   });
 
+  it("trims its own constructor frame from the V8 stack", () => {
+    function makeError(): GlyphError {
+      return new GlyphError({ status: 500, message: "boom", response });
+    }
+    const err = makeError();
+    const frames = (err.stack ?? "").split("\n").filter((line) => line.trim().startsWith("at "));
+    expect(frames.length).toBeGreaterThan(0);
+    expect(frames[0]).toContain("makeError");
+    expect(frames[0]).not.toContain("GlyphError");
+  });
+
   it("isGlyphError discriminates GlyphError from other values", () => {
     expect(isGlyphError(new GlyphError({ status: 400, message: "x", response }))).toBe(true);
     expect(isGlyphError(new Error("plain"))).toBe(false);
