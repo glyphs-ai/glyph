@@ -100,8 +100,8 @@ await service.list();                                       // Task[]
 await service.list({ statuses: ["running"], agent: "writer" });
 await service.get(task.id);                                 // Task | null
 await service.liveCount();                                  // number — in-flight + live
-await service.hasInFlightByOriginMetadata({ origin: "schedule", metadataKey: "scheduleId", metadataValue: scheduleId });
-await service.deleteTerminalByOriginMetadata({ origin: "schedule", metadataKey: "scheduleId", metadataValue: scheduleId });
+await service.hasInFlightByOrigin({ origin: "schedule", originId: scheduleId });
+await service.deleteTerminalByOrigin({ origin: "schedule", originId: scheduleId });
 await service.cancel(task.id);                              // best-effort SIGTERM
 await service.delete(task.id, { purge: false });
 const abs = await service.resolveArtifactPath(task.id, "report.html");

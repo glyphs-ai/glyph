@@ -50,7 +50,7 @@ engine-facing methods are driven by the host (`@glyphs-ai/api` wiring +
   independently atomic; the substrate has no monolithic-batch API.
 - **Structural reads**: `getWorkflow`, `getDag`, `getNode`,
   `getNodeDir`, plus the list / aggregate reads `list`,
-  `countAwaitingHumanByWorkflow`, and `aggregateByOriginMetadataKey`
+  `countAwaitingHumanByWorkflow`, and `aggregateByOrigin`
   that back the dashboard's workflow list and badges.
 - **Lifecycle / operator**: `createWorkflow` (bootstrap a workflow and
   its initial coordinator node), `cancelWorkflow` (operator cancel,
@@ -62,30 +62,29 @@ engine-facing methods are driven by the host (`@glyphs-ai/api` wiring +
   `runnerFor`, the eligibility scan, and `dispatchAtomic` live in
   `_dispatch.ts`; the service keeps thin delegators.
 
-## Origin + indexed metadata
+## Origin + origin_id
 
-Every workflow row carries an `origin` (`WorkflowOrigin = standalone |
-schedule`) recording who launched it. `standalone` is the default for
-direct dashboard / CLI / MCP creation; `schedule` is stamped by the
-schedule integration handler. The default `GET /workflows` listing
-filters to `standalone` by construction so integration-owned workflows
-don't leak into the user's main list.
+Every workflow row carries two first-class routing columns: an `origin`
+recording who launched it, and an optional typed `origin_id` naming the
+specific external entity within that origin. `origin` is an open string
+discriminator (`WorkflowOrigin = string`): `"standalone"` is reserved
+for direct dashboard / CLI / MCP creation and is the default for `GET
+/workflows`; `"schedule"` is stamped by the schedule integration handler
+and pairs with the launching schedule's id in `origin_id`. The default
+listing filters to `standalone` by construction so integration-owned
+workflows don't leak into the user's main list.
 
-The substrate ships **one deliberate integration-aware leak**: a
-partial index `workflows_schedule_id_idx` on
-`json_extract(metadata, '$.scheduleId') WHERE origin = 'schedule'`,
-paired with the `WORKFLOW_INDEXED_METADATA` registry in
-`workflow-repository.ts` that maps the `(origin = "schedule",
-metadataKey = "scheduleId")` pair to that expression. It exists so the
-host can answer "which workflows did schedule X create?" via an indexed
-`aggregateByOriginMetadataKey` lookup instead of a metadata scan. This
-couples the substrate to one convention of one origin
-(`schedule.metadata.scheduleId`) on purpose; a new origin does **not**
-need its own index unless it needs the same reverse lookup — in which
-case extend the registry and add a matching partial index in a
-migration. The `(origin, metadataKey)` pairing is intentionally *not*
-generalized into a dynamic index API: the set of indexed conventions is
-small and explicit.
+The `(origin, origin_id)` pair is backed by the partial index
+`workflows_origin_pair_idx` on `(origin, origin_id) WHERE origin_id IS
+NOT NULL`. It lets the host answer "which workflows did schedule X
+create?" via an indexed `aggregateByOrigin({ origin, originIds })`
+lookup — a typed column comparison, never a `metadata` JSON scan. The
+column is origin-agnostic: a new origin that needs the same reverse
+lookup just stamps its own `origin_id` at create time (via
+`createWorkflow`'s `originId` option) and queries through the same
+primitive — no per-origin index, registry, or `json_extract` expression
+to extend. `metadata` stays a free-form, un-indexed bag; the routing
+key lives in its own typed column.
 
 ## Layout
 
