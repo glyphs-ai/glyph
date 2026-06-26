@@ -23,7 +23,7 @@ import { EditScheduleModal } from "../components/schedules/EditScheduleModal";
 import { FireTaskDetailPane } from "../components/schedules/FireTaskDetailPane";
 import { FireWorkflowDetailPane } from "../components/schedules/FireWorkflowDetailPane";
 import { DeleteScheduleModal } from "../components/schedules/ScheduleConfirmModals";
-import { ScheduleDetail } from "../components/schedules/ScheduleDetail";
+import { ScheduleDetail, type ScheduleDetailTab } from "../components/schedules/ScheduleDetail";
 import { ScheduleList } from "../components/schedules/ScheduleList";
 import { SchedulesFilters } from "../components/schedules/SchedulesFilters";
 import {
@@ -57,6 +57,7 @@ export interface SchedulesPageProps {
 
 const DEFAULT_FIRE_TASK_POLL_INTERVAL_MS = 4000;
 const SEARCH_DEBOUNCE_MS = 200;
+const DEFAULT_SCHEDULE_DETAIL_TAB: ScheduleDetailTab = "fires";
 
 /**
  * Schedules page — workspace-scoped cron-trigger surface. Master-detail:
@@ -72,6 +73,7 @@ const SEARCH_DEBOUNCE_MS = 200;
  *   - `?state=all|enabled|paused` — enabled-state chips
  *   - `?activity=all|awaiting|running|idle` — workflow activity chips
  *   - `?scheduleId=<scheduleId>` — master-detail selection
+ *   - `?tab=fires|spec` — schedule detail body tab (default `fires`)
  *   - `?fireTaskId=<taskId>` — Mode B drill-down (task-kind schedule)
  *   - `?fireWorkflowId=<workflowId>` — Mode B drill-down (workflow-kind schedule)
  *   - `?fireNodeId=<nodeId>` — node drill-down within a workflow fire
@@ -95,10 +97,12 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
   const [fireTaskIdRaw] = useUrlSearchValue("fireTaskId", "");
   const [fireWorkflowIdRaw] = useUrlSearchValue("fireWorkflowId", "");
   const [fireNodeIdRaw] = useUrlSearchValue("fireNodeId", "");
+  const [detailTabRaw] = useUrlSearchValue("tab", DEFAULT_SCHEDULE_DETAIL_TAB);
 
   const kindFilter = coerceScheduleKind(kindRaw);
   const stateFilter = coerceStateFilter(stateFilterRaw);
   const activityFilter = coerceActivityFilter(activityFilterRaw);
+  const detailTab = coerceScheduleDetailTab(detailTabRaw);
   const setStateFilter = useCallback(
     (next: ScheduleStateFilter) => setStateFilterRaw(next),
     [setStateFilterRaw],
@@ -132,6 +136,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       fireTaskId?: string | null;
       fireWorkflowId?: string | null;
       fireNodeId?: string | null;
+      tab?: ScheduleDetailTab;
     }) => {
       const params = new URLSearchParams(location.search);
       if (next.kind !== undefined) {
@@ -167,6 +172,10 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
         if (next.fireNodeId === null || next.fireNodeId === "") params.delete("fireNodeId");
         else params.set("fireNodeId", next.fireNodeId);
       }
+      if (next.tab !== undefined) {
+        if (next.tab === DEFAULT_SCHEDULE_DETAIL_TAB) params.delete("tab");
+        else params.set("tab", next.tab);
+      }
       const search = params.toString();
       navigate(`${location.pathname}${search === "" ? "" : `?${search}`}${location.hash}`, {
         replace: true,
@@ -184,6 +193,11 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     }) => {
       setPageUrl(next);
     },
+    [setPageUrl],
+  );
+
+  const setDetailTab = useCallback(
+    (next: ScheduleDetailTab) => setPageUrl({ tab: next }),
     [setPageUrl],
   );
 
@@ -351,16 +365,6 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     // ScheduleDetail does its own optimistic merge.
     setRefreshToken((n) => n + 1);
   }, []);
-
-  // Close the Edit modal when the user switches to a different
-  // schedule (URL flip clears the modal's target so it doesn't fight
-  // ScheduleDetail's incoming new selection). Idempotent: no-op when
-  // editTarget is already null.
-  useEffect(() => {
-    if (editTarget !== null && editTarget.id !== effectiveSelectedId) {
-      setEditTarget(null);
-    }
-  }, [effectiveSelectedId, editTarget]);
 
   // Only honour `?fireTaskId=` / `?fireWorkflowId=` when a schedule is
   // actually selected AND its kind matches the param. Without the
@@ -832,6 +836,8 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
                 onSelectFire={handleSelectFire}
                 onCancelTaskFire={handleCancelTaskFire}
                 onCancelWorkflowFire={handleCancelWorkflowFire}
+                tab={detailTab}
+                onTabChange={setDetailTab}
               />
             ) : visible.length === 0 ? null : (
               <aside className="tasks-pane__detail tasks-pane__detail--empty">
@@ -921,4 +927,8 @@ function coerceStateFilter(raw: string): ScheduleStateFilter {
 function coerceActivityFilter(raw: string): WorkflowActivityFilter {
   if (raw === "awaiting" || raw === "running" || raw === "idle") return raw;
   return DEFAULT_WORKFLOW_ACTIVITY_FILTER;
+}
+
+function coerceScheduleDetailTab(raw: string): ScheduleDetailTab {
+  return raw === "spec" ? "spec" : DEFAULT_SCHEDULE_DETAIL_TAB;
 }
