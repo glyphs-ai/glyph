@@ -24,7 +24,11 @@ import type { WorkflowService } from "@glyphs-ai/workflow";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { describe, expect, it } from "vitest";
-import { createApiApp } from "../src/routes/_openapi.js";
+import {
+  createApiApp,
+  injectWorkspaceIdParam,
+  registerOpenApiDoc,
+} from "../src/routes/_openapi.js";
 import { catalogRoutes } from "../src/routes/catalog/index.js";
 import { configRoutes } from "../src/routes/config.js";
 import { healthRoutes } from "../src/routes/health.js";
@@ -129,19 +133,23 @@ function buildOpenApiAppForTest(): OpenAPIHono {
 describe("openapi spec", () => {
   it("assembled /api/openapi.json matches the committed snapshot", () => {
     const app = buildOpenApiAppForTest();
-    const doc = app.getOpenAPI31Document({
-      openapi: "3.1.0",
-      info: { title: "@glyphs-ai/server", version: "0.0.0" },
-    });
+    const doc = injectWorkspaceIdParam(
+      app.getOpenAPI31Document({
+        openapi: "3.1.0",
+        info: { title: "@glyphs-ai/server", version: "0.0.0" },
+      }),
+    );
     expect(doc).toMatchSnapshot();
   });
 
   it("documents one operation per registered route", () => {
     const app = buildOpenApiAppForTest();
-    const doc = app.getOpenAPI31Document({
-      openapi: "3.1.0",
-      info: { title: "@glyphs-ai/server", version: "0.0.0" },
-    });
+    const doc = injectWorkspaceIdParam(
+      app.getOpenAPI31Document({
+        openapi: "3.1.0",
+        info: { title: "@glyphs-ai/server", version: "0.0.0" },
+      }),
+    );
     const operationCount = Object.values(doc.paths ?? {}).reduce(
       (sum, item) =>
         sum +
@@ -158,20 +166,27 @@ describe("openapi spec", () => {
 
   it("GET /api/openapi.json serves the assembled 3.1 document", async () => {
     const app = buildOpenApiAppForTest();
-    app.doc31("/api/openapi.json", {
+    registerOpenApiDoc(app, "/api/openapi.json", {
       openapi: "3.1.0",
       info: { title: "@glyphs-ai/server", version: "0.0.0" },
     });
     const res = await app.request("/api/openapi.json");
     expect(res.status).toBe(200);
-    const doc = (await res.json()) as { openapi: string; paths: Record<string, unknown> };
+    const doc = (await res.json()) as {
+      openapi: string;
+      paths: Record<string, Record<string, { parameters?: Array<{ name: string; in: string }> }>>;
+    };
     expect(doc.openapi).toBe("3.1.0");
     expect(doc.paths["/api/health"]).toBeDefined();
+    // The mount-level workspace `id` is injected into every nested
+    // operation's parameters (see `injectWorkspaceIdParam`).
+    const nested = doc.paths["/api/workspaces/{id}/workflows"]?.get;
+    expect(nested?.parameters?.some((p) => p.name === "id" && p.in === "path")).toBe(true);
   });
 
   it("GET /api/docs serves Swagger UI", async () => {
     const app = buildOpenApiAppForTest();
-    app.doc31("/api/openapi.json", {
+    registerOpenApiDoc(app, "/api/openapi.json", {
       openapi: "3.1.0",
       info: { title: "@glyphs-ai/server", version: "0.0.0" },
     });

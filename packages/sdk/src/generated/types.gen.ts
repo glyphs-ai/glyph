@@ -361,7 +361,9 @@ export type PostApiWorkspacesByIdReloadResponse = PostApiWorkspacesByIdReloadRes
 
 export type GetApiWorkspacesByIdSessionsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         agent?: string;
         createdSince?: string;
@@ -402,7 +404,9 @@ export type GetApiWorkspacesByIdSessionsResponse = GetApiWorkspacesByIdSessionsR
 
 export type PostApiWorkspacesByIdSessionsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/sessions';
 };
@@ -440,6 +444,7 @@ export type PostApiWorkspacesByIdSessionsResponse = PostApiWorkspacesByIdSession
 export type DeleteApiWorkspacesByIdSessionsBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: {
@@ -471,6 +476,7 @@ export type DeleteApiWorkspacesByIdSessionsBySidResponse = DeleteApiWorkspacesBy
 export type GetApiWorkspacesByIdSessionsBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -510,6 +516,7 @@ export type GetApiWorkspacesByIdSessionsBySidResponse = GetApiWorkspacesByIdSess
 export type PostApiWorkspacesByIdSessionsBySidSpawnData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -551,7 +558,9 @@ export type PostApiWorkspacesByIdSessionsBySidSpawnResponse = PostApiWorkspacesB
 
 export type GetApiWorkspacesByIdTasksData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         agent?: string;
         runtime?: string;
@@ -622,7 +631,9 @@ export type GetApiWorkspacesByIdTasksResponse = GetApiWorkspacesByIdTasksRespons
 
 export type PostApiWorkspacesByIdTasksData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/tasks';
 };
@@ -689,6 +700,7 @@ export type PostApiWorkspacesByIdTasksResponse = PostApiWorkspacesByIdTasksRespo
 export type DeleteApiWorkspacesByIdTasksByTidData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: {
@@ -724,6 +736,7 @@ export type DeleteApiWorkspacesByIdTasksByTidResponse = DeleteApiWorkspacesByIdT
 export type GetApiWorkspacesByIdTasksByTidData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: never;
@@ -792,6 +805,7 @@ export type GetApiWorkspacesByIdTasksByTidResponse = GetApiWorkspacesByIdTasksBy
 export type PostApiWorkspacesByIdTasksByTidCancelData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: never;
@@ -868,6 +882,7 @@ export type PostApiWorkspacesByIdTasksByTidCancelResponse = PostApiWorkspacesByI
 export type GetApiWorkspacesByIdTasksByTidArtifactByNameData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
         name: string;
     };
@@ -900,6 +915,7 @@ export type GetApiWorkspacesByIdTasksByTidArtifactByNameResponses = {
 export type GetApiWorkspacesByIdTasksByTidActivityData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: {
@@ -1036,6 +1052,7 @@ export type GetApiWorkspacesByIdTasksByTidActivityResponse = GetApiWorkspacesByI
 export type GetApiWorkspacesByIdTasksByTidActivityStreamData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: never;
@@ -1062,7 +1079,9 @@ export type GetApiWorkspacesByIdTasksByTidActivityStreamResponses = {
 
 export type GetApiWorkspacesByIdScheduledTasksData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         agent?: string;
         runtime?: string;
@@ -1134,7 +1153,9 @@ export type GetApiWorkspacesByIdScheduledTasksResponse = GetApiWorkspacesByIdSch
 
 export type GetApiWorkspacesByIdScheduledWorkflowsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         scheduleId?: string;
     };
@@ -1189,7 +1210,9 @@ export type GetApiWorkspacesByIdScheduledWorkflowsResponse = GetApiWorkspacesByI
 
 export type GetApiWorkspacesByIdSchedulesData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         agent?: string;
         enabled?: string;
@@ -1251,7 +1274,9 @@ export type GetApiWorkspacesByIdSchedulesResponse = GetApiWorkspacesByIdSchedule
 
 export type PostApiWorkspacesByIdSchedulesTaskData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/schedules/task';
 };
@@ -1314,7 +1339,9 @@ export type PostApiWorkspacesByIdSchedulesTaskResponse = PostApiWorkspacesByIdSc
 
 export type GetApiWorkspacesByIdSchedulesPreviewCronData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         expr?: string;
         tz?: string;
@@ -1349,6 +1376,7 @@ export type GetApiWorkspacesByIdSchedulesPreviewCronResponse = GetApiWorkspacesB
 export type DeleteApiWorkspacesByIdSchedulesBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -1385,6 +1413,7 @@ export type DeleteApiWorkspacesByIdSchedulesBySidResponse = DeleteApiWorkspacesB
 export type GetApiWorkspacesByIdSchedulesBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -1443,6 +1472,7 @@ export type GetApiWorkspacesByIdSchedulesBySidResponse = GetApiWorkspacesByIdSch
 export type PatchApiWorkspacesByIdSchedulesTaskBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -1507,7 +1537,9 @@ export type PatchApiWorkspacesByIdSchedulesTaskBySidResponse = PatchApiWorkspace
 
 export type PostApiWorkspacesByIdSchedulesWorkflowData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/schedules/workflow';
 };
@@ -1571,6 +1603,7 @@ export type PostApiWorkspacesByIdSchedulesWorkflowResponse = PostApiWorkspacesBy
 export type PatchApiWorkspacesByIdSchedulesWorkflowBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -1636,6 +1669,7 @@ export type PatchApiWorkspacesByIdSchedulesWorkflowBySidResponse = PatchApiWorks
 export type PostApiWorkspacesByIdSchedulesBySidRunData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -1667,6 +1701,7 @@ export type PostApiWorkspacesByIdSchedulesBySidRunResponse = PostApiWorkspacesBy
 export type GetApiWorkspacesByIdSchedulesBySidPreviewData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: {
@@ -1704,7 +1739,9 @@ export type GetApiWorkspacesByIdSchedulesBySidPreviewResponse = GetApiWorkspaces
 
 export type GetApiWorkspacesByIdWorkflowsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         q?: string;
         coordinatorAgent?: string;
@@ -1765,7 +1802,9 @@ export type GetApiWorkspacesByIdWorkflowsResponse = GetApiWorkspacesByIdWorkflow
 
 export type PostApiWorkspacesByIdWorkflowsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/workflows';
 };
@@ -1827,6 +1866,7 @@ export type PostApiWorkspacesByIdWorkflowsResponse = PostApiWorkspacesByIdWorkfl
 export type DeleteApiWorkspacesByIdWorkflowsByWfidData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: {
@@ -1862,6 +1902,7 @@ export type DeleteApiWorkspacesByIdWorkflowsByWfidResponse = DeleteApiWorkspaces
 export type GetApiWorkspacesByIdWorkflowsByWfidData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -1921,6 +1962,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidResponse = GetApiWorkspacesByIdWo
 export type GetApiWorkspacesByIdWorkflowsByWfidDagData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2021,6 +2063,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponse = GetApiWorkspacesByI
 export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         nid: string;
     };
@@ -2055,6 +2098,7 @@ export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponse = DeleteApi
 export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         nid: string;
     };
@@ -2119,6 +2163,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponse = GetApiWorksp
 export type PostApiWorkspacesByIdWorkflowsByWfidCancelData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2186,6 +2231,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidCancelResponse = PostApiWorkspac
 export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2231,6 +2277,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponse = GetApiWorkspa
 export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         encodedPath: string;
     };
@@ -2263,6 +2310,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathResponses =
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2303,6 +2351,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesResponse = PostApiWorkspace
 export type PostApiWorkspacesByIdWorkflowsByWfidEdgesData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2344,6 +2393,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidEdgesResponse = PostApiWorkspace
 export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2387,6 +2437,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponse = PostApiWorksp
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         nid: string;
     };
@@ -2455,6 +2506,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponse = PostA
 export type PostApiWorkspacesByIdWorkflowsByWfidFinishData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2522,6 +2574,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponse = PostApiWorkspac
 export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         from: string;
         to: string;
@@ -2557,6 +2610,7 @@ export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponse = Dele
 export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         nid: string;
     };
@@ -2629,6 +2683,7 @@ export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponse = PatchA
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         nid: string;
     };
@@ -2700,7 +2755,9 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponse = Post
 
 export type GetApiWorkspacesByIdCatalogSkillsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/skills';
 };
@@ -2761,7 +2818,9 @@ export type GetApiWorkspacesByIdCatalogSkillsResponse = GetApiWorkspacesByIdCata
 
 export type PostApiWorkspacesByIdCatalogSkillsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/skills';
 };
@@ -2823,7 +2882,9 @@ export type PostApiWorkspacesByIdCatalogSkillsResponse = PostApiWorkspacesByIdCa
 
 export type PostApiWorkspacesByIdCatalogSkillsResolveData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/skills/resolve';
 };
@@ -2915,6 +2976,7 @@ export type PostApiWorkspacesByIdCatalogSkillsResolveResponse = PostApiWorkspace
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -2943,6 +3005,7 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponse = GetAp
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -2978,6 +3041,7 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponse = GetApi
 export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3006,6 +3070,7 @@ export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponse = DeleteAp
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3075,6 +3140,7 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponse = GetApiWorks
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3165,6 +3231,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponse =
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3239,6 +3306,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponse = PostAp
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3282,7 +3350,9 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsRes
 
 export type GetApiWorkspacesByIdCatalogAgentsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/agents';
 };
@@ -3347,7 +3417,9 @@ export type GetApiWorkspacesByIdCatalogAgentsResponse = GetApiWorkspacesByIdCata
 
 export type PostApiWorkspacesByIdCatalogAgentsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/agents';
 };
@@ -3409,7 +3481,9 @@ export type PostApiWorkspacesByIdCatalogAgentsResponse = PostApiWorkspacesByIdCa
 
 export type PostApiWorkspacesByIdCatalogAgentsResolveData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/agents/resolve';
 };
@@ -3501,6 +3575,7 @@ export type PostApiWorkspacesByIdCatalogAgentsResolveResponse = PostApiWorkspace
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3529,6 +3604,7 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponse = GetAp
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3564,6 +3640,7 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponse = GetApi
 export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3592,6 +3669,7 @@ export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponse = DeleteAp
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3665,6 +3743,7 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponse = GetApiWorks
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3755,6 +3834,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponse =
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3829,6 +3909,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponse = PostAp
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3876,6 +3957,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsRes
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3923,6 +4005,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponse = Pos
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -3969,7 +4052,9 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponse = Post
 
 export type GetApiWorkspacesByIdCatalogMcpsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/mcps';
 };
@@ -3998,7 +4083,9 @@ export type GetApiWorkspacesByIdCatalogMcpsResponse = GetApiWorkspacesByIdCatalo
 
 export type PostApiWorkspacesByIdCatalogMcpsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/mcps';
 };
@@ -4061,6 +4148,7 @@ export type PostApiWorkspacesByIdCatalogMcpsResponse = PostApiWorkspacesByIdCata
 export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -4089,6 +4177,7 @@ export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponse = DeleteApiW
 export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -4126,6 +4215,7 @@ export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponse = GetApiWorkspa
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -4216,6 +4306,7 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponse = P
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncData = {
     body?: never;
     path: {
+        id: string;
         scope: string;
         name: string;
     };
@@ -4289,7 +4380,9 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponse = PostApiW
 
 export type GetApiWorkspacesByIdCatalogOverviewData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/overview';
 };

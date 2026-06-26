@@ -546,6 +546,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     },
     "/api/workspaces/{id}/catalog/agents": {
       "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "200": {
             "content": {
@@ -765,6 +775,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "201": {
             "content": {
@@ -982,6 +1002,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     },
     "/api/workspaces/{id}/catalog/agents/resolve": {
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1332,6 +1362,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -1382,6 +1420,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -1629,6 +1675,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -1758,6 +1812,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -1807,6 +1869,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/catalog/agents/{scope}/{name}/disable": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -1938,6 +2008,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -2067,6 +2145,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -2134,6 +2220,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -2401,6 +2495,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync/resolve": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -2764,6 +2866,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     },
     "/api/workspaces/{id}/catalog/mcps": {
       "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2812,6 +2924,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "201": {
             "content": {
@@ -3032,6 +3154,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -3082,6 +3212,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -3156,6 +3294,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -3423,6 +3569,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync/resolve": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -3786,6 +3940,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     },
     "/api/workspaces/{id}/catalog/overview": {
       "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "200": {
             "content": {
@@ -3841,6 +4005,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     },
     "/api/workspaces/{id}/catalog/skills": {
       "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "200": {
             "content": {
@@ -4042,6 +4216,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "201": {
             "content": {
@@ -4259,6 +4443,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     },
     "/api/workspaces/{id}/catalog/skills/resolve": {
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "200": {
             "content": {
@@ -4609,6 +4803,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -4659,6 +4861,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -4888,6 +5098,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -5003,6 +5221,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "scope",
             "required": true,
             "schema": {
@@ -5052,6 +5278,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/catalog/skills/{scope}/{name}/files": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -5121,6 +5355,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -5388,6 +5630,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync/resolve": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "scope",
@@ -5785,6 +6035,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       "get": {
         "parameters": [
           {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
             "in": "query",
             "name": "agent",
             "required": false,
@@ -6053,6 +6311,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       "get": {
         "parameters": [
           {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
             "in": "query",
             "name": "scheduleId",
             "required": false,
@@ -6226,6 +6492,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/schedules": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "query",
             "name": "agent",
@@ -6412,6 +6686,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       "get": {
         "parameters": [
           {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
             "in": "query",
             "name": "expr",
             "required": false,
@@ -6477,6 +6759,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     },
     "/api/workspaces/{id}/schedules/task": {
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "201": {
             "content": {
@@ -6645,6 +6937,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/schedules/task/{sid}": {
       "patch": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "sid",
@@ -6821,6 +7121,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     },
     "/api/workspaces/{id}/schedules/workflow": {
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "201": {
             "content": {
@@ -6989,6 +7299,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/schedules/workflow/{sid}": {
       "patch": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "sid",
@@ -7168,6 +7486,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "sid",
             "required": true,
             "schema": {
@@ -7218,6 +7544,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "sid",
@@ -7383,6 +7717,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "sid",
             "required": true,
             "schema": {
@@ -7445,6 +7787,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "sid",
             "required": true,
             "schema": {
@@ -7487,6 +7837,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/sessions": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "query",
             "name": "agent",
@@ -7596,6 +7954,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "201": {
             "content": {
@@ -7682,6 +8050,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "sid",
             "required": true,
             "schema": {
@@ -7715,6 +8091,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "sid",
@@ -7810,6 +8194,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "sid",
             "required": true,
             "schema": {
@@ -7896,6 +8288,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/tasks": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "query",
             "name": "agent",
@@ -8153,6 +8553,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "201": {
             "content": {
@@ -8379,6 +8789,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "tid",
             "required": true,
             "schema": {
@@ -8415,6 +8833,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "tid",
@@ -8648,6 +9074,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/tasks/{tid}/activity": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "tid",
@@ -9118,6 +9552,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "tid",
             "required": true,
             "schema": {
@@ -9145,6 +9587,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/tasks/{tid}/artifact/{name}": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "tid",
@@ -9185,6 +9635,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/tasks/{tid}/cancel": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "tid",
@@ -9425,6 +9883,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       "get": {
         "parameters": [
           {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
             "in": "query",
             "name": "q",
             "required": false,
@@ -9614,6 +10080,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
       "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
         "responses": {
           "201": {
             "content": {
@@ -9784,6 +10260,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "wfid",
             "required": true,
             "schema": {
@@ -9823,6 +10307,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "wfid",
@@ -9999,6 +10491,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "wfid",
             "required": true,
             "schema": {
@@ -10127,6 +10627,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "wfid",
             "required": true,
             "schema": {
@@ -10165,6 +10673,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/workflows/{wfid}/cancel": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "wfid",
@@ -10345,6 +10861,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/workflows/{wfid}/dag": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "wfid",
@@ -10711,6 +11235,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "wfid",
             "required": true,
             "schema": {
@@ -10769,6 +11301,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "wfid",
             "required": true,
             "schema": {
@@ -10815,6 +11355,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/workflows/{wfid}/finish": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "wfid",
@@ -10997,6 +11545,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "wfid",
             "required": true,
             "schema": {
@@ -11051,6 +11607,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "wfid",
             "required": true,
             "schema": {
@@ -11087,6 +11651,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "wfid",
@@ -11287,6 +11859,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/cancel": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "wfid",
@@ -11490,6 +12070,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/respond": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "wfid",
@@ -11698,6 +12286,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "wfid",
             "required": true,
             "schema": {
@@ -11902,6 +12498,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
     "/api/workspaces/{id}/workflows/{wfid}/subgraph": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "wfid",

@@ -27,7 +27,7 @@ import { accessLog } from "./middleware/access-log.js";
 import { requestId } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { type WorkspaceVars, workspaceContextMiddleware } from "./middleware/workspace-context.js";
-import { createApiApp } from "./routes/_openapi.js";
+import { createApiApp, registerOpenApiDoc } from "./routes/_openapi.js";
 import { catalogRoutes } from "./routes/catalog/index.js";
 import { configRoutes } from "./routes/config.js";
 import { healthRoutes } from "./routes/health.js";
@@ -345,11 +345,12 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", catalogApp);
 
   // OpenAPI: assemble the 3.1 document from every mounted OpenAPIHono
-  // sub-app and serve it, plus a Swagger UI page. Registered after all
-  // route families (so the spec carries every operation) and before the
-  // static/SPA fallback (so `/api/docs` and `/api/openapi.json` are not
-  // shadowed by the catch-all GET handler below).
-  app.doc31("/api/openapi.json", {
+  // sub-app, inject the mount-level workspace `id` params, and serve it,
+  // plus a Swagger UI page. Registered after all route families (so the
+  // spec carries every operation) and before the static/SPA fallback (so
+  // `/api/docs` and `/api/openapi.json` are not shadowed by the catch-all
+  // GET handler below).
+  registerOpenApiDoc(app, "/api/openapi.json", {
     openapi: "3.1.0",
     info: { title: serverName, version: serverVersion },
   });

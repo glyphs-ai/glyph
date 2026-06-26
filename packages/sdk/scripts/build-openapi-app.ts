@@ -28,7 +28,7 @@ import type { SessionService } from "@glyphs-ai/session";
 import type { TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import { createApiApp } from "../../server/src/routes/_openapi.js";
+import { createApiApp, registerOpenApiDoc } from "../../server/src/routes/_openapi.js";
 import { catalogRoutes } from "../../server/src/routes/catalog/index.js";
 import { configRoutes } from "../../server/src/routes/config.js";
 import { healthRoutes } from "../../server/src/routes/health.js";
@@ -146,7 +146,7 @@ export function buildOpenApiApp(): OpenAPIHono {
   );
   app.route("/api/workspaces", catalogApp);
 
-  app.doc31(OPENAPI_DOC_PATH, { openapi: "3.1.0", info: { ...OPENAPI_INFO } });
+  registerOpenApiDoc(app, OPENAPI_DOC_PATH, { openapi: "3.1.0", info: { ...OPENAPI_INFO } });
 
   return app;
 }
