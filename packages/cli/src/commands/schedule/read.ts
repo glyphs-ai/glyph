@@ -4,12 +4,12 @@
  * `tasks.scheduled.list` / `workflows.scheduled.list` routes.
  */
 
-import type {
-  GetApiWorkspacesByIdScheduledTasksResponses,
-  GetApiWorkspacesByIdScheduledWorkflowsResponses,
-  GetApiWorkspacesByIdSchedulesBySidPreviewResponses,
-  GetApiWorkspacesByIdSchedulesBySidResponses,
-  GetApiWorkspacesByIdSchedulesResponses,
+import {
+  getApiWorkspacesByIdScheduledTasks,
+  getApiWorkspacesByIdScheduledWorkflows,
+  getApiWorkspacesByIdSchedules,
+  getApiWorkspacesByIdSchedulesBySid,
+  getApiWorkspacesByIdSchedulesBySidPreview,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../../output.js";
@@ -31,15 +31,14 @@ export async function scheduleList(opts: ScheduleListOpts = {}): Promise<Command
       stderr: '--enabled must be "true" or "false"\n',
     };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: { agent?: string; enabled?: "true" | "false" } = {};
     if (opts.agent !== undefined) query.agent = opts.agent;
     if (opts.enabled !== undefined) query.enabled = opts.enabled as "true" | "false";
     const list = unwrap(
-      await client.get<GetApiWorkspacesByIdSchedulesResponses>({
-        url: "/api/workspaces/{id}/schedules",
+      await getApiWorkspacesByIdSchedules({
         path: { id: workspaceId },
         query,
       }),
@@ -89,12 +88,11 @@ export async function scheduleShow(
   if (typeof scheduleId !== "string" || scheduleId.trim() === "") {
     return { exitCode: 2, stderr: "schedule id is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const found = unwrap(
-      await client.get<GetApiWorkspacesByIdSchedulesBySidResponses>({
-        url: "/api/workspaces/{id}/schedules/{sid}",
+      await getApiWorkspacesByIdSchedulesBySid({
         path: { id: workspaceId, sid: scheduleId },
       }),
     );
@@ -132,14 +130,13 @@ export async function schedulePreview(
   if (opts.n !== undefined && (!Number.isInteger(opts.n) || opts.n < 1 || opts.n > 100)) {
     return { exitCode: 2, stderr: "-n must be an integer in [1, 100]\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: { n?: string } = {};
     if (opts.n !== undefined) query.n = String(opts.n);
     const preview = unwrap(
-      await client.get<GetApiWorkspacesByIdSchedulesBySidPreviewResponses>({
-        url: "/api/workspaces/{id}/schedules/{sid}/preview",
+      await getApiWorkspacesByIdSchedulesBySidPreview({
         path: { id: workspaceId, sid: scheduleId },
         query,
       }),
@@ -164,7 +161,7 @@ export interface ScheduleListTasksOpts extends WorkspaceFlagOpts {
 }
 
 export async function scheduleListTasks(opts: ScheduleListTasksOpts = {}): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: {
@@ -180,8 +177,7 @@ export async function scheduleListTasks(opts: ScheduleListTasksOpts = {}): Promi
     if (opts.createdSince !== undefined) query.createdSince = opts.createdSince;
     if (opts.status !== undefined) query.status = opts.status;
     const list = unwrap(
-      await client.get<GetApiWorkspacesByIdScheduledTasksResponses>({
-        url: "/api/workspaces/{id}/scheduled-tasks",
+      await getApiWorkspacesByIdScheduledTasks({
         path: { id: workspaceId },
         query,
       }),
@@ -217,14 +213,13 @@ export interface ScheduleListWorkflowsOpts extends WorkspaceFlagOpts {
 export async function scheduleListWorkflows(
   opts: ScheduleListWorkflowsOpts = {},
 ): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: { scheduleId?: string } = {};
     if (opts.scheduleId !== undefined) query.scheduleId = opts.scheduleId;
     const list = unwrap(
-      await client.get<GetApiWorkspacesByIdScheduledWorkflowsResponses>({
-        url: "/api/workspaces/{id}/scheduled-workflows",
+      await getApiWorkspacesByIdScheduledWorkflows({
         path: { id: workspaceId },
         query,
       }),

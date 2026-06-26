@@ -4,31 +4,29 @@
  */
 
 import type {
-  GetApiWorkspacesByIdCatalogMcpsByNameResponses,
-  GetApiWorkspacesByIdCatalogMcpsResponses,
-  PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses,
-  PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses,
   PostApiWorkspacesByIdCatalogMcpsResponses,
+} from "@glyphs-ai/sdk";
+import {
+  deleteApiWorkspacesByIdCatalogMcpsByScopeByName,
+  getApiWorkspacesByIdCatalogMcps,
+  getApiWorkspacesByIdCatalogMcpsByScopeByName,
+  postApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolve,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
 import { unwrap } from "../../sdk-client.js";
-import { buildInstallOrigin, catalogResourceUrl, type InstallSourceFlags } from "./_helpers.js";
+import { buildInstallOrigin, type InstallSourceFlags, splitCatalogFqn } from "./_helpers.js";
 
 export type CatalogMcpListOpts = WorkspaceFlagOpts;
 
 export async function catalogMcpList(opts: CatalogMcpListOpts = {}): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const list = unwrap(
-      await client.get<GetApiWorkspacesByIdCatalogMcpsResponses>({
-        url: "/api/workspaces/{id}/catalog/mcps",
-        path: { id: workspaceId },
-      }),
-    );
+    const list = unwrap(await getApiWorkspacesByIdCatalogMcps({ path: { id: workspaceId } }));
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
     return {
@@ -52,12 +50,13 @@ export async function catalogMcpShow(
   if (typeof fqn !== "string" || fqn.trim() === "") {
     return { exitCode: 2, stderr: "mcp fqn is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(fqn);
     const mcp = unwrap(
-      await client.get<GetApiWorkspacesByIdCatalogMcpsByNameResponses>({
-        url: catalogResourceUrl(workspaceId, "mcps", fqn),
+      await getApiWorkspacesByIdCatalogMcpsByScopeByName({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(mcp) };
@@ -103,14 +102,15 @@ export async function catalogMcpRm(
   if (typeof fqn !== "string" || fqn.trim() === "") {
     return { exitCode: 2, stderr: "mcp fqn is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(fqn);
     // unwrap() even though the value is unused: it preserves the
     // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
     unwrap(
-      await client.delete({
-        url: catalogResourceUrl(workspaceId, "mcps", fqn),
+      await deleteApiWorkspacesByIdCatalogMcpsByScopeByName({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: `mcp ${fqn} removed\n` };
@@ -129,12 +129,13 @@ export async function catalogMcpSyncResolve(
   if (typeof fqn !== "string" || fqn.trim() === "") {
     return { exitCode: 2, stderr: "mcp fqn is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(fqn);
     const plan = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses>({
-        url: catalogResourceUrl(workspaceId, "mcps", fqn, "/sync/resolve"),
+      await postApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolve({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(plan) };
@@ -160,9 +161,11 @@ export async function catalogMcpSync(
   const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(fqn);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses>({
-        url: catalogResourceUrl(workspaceId, "mcps", fqn, "/sync"),
+      await client.post<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses>({
+        url: "/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync",
+        path: { id: workspaceId, scope, name: shortName },
         body: { planToken },
       }),
     );

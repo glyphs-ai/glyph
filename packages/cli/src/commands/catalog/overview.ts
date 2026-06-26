@@ -2,7 +2,7 @@
  * `glyph catalog overview` -- per-workspace catalog counts.
  */
 
-import type { GetApiWorkspacesByIdCatalogOverviewResponses } from "@glyphs-ai/sdk";
+import { getApiWorkspacesByIdCatalogOverview } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
@@ -12,12 +12,11 @@ import { unwrap } from "../../sdk-client.js";
 export type CatalogOverviewOpts = WorkspaceFlagOpts;
 
 export async function catalogOverview(opts: CatalogOverviewOpts = {}): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const ov = unwrap(
-      await client.get<GetApiWorkspacesByIdCatalogOverviewResponses>({
-        url: "/api/workspaces/{id}/catalog/overview",
+      await getApiWorkspacesByIdCatalogOverview({
         path: { id: workspaceId },
       }),
     );

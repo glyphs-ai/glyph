@@ -6,12 +6,13 @@
  * JSON — runtime-neutral.
  */
 
-import type {
-  GetApiWorkspacesByIdTasksByTidActivityResponses,
-  GetApiWorkspacesByIdTasksByTidResponses,
-  GetApiWorkspacesByIdTasksResponses,
-  PostApiWorkspacesByIdTasksByTidCancelResponses,
-  PostApiWorkspacesByIdTasksResponses,
+import type { PostApiWorkspacesByIdTasksResponses } from "@glyphs-ai/sdk";
+import {
+  deleteApiWorkspacesByIdTasksByTid,
+  getApiWorkspacesByIdTasks,
+  getApiWorkspacesByIdTasksByTid,
+  getApiWorkspacesByIdTasksByTidActivity,
+  postApiWorkspacesByIdTasksByTidCancel,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../connect.js";
 import {
@@ -45,7 +46,7 @@ export interface TaskListOpts extends WorkspaceFlagOpts {
  * `/scheduled-tasks` surface, not through this command.
  */
 export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: {
@@ -59,8 +60,7 @@ export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> 
     if (opts.createdSince !== undefined) query.createdSince = opts.createdSince;
     if (opts.status !== undefined) query.status = opts.status;
     const list = unwrap(
-      await client.get<GetApiWorkspacesByIdTasksResponses>({
-        url: "/api/workspaces/{id}/tasks",
+      await getApiWorkspacesByIdTasks({
         path: { id: workspaceId },
         query,
       }),
@@ -143,12 +143,11 @@ export async function taskShow(taskId: string, opts: TaskShowOpts = {}): Promise
   if (typeof taskId !== "string" || taskId.trim() === "") {
     return { exitCode: 2, stderr: "task id is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const task = unwrap(
-      await client.get<GetApiWorkspacesByIdTasksByTidResponses>({
-        url: "/api/workspaces/{id}/tasks/{tid}",
+      await getApiWorkspacesByIdTasksByTid({
         path: { id: workspaceId, tid: taskId },
       }),
     );
@@ -169,7 +168,7 @@ export async function taskRm(taskId: string, opts: TaskRmOpts = {}): Promise<Com
   if (typeof taskId !== "string" || taskId.trim() === "") {
     return { exitCode: 2, stderr: "task id is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: { purge?: "1" } = {};
@@ -177,8 +176,7 @@ export async function taskRm(taskId: string, opts: TaskRmOpts = {}): Promise<Com
     // unwrap() even though the value is unused: it preserves the
     // throw-on-non-2xx behavior (a 409 must surface, not be swallowed).
     unwrap(
-      await client.delete({
-        url: "/api/workspaces/{id}/tasks/{tid}",
+      await deleteApiWorkspacesByIdTasksByTid({
         path: { id: workspaceId, tid: taskId },
         query,
       }),
@@ -217,12 +215,11 @@ export async function taskCancel(
   if (typeof taskId !== "string" || taskId.trim() === "") {
     return { exitCode: 2, stderr: "task id is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const task = unwrap(
-      await client.post<PostApiWorkspacesByIdTasksByTidCancelResponses>({
-        url: "/api/workspaces/{id}/tasks/{tid}/cancel",
+      await postApiWorkspacesByIdTasksByTidCancel({
         path: { id: workspaceId, tid: taskId },
       }),
     );
@@ -274,7 +271,7 @@ export async function taskActivity(
         "--before cannot be combined with --follow (--follow resumes forward only; pass --after instead)\n",
     };
   }
-  const { client, baseUrl } = await makeSdkClient(opts);
+  const { baseUrl } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
 
@@ -292,8 +289,7 @@ export async function taskActivity(
     if (opts.after !== undefined) query.after = String(opts.after);
     if (opts.limit !== undefined) query.limit = String(opts.limit);
     const payload = unwrap(
-      await client.get<GetApiWorkspacesByIdTasksByTidActivityResponses>({
-        url: "/api/workspaces/{id}/tasks/{tid}/activity",
+      await getApiWorkspacesByIdTasksByTidActivity({
         path: { id: workspaceId, tid: taskId },
         query,
       }),

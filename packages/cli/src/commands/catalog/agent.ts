@@ -5,36 +5,34 @@
  */
 
 import type {
-  GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses,
-  GetApiWorkspacesByIdCatalogAgentsByNameResponses,
-  GetApiWorkspacesByIdCatalogAgentsResponses,
-  PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses,
-  PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses,
-  PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses,
-  PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses,
-  PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses,
   PostApiWorkspacesByIdCatalogAgentsResolveResponses,
   PostApiWorkspacesByIdCatalogAgentsResponses,
+} from "@glyphs-ai/sdk";
+import {
+  deleteApiWorkspacesByIdCatalogAgentsByScopeByName,
+  getApiWorkspacesByIdCatalogAgents,
+  getApiWorkspacesByIdCatalogAgentsByScopeByName,
+  getApiWorkspacesByIdCatalogAgentsByScopeByNameAnchor,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqs,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameDisable,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameEnable,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolve,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
 import { unwrap } from "../../sdk-client.js";
-import { buildInstallOrigin, catalogResourceUrl, type InstallSourceFlags } from "./_helpers.js";
+import { buildInstallOrigin, type InstallSourceFlags, splitCatalogFqn } from "./_helpers.js";
 
 export type CatalogAgentListOpts = WorkspaceFlagOpts;
 
 export async function catalogAgentList(opts: CatalogAgentListOpts = {}): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const list = unwrap(
-      await client.get<GetApiWorkspacesByIdCatalogAgentsResponses>({
-        url: "/api/workspaces/{id}/catalog/agents",
-        path: { id: workspaceId },
-      }),
-    );
+    const list = unwrap(await getApiWorkspacesByIdCatalogAgents({ path: { id: workspaceId } }));
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
     return {
@@ -84,22 +82,23 @@ export async function catalogAgentShow(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     if (opts.anchor === true) {
       // Dedicated anchor endpoint. Same rationale as
       // `catalogSkillShow` above.
       const res = unwrap(
-        await client.get<GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses>({
-          url: catalogResourceUrl(workspaceId, "agents", name, "/anchor"),
+        await getApiWorkspacesByIdCatalogAgentsByScopeByNameAnchor({
+          path: { id: workspaceId, scope, name: shortName },
         }),
       );
       return { exitCode: 0, stdout: res.content };
     }
     const agent = unwrap(
-      await client.get<GetApiWorkspacesByIdCatalogAgentsByNameResponses>({
-        url: catalogResourceUrl(workspaceId, "agents", name),
+      await getApiWorkspacesByIdCatalogAgentsByScopeByName({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(agent) };
@@ -140,14 +139,15 @@ export async function catalogAgentRm(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     // unwrap() even though the value is unused: it preserves the
     // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
     unwrap(
-      await client.delete({
-        url: catalogResourceUrl(workspaceId, "agents", name),
+      await deleteApiWorkspacesByIdCatalogAgentsByScopeByName({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: `agent ${name} removed\n` };
@@ -166,12 +166,13 @@ export async function catalogAgentSyncResolve(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     const plan = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses>({
-        url: catalogResourceUrl(workspaceId, "agents", name, "/sync/resolve"),
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolve({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(plan) };
@@ -197,9 +198,11 @@ export async function catalogAgentSync(
   const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses>({
-        url: catalogResourceUrl(workspaceId, "agents", name, "/sync"),
+      await client.post<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses>({
+        url: "/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync",
+        path: { id: workspaceId, scope, name: shortName },
         body: { planToken },
       }),
     );
@@ -219,12 +222,13 @@ export async function catalogAgentAckPrereqs(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     const agent = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses>({
-        url: catalogResourceUrl(workspaceId, "agents", name, "/acknowledge-prereqs"),
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqs({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(agent) };
@@ -247,12 +251,13 @@ export async function catalogAgentEnable(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     const agent = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses>({
-        url: catalogResourceUrl(workspaceId, "agents", name, "/enable"),
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameEnable({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(agent) };
@@ -275,12 +280,13 @@ export async function catalogAgentDisable(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     const agent = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses>({
-        url: catalogResourceUrl(workspaceId, "agents", name, "/disable"),
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameDisable({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(agent) };

@@ -5,34 +5,32 @@
  */
 
 import type {
-  GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses,
-  GetApiWorkspacesByIdCatalogSkillsByNameResponses,
-  GetApiWorkspacesByIdCatalogSkillsResponses,
-  PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses,
-  PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses,
-  PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses,
   PostApiWorkspacesByIdCatalogSkillsResolveResponses,
   PostApiWorkspacesByIdCatalogSkillsResponses,
+} from "@glyphs-ai/sdk";
+import {
+  deleteApiWorkspacesByIdCatalogSkillsByScopeByName,
+  getApiWorkspacesByIdCatalogSkills,
+  getApiWorkspacesByIdCatalogSkillsByScopeByName,
+  getApiWorkspacesByIdCatalogSkillsByScopeByNameAnchor,
+  postApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqs,
+  postApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolve,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
 import { unwrap } from "../../sdk-client.js";
-import { buildInstallOrigin, catalogResourceUrl, type InstallSourceFlags } from "./_helpers.js";
+import { buildInstallOrigin, type InstallSourceFlags, splitCatalogFqn } from "./_helpers.js";
 
 export type CatalogSkillListOpts = WorkspaceFlagOpts;
 
 export async function catalogSkillList(opts: CatalogSkillListOpts = {}): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const list = unwrap(
-      await client.get<GetApiWorkspacesByIdCatalogSkillsResponses>({
-        url: "/api/workspaces/{id}/catalog/skills",
-        path: { id: workspaceId },
-      }),
-    );
+    const list = unwrap(await getApiWorkspacesByIdCatalogSkills({ path: { id: workspaceId } }));
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
     return {
@@ -82,24 +80,25 @@ export async function catalogSkillShow(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "skill name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     if (opts.anchor === true) {
       // Dedicated anchor endpoint -- returns just the
       // SKILL.md bytes without the surrounding entry metadata. Use the
       // raw bytes as stdout so callers can `>` pipe them straight to a
       // file.
       const res = unwrap(
-        await client.get<GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses>({
-          url: catalogResourceUrl(workspaceId, "skills", name, "/anchor"),
+        await getApiWorkspacesByIdCatalogSkillsByScopeByNameAnchor({
+          path: { id: workspaceId, scope, name: shortName },
         }),
       );
       return { exitCode: 0, stdout: res.content };
     }
     const skill = unwrap(
-      await client.get<GetApiWorkspacesByIdCatalogSkillsByNameResponses>({
-        url: catalogResourceUrl(workspaceId, "skills", name),
+      await getApiWorkspacesByIdCatalogSkillsByScopeByName({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(skill) };
@@ -140,14 +139,15 @@ export async function catalogSkillRm(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "skill name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     // unwrap() even though the value is unused: it preserves the
     // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
     unwrap(
-      await client.delete({
-        url: catalogResourceUrl(workspaceId, "skills", name),
+      await deleteApiWorkspacesByIdCatalogSkillsByScopeByName({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: `skill ${name} removed\n` };
@@ -171,12 +171,13 @@ export async function catalogSkillSyncResolve(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "skill name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     const plan = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses>({
-        url: catalogResourceUrl(workspaceId, "skills", name, "/sync/resolve"),
+      await postApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolve({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(plan) };
@@ -207,9 +208,11 @@ export async function catalogSkillSync(
   const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses>({
-        url: catalogResourceUrl(workspaceId, "skills", name, "/sync"),
+      await client.post<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses>({
+        url: "/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync",
+        path: { id: workspaceId, scope, name: shortName },
         body: { planToken },
       }),
     );
@@ -233,12 +236,13 @@ export async function catalogSkillAckPrereqs(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "skill name is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     const skill = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses>({
-        url: catalogResourceUrl(workspaceId, "skills", name, "/acknowledge-prereqs"),
+      await postApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqs({
+        path: { id: workspaceId, scope, name: shortName },
       }),
     );
     return { exitCode: 0, stdout: formatJson(skill) };

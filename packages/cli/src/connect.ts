@@ -68,11 +68,11 @@ export async function resolveConnection(flags: ConnectFlags = {}): Promise<Conne
  * {@link SdkClient} handle. Wraps {@link resolveConnection} and
  * {@link configureClient} so each command stays one line.
  *
- * Param-less routes (config/health/runtime) and the top-level `workspaces.*`
- * routes call the generated SDK operations directly. Every workspace-nested
- * route uses the handle's typed low-level `client`, because the generated
- * operations' `path` types omit the middleware-injected workspace `{id}`. The
- * `baseUrl` also backs the raw SSE stream in `commands/task.ts`.
+ * Most routes call the generated typed SDK operations directly. The handle's
+ * low-level `client` is retained only for the body-bearing writes whose
+ * request bodies the server validates by hand instead of declaring them in
+ * its OpenAPI document (the typed operations type those bodies as `never`).
+ * The `baseUrl` also backs the raw SSE stream in `commands/task.ts`.
  */
 export async function makeSdkClient(flags: ConnectFlags = {}): Promise<SdkClient> {
   const conn = await resolveConnection(flags);

@@ -100,10 +100,12 @@ function querySerializer(query: Record<string, unknown>): string {
  * Handle returned by {@link configureClient}: the configured SDK client plus
  * the resolved base URL. `baseUrl` is needed by the SSE path in
  * `commands/task.ts` (raw streaming, which the SDK does not cover); `client`
- * is the typed low-level entry point used by every workspace-nested route,
- * whose generated operations omit the middleware-injected workspace `{id}`
- * (and, for the catalog `:name` routes, cannot express the server's
- * slash-spanning `{name{.+}}` path params).
+ * is the typed low-level entry point retained for the body-bearing writes
+ * whose request bodies the server validates by hand rather than declaring in
+ * its OpenAPI document — the generated typed operations type `body` as
+ * `never`, so they cannot carry those payloads (catalog install / resolve /
+ * sync, task dispatch, session create / spawn, workflow node + edge
+ * mutations, schedule create / edit).
  */
 export interface SdkClient {
   readonly client: typeof client;

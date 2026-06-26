@@ -57,27 +57,19 @@ export function buildInstallOrigin(
   return { origin: file.startsWith("file:") ? file : `file:${file}` };
 }
 
-/** Catalog resource family segment used in the workspace-scoped URL. */
-export type CatalogKind = "skills" | "agents" | "mcps";
-
 /**
- * Build a workspace-scoped catalog resource URL with the `:name`
- * segment pre-encoded.
+ * Split a catalog resource FQN into its `{scope}/{name}` path segments.
  *
- * The catalog `:name` routes use a slash-spanning `{name{.+}}` path
- * pattern (the resource FQN may contain `/`). The SDK's generated path
- * serializer cannot substitute that nested-brace token, so these sites
- * hand-build the URL -- workspace id and name are each escaped with
- * `encodeURIComponent` (the server matches the segment greedily and
- * percent-decodes it) -- and pass it to the low-level client with no
- * `path` map. `suffix` is the literal route tail (e.g. `/anchor`,
- * `/sync/resolve`), already URL-safe.
+ * Catalog resources are addressed by a two-segment `{scope}/{name}`
+ * route (e.g. `official/git-pr`). The FQN carries exactly one slash
+ * separating the scope from the short name; split on that first slash so
+ * each half can be passed as a discrete typed `path` param to the
+ * generated SDK ops (which percent-encode each segment individually).
  */
-export function catalogResourceUrl(
-  workspaceId: string,
-  kind: CatalogKind,
-  name: string,
-  suffix = "",
-): string {
-  return `/api/workspaces/${encodeURIComponent(workspaceId)}/catalog/${kind}/${encodeURIComponent(name)}${suffix}`;
+export function splitCatalogFqn(fqn: string): { scope: string; name: string } {
+  const slash = fqn.indexOf("/");
+  if (slash === -1) {
+    return { scope: fqn, name: "" };
+  }
+  return { scope: fqn.slice(0, slash), name: fqn.slice(slash + 1) };
 }

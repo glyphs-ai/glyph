@@ -15,10 +15,13 @@
  */
 
 import type {
-  GetApiWorkspacesByIdSessionsBySidResponses,
-  GetApiWorkspacesByIdSessionsResponses,
   PostApiWorkspacesByIdSessionsBySidSpawnResponses,
   PostApiWorkspacesByIdSessionsResponses,
+} from "@glyphs-ai/sdk";
+import {
+  deleteApiWorkspacesByIdSessionsBySid,
+  getApiWorkspacesByIdSessions,
+  getApiWorkspacesByIdSessionsBySid,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../output.js";
@@ -34,7 +37,7 @@ export interface SessionListOpts extends WorkspaceFlagOpts {
 }
 
 export async function sessionList(opts: SessionListOpts = {}): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: { agent?: string; createdSince?: string; activeSince?: string } = {};
@@ -42,8 +45,7 @@ export async function sessionList(opts: SessionListOpts = {}): Promise<CommandRe
     if (opts.createdSince !== undefined) query.createdSince = opts.createdSince;
     if (opts.activeSince !== undefined) query.activeSince = opts.activeSince;
     const list = unwrap(
-      await client.get<GetApiWorkspacesByIdSessionsResponses>({
-        url: "/api/workspaces/{id}/sessions",
+      await getApiWorkspacesByIdSessions({
         path: { id: workspaceId },
         query,
       }),
@@ -107,12 +109,11 @@ export async function sessionShow(
   if (typeof sessionId !== "string" || sessionId.trim() === "") {
     return { exitCode: 2, stderr: "session id is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const session = unwrap(
-      await client.get<GetApiWorkspacesByIdSessionsBySidResponses>({
-        url: "/api/workspaces/{id}/sessions/{sid}",
+      await getApiWorkspacesByIdSessionsBySid({
         path: { id: workspaceId, sid: sessionId },
       }),
     );
@@ -136,7 +137,7 @@ export async function sessionRm(
   if (typeof sessionId !== "string" || sessionId.trim() === "") {
     return { exitCode: 2, stderr: "session id is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: { purge?: "1" } = {};
@@ -144,8 +145,7 @@ export async function sessionRm(
     // unwrap() even though the value is unused: it preserves the
     // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
     unwrap(
-      await client.delete({
-        url: "/api/workspaces/{id}/sessions/{sid}",
+      await deleteApiWorkspacesByIdSessionsBySid({
         path: { id: workspaceId, sid: sessionId },
         query,
       }),

@@ -18,9 +18,13 @@ import type {
   PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses,
   PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses,
   PostApiWorkspacesByIdWorkflowsByWfidFinishResponses,
-  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses,
   PostApiWorkspacesByIdWorkflowsByWfidNodesResponses,
   PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses,
+} from "@glyphs-ai/sdk";
+import {
+  deleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByTo,
+  deleteApiWorkspacesByIdWorkflowsByWfidNodesByNid,
+  postApiWorkspacesByIdWorkflowsByWfidNodesByNidCancel,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../../output.js";
@@ -237,14 +241,13 @@ export async function workflowRemoveNode(
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
     return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     // unwrap() even though the value is unused: it preserves the
     // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
     unwrap(
-      await client.delete({
-        url: "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}",
+      await deleteApiWorkspacesByIdWorkflowsByWfidNodesByNid({
         path: { id: workspaceId, wfid: workflowId, nid: nodeId },
       }),
     );
@@ -272,14 +275,13 @@ export async function workflowRemoveEdge(
   if (typeof toNodeId !== "string" || toNodeId.trim() === "") {
     return { exitCode: 2, stderr: "missing required <to-node-id>\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     // unwrap() even though the value is unused: it preserves the
     // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
     unwrap(
-      await client.delete({
-        url: "/api/workspaces/{id}/workflows/{wfid}/edges/{from}/{to}",
+      await deleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByTo({
         path: { id: workspaceId, wfid: workflowId, from: fromNodeId, to: toNodeId },
       }),
     );
@@ -347,12 +349,11 @@ export async function workflowCancelNode(
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
     return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const updated = unwrap(
-      await client.post<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/cancel",
+      await postApiWorkspacesByIdWorkflowsByWfidNodesByNidCancel({
         path: { id: workspaceId, wfid: workflowId, nid: nodeId },
       }),
     );

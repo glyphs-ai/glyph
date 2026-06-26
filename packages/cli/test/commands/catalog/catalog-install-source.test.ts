@@ -22,7 +22,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { catalogResourceUrl } from "../../../src/commands/catalog/_helpers.js";
+import { splitCatalogFqn } from "../../../src/commands/catalog/_helpers.js";
 import { runCli } from "../../_helpers/run-cli.js";
 
 let home: string;
@@ -227,20 +227,16 @@ describe("catalog skill install --file with Windows paths", () => {
   });
 });
 
-describe("catalogResourceUrl percent-encoding", () => {
-  // Byte-equivalence pin for the catalog `:name` routes: the slash-spanning
-  // FQN segment is `encodeURIComponent`-escaped (`/`->`%2F`, ` `->`%20`),
-  // matching the wire the former hand-rolled client produced. A regression
-  // here would silently change every `catalog * show|sync|enable|...` URL.
-  it("escapes the workspace id and the resource name", () => {
-    expect(catalogResourceUrl("ws-1", "skills", "scope/skill name")).toBe(
-      "/api/workspaces/ws-1/catalog/skills/scope%2Fskill%20name",
-    );
+describe("splitCatalogFqn", () => {
+  // The catalog `{scope}/{name}` routes take two discrete path params;
+  // the CLI splits the FQN on its first slash so the generated SDK ops
+  // can percent-encode each segment. A regression here would misroute
+  // every `catalog * show|sync|enable|...` call.
+  it("splits a scope/name fqn on the first slash", () => {
+    expect(splitCatalogFqn("official/writer")).toEqual({ scope: "official", name: "writer" });
   });
 
-  it("appends a literal, already-safe route suffix", () => {
-    expect(catalogResourceUrl("ws-1", "agents", "official/writer", "/sync/resolve")).toBe(
-      "/api/workspaces/ws-1/catalog/agents/official%2Fwriter/sync/resolve",
-    );
+  it("keeps the remainder (including spaces) intact in the name segment", () => {
+    expect(splitCatalogFqn("scope/skill name")).toEqual({ scope: "scope", name: "skill name" });
   });
 });

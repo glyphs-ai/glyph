@@ -7,12 +7,15 @@
 
 import type { CancelWorkflowRequest, CreateWorkflowRequest } from "@glyphs-ai/contracts";
 import type {
-  GetApiWorkspacesByIdWorkflowsByWfidDagResponses,
-  GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses,
-  GetApiWorkspacesByIdWorkflowsByWfidResponses,
-  GetApiWorkspacesByIdWorkflowsResponses,
   PostApiWorkspacesByIdWorkflowsByWfidCancelResponses,
   PostApiWorkspacesByIdWorkflowsResponses,
+} from "@glyphs-ai/sdk";
+import {
+  deleteApiWorkspacesByIdWorkflowsByWfid,
+  getApiWorkspacesByIdWorkflows,
+  getApiWorkspacesByIdWorkflowsByWfid,
+  getApiWorkspacesByIdWorkflowsByWfidDag,
+  getApiWorkspacesByIdWorkflowsByWfidNodesByNid,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
@@ -44,7 +47,7 @@ export interface WorkflowListOpts extends WorkspaceFlagOpts {
 }
 
 export async function workflowList(opts: WorkflowListOpts = {}): Promise<CommandResult> {
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: {
@@ -56,8 +59,7 @@ export async function workflowList(opts: WorkflowListOpts = {}): Promise<Command
     if (opts.coordinatorAgent !== undefined) query.coordinatorAgent = opts.coordinatorAgent;
     if (opts.createdSince !== undefined) query.createdSince = opts.createdSince;
     const list = unwrap(
-      await client.get<GetApiWorkspacesByIdWorkflowsResponses>({
-        url: "/api/workspaces/{id}/workflows",
+      await getApiWorkspacesByIdWorkflows({
         path: { id: workspaceId },
         query,
       }),
@@ -130,12 +132,11 @@ export async function workflowShow(
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
     return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const found = unwrap(
-      await client.get<GetApiWorkspacesByIdWorkflowsByWfidResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}",
+      await getApiWorkspacesByIdWorkflowsByWfid({
         path: { id: workspaceId, wfid: workflowId },
       }),
     );
@@ -159,12 +160,11 @@ export async function workflowNodeShow(
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
     return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const node = unwrap(
-      await client.get<GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}",
+      await getApiWorkspacesByIdWorkflowsByWfidNodesByNid({
         path: { id: workspaceId, wfid: workflowId, nid: nodeId },
       }),
     );
@@ -205,12 +205,11 @@ export async function workflowDag(
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
     return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const dag = unwrap(
-      await client.get<GetApiWorkspacesByIdWorkflowsByWfidDagResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/dag",
+      await getApiWorkspacesByIdWorkflowsByWfidDag({
         path: { id: workspaceId, wfid: workflowId },
       }),
     );
@@ -294,7 +293,7 @@ export async function workflowRm(
   if (typeof workflowId !== "string" || workflowId.trim() === "") {
     return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const query: { purge?: "1" } = {};
@@ -302,8 +301,7 @@ export async function workflowRm(
     // unwrap() even though the value is unused: it preserves the
     // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
     unwrap(
-      await client.delete({
-        url: "/api/workspaces/{id}/workflows/{wfid}",
+      await deleteApiWorkspacesByIdWorkflowsByWfid({
         path: { id: workspaceId, wfid: workflowId },
         query,
       }),
