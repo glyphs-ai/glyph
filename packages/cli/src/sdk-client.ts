@@ -62,13 +62,13 @@ export interface SdkResult<T> {
  *    parsed error body, with the same message derivation the CLI shows
  *    today (`body.error` when it's a string, else `HTTP <status>`).
  */
-export function unwrap<T>(result: SdkResult<T>): T {
+export function unwrap<T>(result: SdkResult<T>): NonNullable<T> {
   const { response, error } = result;
   if (!response) {
     throw error instanceof Error ? error : new Error(String(error));
   }
   if (response.ok) {
-    return result.data as T;
+    return result.data as NonNullable<T>;
   }
   const message =
     typeof error === "object" &&

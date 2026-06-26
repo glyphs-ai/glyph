@@ -62,8 +62,15 @@ function stubFetch(response: { status: number; body: string; contentType?: strin
       return new Response("unexpected second fetch call", { status: 500 });
     }
     called = true;
-    cap.url = String(input);
-    cap.method = String(init?.method ?? "GET");
+    if (input instanceof Request) {
+      // `@glyphs-ai/sdk` operations call `fetch(new Request(url, init))`
+      // (single Request arg); read the URL + method off the Request.
+      cap.url = input.url;
+      cap.method = input.method;
+    } else {
+      cap.url = String(input);
+      cap.method = String(init?.method ?? "GET");
+    }
     return new Response(response.body, {
       status: response.status,
       headers: { "content-type": response.contentType ?? "application/json" },

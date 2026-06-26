@@ -9,9 +9,11 @@
  * and surfaces the server's self-reported version + uptime.
  */
 
-import { makeClient } from "../connect.js";
+import { getApiHealth } from "@glyphs-ai/sdk";
+import { makeSdkClient } from "../connect.js";
 import { formatError, formatJson, formatRecord, pickFormat } from "../output.js";
 import type { CommandResult } from "../result.js";
+import { unwrap } from "../sdk-client.js";
 
 export interface HealthOpts {
   readonly server?: string;
@@ -21,9 +23,9 @@ export interface HealthOpts {
 }
 
 export async function health(opts: HealthOpts = {}): Promise<CommandResult> {
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
-    const snap = await client.call("health.get");
+    const snap = unwrap(await getApiHealth());
     const fmt = pickFormat(opts, "table");
     const stdout =
       fmt === "json"

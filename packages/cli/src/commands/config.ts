@@ -5,9 +5,11 @@
  * landed where you expected.
  */
 
-import { makeClient } from "../connect.js";
+import { getApiConfig } from "@glyphs-ai/sdk";
+import { makeSdkClient } from "../connect.js";
 import { formatError, formatJson, formatRecord, pickFormat } from "../output.js";
 import type { CommandResult } from "../result.js";
+import { unwrap } from "../sdk-client.js";
 
 export interface ConfigOpts {
   readonly server?: string;
@@ -17,9 +19,9 @@ export interface ConfigOpts {
 }
 
 export async function config(opts: ConfigOpts = {}): Promise<CommandResult> {
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
-    const cfg = await client.call("config.get");
+    const cfg = unwrap(await getApiConfig());
     const fmt = pickFormat(opts, "table");
     const stdout =
       fmt === "json"
