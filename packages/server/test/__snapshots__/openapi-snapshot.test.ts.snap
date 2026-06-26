@@ -1327,14 +1327,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}": {
+    "/api/workspaces/{id}/catalog/agents/{scope}/{name}": {
       "delete": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -1374,9 +1384,19 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -1604,14 +1624,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}/acknowledge-prereqs": {
+    "/api/workspaces/{id}/catalog/agents/{scope}/{name}/acknowledge-prereqs": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -1723,14 +1753,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}/anchor": {
+    "/api/workspaces/{id}/catalog/agents/{scope}/{name}/anchor": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -1764,14 +1804,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}/disable": {
+    "/api/workspaces/{id}/catalog/agents/{scope}/{name}/disable": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -1883,14 +1933,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}/enable": {
+    "/api/workspaces/{id}/catalog/agents/{scope}/{name}/enable": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -2002,13 +2062,31 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}/files": {
+    "/api/workspaces/{id}/catalog/agents/{scope}/{name}/files": {
       "get": {
         "parameters": [
           {
             "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "name",
             "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
             "schema": {
               "type": "string",
             },
@@ -2038,41 +2116,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "File entries",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "List an agent's files",
-        "tags": [
-          "catalog",
-        ],
-      },
-    },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}/files/{path{.+}}": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "responses": {
-          "200": {
-            "description": "File bytes",
+            "description": "File entries, or raw file bytes when ?path= is set",
           },
           "404": {
             "description": "File not found",
@@ -2081,20 +2125,30 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Internal error",
           },
         },
-        "summary": "Read an agent file",
+        "summary": "List an agent's files, or read one file's bytes",
         "tags": [
           "catalog",
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}/sync": {
+    "/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -2344,14 +2398,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/agents/{name{.+}}/sync/resolve": {
+    "/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync/resolve": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -2963,14 +3027,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/mcps/{name{.+}}": {
+    "/api/workspaces/{id}/catalog/mcps/{scope}/{name}": {
       "delete": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -3010,9 +3084,19 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -3069,14 +3153,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/mcps/{name{.+}}/sync": {
+    "/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -3326,14 +3420,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/mcps/{name{.+}}/sync/resolve": {
+    "/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync/resolve": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -4500,14 +4604,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/skills/{name{.+}}": {
+    "/api/workspaces/{id}/catalog/skills/{scope}/{name}": {
       "delete": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -4547,9 +4661,19 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         "parameters": [
           {
             "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -4759,14 +4883,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/skills/{name{.+}}/acknowledge-prereqs": {
+    "/api/workspaces/{id}/catalog/skills/{scope}/{name}/acknowledge-prereqs": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -4864,14 +4998,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/skills/{name{.+}}/anchor": {
+    "/api/workspaces/{id}/catalog/skills/{scope}/{name}/anchor": {
       "get": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -4905,13 +5049,31 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/skills/{name{.+}}/files": {
+    "/api/workspaces/{id}/catalog/skills/{scope}/{name}/files": {
       "get": {
         "parameters": [
           {
             "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
             "name": "name",
             "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
             "schema": {
               "type": "string",
             },
@@ -4941,41 +5103,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "File entries",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "List a skill's files",
-        "tags": [
-          "catalog",
-        ],
-      },
-    },
-    "/api/workspaces/{id}/catalog/skills/{name{.+}}/files/{path{.+}}": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "responses": {
-          "200": {
-            "description": "File bytes",
+            "description": "File entries, or raw file bytes when ?path= is set",
           },
           "404": {
             "description": "File not found",
@@ -4984,20 +5112,30 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Internal error",
           },
         },
-        "summary": "Read a skill file",
+        "summary": "List a skill's files, or read one file's bytes",
         "tags": [
           "catalog",
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/skills/{name{.+}}/sync": {
+    "/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -5247,14 +5385,24 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/catalog/skills/{name{.+}}/sync/resolve": {
+    "/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync/resolve": {
       "post": {
         "parameters": [
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
           {
             "in": "path",
             "name": "name",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },

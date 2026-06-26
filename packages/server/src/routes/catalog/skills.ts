@@ -84,10 +84,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "get",
-      path: "/{name{.+}}/anchor",
+      path: "/{scope}/{name}/anchor",
       tags: ["catalog"],
       summary: "Get a skill's anchor content",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(AnchorResponseSchema, "Anchor content"),
         500: errorResponse("Internal error"),
@@ -95,15 +95,15 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const content = await catalog.getSkillContent(name);
+        const content = await catalog.getSkillContent(fqn);
         return c.json({ content });
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.skills.anchor",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -112,63 +112,57 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "get",
-      path: "/{name{.+}}/files/{path{.+}}",
+      path: "/{scope}/{name}/files",
       tags: ["catalog"],
-      summary: "Read a skill file",
-      request: { params: z.object({ name: z.string(), path: z.string() }) },
+      summary: "List a skill's files, or read one file's bytes",
+      request: {
+        params: z.object({ scope: z.string().min(1), name: z.string().min(1) }),
+        query: z.object({ path: z.string().optional() }),
+      },
       responses: {
-        200: errorResponse("File bytes"),
+        200: jsonResponse(
+          CatalogFileEntrySchema.array(),
+          "File entries, or raw file bytes when ?path= is set",
+        ),
         404: errorResponse("File not found"),
         500: errorResponse("Internal error"),
       },
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
-      const path = c.req.param("path");
-      let relPath = path;
-      try {
-        relPath = decodeURIComponent(path);
-        const buf = await catalog.getSkillFile(name, relPath);
-        if (buf === null) return c.json({ error: "not found", code: "NotFound" }, 404);
-        const ab = new ArrayBuffer(buf.byteLength);
-        new Uint8Array(ab).set(buf);
-        return new Response(ab, {
-          headers: { "Content-Type": mimeFromExt(relPath) },
-        });
-      } catch (err) {
-        return respondError(c, err, {
-          route: "catalog.skills.files.get",
-          policy: catalogErrorPolicy,
-          meta: { fqn: name, relPath },
-        });
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
+      // `?path=` selects a single file to stream (bytes); its absence
+      // lists the entry's files. The file path rides as a query param,
+      // not a path segment, because it is itself slash-bearing and of
+      // arbitrary depth — which a single `{name}` segment can't carry.
+      const rawPath = c.req.query("path");
+      if (rawPath !== undefined) {
+        let relPath = rawPath;
+        try {
+          relPath = decodeURIComponent(rawPath);
+          const buf = await catalog.getSkillFile(fqn, relPath);
+          if (buf === null) return c.json({ error: "not found", code: "NotFound" }, 404);
+          const ab = new ArrayBuffer(buf.byteLength);
+          new Uint8Array(ab).set(buf);
+          return new Response(ab, {
+            headers: { "Content-Type": mimeFromExt(relPath) },
+          });
+        } catch (err) {
+          return respondError(c, err, {
+            route: "catalog.skills.files.get",
+            policy: catalogErrorPolicy,
+            meta: { fqn, relPath },
+          });
+        }
       }
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "get",
-      path: "/{name{.+}}/files",
-      tags: ["catalog"],
-      summary: "List a skill's files",
-      request: { params: z.object({ name: z.string() }) },
-      responses: {
-        200: jsonResponse(CatalogFileEntrySchema.array(), "File entries"),
-        500: errorResponse("Internal error"),
-      },
-    }),
-    async (c) => {
-      const catalog = getCatalog(c);
-      const name = c.req.param("name");
       try {
-        const files = await catalog.listSkillFiles(name);
+        const files = await catalog.listSkillFiles(fqn);
         return c.json(files);
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.skills.files.list",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -177,10 +171,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "get",
-      path: "/{name{.+}}",
+      path: "/{scope}/{name}",
       tags: ["catalog"],
       summary: "Get a skill with content",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(SkillWithContentSchema, "Skill with content"),
         404: errorResponse("Skill not found"),
@@ -189,17 +183,17 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const entry = await catalog.getSkillEntry(name);
+        const entry = await catalog.getSkillEntry(fqn);
         if (!entry) return c.json({ error: "not found", code: "NotFound" }, 404);
-        const content = await catalog.getSkillContent(name);
+        const content = await catalog.getSkillContent(fqn);
         return c.json({ ...entry, content });
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.skills.get",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -245,10 +239,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/sync/resolve",
+      path: "/{scope}/{name}/sync/resolve",
       tags: ["catalog"],
       summary: "Preview a skill sync",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
         500: errorResponse("Internal error"),
@@ -256,11 +250,11 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
         // resolveSyncSkill reads the local origin off the row and stamps
         // it onto plan.rootOrigin — no second catalog round-trip needed.
-        const plan = await catalog.resolveSyncSkill(name);
+        const plan = await catalog.resolveSyncSkill(fqn);
         // Cache the plan and ship the token to the dashboard. /sync
         // trades the token back for this exact plan, so apply runs the
         // closure the user previewed (not a fresh resolve that could
@@ -271,7 +265,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
         return respondError(c, err, {
           route: "catalog.skills.sync.resolve",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -280,10 +274,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/sync",
+      path: "/{scope}/{name}/sync",
       tags: ["catalog"],
       summary: "Apply a skill sync",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
@@ -331,10 +325,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/acknowledge-prereqs",
+      path: "/{scope}/{name}/acknowledge-prereqs",
       tags: ["catalog"],
       summary: "Acknowledge a skill's prereqs",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(SkillSchema, "Skill"),
         500: errorResponse("Internal error"),
@@ -342,16 +336,16 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const skill = await catalog.acknowledgeSkillPrereqs(name);
-        logEvent(c, "catalog: skill prereqs acknowledged", { kind: "skill", fqn: name });
+        const skill = await catalog.acknowledgeSkillPrereqs(fqn);
+        logEvent(c, "catalog: skill prereqs acknowledged", { kind: "skill", fqn });
         return c.json(skill);
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.skills.acknowledgePrereqs",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -360,10 +354,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "delete",
-      path: "/{name{.+}}",
+      path: "/{scope}/{name}",
       tags: ["catalog"],
       summary: "Delete a skill",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(OkResponseSchema, "Deleted"),
         500: errorResponse("Internal error"),
@@ -371,16 +365,16 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        await catalog.deleteSkill(name);
-        logEvent(c, "catalog: skill removed", { kind: "skill", fqn: name });
+        await catalog.deleteSkill(fqn);
+        logEvent(c, "catalog: skill removed", { kind: "skill", fqn });
         return c.json({ ok: true });
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.skills.delete",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },

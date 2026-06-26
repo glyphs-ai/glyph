@@ -50,7 +50,6 @@ import type {
   CancelWorkflowRequest,
   CatalogConflict,
   CatalogFileEntry,
-  CatalogFilePathParams,
   CatalogInstallResult,
   CatalogKind,
   CatalogOverview,
@@ -170,7 +169,6 @@ import type {
   CancelWorkflowRequestSchema,
   CatalogConflictSchema,
   CatalogFileEntrySchema,
-  CatalogFilePathParamsSchema,
   CatalogInstallResultSchema,
   CatalogKindSchema,
   CatalogOverviewSchema,
@@ -886,13 +884,6 @@ describe("wire-schema parity", () => {
     >();
     expectTypeOf<Wire<CatalogResourcePathParams>>().toExtend<
       Wire<z.infer<typeof CatalogResourcePathParamsSchema>>
-    >();
-
-    expectTypeOf<Wire<z.infer<typeof CatalogFilePathParamsSchema>>>().toExtend<
-      Wire<CatalogFilePathParams>
-    >();
-    expectTypeOf<Wire<CatalogFilePathParams>>().toExtend<
-      Wire<z.infer<typeof CatalogFilePathParamsSchema>>
     >();
 
     expectTypeOf<Wire<z.infer<typeof OrphanManifestEntrySchema>>>().toExtend<

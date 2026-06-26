@@ -102,7 +102,7 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
     expect(install.status).toBe(201);
 
     const res = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/sync/resolve`,
+      `/api/workspaces/${ws.id}/catalog/skills/public/tool/sync/resolve`,
       { method: "POST" },
     );
     expect(res.status).toBe(200);
@@ -147,23 +147,19 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
     expect(installRes.status).toBe(201);
 
     // Before ack: prereqsAck=false, status=blocked (needsPrereqsAck).
-    const before = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}`,
-    );
+    const before = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool`);
     const beforeBody = (await before.json()) as { skill: Skill; status: string };
     expect(beforeBody.skill.prereqsAck).toBe(false);
     expect(beforeBody.status).toBe("blocked");
     expect(beforeBody.skill.orphaned).toBe(false);
 
     const ack = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/acknowledge-prereqs`,
+      `/api/workspaces/${ws.id}/catalog/skills/public/tool/acknowledge-prereqs`,
       { method: "POST" },
     );
     expect(ack.status).toBe(200);
 
-    const after = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}`,
-    );
+    const after = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool`);
     const afterBody = (await after.json()) as { skill: Skill; status: string };
     expect(afterBody.skill.prereqsAck).toBe(true);
     expect(afterBody.status).toBe("ready");
@@ -187,27 +183,23 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
     });
 
     const disableRes = await app.request(
-      `/api/workspaces/${ws.id}/catalog/agents/${encodeURIComponent("public/writer")}/disable`,
+      `/api/workspaces/${ws.id}/catalog/agents/public/writer/disable`,
       { method: "POST" },
     );
     expect(disableRes.status).toBe(200);
     let entry = (await (
-      await app.request(
-        `/api/workspaces/${ws.id}/catalog/agents/${encodeURIComponent("public/writer")}`,
-      )
+      await app.request(`/api/workspaces/${ws.id}/catalog/agents/public/writer`)
     ).json()) as { agent: { disabledByUser: boolean }; status: string };
     expect(entry.agent.disabledByUser).toBe(true);
     expect(entry.status).toBe("blocked");
 
     const enableRes = await app.request(
-      `/api/workspaces/${ws.id}/catalog/agents/${encodeURIComponent("public/writer")}/enable`,
+      `/api/workspaces/${ws.id}/catalog/agents/public/writer/enable`,
       { method: "POST" },
     );
     expect(enableRes.status).toBe(200);
     entry = (await (
-      await app.request(
-        `/api/workspaces/${ws.id}/catalog/agents/${encodeURIComponent("public/writer")}`,
-      )
+      await app.request(`/api/workspaces/${ws.id}/catalog/agents/public/writer`)
     ).json()) as { agent: { disabledByUser: boolean }; status: string };
     expect(entry.agent.disabledByUser).toBe(false);
     expect(entry.status).toBe("ready");
@@ -262,19 +254,16 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
     // The server caches the previewed plan so apply replays the
     // exact closure (no fresh re-resolve, no preview/apply drift).
     const previewRes = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/sync/resolve`,
+      `/api/workspaces/${ws.id}/catalog/skills/public/tool/sync/resolve`,
       { method: "POST" },
     );
     expect(previewRes.status).toBe(200);
     const { planToken } = (await previewRes.json()) as { planToken: string };
-    const syncRes = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/sync`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ planToken }),
-      },
-    );
+    const syncRes = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool/sync`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ planToken }),
+    });
     expect(syncRes.status).toBe(200);
 
     const overviewRes = await app.request(`/api/workspaces/${ws.id}/catalog/overview`);
@@ -293,10 +282,9 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
     });
 
     // No body — apply requires a planToken minted by /sync/resolve.
-    const res = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/sync`,
-      { method: "POST" },
-    );
+    const res = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool/sync`, {
+      method: "POST",
+    });
     expect(res.status).toBe(400);
   });
 
@@ -310,14 +298,11 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
       body: JSON.stringify({ origin }),
     });
 
-    const res = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/sync`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ planToken: "not-a-real-token" }),
-      },
-    );
+    const res = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool/sync`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ planToken: "not-a-real-token" }),
+    });
     expect(res.status).toBe(410);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe("PlanTokenInvalid");
@@ -334,31 +319,25 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
     });
 
     const previewRes = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/sync/resolve`,
+      `/api/workspaces/${ws.id}/catalog/skills/public/tool/sync/resolve`,
       { method: "POST" },
     );
     const { planToken } = (await previewRes.json()) as { planToken: string };
 
-    const apply1 = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/sync`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ planToken }),
-      },
-    );
+    const apply1 = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool/sync`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ planToken }),
+    });
     expect(apply1.status).toBe(200);
 
     // Same token, second apply — token was consumed on first call.
     // Defends against UI double-click re-running the install.
-    const apply2 = await app.request(
-      `/api/workspaces/${ws.id}/catalog/skills/${encodeURIComponent("public/tool")}/sync`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ planToken }),
-      },
-    );
+    const apply2 = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool/sync`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ planToken }),
+    });
     expect(apply2.status).toBe(410);
   });
 });

@@ -2912,23 +2912,24 @@ export type PostApiWorkspacesByIdCatalogSkillsResolveResponses = {
 
 export type PostApiWorkspacesByIdCatalogSkillsResolveResponse = PostApiWorkspacesByIdCatalogSkillsResolveResponses[keyof PostApiWorkspacesByIdCatalogSkillsResolveResponses];
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorData = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/anchor';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/anchor';
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorErrors = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponses = {
     /**
      * Anchor content
      */
@@ -2937,19 +2938,21 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponse = GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses[keyof GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses];
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponse = GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponses[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponses];
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesByPathData = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
-        path: string;
     };
-    query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/files/{path{.+}}';
+    query?: {
+        path?: string;
+    };
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/files';
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesByPathErrors = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesErrors = {
     /**
      * File not found
      */
@@ -2960,32 +2963,9 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameFilesByPathErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesByPathResponses = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponses = {
     /**
-     * File bytes
-     */
-    200: unknown;
-};
-
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesData = {
-    body?: never;
-    path: {
-        name: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/files';
-};
-
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesErrors = {
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesResponses = {
-    /**
-     * File entries
+     * File entries, or raw file bytes when ?path= is set
      */
     200: Array<{
         relPath: string;
@@ -2993,25 +2973,26 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameFilesResponses = {
     }>;
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesResponse = GetApiWorkspacesByIdCatalogSkillsByNameFilesResponses[keyof GetApiWorkspacesByIdCatalogSkillsByNameFilesResponses];
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponse = GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponses[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponses];
 
-export type DeleteApiWorkspacesByIdCatalogSkillsByNameData = {
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}';
 };
 
-export type DeleteApiWorkspacesByIdCatalogSkillsByNameErrors = {
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type DeleteApiWorkspacesByIdCatalogSkillsByNameResponses = {
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponses = {
     /**
      * Deleted
      */
@@ -3020,18 +3001,19 @@ export type DeleteApiWorkspacesByIdCatalogSkillsByNameResponses = {
     };
 };
 
-export type DeleteApiWorkspacesByIdCatalogSkillsByNameResponse = DeleteApiWorkspacesByIdCatalogSkillsByNameResponses[keyof DeleteApiWorkspacesByIdCatalogSkillsByNameResponses];
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponse = DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponses[keyof DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponses];
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameData = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}';
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameErrors = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
     /**
      * Skill not found
      */
@@ -3042,7 +3024,7 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameResponses = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponses = {
     /**
      * Skill with content
      */
@@ -3088,25 +3070,26 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameResponse = GetApiWorkspacesByIdCatalogSkillsByNameResponses[keyof GetApiWorkspacesByIdCatalogSkillsByNameResponses];
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponse = GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponses[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponses];
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveData = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/sync/resolve';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync/resolve';
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveErrors = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses = {
     /**
      * Resolve manifest
      */
@@ -3177,18 +3160,19 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses];
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses];
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncData = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/sync';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync';
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncErrors = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
@@ -3203,7 +3187,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameSyncErrors = {
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses = {
     /**
      * Sync result
      */
@@ -3250,25 +3234,26 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResponse = PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses];
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponse = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses];
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsData = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/acknowledge-prereqs';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/acknowledge-prereqs';
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsErrors = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponses = {
     /**
      * Skill
      */
@@ -3293,7 +3278,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses 
     };
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponse = PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses[keyof PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses];
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponse = PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponses[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponses];
 
 export type GetApiWorkspacesByIdCatalogAgentsData = {
     body?: never;
@@ -3513,23 +3498,24 @@ export type PostApiWorkspacesByIdCatalogAgentsResolveResponses = {
 
 export type PostApiWorkspacesByIdCatalogAgentsResolveResponse = PostApiWorkspacesByIdCatalogAgentsResolveResponses[keyof PostApiWorkspacesByIdCatalogAgentsResolveResponses];
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorData = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/anchor';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/anchor';
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorErrors = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponses = {
     /**
      * Anchor content
      */
@@ -3538,19 +3524,21 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponse = GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses[keyof GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses];
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponse = GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponses[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponses];
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesByPathData = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
-        path: string;
     };
-    query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/files/{path{.+}}';
+    query?: {
+        path?: string;
+    };
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/files';
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesByPathErrors = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesErrors = {
     /**
      * File not found
      */
@@ -3561,32 +3549,9 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameFilesByPathErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesByPathResponses = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponses = {
     /**
-     * File bytes
-     */
-    200: unknown;
-};
-
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesData = {
-    body?: never;
-    path: {
-        name: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/files';
-};
-
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesErrors = {
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesResponses = {
-    /**
-     * File entries
+     * File entries, or raw file bytes when ?path= is set
      */
     200: Array<{
         relPath: string;
@@ -3594,25 +3559,26 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameFilesResponses = {
     }>;
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesResponse = GetApiWorkspacesByIdCatalogAgentsByNameFilesResponses[keyof GetApiWorkspacesByIdCatalogAgentsByNameFilesResponses];
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponse = GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponses[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponses];
 
-export type DeleteApiWorkspacesByIdCatalogAgentsByNameData = {
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}';
 };
 
-export type DeleteApiWorkspacesByIdCatalogAgentsByNameErrors = {
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type DeleteApiWorkspacesByIdCatalogAgentsByNameResponses = {
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponses = {
     /**
      * Deleted
      */
@@ -3621,18 +3587,19 @@ export type DeleteApiWorkspacesByIdCatalogAgentsByNameResponses = {
     };
 };
 
-export type DeleteApiWorkspacesByIdCatalogAgentsByNameResponse = DeleteApiWorkspacesByIdCatalogAgentsByNameResponses[keyof DeleteApiWorkspacesByIdCatalogAgentsByNameResponses];
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponse = DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponses[keyof DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponses];
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameData = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}';
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameErrors = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
     /**
      * Agent not found
      */
@@ -3643,7 +3610,7 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameResponses = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponses = {
     /**
      * Agent with content
      */
@@ -3693,25 +3660,26 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameResponse = GetApiWorkspacesByIdCatalogAgentsByNameResponses[keyof GetApiWorkspacesByIdCatalogAgentsByNameResponses];
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponse = GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponses[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/sync/resolve';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync/resolve';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses = {
     /**
      * Resolve manifest
      */
@@ -3782,18 +3750,19 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/sync';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
@@ -3808,7 +3777,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameSyncErrors = {
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses = {
     /**
      * Sync result
      */
@@ -3855,25 +3824,26 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResponse = PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/acknowledge-prereqs';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/acknowledge-prereqs';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponses = {
     /**
      * Agent
      */
@@ -3901,25 +3871,26 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses 
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponse = PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameDisableData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/disable';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/disable';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameDisableErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponses = {
     /**
      * Agent
      */
@@ -3947,25 +3918,26 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameDisableResponse = PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameEnableData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/enable';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/enable';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameEnableErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponses = {
     /**
      * Agent
      */
@@ -3993,7 +3965,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameEnableResponse = PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponses];
 
 export type GetApiWorkspacesByIdCatalogMcpsData = {
     body?: never;
@@ -4086,23 +4058,24 @@ export type PostApiWorkspacesByIdCatalogMcpsResponses = {
 
 export type PostApiWorkspacesByIdCatalogMcpsResponse = PostApiWorkspacesByIdCatalogMcpsResponses[keyof PostApiWorkspacesByIdCatalogMcpsResponses];
 
-export type DeleteApiWorkspacesByIdCatalogMcpsByNameData = {
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/mcps/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}';
 };
 
-export type DeleteApiWorkspacesByIdCatalogMcpsByNameErrors = {
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type DeleteApiWorkspacesByIdCatalogMcpsByNameResponses = {
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponses = {
     /**
      * Deleted
      */
@@ -4111,18 +4084,19 @@ export type DeleteApiWorkspacesByIdCatalogMcpsByNameResponses = {
     };
 };
 
-export type DeleteApiWorkspacesByIdCatalogMcpsByNameResponse = DeleteApiWorkspacesByIdCatalogMcpsByNameResponses[keyof DeleteApiWorkspacesByIdCatalogMcpsByNameResponses];
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponse = DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponses[keyof DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponses];
 
-export type GetApiWorkspacesByIdCatalogMcpsByNameData = {
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/mcps/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}';
 };
 
-export type GetApiWorkspacesByIdCatalogMcpsByNameErrors = {
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
     /**
      * MCP not found
      */
@@ -4133,7 +4107,7 @@ export type GetApiWorkspacesByIdCatalogMcpsByNameErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogMcpsByNameResponses = {
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponses = {
     /**
      * MCP with content
      */
@@ -4147,25 +4121,26 @@ export type GetApiWorkspacesByIdCatalogMcpsByNameResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogMcpsByNameResponse = GetApiWorkspacesByIdCatalogMcpsByNameResponses[keyof GetApiWorkspacesByIdCatalogMcpsByNameResponses];
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponse = GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponses[keyof GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponses];
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveData = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/mcps/{name{.+}}/sync/resolve';
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync/resolve';
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveErrors = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses = {
     /**
      * Resolve manifest
      */
@@ -4236,18 +4211,19 @@ export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses];
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses];
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncData = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncData = {
     body?: never;
     path: {
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/mcps/{name{.+}}/sync';
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync';
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncErrors = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
@@ -4262,7 +4238,7 @@ export type PostApiWorkspacesByIdCatalogMcpsByNameSyncErrors = {
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses = {
     /**
      * Sync result
      */
@@ -4309,7 +4285,7 @@ export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResponse = PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses];
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponse = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses];
 
 export type GetApiWorkspacesByIdCatalogOverviewData = {
     body?: never;

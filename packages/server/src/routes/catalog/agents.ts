@@ -82,10 +82,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "get",
-      path: "/{name{.+}}/anchor",
+      path: "/{scope}/{name}/anchor",
       tags: ["catalog"],
       summary: "Get an agent's anchor content",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(AnchorResponseSchema, "Anchor content"),
         500: errorResponse("Internal error"),
@@ -93,15 +93,15 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const content = await catalog.getAgentContent(name);
+        const content = await catalog.getAgentContent(fqn);
         return c.json({ content });
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.agents.anchor",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -110,63 +110,57 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "get",
-      path: "/{name{.+}}/files/{path{.+}}",
+      path: "/{scope}/{name}/files",
       tags: ["catalog"],
-      summary: "Read an agent file",
-      request: { params: z.object({ name: z.string(), path: z.string() }) },
+      summary: "List an agent's files, or read one file's bytes",
+      request: {
+        params: z.object({ scope: z.string().min(1), name: z.string().min(1) }),
+        query: z.object({ path: z.string().optional() }),
+      },
       responses: {
-        200: errorResponse("File bytes"),
+        200: jsonResponse(
+          CatalogFileEntrySchema.array(),
+          "File entries, or raw file bytes when ?path= is set",
+        ),
         404: errorResponse("File not found"),
         500: errorResponse("Internal error"),
       },
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
-      const path = c.req.param("path");
-      let relPath = path;
-      try {
-        relPath = decodeURIComponent(path);
-        const buf = await catalog.getAgentFile(name, relPath);
-        if (buf === null) return c.json({ error: "not found", code: "NotFound" }, 404);
-        const ab = new ArrayBuffer(buf.byteLength);
-        new Uint8Array(ab).set(buf);
-        return new Response(ab, {
-          headers: { "Content-Type": mimeFromExt(relPath) },
-        });
-      } catch (err) {
-        return respondError(c, err, {
-          route: "catalog.agents.files.get",
-          policy: catalogErrorPolicy,
-          meta: { fqn: name, relPath },
-        });
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
+      // `?path=` selects a single file to stream (bytes); its absence
+      // lists the entry's files. The file path rides as a query param,
+      // not a path segment, because it is itself slash-bearing and of
+      // arbitrary depth — which a single `{name}` segment can't carry.
+      const rawPath = c.req.query("path");
+      if (rawPath !== undefined) {
+        let relPath = rawPath;
+        try {
+          relPath = decodeURIComponent(rawPath);
+          const buf = await catalog.getAgentFile(fqn, relPath);
+          if (buf === null) return c.json({ error: "not found", code: "NotFound" }, 404);
+          const ab = new ArrayBuffer(buf.byteLength);
+          new Uint8Array(ab).set(buf);
+          return new Response(ab, {
+            headers: { "Content-Type": mimeFromExt(relPath) },
+          });
+        } catch (err) {
+          return respondError(c, err, {
+            route: "catalog.agents.files.get",
+            policy: catalogErrorPolicy,
+            meta: { fqn, relPath },
+          });
+        }
       }
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "get",
-      path: "/{name{.+}}/files",
-      tags: ["catalog"],
-      summary: "List an agent's files",
-      request: { params: z.object({ name: z.string() }) },
-      responses: {
-        200: jsonResponse(CatalogFileEntrySchema.array(), "File entries"),
-        500: errorResponse("Internal error"),
-      },
-    }),
-    async (c) => {
-      const catalog = getCatalog(c);
-      const name = c.req.param("name");
       try {
-        const files = await catalog.listAgentFiles(name);
+        const files = await catalog.listAgentFiles(fqn);
         return c.json(files);
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.agents.files.list",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -175,10 +169,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "get",
-      path: "/{name{.+}}",
+      path: "/{scope}/{name}",
       tags: ["catalog"],
       summary: "Get an agent with content",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(AgentWithContentSchema, "Agent with content"),
         404: errorResponse("Agent not found"),
@@ -187,17 +181,17 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const entry = await catalog.getAgentEntry(name);
+        const entry = await catalog.getAgentEntry(fqn);
         if (!entry) return c.json({ error: "not found", code: "NotFound" }, 404);
-        const content = await catalog.getAgentContent(name);
+        const content = await catalog.getAgentContent(fqn);
         return c.json({ ...entry, content });
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.agents.get",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -243,10 +237,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/sync/resolve",
+      path: "/{scope}/{name}/sync/resolve",
       tags: ["catalog"],
       summary: "Preview an agent sync",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
         500: errorResponse("Internal error"),
@@ -254,18 +248,18 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
         // resolveSyncAgent stamps the local origin onto plan.rootOrigin —
         // no second catalog round-trip needed.
-        const plan = await catalog.resolveSyncAgent(name);
+        const plan = await catalog.resolveSyncAgent(fqn);
         const planToken = catalog.cachePlan(plan);
         return c.json(planToManifest(plan, planToken));
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.agents.sync.resolve",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -274,10 +268,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/sync",
+      path: "/{scope}/{name}/sync",
       tags: ["catalog"],
       summary: "Apply an agent sync",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
@@ -321,10 +315,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/acknowledge-prereqs",
+      path: "/{scope}/{name}/acknowledge-prereqs",
       tags: ["catalog"],
       summary: "Acknowledge an agent's prereqs",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(AgentSchema, "Agent"),
         500: errorResponse("Internal error"),
@@ -332,16 +326,16 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const agent = await catalog.acknowledgeAgentPrereqs(name);
-        logEvent(c, "catalog: agent prereqs acknowledged", { kind: "agent", fqn: name });
+        const agent = await catalog.acknowledgeAgentPrereqs(fqn);
+        logEvent(c, "catalog: agent prereqs acknowledged", { kind: "agent", fqn });
         return c.json(agent);
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.agents.acknowledgePrereqs",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -350,10 +344,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/disable",
+      path: "/{scope}/{name}/disable",
       tags: ["catalog"],
       summary: "Disable an agent",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(AgentSchema, "Agent"),
         500: errorResponse("Internal error"),
@@ -361,16 +355,16 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const agent = await catalog.disableAgent(name);
-        logEvent(c, "catalog: agent disabled", { kind: "agent", fqn: name });
+        const agent = await catalog.disableAgent(fqn);
+        logEvent(c, "catalog: agent disabled", { kind: "agent", fqn });
         return c.json(agent);
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.agents.disable",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -379,10 +373,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/enable",
+      path: "/{scope}/{name}/enable",
       tags: ["catalog"],
       summary: "Enable an agent",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(AgentSchema, "Agent"),
         500: errorResponse("Internal error"),
@@ -390,16 +384,16 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const agent = await catalog.enableAgent(name);
-        logEvent(c, "catalog: agent enabled", { kind: "agent", fqn: name });
+        const agent = await catalog.enableAgent(fqn);
+        logEvent(c, "catalog: agent enabled", { kind: "agent", fqn });
         return c.json(agent);
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.agents.enable",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -408,10 +402,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
   app.openapi(
     createRoute({
       method: "delete",
-      path: "/{name{.+}}",
+      path: "/{scope}/{name}",
       tags: ["catalog"],
       summary: "Delete an agent",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(OkResponseSchema, "Deleted"),
         500: errorResponse("Internal error"),
@@ -419,16 +413,16 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        await catalog.deleteAgent(name);
-        logEvent(c, "catalog: agent removed", { kind: "agent", fqn: name });
+        await catalog.deleteAgent(fqn);
+        logEvent(c, "catalog: agent removed", { kind: "agent", fqn });
         return c.json({ ok: true });
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.agents.delete",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },

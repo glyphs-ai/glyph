@@ -56,10 +56,10 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
   app.openapi(
     createRoute({
       method: "get",
-      path: "/{name{.+}}",
+      path: "/{scope}/{name}",
       tags: ["catalog"],
       summary: "Get an MCP with content",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(McpWithContentSchema, "MCP with content"),
         404: errorResponse("MCP not found"),
@@ -68,17 +68,17 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        const meta = await catalog.getMcp(name);
+        const meta = await catalog.getMcp(fqn);
         if (meta === null) return c.json({ error: "not found", code: "NotFound" }, 404);
-        const content = await catalog.getMcpContent(name);
+        const content = await catalog.getMcpContent(fqn);
         return c.json({ ...meta, content });
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.mcps.get",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -124,10 +124,10 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/sync/resolve",
+      path: "/{scope}/{name}/sync/resolve",
       tags: ["catalog"],
       summary: "Preview an MCP sync",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
         500: errorResponse("Internal error"),
@@ -135,18 +135,18 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
         // resolveSyncMcp stamps the local origin onto plan.rootOrigin —
         // no second catalog round-trip needed.
-        const plan = await catalog.resolveSyncMcp(name);
+        const plan = await catalog.resolveSyncMcp(fqn);
         const planToken = catalog.cachePlan(plan);
         return c.json(planToManifest(plan, planToken));
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.mcps.sync.resolve",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },
@@ -155,10 +155,10 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
   app.openapi(
     createRoute({
       method: "post",
-      path: "/{name{.+}}/sync",
+      path: "/{scope}/{name}/sync",
       tags: ["catalog"],
       summary: "Apply an MCP sync",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
@@ -202,10 +202,10 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
   app.openapi(
     createRoute({
       method: "delete",
-      path: "/{name{.+}}",
+      path: "/{scope}/{name}",
       tags: ["catalog"],
       summary: "Delete an MCP",
-      request: { params: z.object({ name: z.string() }) },
+      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(OkResponseSchema, "Deleted"),
         500: errorResponse("Internal error"),
@@ -213,16 +213,16 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const name = c.req.param("name");
+      const fqn = `${c.req.param("scope")}/${c.req.param("name")}`;
       try {
-        await catalog.deleteMcp(name);
-        logEvent(c, "catalog: mcp removed", { kind: "mcp", fqn: name });
+        await catalog.deleteMcp(fqn);
+        logEvent(c, "catalog: mcp removed", { kind: "mcp", fqn });
         return c.json({ ok: true });
       } catch (err) {
         return respondError(c, err, {
           route: "catalog.mcps.delete",
           policy: catalogErrorPolicy,
-          meta: { fqn: name },
+          meta: { fqn },
         });
       }
     },

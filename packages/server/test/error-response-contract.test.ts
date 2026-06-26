@@ -178,7 +178,7 @@ describe("respondError contract — cross-domain status preservation", () => {
         throw new CatalogAgentNotFoundError("public/ghost");
       }),
     } as never;
-    const res = await catalogRoutes(() => catalog).request("/agents/public%2Fghost");
+    const res = await catalogRoutes(() => catalog).request("/agents/public/ghost");
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.code).toBe("AgentNotFoundError");

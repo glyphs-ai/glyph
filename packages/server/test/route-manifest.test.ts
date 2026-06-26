@@ -169,12 +169,12 @@ describe("route manifest", () => {
     expect(missingFromApp, "in ROUTES but not registered (forgot to add handler?)").toEqual([]);
   });
 
-  it("listRoutes returns 85 entries (the current API surface)", () => {
+  it("listRoutes returns 83 entries (the current API surface)", () => {
     // Canary against silent surface drift — updating the manifest AND
     // the handler in a single commit keeps this assertion satisfied
     // and forces a deliberate ++N here, which surfaces in code review.
     // The running total is the only fact a reader needs here.
-    expect(listRoutes()).toHaveLength(85);
+    expect(listRoutes()).toHaveLength(83);
   });
 });
 

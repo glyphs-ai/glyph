@@ -209,11 +209,8 @@ export const OkResponseSchema = z.object({
 
 export const CatalogResourcePathParamsSchema = z.object({
   id: z.string(),
+  scope: z.string(),
   name: z.string(),
-});
-
-export const CatalogFilePathParamsSchema = CatalogResourcePathParamsSchema.extend({
-  path: z.string(),
 });
 
 // ─── Resolve manifest (install + sync preview projection) ─────────
