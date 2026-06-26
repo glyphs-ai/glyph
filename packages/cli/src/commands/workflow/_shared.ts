@@ -5,7 +5,7 @@
  * Consumed by the read / mutate / respond concern modules.
  */
 
-import type { WorkflowHeader, WorkflowNode } from "@glyphs-ai/contracts";
+import type { WorkflowHeader } from "@glyphs-ai/contracts";
 import { formatJson, formatRecord, pickFormat } from "../../output.js";
 
 /** Render a {@link WorkflowHeader} via either JSON or the record formatter. */
@@ -22,9 +22,25 @@ export function agentForSpec(spec: { readonly kind: string; readonly agent?: str
   return typeof spec.agent === "string" ? spec.agent : "";
 }
 
-/** Render a {@link WorkflowNode} via either JSON or the record formatter. */
+/**
+ * Render a workflow node via either JSON or the record formatter.
+ *
+ * Typed to the fields the renderer reads rather than a nominal DTO:
+ * the SDK-projected node and the contract `WorkflowNode` agree on
+ * these fields but diverge on the catch-all `spec` arm's optionality,
+ * so segregating the param keeps both assignable without a cast.
+ */
 export function renderNode(
-  node: WorkflowNode,
+  node: {
+    readonly id: string;
+    readonly phase: number;
+    readonly status: string;
+    readonly spec: { readonly kind: string; readonly agent?: string };
+    readonly createdAt: string;
+    readonly readyAt?: string;
+    readonly runningAt?: string;
+    readonly endedAt?: string;
+  },
   flags: { readonly output?: string; readonly json?: boolean } | undefined,
 ): string {
   const fmt = pickFormat(flags, "table");

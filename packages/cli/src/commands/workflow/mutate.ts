@@ -14,10 +14,19 @@ import type {
   FinishWorkflowRequest,
   ReplaceNodeSpecRequest,
 } from "@glyphs-ai/contracts";
-import { makeClient, resolveWorkspace } from "../../connect.js";
+import type {
+  PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses,
+  PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses,
+  PostApiWorkspacesByIdWorkflowsByWfidFinishResponses,
+  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses,
+  PostApiWorkspacesByIdWorkflowsByWfidNodesResponses,
+  PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses,
+} from "@glyphs-ai/sdk";
+import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
+import { unwrap } from "../../sdk-client.js";
 import { renderHeader, renderNode } from "./_shared.js";
 import {
   isFinishOutcome,
@@ -98,7 +107,7 @@ export async function workflowAddNode(
     return { exitCode: 2, stderr: `${specResult.error}\n` };
   }
   const spec = specResult.value;
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: AddNodeRequest = {
@@ -106,10 +115,13 @@ export async function workflowAddNode(
       spec,
       parents: parseParents(opts.parentNodeIds),
     };
-    const result = await client.call("workflows.nodes.add", {
-      params: { id: workspaceId, wfid: workflowId },
-      body,
-    });
+    const result = unwrap(
+      await client.post<PostApiWorkspacesByIdWorkflowsByWfidNodesResponses>({
+        url: "/api/workspaces/{id}/workflows/{wfid}/nodes",
+        path: { id: workspaceId, wfid: workflowId },
+        body,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(result) };
     return { exitCode: 0, stdout: formatRecord({ ...result }) };
@@ -147,13 +159,16 @@ export async function workflowAddSubgraph(
     return { exitCode: 2, stderr: `${bodyResult.error}\n` };
   }
   const { body } = bodyResult;
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const result = await client.call("workflows.subgraph.add", {
-      params: { id: workspaceId, wfid: workflowId },
-      body,
-    });
+    const result = unwrap(
+      await client.post<PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses>({
+        url: "/api/workspaces/{id}/workflows/{wfid}/subgraph",
+        path: { id: workspaceId, wfid: workflowId },
+        body,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(result) };
     return {
@@ -186,14 +201,17 @@ export async function workflowAddEdge(
   if (typeof toNodeId !== "string" || toNodeId.trim() === "") {
     return { exitCode: 2, stderr: "missing required <to-node-id>\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: AddEdgeRequest = { fromNodeId, toNodeId };
-    const result = await client.call("workflows.edges.add", {
-      params: { id: workspaceId, wfid: workflowId },
-      body,
-    });
+    const result = unwrap(
+      await client.post<PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses>({
+        url: "/api/workspaces/{id}/workflows/{wfid}/edges",
+        path: { id: workspaceId, wfid: workflowId },
+        body,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(result) };
     return {
@@ -219,12 +237,17 @@ export async function workflowRemoveNode(
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
     return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    await client.call("workflows.nodes.remove", {
-      params: { id: workspaceId, wfid: workflowId, nid: nodeId },
-    });
+    // unwrap() even though the value is unused: it preserves the
+    // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
+    unwrap(
+      await client.delete({
+        url: "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}",
+        path: { id: workspaceId, wfid: workflowId, nid: nodeId },
+      }),
+    );
     return { exitCode: 0, stdout: `node ${nodeId} removed from workflow ${workflowId}\n` };
   } catch (err) {
     return formatError(err);
@@ -249,12 +272,17 @@ export async function workflowRemoveEdge(
   if (typeof toNodeId !== "string" || toNodeId.trim() === "") {
     return { exitCode: 2, stderr: "missing required <to-node-id>\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    await client.call("workflows.edges.remove", {
-      params: { id: workspaceId, wfid: workflowId, from: fromNodeId, to: toNodeId },
-    });
+    // unwrap() even though the value is unused: it preserves the
+    // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
+    unwrap(
+      await client.delete({
+        url: "/api/workspaces/{id}/workflows/{wfid}/edges/{from}/{to}",
+        path: { id: workspaceId, wfid: workflowId, from: fromNodeId, to: toNodeId },
+      }),
+    );
     return {
       exitCode: 0,
       stdout: `edge ${fromNodeId} → ${toNodeId} removed from workflow ${workflowId}\n`,
@@ -288,14 +316,17 @@ export async function workflowReplaceSpec(
     return { exitCode: 2, stderr: `${newSpecResult.error}\n` };
   }
   const newSpec = newSpecResult.value;
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: ReplaceNodeSpecRequest = { newSpec };
-    const updated = await client.call("workflows.nodes.spec.replace", {
-      params: { id: workspaceId, wfid: workflowId, nid: nodeId },
-      body,
-    });
+    const updated = unwrap(
+      await client.patch<PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses>({
+        url: "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec",
+        path: { id: workspaceId, wfid: workflowId, nid: nodeId },
+        body,
+      }),
+    );
     return { exitCode: 0, stdout: renderNode(updated, opts) };
   } catch (err) {
     return formatError(err);
@@ -316,12 +347,15 @@ export async function workflowCancelNode(
   if (typeof nodeId !== "string" || nodeId.trim() === "") {
     return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const updated = await client.call("workflows.nodes.cancel", {
-      params: { id: workspaceId, wfid: workflowId, nid: nodeId },
-    });
+    const updated = unwrap(
+      await client.post<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses>({
+        url: "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/cancel",
+        path: { id: workspaceId, wfid: workflowId, nid: nodeId },
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(updated) };
     return { exitCode: 0, stdout: `node ${nodeId} cancelled\n${renderNode(updated, opts)}` };
@@ -378,17 +412,20 @@ export async function workflowFinish(
       stderr: "--summary is only valid with --outcome succeeded; use --message instead\n",
     };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: FinishWorkflowRequest =
       outcome === "succeeded"
         ? { kind: "succeeded", success: { output: opts.summary ?? null } }
         : { kind: "failed", failure: { kind: "coordinator", message: opts.message ?? "" } };
-    const updated = await client.call("workflows.finish", {
-      params: { id: workspaceId, wfid: workflowId },
-      body,
-    });
+    const updated = unwrap(
+      await client.post<PostApiWorkspacesByIdWorkflowsByWfidFinishResponses>({
+        url: "/api/workspaces/{id}/workflows/{wfid}/finish",
+        path: { id: workspaceId, wfid: workflowId },
+        body,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(updated) };
     return {

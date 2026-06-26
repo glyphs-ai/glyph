@@ -5,10 +5,12 @@
  */
 
 import type { RespondHumanNodeRequest } from "@glyphs-ai/contracts";
-import { makeClient, resolveWorkspace } from "../../connect.js";
+import type { PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses } from "@glyphs-ai/sdk";
+import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
+import { unwrap } from "../../sdk-client.js";
 import { renderNode } from "./_shared.js";
 
 // --- respond ------------------------------------------------------------
@@ -35,17 +37,20 @@ export async function workflowRespond(
   } else if (opts.choiceId.trim() === "") {
     return { exitCode: 2, stderr: "--choice-id must be a non-empty string\n" };
   }
-  const client = await makeClient(opts);
+  const { client } = await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: RespondHumanNodeRequest = {
       ...(opts.choiceId !== undefined ? { choiceId: opts.choiceId } : {}),
       ...(opts.input !== undefined ? { input: opts.input } : {}),
     };
-    const updated = await client.call("workflows.nodes.respond", {
-      params: { id: workspaceId, wfid: workflowId, nid: nodeId },
-      body,
-    });
+    const updated = unwrap(
+      await client.post<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses>({
+        url: "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/respond",
+        path: { id: workspaceId, wfid: workflowId, nid: nodeId },
+        body,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(updated) };
     return { exitCode: 0, stdout: `node ${nodeId} responded\n${renderNode(updated, opts)}` };

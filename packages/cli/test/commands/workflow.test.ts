@@ -73,7 +73,10 @@ function stubFetchMulti(responses: readonly MockResponse[]): { calls: Call[] } {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const r = responses[i];
     i += 1;
-    const rawBody = init?.body;
+    const isRequest = input instanceof Request;
+    const url = isRequest ? input.url : String(input);
+    const method = isRequest ? input.method : String(init?.method ?? "GET");
+    const rawBody = isRequest ? await input.text() : init?.body;
     let parsed: unknown;
     if (typeof rawBody === "string" && rawBody.length > 0) {
       try {
@@ -83,8 +86,8 @@ function stubFetchMulti(responses: readonly MockResponse[]): { calls: Call[] } {
       }
     }
     calls.push({
-      url: String(input),
-      method: String(init?.method ?? "GET"),
+      url,
+      method,
       body: parsed,
     });
     if (r === undefined) {
