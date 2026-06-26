@@ -366,16 +366,6 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     setRefreshToken((n) => n + 1);
   }, []);
 
-  // Close the Edit modal when the user switches to a different
-  // schedule (URL flip clears the modal's target so it doesn't fight
-  // ScheduleDetail's incoming new selection). Idempotent: no-op when
-  // editTarget is already null.
-  useEffect(() => {
-    if (editTarget !== null && editTarget.id !== effectiveSelectedId) {
-      setEditTarget(null);
-    }
-  }, [effectiveSelectedId, editTarget]);
-
   // Only honour `?fireTaskId=` / `?fireWorkflowId=` when a schedule is
   // actually selected AND its kind matches the param. Without the
   // selection guard, a deep link carrying a fire id but no
