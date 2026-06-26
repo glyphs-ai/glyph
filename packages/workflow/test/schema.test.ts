@@ -49,6 +49,7 @@ describe("workflows schema", () => {
         "id",
         "metadata",
         "origin",
+        "origin_id",
         "started_at",
         "status",
         "success",

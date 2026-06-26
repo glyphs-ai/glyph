@@ -6,8 +6,8 @@
  *
  *   - validate: shape checks + agent-existence lookup
  *     (`AgentNotFoundError` / `AgentResolutionFailedError`)
- *   - dispatch: synthesises `origin: 'workflow'` + canonical
- *     `metadata.workflowNodeId` reverse-lookup key; installs the
+ *   - dispatch: synthesises `origin: 'workflow'` + the node id in the
+ *     typed `origin_id` column (reverse-lookup); installs the
  *     per-node poll interval and returns `void` (the runner logs the
  *     task id at info inside dispatch for audit / log correlation)
  *   - poll loop status→terminal mapping (`succeeded` / `failed` /
@@ -287,7 +287,7 @@ describe("makeWorkerNodeRunner — validate", () => {
 });
 
 describe("makeWorkerNodeRunner — dispatch", () => {
-  it("calls tasks.dispatch with origin='workflow' + canonical metadata + 2-key subprocessEnv", async () => {
+  it("calls tasks.dispatch with origin='workflow' + originId + metadata + 2-key subprocessEnv", async () => {
     // biome-ignore lint/suspicious/noExplicitAny: fakeTaskRow is intentionally minimal vs the full Task type.
     const deps = stubDeps({ dispatchReturn: fakeTaskRow({ id: "tid-7" }) as any });
     const r = makeWorkerNodeRunner({
@@ -303,9 +303,9 @@ describe("makeWorkerNodeRunner — dispatch", () => {
       agent: "w",
       brief: "b",
       origin: "workflow",
+      originId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       metadata: {
         workflowId: "20260101-deadbeef",
-        workflowNodeId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       },
       // Worker tasks see the two workflow identity env keys
       // (`GLYPH_WORKFLOW_ID`, `GLYPH_NODE_ID`) but NOT
@@ -367,9 +367,9 @@ describe("makeWorkerNodeRunner — dispatch", () => {
       details: "d",
       runtime: "copilot",
       origin: "workflow",
+      originId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       metadata: {
         workflowId: "20260101-deadbeef",
-        workflowNodeId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       },
       // The injected env shape is the same two identity keys
       // regardless of spec.details / spec.runtime — those spec

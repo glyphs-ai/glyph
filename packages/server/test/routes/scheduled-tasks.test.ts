@@ -59,7 +59,7 @@ describe("scheduledTasksRoutes", () => {
     expect(res.status).toBe(200);
     expect(list).toHaveBeenCalledWith({
       origin: ["schedule"],
-      metadataEquals: { key: "scheduleId", value: "sched-abc" },
+      originId: "sched-abc",
     });
   });
 
@@ -106,7 +106,7 @@ describe("scheduledTasksRoutes", () => {
       runtime: "copilot",
       createdSince: "2026-05-27T00:00:00.000Z",
       statuses: ["running"],
-      metadataEquals: { key: "scheduleId", value: "sched-x" },
+      originId: "sched-x",
     });
   });
 

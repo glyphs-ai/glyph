@@ -19,18 +19,17 @@ async function seed(args: {
   id: string;
   origin: TaskOrigin;
   status: TaskStatus;
-  refId?: string;
+  originId?: string;
 }): Promise<void> {
-  const metadata: Record<string, unknown> = {};
-  if (args.refId !== undefined) metadata.refId = args.refId;
   await repo.save(
     TaskEntity.fromStored({
       id: args.id,
       agent: "demo",
       brief: "b",
       origin: args.origin,
+      ...(args.originId !== undefined ? { originId: args.originId } : {}),
       status: args.status,
-      metadata,
+      metadata: {},
       createdAt: "2026-05-19T01:00:00.000Z",
       startedAt: "2026-05-19T01:00:00.000Z",
       ...(args.status !== "running" ? { endedAt: "2026-05-19T02:00:00.000Z" } : {}),
@@ -40,25 +39,28 @@ async function seed(args: {
   );
 }
 
-describe("TaskRepository.aggregateByOriginMetadataKey", () => {
-  it("returns empty map when metadataValues is empty", async () => {
-    const result = await repo.aggregateByOriginMetadataKey({
+describe("TaskRepository.aggregateByOrigin", () => {
+  it("returns empty map when originIds is empty", async () => {
+    const result = await repo.aggregateByOrigin({
       origin: "workflow",
-      metadataKey: "refId",
-      metadataValues: [],
+      originIds: [],
     });
     expect(result.size).toBe(0);
   });
 
-  it("counts totalCount and runningCount for matching tasks", async () => {
-    await seed({ id: "20260519-aaaaaaaa", origin: "workflow", status: "running", refId: "r1" });
-    await seed({ id: "20260519-bbbbbbbb", origin: "workflow", status: "succeeded", refId: "r1" });
-    await seed({ id: "20260519-cccccccc", origin: "workflow", status: "running", refId: "r2" });
-
-    const result = await repo.aggregateByOriginMetadataKey({
+  it("counts totalCount and runningCount keyed by originId", async () => {
+    await seed({ id: "20260519-aaaaaaaa", origin: "workflow", status: "running", originId: "r1" });
+    await seed({
+      id: "20260519-bbbbbbbb",
       origin: "workflow",
-      metadataKey: "refId",
-      metadataValues: ["r1", "r2"],
+      status: "succeeded",
+      originId: "r1",
+    });
+    await seed({ id: "20260519-cccccccc", origin: "workflow", status: "running", originId: "r2" });
+
+    const result = await repo.aggregateByOrigin({
+      origin: "workflow",
+      originIds: ["r1", "r2"],
     });
 
     expect(result.get("r1")).toEqual({ totalCount: 2, runningCount: 1 });
@@ -66,35 +68,42 @@ describe("TaskRepository.aggregateByOriginMetadataKey", () => {
   });
 
   it("respects statusIn filter", async () => {
-    await seed({ id: "20260519-aaaaaaaa", origin: "workflow", status: "running", refId: "r1" });
-    await seed({ id: "20260519-bbbbbbbb", origin: "workflow", status: "succeeded", refId: "r1" });
-
-    const onlyRunning = await repo.aggregateByOriginMetadataKey({
+    await seed({ id: "20260519-aaaaaaaa", origin: "workflow", status: "running", originId: "r1" });
+    await seed({
+      id: "20260519-bbbbbbbb",
       origin: "workflow",
-      metadataKey: "refId",
-      metadataValues: ["r1"],
+      status: "succeeded",
+      originId: "r1",
+    });
+
+    const onlyRunning = await repo.aggregateByOrigin({
+      origin: "workflow",
+      originIds: ["r1"],
       statusIn: ["running"],
     });
     expect(onlyRunning.get("r1")).toEqual({ totalCount: 1, runningCount: 1 });
   });
 
   it("does not match tasks from a different origin", async () => {
-    await seed({ id: "20260519-aaaaaaaa", origin: "workflow", status: "running", refId: "r1" });
-    await seed({ id: "20260519-bbbbbbbb", origin: "standalone", status: "running", refId: "r1" });
+    await seed({ id: "20260519-aaaaaaaa", origin: "workflow", status: "running", originId: "r1" });
+    await seed({
+      id: "20260519-bbbbbbbb",
+      origin: "standalone",
+      status: "running",
+      originId: "r1",
+    });
 
-    const result = await repo.aggregateByOriginMetadataKey({
+    const result = await repo.aggregateByOrigin({
       origin: "workflow",
-      metadataKey: "refId",
-      metadataValues: ["r1"],
+      originIds: ["r1"],
     });
     expect(result.get("r1")!.totalCount).toBe(1);
   });
 
-  it("metadataValues not present yields absent keys in the map", async () => {
-    const result = await repo.aggregateByOriginMetadataKey({
+  it("originIds not present yields absent keys in the map", async () => {
+    const result = await repo.aggregateByOrigin({
       origin: "workflow",
-      metadataKey: "refId",
-      metadataValues: ["nonexistent"],
+      originIds: ["nonexistent"],
     });
     expect(result.has("nonexistent")).toBe(false);
   });

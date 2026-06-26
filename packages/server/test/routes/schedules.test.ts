@@ -165,7 +165,7 @@ describe("schedulesRoutes — list", () => {
     const list = vi.fn(async () => [sampleSchedule, workflowSchedule]);
     const svc = stubService({ list });
     const workflowService = {
-      aggregateByOriginMetadataKey: vi.fn(
+      aggregateByOrigin: vi.fn(
         async () => new Map([["sched-wf", { totalCount: 3, runningCount: 3, awaitingCount: 1 }]]),
       ),
     };

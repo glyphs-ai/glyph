@@ -17,8 +17,8 @@ afterEach(() => {
 function insertWorkflow(args: {
   id: string;
   origin: string;
+  originId: string | null;
   status: string;
-  metadata: Record<string, unknown>;
 }): void {
   testDb.db
     .insert(workflows)
@@ -28,47 +28,31 @@ function insertWorkflow(args: {
       coordinatorAgent: "agent-a",
       status: args.status,
       origin: args.origin,
-      metadata: JSON.stringify(args.metadata),
+      originId: args.originId,
+      metadata: "{}",
       createdAt: "2026-06-07T00:00:00.000Z",
       startedAt: "2026-06-07T00:00:00.000Z",
     })
     .run();
 }
 
-describe("WorkflowRepository.aggregateByOriginMetadataKey", () => {
-  it("returns empty map when metadataValues is empty", async () => {
-    const result = await repo.aggregateByOriginMetadataKey({
+describe("WorkflowRepository.aggregateByOrigin", () => {
+  it("returns empty map when originIds is empty", async () => {
+    const result = await repo.aggregateByOrigin({
       origin: "fake-origin-x",
-      metadataKey: "refId",
-      metadataValues: [],
+      originIds: [],
     });
     expect(result.size).toBe(0);
   });
 
-  it("counts totalCount and runningCount for matching workflows", async () => {
-    insertWorkflow({
-      id: "wf-001",
-      origin: "fake-origin-x",
-      status: "running",
-      metadata: { refId: "r1" },
-    });
-    insertWorkflow({
-      id: "wf-002",
-      origin: "fake-origin-x",
-      status: "running",
-      metadata: { refId: "r1" },
-    });
-    insertWorkflow({
-      id: "wf-003",
-      origin: "fake-origin-x",
-      status: "running",
-      metadata: { refId: "r2" },
-    });
+  it("counts totalCount and runningCount keyed by originId", async () => {
+    insertWorkflow({ id: "wf-001", origin: "fake-origin-x", originId: "r1", status: "running" });
+    insertWorkflow({ id: "wf-002", origin: "fake-origin-x", originId: "r1", status: "running" });
+    insertWorkflow({ id: "wf-003", origin: "fake-origin-x", originId: "r2", status: "running" });
 
-    const result = await repo.aggregateByOriginMetadataKey({
+    const result = await repo.aggregateByOrigin({
       origin: "fake-origin-x",
-      metadataKey: "refId",
-      metadataValues: ["r1", "r2"],
+      originIds: ["r1", "r2"],
     });
 
     expect(result.get("r1")).toEqual({ totalCount: 2, runningCount: 2, awaitingCount: 0 });
@@ -76,30 +60,18 @@ describe("WorkflowRepository.aggregateByOriginMetadataKey", () => {
   });
 
   it("respects statusIn filter", async () => {
-    insertWorkflow({
-      id: "wf-001",
-      origin: "fake-origin-x",
-      status: "running",
-      metadata: { refId: "r1" },
-    });
-    insertWorkflow({
-      id: "wf-002",
-      origin: "fake-origin-x",
-      status: "succeeded",
-      metadata: { refId: "r1" },
-    });
+    insertWorkflow({ id: "wf-001", origin: "fake-origin-x", originId: "r1", status: "running" });
+    insertWorkflow({ id: "wf-002", origin: "fake-origin-x", originId: "r1", status: "succeeded" });
 
-    const allStatuses = await repo.aggregateByOriginMetadataKey({
+    const allStatuses = await repo.aggregateByOrigin({
       origin: "fake-origin-x",
-      metadataKey: "refId",
-      metadataValues: ["r1"],
+      originIds: ["r1"],
     });
     expect(allStatuses.get("r1")!.totalCount).toBe(2);
 
-    const onlyRunning = await repo.aggregateByOriginMetadataKey({
+    const onlyRunning = await repo.aggregateByOrigin({
       origin: "fake-origin-x",
-      metadataKey: "refId",
-      metadataValues: ["r1"],
+      originIds: ["r1"],
       statusIn: ["running"],
     });
     expect(onlyRunning.get("r1")!.totalCount).toBe(1);
@@ -107,32 +79,20 @@ describe("WorkflowRepository.aggregateByOriginMetadataKey", () => {
   });
 
   it("does not match workflows from a different origin", async () => {
-    insertWorkflow({
-      id: "wf-001",
-      origin: "fake-origin-x",
-      status: "running",
-      metadata: { refId: "r1" },
-    });
-    insertWorkflow({
-      id: "wf-002",
-      origin: "standalone",
-      status: "running",
-      metadata: { refId: "r1" },
-    });
+    insertWorkflow({ id: "wf-001", origin: "fake-origin-x", originId: "r1", status: "running" });
+    insertWorkflow({ id: "wf-002", origin: "standalone", originId: "r1", status: "running" });
 
-    const result = await repo.aggregateByOriginMetadataKey({
+    const result = await repo.aggregateByOrigin({
       origin: "fake-origin-x",
-      metadataKey: "refId",
-      metadataValues: ["r1"],
+      originIds: ["r1"],
     });
     expect(result.get("r1")!.totalCount).toBe(1);
   });
 
-  it("metadataValues not present yields absent keys in the map", async () => {
-    const result = await repo.aggregateByOriginMetadataKey({
+  it("originIds not present yields absent keys in the map", async () => {
+    const result = await repo.aggregateByOrigin({
       origin: "fake-origin-x",
-      metadataKey: "refId",
-      metadataValues: ["nonexistent"],
+      originIds: ["nonexistent"],
     });
     expect(result.has("nonexistent")).toBe(false);
   });

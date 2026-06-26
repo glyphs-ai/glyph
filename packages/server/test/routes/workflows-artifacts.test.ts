@@ -52,6 +52,7 @@ function makeHeader(): WorkflowEntity {
     coordinatorAgent: "coord-agent",
     status: "running",
     origin: "standalone",
+    originId: null,
     metadata: "{}",
     createdAt: "2026-06-07T00:00:00.000Z",
     startedAt: "2026-06-07T00:00:00.000Z",

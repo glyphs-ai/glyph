@@ -157,9 +157,9 @@ describe("@glyphs-ai/task public API guard", () => {
     expectTypeOf<TaskService>().toHaveProperty("get");
     expectTypeOf<TaskService>().toHaveProperty("cancel");
     expectTypeOf<TaskService>().toHaveProperty("delete");
-    expectTypeOf<TaskService>().toHaveProperty("hasInFlightByOriginMetadata");
-    expectTypeOf<TaskService>().toHaveProperty("deleteTerminalByOriginMetadata");
-    expectTypeOf<TaskService>().toHaveProperty("aggregateByOriginMetadataKey");
+    expectTypeOf<TaskService>().toHaveProperty("hasInFlightByOrigin");
+    expectTypeOf<TaskService>().toHaveProperty("deleteTerminalByOrigin");
+    expectTypeOf<TaskService>().toHaveProperty("aggregateByOrigin");
     expectTypeOf<TaskService>().toHaveProperty("getTaskActivity");
     expectTypeOf<TaskService>().toHaveProperty("getTaskActivityStream");
     expectTypeOf<TaskService>().toHaveProperty("recoverOrphaned");

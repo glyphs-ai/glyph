@@ -12,7 +12,7 @@
  *     (`AgentNotFoundError` / `AgentResolutionFailedError`)
  *   - dispatch: reads the workflow header via `getService` thunk;
  *     synthesises `origin: 'workflow'` + canonical
- *     `metadata.workflowNodeId` reverse-lookup key; conditional
+ *     node id in the typed `origin_id` column (reverse-lookup); conditional
  *     `details` spread; throws if `getService()` returns null/undefined
  *   - poll loop status→terminal mapping (`succeeded` / `failed` /
  *     `cancelled` / `null` task), runner-local error budget exhaustion
@@ -409,9 +409,9 @@ describe("makeCoordNodeRunner — dispatch", () => {
       brief: "wf brief",
       details: "wf details",
       origin: "workflow",
+      originId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       metadata: {
         workflowId: "20260101-deadbeef",
-        workflowNodeId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       },
       // Coord-kind framing prompt — replaces the default
       // `DEFAULT_TASK_FRAMING_PROMPT`. Asserted as
@@ -511,9 +511,9 @@ describe("makeCoordNodeRunner — dispatch", () => {
       agent: "coord-agent",
       brief: "only brief",
       origin: "workflow",
+      originId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       metadata: {
         workflowId: "20260101-deadbeef",
-        workflowNodeId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
       },
       // Prompt + subprocessEnv are emitted by the coord runner
       // regardless of whether wf.details is set — the env shape
