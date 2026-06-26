@@ -24,7 +24,7 @@ in a follow-up doc**.
 | --------- | ----------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | **T0**    | Foundations | `catalog`, `runtime`, `schedule`, `terminal`, `workspace` | Who / Where / When / Scope + leaf infrastructure — irreducible primitives                |
 | **T1**    | Modes       | `session`, `task`, `workflow`                       | How work runs — Interactive (`session`) / Headless single-shot (`task`) / Multi-task DAG (`workflow`) |
-| **T2**    | Application | `contracts` (wire types), `api` (orchestration)     | Two siblings: cross-pkg wire contracts + composition of T0/T1 into business capabilities |
+| **T2**    | Application | `contracts` (wire types), `api` (orchestration), `sdk` (generated client) | Three siblings: cross-pkg wire contracts + composition of T0/T1 into business capabilities + a generated typed HTTP client |
 | **T3**    | Host        | `server`                                            | HTTP transport that exposes T2 capabilities over the wire                               |
 | **T_top** | Surfaces    | `dashboard`, `cli`                                  | Platform-specific UI on top of T3                                                       |
 
@@ -56,7 +56,7 @@ wire format is a separate axis (see "Dependency invariants" — TBD).
     edges, coordinated by `coordinator` task nodes that mutate the DAG
     based on parent terminal state)
 - T2 — what can the system *do*, and how is that spelled? Split
-  across two siblings:
+  across three siblings:
   - `contracts` — the *what is on the wire*: route catalog, request /
     response DTO shapes, leaf path helpers (`GLYPH_HOME`,
     `runtime.json`). Pure types + side-effect-free constants. The
@@ -68,6 +68,16 @@ wire format is a separate axis (see "Dependency invariants" — TBD).
     implement the contracts. Consumed by `server`. Re-exports the
     contracts barrel as a convenience for the in-process server
     composition root that needs both layers in one import site.
+  - `sdk` — the *typed client for the wire*: a fully-generated fetch
+    client (`@hey-api/openapi-ts`) over `server`'s `/api/openapi.json`,
+    plus thin `unwrap` / `GlyphError` helpers we own. Self-contained at
+    runtime (zero `@glyphs-ai/*` imports — the generated output inlines
+    its own fetch client), so it ships to browser surfaces just like
+    `contracts`. Codegen is devtime-only tooling under `scripts/` that
+    reads `server` source to assemble the spec; that devtime edge is not
+    a runtime tier dependency (enforced by
+    `sdk-no-server-runtime-import.test.ts`). Strictly additive today —
+    no surface consumes it yet.
 - T3 — how do remote clients invoke T2? `server` is a thin HTTP
   binding.
 - T_top — how does a human (or another agent) interact?
