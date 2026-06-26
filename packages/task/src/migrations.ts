@@ -28,6 +28,23 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     folderMillis: 2,
     hash: "78071717c7b3a3a8a17342a8b446c75c3642d3da441b323fecd726ae7bcb09e4",
   },
+  {
+    sql: [
+      "ALTER TABLE `tasks` ADD COLUMN `origin_id` text;\n",
+      "\nUPDATE `tasks` SET `origin_id` = json_extract(`metadata`, '$.scheduleId')\n  WHERE `origin` = 'schedule' AND json_extract(`metadata`, '$.scheduleId') IS NOT NULL;\n",
+      "\nUPDATE `tasks` SET `origin_id` = json_extract(`metadata`, '$.workflowNodeId')\n  WHERE `origin` = 'workflow' AND json_extract(`metadata`, '$.workflowNodeId') IS NOT NULL;\n",
+      "\nCREATE INDEX `tasks_origin_pair_idx` ON `tasks` (`origin`, `origin_id`) WHERE `origin_id` IS NOT NULL;\n",
+      "\nCREATE TEMP TABLE `_assert_tasks_origin_backfill` (`x`);\n",
+      "\nCREATE TEMP TRIGGER `_assert_tasks_origin_backfill_trg` BEFORE INSERT ON `_assert_tasks_origin_backfill`\nBEGIN\n  SELECT RAISE(FAIL, 'tasks backfill incomplete: non-standalone row without origin_id')\n  WHERE EXISTS (SELECT 1 FROM `tasks` WHERE `origin` NOT IN ('standalone') AND `origin_id` IS NULL);\nEND;\n",
+      "\nINSERT INTO `_assert_tasks_origin_backfill` VALUES (1);\n",
+      "\nDROP TRIGGER `_assert_tasks_origin_backfill_trg`;\n",
+      "\nDROP TABLE `_assert_tasks_origin_backfill`;\n",
+      "\nDROP INDEX IF EXISTS `tasks_schedule_id_idx`;\n"
+    ],
+    bps: true,
+    folderMillis: 3,
+    hash: "076555333d8811d9e027047043508f46f43d893f8c3d00ff7c719fe7164f6f99",
+  },
 ];
 
 /**

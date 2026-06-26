@@ -49,6 +49,22 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     folderMillis: 4,
     hash: "18681abac79f1ed7164bd6caa36b4720aa1263671f3ecfcc19f4e72bc4dcb8d1",
   },
+  {
+    sql: [
+      "ALTER TABLE `workflows` ADD COLUMN `origin_id` text;\n",
+      "\nUPDATE `workflows` SET `origin_id` = json_extract(`metadata`, '$.scheduleId')\n  WHERE `origin` = 'schedule' AND json_extract(`metadata`, '$.scheduleId') IS NOT NULL;\n",
+      "\nCREATE INDEX `workflows_origin_pair_idx` ON `workflows` (`origin`, `origin_id`) WHERE `origin_id` IS NOT NULL;\n",
+      "\nCREATE TEMP TABLE `_assert_workflows_origin_backfill` (`x`);\n",
+      "\nCREATE TEMP TRIGGER `_assert_workflows_origin_backfill_trg` BEFORE INSERT ON `_assert_workflows_origin_backfill`\nBEGIN\n  SELECT RAISE(FAIL, 'workflows backfill incomplete: non-standalone row without origin_id')\n  WHERE EXISTS (SELECT 1 FROM `workflows` WHERE `origin` != 'standalone' AND `origin_id` IS NULL);\nEND;\n",
+      "\nINSERT INTO `_assert_workflows_origin_backfill` VALUES (1);\n",
+      "\nDROP TRIGGER `_assert_workflows_origin_backfill_trg`;\n",
+      "\nDROP TABLE `_assert_workflows_origin_backfill`;\n",
+      "\nDROP INDEX IF EXISTS `workflows_schedule_id_idx`;\n"
+    ],
+    bps: true,
+    folderMillis: 5,
+    hash: "a451e52624472b3ae6f63ed467bffa4c6006366fce1d31f80f082c8d89842c95",
+  },
 ];
 
 /**
