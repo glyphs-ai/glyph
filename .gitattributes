@@ -5,3 +5,10 @@
 *.ico binary
 *.woff binary
 *.woff2 binary
+
+# @glyphs-ai/sdk commits a codegenned fetch client whose source of truth is
+# the OpenAPI spec, not hand edits. Mark it linguist-generated so GitHub
+# folds it in PR diffs and drops it from language stats; `-diff` also skips
+# it in local `git diff`. Drift is still caught: `git diff --exit-code`
+# reports a binary change and exits non-zero when the tree is stale.
+packages/sdk/src/generated/** linguist-generated=true -diff

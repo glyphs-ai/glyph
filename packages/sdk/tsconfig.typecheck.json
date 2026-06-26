@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // The smoke test + scripts/build-openapi-app.ts assemble the in-process
+    // OpenAPI app from server route factories via cross-package source
+    // imports (the devtime path the architecture test exempts). Those files
+    // live outside packages/sdk, so widen rootDir to the repo root; this is a
+    // pure type-only program (noEmit) so there is no output-layout impact.
+    "rootDir": "../.."
+  },
+  "include": ["src/**/*", "test/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

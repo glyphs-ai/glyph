@@ -14,7 +14,8 @@
       "!**/dist",
       "!**/node_modules",
       "!docs",
-      "!**/public/mockServiceWorker.js"
+      "!**/public/mockServiceWorker.js",
+      "!packages/sdk/src/generated"
     ]
   },
   "formatter": {

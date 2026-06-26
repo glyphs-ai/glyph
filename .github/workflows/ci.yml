@@ -103,6 +103,43 @@ jobs:
             exit 1
           fi
 
+  sdk-codegen-drift:
+    name: SDK codegen drift
+    # Runs after the lint + TypeScript matrix so a real build/test/lint
+    # failure surfaces first. Single-OS: the generated tree is committed
+    # with LF (.gitattributes), so one runner is enough to catch drift.
+    needs: [lint, ts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The generator imports @glyphs-ai/server route source, whose own
+      # @glyphs-ai/* imports resolve to dist/. Build first so they resolve.
+      - name: Build
+        run: pnpm build
+
+      - name: Regenerate SDK client
+        run: pnpm -F @glyphs-ai/sdk gen
+
+      - name: Verify committed SDK matches a fresh codegen
+        # If this fails: the @glyphs-ai/api schema / @glyphs-ai/server routes
+        # changed but the generated SDK was not regenerated.
+        run: |
+          if ! git diff --exit-code packages/sdk/src/generated; then
+            echo "::error::packages/sdk/src/generated is stale. Run 'pnpm build && pnpm -F @glyphs-ai/sdk gen' and commit packages/sdk/src/generated/."
+            exit 1
+          fi
+
   links:
     runs-on: ubuntu-latest
     steps:

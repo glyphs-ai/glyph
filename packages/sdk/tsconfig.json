@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    // The generated fetch client is browser-targeted and references DOM
+    // lib types (BodyInit, FormData, Blob, Request/Response). The base
+    // config pins lib to ES2022 only, so re-add DOM here.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // The committed @hey-api/openapi-ts output under src/generated/ is a
+    // vendored artifact (drift-checked, excluded from Biome) that is not
+    // authored against exactOptionalPropertyTypes. Relax only this one flag
+    // for the package; every other base strict flag stays on, and the
+    // hand-written surface (index/errors/unwrap) is written to satisfy
+    // exactOptionalPropertyTypes regardless.
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "scripts"]
+}

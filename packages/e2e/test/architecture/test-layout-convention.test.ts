@@ -122,6 +122,11 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
       "grouped by area (architecture/); zero in-pkg src value-imports, so the rule says flat. Cross-cutting repo-wide audits stay grouped with architecture siblings.",
   },
   {
+    file: "packages/e2e/test/architecture/sdk-no-server-runtime-import.test.ts",
+    rationale:
+      "grouped by area (architecture/); zero in-pkg src value-imports — rule says flat. Cross-cutting repo-wide audits stay grouped with architecture siblings.",
+  },
+  {
     file: "packages/e2e/test/architecture/split-convention.test.ts",
     rationale:
       "grouped by area (architecture/); zero in-pkg src value-imports — rule says flat. Cross-cutting repo-wide audits stay grouped with architecture siblings.",

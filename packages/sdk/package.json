@@ -1,0 +1,55 @@
+{
+  "name": "@glyphs-ai/sdk",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Typed REST client for the glyph HTTP API, codegenned from @glyphs-ai/server's OpenAPI spec via @hey-api/openapi-ts. Node 22+ devtime; runtime-agnostic, browser-safe output. SSE/streaming endpoints are out of scope.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "gen": "tsx scripts/generate.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@glyphs-ai/api": "workspace:*",
+    "@glyphs-ai/catalog": "workspace:*",
+    "@glyphs-ai/runtime": "workspace:*",
+    "@glyphs-ai/schedule": "workspace:*",
+    "@glyphs-ai/server": "workspace:*",
+    "@glyphs-ai/session": "workspace:*",
+    "@glyphs-ai/task": "workspace:*",
+    "@glyphs-ai/workflow": "workspace:*",
+    "@hey-api/client-fetch": "0.13.1",
+    "@hey-api/openapi-ts": "0.99.0",
+    "@hono/zod-openapi": "^1.4.0",
+    "@types/node": "^22.0.0",
+    "hono": "^4.7.11",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vite": "^8.0.11",
+    "vitest": "^4.1.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/glyphs-ai/glyph.git",
+    "directory": "packages/sdk"
+  }
+}
