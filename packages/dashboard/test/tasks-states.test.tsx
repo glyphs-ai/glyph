@@ -16,9 +16,10 @@ import { TasksPage } from "../src/pages/Tasks";
  * regression (a populated workspace whose rows all predate the default
  * window resolves to No-match, not Zero). ("Unselected" is structurally
  * unreachable here: `effectiveSelectedId` auto-binds the first visible
- * row, so it collapses to Normal — exhaustively covered in
- * `test/components/list-page-state.test.ts`.) DOM snapshots pin the empty
- * cards + skeletons against silent regressions.
+ * row, so it collapses to Normal, exercised by the Normal-state cases
+ * below.) Each reachable state is pinned by explicit testid
+ * presence/absence + CTA assertions below; the brittle DOM snapshots were
+ * dropped this round.
  */
 
 vi.mock("../src/api", async () => {

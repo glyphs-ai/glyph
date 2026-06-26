@@ -11,8 +11,10 @@ import type { WorkflowDag, WorkflowHeader } from "../src/api";
  * load (not just mid-flight), and a stale-time-window regression (a
  * populated workspace whose workflows all predate the default window
  * resolves to No-match, not Zero). "Unselected" is unreachable here
- * (auto-bind) and is covered in the resolver unit test. DOM snapshots pin
- * the empty cards + skeletons against silent regressions.
+ * (auto-bind), so it collapses to Normal and is exercised by the
+ * Normal-state cases below. Each reachable state is pinned by explicit
+ * testid presence/absence + CTA assertions below; the brittle DOM
+ * snapshots were dropped this round.
  */
 
 vi.mock("../src/api", async () => {

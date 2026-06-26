@@ -15,8 +15,9 @@ import { SessionsPage } from "../src/pages/Sessions";
  * Normal — each rendered through the shared `<EmptyState>` (no detail
  * pane, so no "unselected"), plus a stale-time-window regression (a
  * populated workspace whose sessions all predate the default window
- * resolves to No-match, not Zero). DOM snapshots pin the empty cards so a
- * future refactor can't silently regress them.
+ * resolves to No-match, not Zero). Each reachable state is pinned by
+ * explicit testid presence/absence + CTA assertions below; the brittle DOM
+ * snapshots were dropped this round.
  */
 
 vi.mock("../src/api", async () => {

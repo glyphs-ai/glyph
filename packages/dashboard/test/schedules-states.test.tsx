@@ -9,8 +9,10 @@ import type { ScheduleView } from "../src/api";
  * user-reachable named states — Loading, Zero, No-match, Normal — and pins
  * the layout reshape: the `tasks-pane--zero` whole-page switch is gone, so
  * the filter chrome stays mounted and the empty cards live in the detail
- * pane. "Unselected" is unreachable (auto-bind); see the resolver unit
- * test. DOM snapshots guard the empty cards + skeletons.
+ * pane. "Unselected" is unreachable (auto-bind), so it collapses to Normal
+ * and is exercised by the Normal-state cases below. Each reachable state is
+ * pinned by explicit testid presence/absence + CTA assertions below; the
+ * brittle DOM snapshots were dropped this round.
  */
 
 vi.mock("../src/api", async () => {
