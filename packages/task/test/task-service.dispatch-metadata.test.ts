@@ -17,19 +17,19 @@ describe("TaskService.dispatch — metadata plumbing", () => {
         agent: "demo",
         brief: "metadata",
         origin: "schedule",
-        metadata: { scheduleId: "abc", firedAt: "2026-05-19T01:00:00.000Z" },
+        metadata: { label: "abc", firedAt: "2026-05-19T01:00:00.000Z" },
       });
       // Caller-supplied keys present verbatim alongside the kernel
       // keys (workdir + runtime).
-      expect(t.metadata.scheduleId).toBe("abc");
+      expect(t.metadata.label).toBe("abc");
       expect(t.metadata.firedAt).toBe("2026-05-19T01:00:00.000Z");
       expect(t.metadata.workdir).toBeTypeOf("string");
       expect(t.metadata.runtime).toBe("copilot");
       // Round-trips through the repository so the persisted row carries
       // the same keys (and the `runtime` column promotion + re-fold
-      // doesn't corrupt the schedule fields).
+      // doesn't corrupt the caller fields).
       const back = await fx.repo.read(t.id);
-      expect(back?.metadata.scheduleId).toBe("abc");
+      expect(back?.metadata.label).toBe("abc");
       expect(back?.metadata.firedAt).toBe("2026-05-19T01:00:00.000Z");
       expect(back?.metadata.runtime).toBe("copilot");
     } finally {

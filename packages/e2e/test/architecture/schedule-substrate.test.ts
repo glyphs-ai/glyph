@@ -1,31 +1,41 @@
 /**
- * Pin the cross-package "schedule substrate" -- the implicit string
- * contract by which a fired schedule becomes a task/workflow that can
- * later be found and cleaned up.
+ * Pin the cross-package "schedule substrate" -- the contract by which a
+ * fired schedule becomes a task/workflow that can later be found and
+ * cleaned up. The schedule id is a first-class typed column
+ * (`origin_id`), NOT a `metadata` JSON probe.
  *
- * Three magic tokens must agree across four packages:
+ * The tokens that must agree across packages:
  *
- *   - the origin tag    `"schedule"`     (api producers, task/workflow
- *                                          repositories, partial indexes)
- *   - the metadata key  `scheduleId`     (api producers stamp it; repos
- *                                          + indexes query it)
- *   - the JSON path     `'$.scheduleId'` (repositories + indexes)
+ *   - the origin tag    `"schedule"`   (api producers stamp it; the
+ *                                        migration partial index scopes on
+ *                                        it; the repositories pair it with
+ *                                        the id column)
+ *   - the typed column  `origin_id`    (api producers stamp
+ *                                        `originId: scheduleId`; the
+ *                                        repositories query
+ *                                        `eq(*.originId, …)`; a composite
+ *                                        partial index `(origin, origin_id)`
+ *                                        backs the lookup)
  *
  * Flow: `schedule-service.dispatch()` hands the registered handler an
- * envelope `{ scheduleId: entity.id, ... }`; the api wiring handlers
- * create the task/workflow with `origin: "schedule"` and
- * `metadata: { scheduleId }`; the task/workflow repositories locate that
- * work with `json_extract(metadata, '$.scheduleId')` filtered to
- * `origin = 'schedule'`, backed by a partial index on the same
- * expression. No single test pins that all of those ends agree, so a
- * rename on one side silently breaks in-flight dedup + schedule cleanup
- * (the producer writes a key the consumer never queries). This audit
- * reads the sources and fails if the substrate drifts.
+ * envelope `{ scheduleId: entity.id, … }`; the api wiring handlers create
+ * the task/workflow with `origin: "schedule"` and `originId: scheduleId`;
+ * the task/workflow repositories locate that work by the typed
+ * `(origin, origin_id)` column pair, backed by a composite partial index
+ * on the same columns. No single test pins that all of those ends agree,
+ * so a drift on one side silently breaks in-flight dedup + schedule
+ * cleanup (the producer writes a column the consumer never queries). This
+ * audit reads the sources and fails if the substrate drifts.
  *
- * It deliberately reads source text rather than exercising a live DB:
- * the failure mode is a literal-string divergence between packages that
- * each still type-check in isolation, which a source-level pin catches
- * directly and cheaply.
+ * It also pins the *negative*: the repositories MUST NOT recover the
+ * schedule id by probing `metadata` via `json_extract('$.scheduleId')`.
+ * That legacy path now survives only inside the one-time migration
+ * backfill (which reads the pre-refactor rows), never in a hot-path query.
+ *
+ * It deliberately reads source text rather than exercising a live DB: the
+ * failure mode is a literal divergence between packages that each still
+ * type-check in isolation, which a source-level pin catches directly and
+ * cheaply.
  */
 
 import { readFileSync } from "node:fs";
@@ -39,10 +49,17 @@ function readSrc(rel: string): string {
   return readFileSync(path.join(PACKAGES_DIR, rel), "utf8");
 }
 
-// The JSON path the repositories + indexes extract the schedule id from.
-const SCHEDULE_ID_JSON_PATH = /'\$\.scheduleId'/;
-// `origin = 'schedule'` in raw SQL (column optionally backtick-quoted).
-const ORIGIN_SCHEDULE_SQL = /`?origin`?\s*=\s*'schedule'/;
+// The legacy JSON path the substrate probed BEFORE origin_id was promoted
+// to a typed column. It must survive only in the migration backfill, never
+// in a repository hot-path query.
+const LEGACY_SCHEDULE_ID_JSON_PATH = /'\$\.scheduleId'/;
+// The composite partial index that backs the typed `(origin, origin_id)`
+// lookup -- column order and partial predicate both pinned.
+const ORIGIN_PAIR_INDEX =
+  /CREATE INDEX [`"]?\w*origin_pair\w*[`"]?\s+ON\s+[`"]?\w+[`"]?\s*\(\s*[`"]?origin[`"]?\s*,\s*[`"]?origin_id[`"]?\s*\)\s*WHERE\s+[`"]?origin_id[`"]?\s+IS\s+NOT\s+NULL/i;
+// The legacy single-column schedule-id index the migration drops once the
+// typed column supersedes it.
+const LEGACY_SCHEDULE_ID_INDEX_DROP = /DROP INDEX IF EXISTS [`"]?\w*schedule_id_idx[`"]?/i;
 
 describe("schedule substrate: producer envelope", () => {
   it("schedule-service hands the handler { scheduleId: entity.id }", () => {
@@ -51,46 +68,48 @@ describe("schedule substrate: producer envelope", () => {
   });
 });
 
-describe("schedule substrate: api handlers stamp origin + metadata.scheduleId", () => {
+describe("schedule substrate: api handlers stamp origin + typed origin_id", () => {
   for (const rel of [
     "api/src/wiring/schedule-task-handler.ts",
     "api/src/wiring/schedule-workflow-handler.ts",
   ] as const) {
-    it(`${path.basename(rel)} creates work with origin "schedule" + metadata.scheduleId`, () => {
+    it(`${path.basename(rel)} creates work with origin "schedule" + originId: scheduleId`, () => {
       const src = readSrc(rel);
       expect(src, rel).toMatch(/origin:\s*"schedule"/);
-      expect(src, rel).toMatch(/metadata:\s*\{\s*scheduleId/);
+      expect(src, rel).toMatch(/originId:\s*scheduleId/);
     });
   }
 });
 
-describe("schedule substrate: repositories query the stamped metadata", () => {
-  it("task-repository resolves scheduled work via json_extract '$.scheduleId'", () => {
+describe("schedule substrate: repositories query the typed origin_id column", () => {
+  it("task-repository locates scheduled work via the (origin, origin_id) columns", () => {
     const src = readSrc("task/src/task-repository.ts");
-    expect(src).toMatch(/json_extract/);
-    expect(src).toMatch(SCHEDULE_ID_JSON_PATH);
-    expect(src).toMatch(/"scheduleId"/);
+    expect(src).toMatch(/eq\(\s*tasks\.origin\s*,/);
+    expect(src).toMatch(/eq\(\s*tasks\.originId\s*,/);
+    // Negative: the schedule id is never recovered from a metadata JSON probe.
+    expect(src).not.toMatch(LEGACY_SCHEDULE_ID_JSON_PATH);
   });
 
-  it('workflow-repository pairs origin "schedule" with metadataKey "scheduleId"', () => {
+  it("workflow-repository locates scheduled work via the (origin, origin_id) columns", () => {
     const src = readSrc("workflow/src/workflow-repository.ts");
-    expect(src).toMatch(/json_extract/);
-    expect(src).toMatch(SCHEDULE_ID_JSON_PATH);
-    expect(src).toMatch(/origin:\s*"schedule"/);
-    expect(src).toMatch(/metadataKey:\s*"scheduleId"/);
+    expect(src).toMatch(/eq\(\s*workflows\.origin\s*,/);
+    expect(src).toMatch(/(?:eq|inArray)\(\s*workflows\.originId\s*,/);
+    expect(src).not.toMatch(LEGACY_SCHEDULE_ID_JSON_PATH);
   });
 });
 
-describe("schedule substrate: partial indexes match the query", () => {
+describe("schedule substrate: composite partial index backs the column query", () => {
   for (const [pkg, rel] of [
     ["task", "task/src/migrations.ts"],
     ["workflow", "workflow/src/migrations.ts"],
   ] as const) {
-    it(`${pkg} partial index is scoped to origin='schedule' on '$.scheduleId'`, () => {
+    it(`${pkg} migration creates the (origin, origin_id) partial index`, () => {
       const src = readSrc(rel);
-      expect(src, rel).toMatch(/json_extract/);
-      expect(src, rel).toMatch(SCHEDULE_ID_JSON_PATH);
-      expect(src, rel).toMatch(ORIGIN_SCHEDULE_SQL);
+      expect(src, rel).toMatch(ORIGIN_PAIR_INDEX);
+    });
+    it(`${pkg} migration drops the legacy single-column schedule-id index`, () => {
+      const src = readSrc(rel);
+      expect(src, rel).toMatch(LEGACY_SCHEDULE_ID_INDEX_DROP);
     });
   }
 });

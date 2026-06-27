@@ -21,7 +21,7 @@ import type { WorkflowTargetData, WorkflowTargetPatch } from "../wire/index.js";
  *   - workflow-target shape validation
  *   - coordinator-agent existence + coord-eligibility lookup
  *   - RFC 7396 deep-merge of workflow target patches
- *   - origin/metadata synthesis for `WorkflowService.createWorkflow`
+ *   - origin/originId synthesis for `WorkflowService.createWorkflow`
  *   - lifecycle delegation for `hasInFlightForSchedule` /
  *     `deleteForSchedule`
  *
@@ -161,36 +161,25 @@ export function makeWorkflowKindHandler(opts: {
         brief: t.brief,
         ...(t.details !== undefined ? { details: t.details } : {}),
         origin: "schedule",
-        metadata: { scheduleId, firedAt },
+        originId: scheduleId,
+        metadata: { firedAt },
       });
       return { id: result.workflowId };
     },
 
-    // PERF / KNOWN N+1: both `hasInFlightForSchedule` and
-    // `deleteForSchedule` pull EVERY schedule-originated workflow via
-    // `workflows.list({ origin: "schedule" })` and then filter
-    // client-side on `metadata.scheduleId`. `ListWorkflowOpts` (in
-    // `@glyphs-ai/workflow`) exposes no metadata / scheduleId predicate,
-    // so there is no DB-scoped narrowing reachable from this layer. For
-    // a schedule that has fired thousands of times this is the hot path
-    // for `DELETE /schedules/:sid`, and `deleteForSchedule` compounds
-    // it: a `getDag` per matched workflow plus an in-flight probe +
-    // `findTaskByWorkflowNode` per node (N+M+P round-trips). The real
-    // fix is a metadata-scoped `WorkflowService.list` filter (or a
-    // dedicated `findBySchedule`) in the workflow substrate — out of
-    // scope for this api-only pass. Mirror the task handler's
-    // DB-scoped `tasks.hasInFlightByOriginMetadata` /
-    // `tasks.deleteTerminalByOriginMetadata` once that lands.
+    // Both lookups narrow to the schedule's workflows in SQL via the
+    // typed `(origin, origin_id)` column pair (served by
+    // `workflows_origin_pair_idx`), so the DB returns only the rows for
+    // this schedule — no full `origin: "schedule"` scan + client-side
+    // `metadata.scheduleId` filter.
     async hasInFlightForSchedule(scheduleId) {
-      const all = await workflows.list({ origin: "schedule" });
-      return all.some((wf) => wf.status === "running" && wf.metadata.scheduleId === scheduleId);
+      const matched = await workflows.list({ origin: "schedule", originId: scheduleId });
+      return matched.some((wf) => wf.status === "running");
     },
 
     async deleteForSchedule(scheduleId) {
-      const all = await workflows.list({ origin: "schedule" });
-      const terminal = all.filter(
-        (wf) => wf.status !== "running" && wf.metadata.scheduleId === scheduleId,
-      );
+      const matched = await workflows.list({ origin: "schedule", originId: scheduleId });
+      const terminal = matched.filter((wf) => wf.status !== "running");
       let deletedCount = 0;
       for (const wf of terminal) {
         // The workflow substrate's `deleteWorkflow` drops only its own

@@ -45,10 +45,10 @@
  *
  * # Spec invariants honored
  *
- *   - `task.metadata.workflowNodeId` is the canonical reverse-lookup
- *     key documented by `@glyphs-ai/workflow`. Worker and
- *     coord runners use the SAME key — `tasks.hasInFlightForWorkflowNode`
- *     covers both kinds via the existing partial index.
+ *   - The node's id lives in the task's typed `origin_id` column
+ *     (`origin: "workflow"`, `originId: nodeId`). Worker and
+ *     coord runners use the SAME column — `tasks.hasInFlightForWorkflowNode`
+ *     covers both kinds via the `tasks_origin_pair_idx` partial index.
  *   - `onTerminal` is fired exactly once per dispatched node by this
  *     runner (the interval is cleared the moment a terminal status
  *     is observed, and the per-node Map entry is dropped at the same
@@ -345,14 +345,13 @@ export function makeCoordNodeRunner(
         // conditional spread.
         ...(wf.details !== undefined ? { details: wf.details } : {}),
         origin: "workflow",
-        // `workflowNodeId` is the canonical reverse-lookup metadata
-        // key documented by `@glyphs-ai/workflow`; `workflowId`
-        // is included for log correlation only. Worker and coord
-        // runners use the SAME key — `tasks.hasInFlightForWorkflowNode`
-        // covers both kinds via the existing partial index.
+        originId: opts.nodeId,
+        // `workflowId` stays in metadata for log correlation only.
+        // Worker and coord runners write the node reverse-lookup id to
+        // the SAME typed `origin_id` column — `tasks.hasInFlightForWorkflowNode`
+        // covers both kinds via the `tasks_origin_pair_idx` index.
         metadata: {
           workflowId: opts.workflowId,
-          workflowNodeId: opts.nodeId,
         },
         // Override the default framing prompt so the spawned coord
         // task receives the coord-kind opener defined at the top of

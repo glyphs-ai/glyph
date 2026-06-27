@@ -336,7 +336,7 @@ export class WorkspaceContextRegistry {
       cleanup.push(() => taskModule.close());
 
       // Schedules are composed AFTER tasks so the kind handler's
-      // `dispatch` / `hasInFlightByOriginMetadata` / `deleteTerminalByOriginMetadata`
+      // `dispatch` / `hasInFlightByOrigin` / `deleteTerminalByOrigin`
       // can bridge to a live `TaskService`. The same workspace.db
       // file is reused (WAL-mode shared connection); migrations are
       // idempotent.
@@ -354,7 +354,7 @@ export class WorkspaceContextRegistry {
       // register-before-recover requirement. The order is also
       // load-bearing for the catchup path: a catchup fire (next
       // fire in the past at boot) needs the freshly-reconciled
-      // task list when it checks hasInFlightByOriginMetadata.
+      // task list when it checks hasInFlightByOrigin.
       scheduleModule.service.registerKind(
         "task",
         makeTaskKindHandler({
@@ -402,7 +402,7 @@ export class WorkspaceContextRegistry {
 
       // Register workflow kind AFTER compose so the handler can
       // reference the live WorkflowService for dispatch / hasInFlight
-      // / deleteTerminalByOriginMetadata. Both kinds are now registered; recover()
+      // / deleteTerminalByOrigin. Both kinds are now registered; recover()
       // below will preflight all persisted rows and fire catchups.
       scheduleModule.service.registerKind(
         "workflow",

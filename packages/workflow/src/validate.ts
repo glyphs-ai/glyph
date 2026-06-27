@@ -162,18 +162,18 @@ export function assertValidWorkflowNodeKind(kind: unknown): asserts kind is Work
   }
 }
 
-// ─── Origin enum check ──────────────────────────────────────────────
-
-const VALID_ORIGINS: readonly WorkflowOrigin[] = ["standalone", "schedule"];
+// ─── Origin check ───────────────────────────────────────────────────
 
 /**
- * Enum-membership check for `workflows.origin`. Throws
- * {@link WorkflowEnumValueCorruptionError} on miss — used by
- * `WorkflowEntity.fromRow` to reject corrupted rows.
+ * `workflows.origin` is an open string discriminator: `"standalone"`
+ * is the reserved default for user-created workflows, and integration
+ * handlers may introduce further origins (e.g. `"schedule"`) without a
+ * substrate change. The only shape rejected is a non-string / empty
+ * value, which can only come from a corrupted or hand-edited row.
  */
 export function assertValidWorkflowOriginEnum(origin: unknown): asserts origin is WorkflowOrigin {
-  if (typeof origin !== "string" || !(VALID_ORIGINS as readonly string[]).includes(origin)) {
-    throw new WorkflowEnumValueCorruptionError("origin", String(origin), VALID_ORIGINS);
+  if (typeof origin !== "string" || origin.length === 0) {
+    throw new WorkflowEnumValueCorruptionError("origin", String(origin), ["<non-empty string>"]);
   }
 }
 

@@ -10,7 +10,6 @@ import type {
 import { assertValidTaskId, generateTaskId, TASK_ID_RE } from "./validate.js";
 
 const VALID_STATUSES = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
-const VALID_ORIGINS = new Set<TaskOrigin>(["standalone", "workflow", "schedule"]);
 
 /**
  * Args accepted by {@link TaskEntity.create}. `agent` and `brief` are
@@ -38,6 +37,14 @@ export interface TaskCreateArgs {
    * can hide non-standalone tasks.
    */
   readonly origin?: TaskOrigin;
+  /**
+   * First-class routing id for a cross-package origin: the schedule
+   * id for `origin = 'schedule'`, the workflow-node id for `origin =
+   * 'workflow'`. Omitted (→ `undefined`) for standalone tasks. The
+   * substrate persists it in the typed `origin_id` column, never in
+   * `metadata`.
+   */
+  readonly originId?: string;
   /** Override the task id (deterministic-test seam). */
   readonly id?: string;
   /** Override creation timestamp (ISO 8601 UTC string). */
@@ -62,6 +69,7 @@ export interface TaskFromStoredArgs {
   readonly brief: string;
   readonly details?: string;
   readonly origin: TaskOrigin;
+  readonly originId?: string;
   readonly status: TaskStatus;
   readonly metadata: Readonly<Record<string, unknown>>;
   readonly createdAt: string;
@@ -117,6 +125,7 @@ export class TaskEntity {
     private readonly _brief: string,
     private readonly _details: string | undefined,
     private readonly _origin: TaskOrigin,
+    private readonly _originId: string | undefined,
     private readonly _status: TaskStatus,
     private readonly _metadata: Readonly<Record<string, unknown>>,
     private readonly _createdAt: string,
@@ -148,6 +157,7 @@ export class TaskEntity {
       args.brief,
       args.details,
       origin,
+      args.originId,
       "running",
       Object.freeze({ ...(args.metadata ?? {}) }),
       createdAt,
@@ -176,11 +186,11 @@ export class TaskEntity {
     if (args.details !== undefined && typeof args.details !== "string") {
       throw new CorruptedTaskError(args.id, "task.details, when present, must be a string");
     }
-    if (typeof args.origin !== "string" || !VALID_ORIGINS.has(args.origin as TaskOrigin)) {
-      throw new CorruptedTaskError(
-        args.id,
-        `task.origin must be one of: ${[...VALID_ORIGINS].join(", ")}`,
-      );
+    if (typeof args.origin !== "string" || args.origin.length === 0) {
+      throw new CorruptedTaskError(args.id, "task.origin must be a non-empty string");
+    }
+    if (args.originId !== undefined && typeof args.originId !== "string") {
+      throw new CorruptedTaskError(args.id, "task.origin_id, when present, must be a string");
     }
     if (typeof args.status !== "string" || !VALID_STATUSES.has(args.status)) {
       throw new CorruptedTaskError(
@@ -245,6 +255,7 @@ export class TaskEntity {
       args.brief,
       args.details,
       args.origin,
+      args.originId,
       args.status,
       Object.freeze({ ...args.metadata }),
       args.createdAt,
@@ -270,6 +281,14 @@ export class TaskEntity {
   }
   get origin(): TaskOrigin {
     return this._origin;
+  }
+  /**
+   * Routing id for a cross-package origin (schedule id / workflow-node
+   * id); `undefined` for standalone tasks. Backed by the typed
+   * `origin_id` column.
+   */
+  get originId(): string | undefined {
+    return this._originId;
   }
   get status(): TaskStatus {
     return this._status;
@@ -357,6 +376,7 @@ export class TaskEntity {
       this._brief,
       this._details,
       this._origin,
+      this._originId,
       this._status,
       Object.freeze({ ...metadata }),
       this._createdAt,
@@ -388,6 +408,7 @@ export class TaskEntity {
       brief: this._brief,
       ...(this._details !== undefined ? { details: this._details } : {}),
       origin: this._origin,
+      ...(this._originId !== undefined ? { originId: this._originId } : {}),
       status: this._status,
       metadata: this._metadata,
       createdAt: this._createdAt,
@@ -415,6 +436,7 @@ export class TaskEntity {
       this._brief,
       this._details,
       this._origin,
+      this._originId,
       patch.status,
       patch.metadata,
       this._createdAt,

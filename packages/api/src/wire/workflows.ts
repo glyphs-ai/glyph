@@ -107,6 +107,12 @@ export interface WorkflowHeader {
   readonly coordinatorAgent: string;
   readonly status: WorkflowStatus;
   readonly origin: WorkflowOrigin;
+  /**
+   * Typed routing id for the originating integration (e.g. the schedule
+   * id when `origin === "schedule"`). Projected from the first-class
+   * `origin_id` column; absent for `standalone` workflows.
+   */
+  readonly originId?: string;
   readonly metadata: Readonly<Record<string, unknown>>;
   /**
    * Coordinator-chain depth at projection time. Present on
@@ -147,8 +153,9 @@ export interface WorkflowNode {
    * too (see `packages/api/src/wiring/workflow-coord-task-runner.ts`).
    * Absent on a node that has been inserted but not yet dispatched
    * (a tight window in normal operation). Server-enriched at
-   * projection time via the `task.metadata.workflowNodeId === node.id`
-   * reverse-lookup; see `projectWorkflowNodeWithTaskId` in
+   * projection time via the typed `(origin, origin_id)` reverse-lookup
+   * (a task with `origin === "workflow"` and `origin_id === node.id`);
+   * see `projectWorkflowNodeWithTaskId` in
    * `packages/server/src/routes/_workflow-projection.ts`.
    */
   readonly taskId?: string;

@@ -74,7 +74,7 @@ export const workflowRoutes = {
   /**
    * Schedule-origin list of workflows launched by cron triggers.
    * Mirrors `tasks.scheduled.list` but returns `WorkflowHeader[]`.
-   * Constrained to schedule-launched workflows (metadata.scheduleId)
+   * Constrained to schedule-launched workflows (`origin = "schedule"`)
    * server-side; callers cannot widen.
    */
   "workflows.scheduled.list": defineRoute<

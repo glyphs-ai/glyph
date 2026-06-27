@@ -57,6 +57,7 @@ interface RunDispatchArgs {
   readonly brief: string;
   readonly details: string | undefined;
   readonly origin: TaskOrigin;
+  readonly originId?: string;
   readonly runtime: Runtime & { launchHeadless: NonNullable<Runtime["launchHeadless"]> };
   readonly resolveResult: ResolvedAgent;
   readonly metadata?: Readonly<Record<string, unknown>>;
@@ -150,6 +151,7 @@ export async function runDispatch(ctx: TaskServiceCtx, args: RunDispatchArgs): P
     brief,
     ...(details !== undefined ? { details } : {}),
     origin,
+    ...(args.originId !== undefined ? { originId: args.originId } : {}),
     createdAt,
     metadata: initialMeta,
   });

@@ -2160,25 +2160,26 @@ describe("resolveArtifactPath", () => {
   });
 });
 
-// ───── deleteTerminalByOriginMetadata (cascade-delete) ─────────────────
+// ───── deleteTerminalByOrigin (cascade-delete) ─────────────────
 //
 // Integration packages call this via typed wrappers to purge every
-// TERMINAL task matching an origin+metadata pair. Workdirs are enqueued
-// on the same serialised purgeQueue used by single-task delete.
+// TERMINAL task matching an (origin, origin_id) pair. Workdirs are
+// enqueued on the same serialised purgeQueue used by single-task delete.
 
-describe("TaskService.deleteTerminalByOriginMetadata (cascade-delete)", () => {
+describe("TaskService.deleteTerminalByOrigin (cascade-delete)", () => {
   async function seedFiredTask(
     m: TaskService,
     repo: TaskRepository,
-    args: { refId: string; status: "succeeded" | "failed" | "cancelled" },
+    args: { originId: string; status: "succeeded" | "failed" | "cancelled" },
   ): Promise<TaskEntity> {
     const t = await m.dispatch(dispatchOf());
     const ended = "2026-05-08T02:00:00.000Z";
     const base = {
       ...t,
       origin: "workflow" as const,
+      originId: args.originId,
       status: args.status,
-      metadata: { ...t.metadata, refId: args.refId },
+      metadata: { ...t.metadata },
       endedAt: ended,
     };
     const overlay: Record<string, unknown> = {};
@@ -2190,21 +2191,21 @@ describe("TaskService.deleteTerminalByOriginMetadata (cascade-delete)", () => {
     return reseeded;
   }
 
-  const OPTS = { origin: "workflow", metadataKey: "refId", metadataValue: "r1" } as const;
+  const OPTS = { origin: "workflow", originId: "r1" } as const;
 
   it("returns { deletedCount: 0 } when no historical tasks match", async () => {
     const { m } = await makeManager();
-    expect(await m.deleteTerminalByOriginMetadata(OPTS)).toEqual({ deletedCount: 0 });
+    expect(await m.deleteTerminalByOrigin(OPTS)).toEqual({ deletedCount: 0 });
   });
 
-  it("removes every terminal task matching origin+metadata and enqueues workdir purge", async () => {
+  it("removes every terminal task matching (origin, origin_id) and enqueues workdir purge", async () => {
     const rt = new StubRuntime();
     const { m, repo } = await makeManager({ runtime: rt });
-    const a = await seedFiredTask(m, repo, { refId: "r1", status: "succeeded" });
-    const b = await seedFiredTask(m, repo, { refId: "r1", status: "failed" });
-    const c = await seedFiredTask(m, repo, { refId: "r2", status: "succeeded" });
+    const a = await seedFiredTask(m, repo, { originId: "r1", status: "succeeded" });
+    const b = await seedFiredTask(m, repo, { originId: "r1", status: "failed" });
+    const c = await seedFiredTask(m, repo, { originId: "r2", status: "succeeded" });
 
-    const result = await m.deleteTerminalByOriginMetadata(OPTS);
+    const result = await m.deleteTerminalByOrigin(OPTS);
     expect(result).toEqual({ deletedCount: 2 });
 
     expect(await m.get(a.id)).toBeNull();
@@ -2217,11 +2218,11 @@ describe("TaskService.deleteTerminalByOriginMetadata (cascade-delete)", () => {
     expect(await safeStat(path.join(tasksDir, c.id))).not.toBeNull();
   });
 
-  it("does NOT delete running tasks even if metadata matches (terminal-only filter)", async () => {
+  it("does NOT delete running tasks even if origin_id matches (terminal-only filter)", async () => {
     const rt = new StubRuntime();
     const { m, repo } = await makeManager({ runtime: rt });
     const terminal = await seedFiredTask(m, repo, {
-      refId: "r1",
+      originId: "r1",
       status: "succeeded",
     });
     const live = await m.dispatch(dispatchOf());
@@ -2229,11 +2230,11 @@ describe("TaskService.deleteTerminalByOriginMetadata (cascade-delete)", () => {
       TaskEntity.fromStored({
         ...live,
         origin: "workflow",
-        metadata: { ...live.metadata, refId: "r1" },
+        originId: "r1",
       } as never),
     );
 
-    const result = await m.deleteTerminalByOriginMetadata(OPTS);
+    const result = await m.deleteTerminalByOrigin(OPTS);
     expect(result).toEqual({ deletedCount: 1 });
 
     expect(await m.get(terminal.id)).toBeNull();

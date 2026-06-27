@@ -13,7 +13,7 @@
  *     not-coord-eligible agent, but `AgentResolutionFailedError` (→ 500
  *     opaque) when the catalog itself throws (infra, not bad input)
  *   - `mergePatch` RFC 7396 semantics + `changedKeys` accuracy
- *   - `dispatch` synthesises `metadata: { scheduleId, firedAt }`,
+ *   - `dispatch` synthesises `originId: scheduleId` + `metadata: { firedAt }`,
  *     conditional-spreads `details`, returns `{ id }`
  *   - `hasInFlightForSchedule` true only for `running` workflows of the
  *     schedule
@@ -37,7 +37,7 @@ const COORD_OK = { name: "coord", dependencies: { agents: ["worker"] } };
 interface WfStub {
   id: string;
   status: string;
-  metadata: Record<string, unknown>;
+  originId?: string;
 }
 
 function stubDeps(
@@ -68,7 +68,13 @@ function stubDeps(
     return opts.agent === undefined ? COORD_OK : opts.agent;
   });
   const createWorkflow = vi.fn(async () => opts.createReturn ?? { workflowId: "wf-xyz" });
-  const listWorkflows = vi.fn(async () => opts.workflows ?? []);
+  // Models the substrate's `(origin, origin_id)` SQL filter: the handler
+  // delegates schedule-scoping to `list`, so the stub honours `originId`
+  // rather than the handler re-filtering client-side.
+  const listWorkflows = vi.fn(async (filter?: { originId?: string }) => {
+    const all = opts.workflows ?? [];
+    return filter?.originId === undefined ? all : all.filter((w) => w.originId === filter.originId);
+  });
   const getDag = vi.fn(async (id: string) => ({
     nodes: opts.dagNodes?.[id] ?? [],
   }));
@@ -300,7 +306,7 @@ describe("makeWorkflowKindHandler.mergePatch", () => {
 });
 
 describe("makeWorkflowKindHandler.dispatch", () => {
-  it("calls workflows.createWorkflow with metadata { scheduleId, firedAt } + returns { id }", async () => {
+  it("calls workflows.createWorkflow with origin/originId + metadata { firedAt } + returns { id }", async () => {
     const deps = stubDeps({ createReturn: { workflowId: "wf-001" } });
     const h = makeHandler(deps);
     const out = await h.dispatch({
@@ -313,7 +319,9 @@ describe("makeWorkflowKindHandler.dispatch", () => {
     const call = deps.createWorkflow.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(call.coordinatorAgent).toBe("coord");
     expect(call.brief).toBe("Ship it");
-    expect(call.metadata).toEqual({ scheduleId: "sched-abc", firedAt: "2026-06-01T00:00:00.000Z" });
+    expect(call.origin).toBe("schedule");
+    expect(call.originId).toBe("sched-abc");
+    expect(call.metadata).toEqual({ firedAt: "2026-06-01T00:00:00.000Z" });
   });
 
   it("conditional-spreads details (omits when not on data)", async () => {
@@ -345,8 +353,8 @@ describe("makeWorkflowKindHandler.hasInFlightForSchedule", () => {
   it("returns true only when a running workflow belongs to the schedule", async () => {
     const deps = stubDeps({
       workflows: [
-        { id: "w1", status: "succeeded", metadata: { scheduleId: "sched-abc" } },
-        { id: "w2", status: "running", metadata: { scheduleId: "sched-abc" } },
+        { id: "w1", status: "succeeded", originId: "sched-abc" },
+        { id: "w2", status: "running", originId: "sched-abc" },
       ],
     });
     const h = makeHandler(deps);
@@ -355,7 +363,7 @@ describe("makeWorkflowKindHandler.hasInFlightForSchedule", () => {
 
   it("ignores running workflows belonging to a different schedule", async () => {
     const deps = stubDeps({
-      workflows: [{ id: "w2", status: "running", metadata: { scheduleId: "other" } }],
+      workflows: [{ id: "w2", status: "running", originId: "other" }],
     });
     const h = makeHandler(deps);
     expect(await h.hasInFlightForSchedule("sched-abc")).toBe(false);
@@ -364,8 +372,8 @@ describe("makeWorkflowKindHandler.hasInFlightForSchedule", () => {
   it("returns false when only terminal workflows belong to the schedule", async () => {
     const deps = stubDeps({
       workflows: [
-        { id: "w1", status: "succeeded", metadata: { scheduleId: "sched-abc" } },
-        { id: "w3", status: "failed", metadata: { scheduleId: "sched-abc" } },
+        { id: "w1", status: "succeeded", originId: "sched-abc" },
+        { id: "w3", status: "failed", originId: "sched-abc" },
       ],
     });
     const h = makeHandler(deps);
@@ -377,11 +385,11 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
   it("cascades each terminal run's node-backing tasks (purge) then purges the workflow dir", async () => {
     const deps = stubDeps({
       workflows: [
-        { id: "wf-done", status: "succeeded", metadata: { scheduleId: "sched-abc" } },
+        { id: "wf-done", status: "succeeded", originId: "sched-abc" },
         // Running run for the SAME schedule must be left alone.
-        { id: "wf-live", status: "running", metadata: { scheduleId: "sched-abc" } },
+        { id: "wf-live", status: "running", originId: "sched-abc" },
         // Terminal run for a DIFFERENT schedule must be left alone.
-        { id: "wf-other", status: "failed", metadata: { scheduleId: "other" } },
+        { id: "wf-other", status: "failed", originId: "other" },
       ],
       dagNodes: { "wf-done": [{ id: "n1" }, { id: "n2" }] },
       nodeTasks: { n1: { id: "task-1" }, n2: { id: "task-2" } },
@@ -403,7 +411,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
 
   it("skips a node with no backing task (no throw)", async () => {
     const deps = stubDeps({
-      workflows: [{ id: "wf-done", status: "succeeded", metadata: { scheduleId: "sched-abc" } }],
+      workflows: [{ id: "wf-done", status: "succeeded", originId: "sched-abc" }],
       dagNodes: { "wf-done": [{ id: "n1" }, { id: "n2" }] },
       nodeTasks: { n1: { id: "task-1" }, n2: null },
     });
@@ -418,7 +426,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
 
   it("skips a terminal run that still has an in-flight node task (no partial delete)", async () => {
     const deps = stubDeps({
-      workflows: [{ id: "wf-racy", status: "succeeded", metadata: { scheduleId: "sched-abc" } }],
+      workflows: [{ id: "wf-racy", status: "succeeded", originId: "sched-abc" }],
       dagNodes: { "wf-racy": [{ id: "n1" }, { id: "n2" }] },
       inFlightNodes: new Set(["n2"]),
     });
@@ -433,7 +441,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
 
   it("returns deletedCount 0 when no terminal runs belong to the schedule", async () => {
     const deps = stubDeps({
-      workflows: [{ id: "wf-live", status: "running", metadata: { scheduleId: "sched-abc" } }],
+      workflows: [{ id: "wf-live", status: "running", originId: "sched-abc" }],
     });
     const h = makeHandler(deps);
     const out = await h.deleteForSchedule("sched-abc");

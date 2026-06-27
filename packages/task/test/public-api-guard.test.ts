@@ -117,7 +117,11 @@ describe("@glyphs-ai/task public API guard", () => {
     // status arms here ripples to every consumer that branches on them.
     expectTypeOf<TaskStatus>().toEqualTypeOf<"running" | "succeeded" | "failed" | "cancelled">();
     expectTypeOf<TerminalStatus>().toEqualTypeOf<"succeeded" | "failed" | "cancelled">();
-    expectTypeOf<TaskOrigin>().toEqualTypeOf<"standalone" | "workflow" | "schedule">();
+    // `origin`, by contrast, is an open string discriminator at the
+    // substrate: the kind-agnostic task table never enumerates its
+    // consumers. The closed, enumerable catalog of known origins
+    // lives at the contract / wire boundary, not here.
+    expectTypeOf<TaskOrigin>().toEqualTypeOf<string>();
 
     // Terminal payloads — discriminated unions; assert the discriminator
     // surface so a missing variant trips at compile time.
@@ -157,9 +161,9 @@ describe("@glyphs-ai/task public API guard", () => {
     expectTypeOf<TaskService>().toHaveProperty("get");
     expectTypeOf<TaskService>().toHaveProperty("cancel");
     expectTypeOf<TaskService>().toHaveProperty("delete");
-    expectTypeOf<TaskService>().toHaveProperty("hasInFlightByOriginMetadata");
-    expectTypeOf<TaskService>().toHaveProperty("deleteTerminalByOriginMetadata");
-    expectTypeOf<TaskService>().toHaveProperty("aggregateByOriginMetadataKey");
+    expectTypeOf<TaskService>().toHaveProperty("hasInFlightByOrigin");
+    expectTypeOf<TaskService>().toHaveProperty("deleteTerminalByOrigin");
+    expectTypeOf<TaskService>().toHaveProperty("aggregateByOrigin");
     expectTypeOf<TaskService>().toHaveProperty("getTaskActivity");
     expectTypeOf<TaskService>().toHaveProperty("getTaskActivityStream");
     expectTypeOf<TaskService>().toHaveProperty("recoverOrphaned");

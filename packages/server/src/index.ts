@@ -294,7 +294,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
 
   // `/scheduled-workflows` is the schedule-origin sibling of
   // `/workflows`. Returns workflows launched by cron triggers,
-  // filtered by `metadata.scheduleId`.
+  // filtered to `origin = 'schedule'`.
   const scheduledWorkflowsApp = createApiApp<{ Variables: WorkspaceVars }>();
   scheduledWorkflowsApp.use(
     "/:id/scheduled-workflows/*",

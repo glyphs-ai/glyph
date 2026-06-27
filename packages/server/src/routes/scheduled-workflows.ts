@@ -18,7 +18,7 @@ type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
  *
  * Mounted at the parent in `index.ts`; paths here are relative to that
  * mount. This route is **schedule-origin-only by construction** — the
- * filter is hardcoded to workflows whose `metadata.scheduleId` is set.
+ * filter is hardcoded to workflows whose `origin` is `"schedule"`.
  * Splitting at the URL layer (instead of via a `?origin=` discriminator
  * on `/workflows`) means each origin's caller surface gets a route whose
  * URL IS the contract; callers cannot accidentally widen the result set.
@@ -45,15 +45,17 @@ export function scheduledWorkflowsRoutes(
 
       try {
         const svc = resolveWorkflowService(c);
-        const [all, awaitingMap] = await Promise.all([
-          svc.list({ origin: "schedule" }),
+        // Narrow to schedule-origin workflows — optionally to a single
+        // schedule — through the typed `(origin, origin_id)` column pair,
+        // so the `?scheduleId=` filter is served from
+        // `workflows_origin_pair_idx` with no `metadata` JSON probing.
+        const [filtered, awaitingMap] = await Promise.all([
+          svc.list({
+            origin: "schedule",
+            ...(scheduleId !== undefined ? { originId: scheduleId } : {}),
+          }),
           svc.countAwaitingHumanByWorkflow(),
         ]);
-        // Optionally narrow to a specific scheduleId via metadata.
-        const filtered =
-          scheduleId !== undefined
-            ? all.filter((wf) => wf.metadata.scheduleId === scheduleId)
-            : all;
         // Project to wire headers — same entity→wire boundary every other
         // workflow route uses. `iterationCount` is omitted (O(workflows)
         // list semantics); `awaitingHumanCount` comes from the batch query.

@@ -213,9 +213,9 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
       expect(call.brief).toBe("my brief");
       expect(call.details).toBe("my long details");
       expect(call.origin).toBe("workflow");
+      expect(call.originId).toBe(initialCoordNodeId);
       expect(call.metadata).toEqual({
         workflowId,
-        workflowNodeId: initialCoordNodeId,
       });
     }
   });

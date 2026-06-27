@@ -15,7 +15,7 @@
  *
  *   - worker spec-shape validation
  *   - agent existence lookup (mirroring `schedule-task-handler.ts`)
- *   - origin/metadata synthesis for `TaskService.dispatch`
+ *   - origin/originId synthesis for `TaskService.dispatch`
  *   - polling `tasks.get(...)` to discover terminal status
  *   - mapping `TaskStatus` → `WorkflowNodeTerminalResult`
  *   - bookkeeping the per-node `setInterval` handle so `dispose()`
@@ -44,10 +44,10 @@
  *
  * # Spec invariants honored
  *
- * - `task.metadata.workflowNodeId` is the canonical reverse-lookup
- *   key documented by `@glyphs-ai/workflow`. This module never
+ * - The node's id lives in the task's typed `origin_id` column
+ *   (`origin: "workflow"`, `originId: nodeId`). This module never
  *   asks the substrate to persist the task id; reverse-lookup goes
- *   through this metadata key via
+ *   through that column via
  *   `TaskService.hasInFlightForWorkflowNode` / `listInFlightForWorkflowNode`.
  * - `onTerminal` is fired exactly once per dispatched node by this
  *   runner (the interval is cleared the moment a terminal status is
@@ -56,7 +56,7 @@
  *   identifier (the task id) at info level inside `dispatch` so
  *   operators can correlate substrate events with the underlying
  *   task; the substrate explicitly does NOT persist that id because
- *   reverse-lookup goes through the unit's metadata.
+ *   reverse-lookup goes through the unit's typed `origin_id` column.
  * - No retry, no exponential backoff at the runner level; a single
  *   runner-local poll-error budget (`maxPollErrors`, default 3)
  *   maps repeated `tasks.get` failures to
@@ -279,14 +279,12 @@ export function makeWorkerNodeRunner(
         ...(spec.details !== undefined ? { details: spec.details } : {}),
         ...(spec.runtime !== undefined ? { runtime: spec.runtime } : {}),
         origin: "workflow",
-        // `workflowNodeId` is the canonical reverse-lookup metadata
-        // key documented by `@glyphs-ai/workflow`; `workflowId`
-        // is included for log correlation only. Do NOT rename either
-        // key without updating the corresponding partial-index /
-        // hasInFlightForWorkflowNode SQL predicate.
+        originId: opts.nodeId,
+        // `workflowId` stays in metadata for log correlation only; the
+        // node reverse-lookup id lives in the typed `origin_id` column
+        // (`originId`), consumed by `tasks.hasInFlightForWorkflowNode`.
         metadata: {
           workflowId: opts.workflowId,
-          workflowNodeId: opts.nodeId,
         },
         // Worker tasks see the two workflow identity keys
         // (`GLYPH_WORKFLOW_ID`, `GLYPH_NODE_ID`) but NOT

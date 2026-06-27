@@ -8,10 +8,10 @@
  * row when several were dispatched (e.g. a re-dispatch after
  * cancel).
  *
- * Predicate is `origin = 'workflow' AND metadata.workflowNodeId = ?`
- * ordered by `createdAt DESC LIMIT 1`. The origin guard
- * discriminates: a standalone task that happens to carry
- * `metadata.workflowNodeId` does NOT count.
+ * Predicate is `origin = 'workflow' AND origin_id = ?` ordered by
+ * `createdAt DESC LIMIT 1`. The origin guard discriminates: a
+ * standalone task that happens to carry the same `origin_id` does
+ * NOT count.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -47,8 +47,6 @@ async function seed(args: {
   failure?: TaskFailure;
   cancellation?: TaskCancellation;
 }): Promise<void> {
-  const metadata: Record<string, unknown> = {};
-  if (args.workflowNodeId !== undefined) metadata.workflowNodeId = args.workflowNodeId;
   const createdAt = args.createdAt ?? "2026-05-19T01:00:00.000Z";
   await repo.save(
     TaskEntity.fromStored({
@@ -56,8 +54,9 @@ async function seed(args: {
       agent: "demo",
       brief: "b",
       origin: args.origin,
+      ...(args.workflowNodeId !== undefined ? { originId: args.workflowNodeId } : {}),
       status: args.status,
-      metadata,
+      metadata: {},
       createdAt,
       startedAt: createdAt,
       ...(args.status !== "running" ? { endedAt: "2026-05-19T02:00:00.000Z" } : {}),
@@ -99,7 +98,7 @@ describe("TaskRepository.findTaskByWorkflowNode", () => {
     expect(found).toBeNull();
   });
 
-  it("returns null when only a standalone task carries the same workflowNodeId (origin guard)", async () => {
+  it("returns null when only a standalone task carries the same origin_id (origin guard)", async () => {
     await seed({
       id: "20260519-cccccccc",
       origin: "standalone",

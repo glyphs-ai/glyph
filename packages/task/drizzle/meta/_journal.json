@@ -15,6 +15,13 @@
       "when": 1779868785367,
       "tag": "0001_tasks_schedule_id_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782481636402,
+      "tag": "0002_tasks_origin_id",
+      "breakpoints": true
     }
   ]
 }

@@ -189,12 +189,11 @@ export async function scheduleListTasks(opts: ScheduleListTasksOpts = {}): Promi
       stdout: formatTable(
         ["id", "agent", "status", "scheduleId", "createdAt"],
         list.map((t) => {
-          const meta = (t as { metadata?: { scheduleId?: string } }).metadata;
           return [
             (t as { id?: string }).id ?? "",
             (t as { agent?: string }).agent ?? "",
             (t as { status?: string }).status ?? "",
-            meta?.scheduleId ?? "",
+            (t as { originId?: string }).originId ?? "",
             (t as { createdAt?: string }).createdAt ?? "",
           ];
         }),
@@ -231,7 +230,7 @@ export async function scheduleListWorkflows(
       stdout: formatTable(
         ["id", "coordinatorAgent", "status", "scheduleId", "createdAt"],
         list.map((w) => {
-          const scheduleId = typeof w.metadata.scheduleId === "string" ? w.metadata.scheduleId : "";
+          const scheduleId = typeof w.originId === "string" ? w.originId : "";
           return [w.id, w.coordinatorAgent, w.status, scheduleId, w.createdAt];
         }),
       ),

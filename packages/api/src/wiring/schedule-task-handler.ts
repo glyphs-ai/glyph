@@ -16,7 +16,7 @@ import type { TaskTargetData, TaskTargetPatch } from "../wire/index.js";
  *   - task-target shape validation
  *   - agent existence lookup
  *   - RFC 7396 deep-merge of task target patches
- *   - origin/metadata synthesis for `TaskService.dispatch`
+ *   - origin/originId synthesis for `TaskService.dispatch`
  *   - lifecycle delegation for `hasInFlightForSchedule` /
  *     `deleteForSchedule`
  *
@@ -154,24 +154,23 @@ export function makeTaskKindHandler(opts: {
         ...(t.details !== undefined ? { details: t.details } : {}),
         ...(t.runtime !== undefined ? { runtime: t.runtime } : {}),
         origin: "schedule",
-        metadata: { scheduleId, firedAt },
+        originId: scheduleId,
+        metadata: { firedAt },
       });
       return { id: result.id };
     },
 
     hasInFlightForSchedule(scheduleId) {
-      return tasks.hasInFlightByOriginMetadata({
+      return tasks.hasInFlightByOrigin({
         origin: "schedule",
-        metadataKey: "scheduleId",
-        metadataValue: scheduleId,
+        originId: scheduleId,
       });
     },
 
     deleteForSchedule(scheduleId) {
-      return tasks.deleteTerminalByOriginMetadata({
+      return tasks.deleteTerminalByOrigin({
         origin: "schedule",
-        metadataKey: "scheduleId",
-        metadataValue: scheduleId,
+        originId: scheduleId,
       });
     },
   };

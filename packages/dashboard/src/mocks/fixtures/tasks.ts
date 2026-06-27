@@ -14,7 +14,7 @@ const ART_DIR = "/mock/workspaces/designer/tasks";
  *   - artifact count: 0 / 1 / N
  *   - artifact type: html / image / code (markdown/txt) / text / json
  *   - metadata.runtime: copilot + at least one alternative
- *   - origin: standalone + schedule (with metadata.scheduleId)
+ *   - origin: standalone + schedule (with typed originId)
  *
  * Keep this list <= 10 entries — one task can cover several axes at once.
  */
@@ -118,11 +118,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Nightly diff review (scheduled)",
     origin: "schedule",
     status: "succeeded",
+    originId: "sched-nightly-review",
     metadata: {
       workdir: `${ART_DIR}/schedule-launched`,
       runtime: "copilot",
       runtimeSessionId: "copilot-rt-sched-1",
-      scheduleId: "sched-nightly-review",
     },
     createdAt: "2026-05-27T02:00:00.000Z",
     startedAt: "2026-05-27T02:00:01.000Z",
@@ -154,7 +154,7 @@ export const fixtureTasks: TaskRecord[] = [
       ],
     },
   },
-  // Schedule-launched task fixtures. Each `metadata.scheduleId`
+  // Schedule-launched task fixtures. Each `originId`
   // matches one of the entries in
   // `fixtureSchedules`, so the per-schedule "Recent fires" panel on
   // the schedule detail surface has rows to render. Status mix keeps
@@ -166,11 +166,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Nightly cleanup",
     origin: "schedule",
     status: "succeeded",
+    originId: "sched-nightly-cleanup",
     metadata: {
       workdir: `${ART_DIR}/sched-cleanup-fire-1`,
       runtime: "copilot",
       runtimeSessionId: "copilot-rt-cleanup-1",
-      scheduleId: "sched-nightly-cleanup",
       firedAt: "2026-05-27T19:00:00.000Z",
     },
     createdAt: "2026-05-27T19:00:00.000Z",
@@ -187,11 +187,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Nightly cleanup",
     origin: "schedule",
     status: "failed",
+    originId: "sched-nightly-cleanup",
     metadata: {
       workdir: `${ART_DIR}/sched-cleanup-fire-2`,
       runtime: "copilot",
       runtimeSessionId: "copilot-rt-cleanup-2",
-      scheduleId: "sched-nightly-cleanup",
       firedAt: "2026-05-26T19:00:00.000Z",
     },
     createdAt: "2026-05-26T19:00:00.000Z",
@@ -209,11 +209,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Hourly health report",
     origin: "schedule",
     status: "running",
+    originId: "sched-hourly-report",
     metadata: {
       workdir: `${ART_DIR}/sched-report-fire-running`,
       runtime: "copilot",
       runtimeSessionId: "copilot-rt-report-1",
-      scheduleId: "sched-hourly-report",
       firedAt: "2026-05-27T23:00:00.000Z",
     },
     createdAt: "2026-05-27T23:00:00.000Z",
@@ -225,11 +225,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Hourly health report",
     origin: "schedule",
     status: "succeeded",
+    originId: "sched-hourly-report",
     metadata: {
       workdir: `${ART_DIR}/sched-report-fire-prev`,
       runtime: "copilot",
       runtimeSessionId: "copilot-rt-report-prev",
-      scheduleId: "sched-hourly-report",
       firedAt: "2026-05-27T22:00:00.000Z",
     },
     createdAt: "2026-05-27T22:00:00.000Z",
@@ -246,11 +246,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Weekly digest (last run before pause)",
     origin: "schedule",
     status: "succeeded",
+    originId: "sched-weekly-digest",
     metadata: {
       workdir: `${ART_DIR}/sched-digest-fire-pre-pause`,
       runtime: "claude",
       runtimeSessionId: "claude-rt-digest-1",
-      scheduleId: "sched-weekly-digest",
       firedAt: "2026-05-19T01:00:00.000Z",
     },
     createdAt: "2026-05-19T01:00:00.000Z",
@@ -273,11 +273,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Coordinator: plan auth-module OAuth migration",
     origin: "workflow",
     status: "succeeded",
+    originId: WF_IDS.nodes.migCoord0,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.migCoord0}`,
       runtime: "copilot",
       workflowId: "20260608-1f3a7b9c",
-      workflowNodeId: WF_IDS.nodes.migCoord0,
     },
     createdAt: "2026-05-27T21:00:00.000Z",
     startedAt: "2026-05-27T21:00:01.000Z",
@@ -290,11 +290,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Replace session middleware with OAuth in packages/server",
     origin: "workflow",
     status: "succeeded",
+    originId: WF_IDS.nodes.migTask1a,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.migTask1a}`,
       runtime: "copilot",
       workflowId: "20260608-1f3a7b9c",
-      workflowNodeId: WF_IDS.nodes.migTask1a,
     },
     createdAt: "2026-05-27T21:21:00.000Z",
     startedAt: "2026-05-27T21:21:02.000Z",
@@ -307,11 +307,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Coordinator: review patch + queue regression sweep",
     origin: "workflow",
     status: "succeeded",
+    originId: WF_IDS.nodes.migCoord2,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.migCoord2}`,
       runtime: "copilot",
       workflowId: "20260608-1f3a7b9c",
-      workflowNodeId: WF_IDS.nodes.migCoord2,
     },
     createdAt: "2026-05-27T22:31:00.000Z",
     startedAt: "2026-05-27T22:31:01.000Z",
@@ -324,11 +324,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Run the auth integration suite + summarise failures",
     origin: "workflow",
     status: "running",
+    originId: WF_IDS.nodes.migTask3a,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.migTask3a}`,
       runtime: "claude",
       workflowId: "20260608-1f3a7b9c",
-      workflowNodeId: WF_IDS.nodes.migTask3a,
     },
     createdAt: "2026-05-27T22:51:00.000Z",
     startedAt: "2026-05-27T22:51:02.000Z",
@@ -339,11 +339,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Coordinator: stage logger refactor across packages/catalog",
     origin: "workflow",
     status: "succeeded",
+    originId: WF_IDS.nodes.logCoord0,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.logCoord0}`,
       runtime: "copilot",
       workflowId: "20260607-2e4b8cad",
-      workflowNodeId: WF_IDS.nodes.logCoord0,
     },
     createdAt: "2026-05-27T00:00:00.000Z",
     startedAt: "2026-05-27T00:00:01.000Z",
@@ -356,11 +356,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Replace console.log calls in packages/catalog",
     origin: "workflow",
     status: "succeeded",
+    originId: WF_IDS.nodes.logTask1a,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.logTask1a}`,
       runtime: "copilot",
       workflowId: "20260607-2e4b8cad",
-      workflowNodeId: WF_IDS.nodes.logTask1a,
     },
     createdAt: "2026-05-27T00:11:00.000Z",
     startedAt: "2026-05-27T00:11:02.000Z",
@@ -373,11 +373,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Add structured-logger happy-path tests",
     origin: "workflow",
     status: "succeeded",
+    originId: WF_IDS.nodes.logTask1b,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.logTask1b}`,
       runtime: "copilot",
       workflowId: "20260607-2e4b8cad",
-      workflowNodeId: WF_IDS.nodes.logTask1b,
     },
     createdAt: "2026-05-27T00:12:00.000Z",
     startedAt: "2026-05-27T00:12:01.000Z",
@@ -390,11 +390,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Coordinator: bump contracts version (failed)",
     origin: "workflow",
     status: "failed",
+    originId: WF_IDS.nodes.bumpCoord0,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.bumpCoord0}`,
       runtime: "copilot",
       workflowId: "20260606-3d5c9dbe",
-      workflowNodeId: WF_IDS.nodes.bumpCoord0,
     },
     createdAt: "2026-05-26T00:00:00.000Z",
     startedAt: "2026-05-26T00:00:01.000Z",
@@ -407,11 +407,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Coordinator: brand kit landing-page plan",
     origin: "workflow",
     status: "succeeded",
+    originId: WF_IDS.nodes.brandCoord0,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.brandCoord0}`,
       runtime: "copilot",
       workflowId: "20260605-4e6dabcf",
-      workflowNodeId: WF_IDS.nodes.brandCoord0,
     },
     createdAt: "2026-05-25T00:00:00.000Z",
     startedAt: "2026-05-25T00:00:01.000Z",
@@ -424,11 +424,11 @@ export const fixtureTasks: TaskRecord[] = [
     brief: "Draft hero section copy + image layout",
     origin: "workflow",
     status: "cancelled",
+    originId: WF_IDS.nodes.brandTask1a,
     metadata: {
       workdir: `${ART_DIR}/${WF_IDS.tasks.brandTask1a}`,
       runtime: "copilot",
       workflowId: "20260605-4e6dabcf",
-      workflowNodeId: WF_IDS.nodes.brandTask1a,
     },
     createdAt: "2026-05-25T00:21:00.000Z",
     startedAt: "2026-05-25T00:21:02.000Z",

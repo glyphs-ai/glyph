@@ -61,12 +61,17 @@ export const TERMINAL_TASK_STATUSES = [
 ] as const satisfies readonly TerminalStatus[];
 
 /**
- * Who launched this task. A first-class column on the row that lets
- * tasks from different origins share the same T1 task table. New
- * dispatches default to `'standalone'` (a direct CLI / dashboard /
- * MCP call).
+ * Who launched this task. An open string discriminator rather than a
+ * closed enum: `"standalone"` is reserved for direct user dispatches
+ * (CLI / dashboard / MCP), while integration handlers supply their own
+ * origin (e.g. `"schedule"`, `"workflow"`) paired with a typed
+ * `originId`. The substrate deliberately does NOT enumerate its
+ * consumers; that decoupling is the point — adding a future origin
+ * (e.g. a webhook) needs no task-substrate change. The closed,
+ * enumerable catalog of currently-known origins lives at the
+ * contract / wire boundary (`@glyphs-ai/api` zod schemas), not here.
  */
-export type TaskOrigin = "standalone" | "workflow" | "schedule";
+export type TaskOrigin = string;
 
 /**
  * Payload attached when a Task transitions to `succeeded`. Both fields
@@ -156,6 +161,14 @@ export interface Task {
   readonly brief: string;
   readonly details?: string;
   readonly origin: TaskOrigin;
+  /**
+   * Routing id for a cross-package origin: the schedule id for
+   * `origin = 'schedule'`, the workflow-node id for `origin =
+   * 'workflow'`. Omitted for standalone tasks. Backed by the typed
+   * `origin_id` column; downstream surfaces (CLI / dashboard) map it
+   * to their domain label (e.g. the schedule-id column).
+   */
+  readonly originId?: string;
   readonly status: TaskStatus;
   readonly metadata: Readonly<Record<string, unknown>>;
   readonly createdAt: string;
@@ -220,6 +233,14 @@ export interface DispatchOpts {
    * tasks on demand.
    */
   readonly origin?: TaskOrigin;
+  /**
+   * First-class routing id for a cross-package origin — the schedule
+   * id for `origin = 'schedule'`, the workflow-node id for `origin =
+   * 'workflow'`. Persisted in the typed `origin_id` column, never in
+   * `metadata`. Omit for standalone dispatches. Callers pass this
+   * instead of stashing the id under a `metadata` key.
+   */
+  readonly originId?: string;
   /**
    * Optional caller-supplied metadata to shallow-merge into the initial
    * Task.metadata bag. Kernel-supplied keys (workdir, runtime) take
@@ -302,9 +323,11 @@ export interface ListTaskOpts {
    */
   readonly origin?: TaskOrigin | readonly TaskOrigin[];
   /**
-   * Filter to tasks whose top-level metadata key matches the given value.
-   * Combined with the other filters via AND. When the key matches a known
-   * partial expression index, the query engages it.
+   * Filter to tasks whose typed `origin_id` column matches this exact
+   * value. AND-combined with the other filters. Almost always paired
+   * with an `origin` filter — e.g. `{ origin: 'schedule', originId:
+   * scheduleId }` is how the public `?scheduleId=` wire filter maps to
+   * the substrate, engaging the `(origin, origin_id)` partial index.
    */
-  readonly metadataEquals?: { readonly key: string; readonly value: string };
+  readonly originId?: string;
 }
