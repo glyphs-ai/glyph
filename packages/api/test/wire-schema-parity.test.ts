@@ -410,8 +410,16 @@ describe("wire-schema parity", () => {
   });
 
   it("tasks / scheduled-tasks", () => {
+    // `origin` is the sole wire/substrate asymmetry: the wire schema
+    // pins the closed, enumerable catalog of known origins while the
+    // substrate keeps `origin` an open `string`, so the schema's
+    // origin is a strict subset of the DTO's. Assert that direction for
+    // the whole shape, and keep every other field in exact parity by
+    // comparing the reverse modulo `origin`.
     expectTypeOf<Wire<z.infer<typeof TaskSchema>>>().toExtend<Wire<Task>>();
-    expectTypeOf<Wire<Task>>().toExtend<Wire<z.infer<typeof TaskSchema>>>();
+    expectTypeOf<Wire<Omit<Task, "origin">>>().toExtend<
+      Wire<Omit<z.infer<typeof TaskSchema>, "origin">>
+    >();
 
     expectTypeOf<Wire<z.infer<typeof ActivityItemSchema>>>().toExtend<Wire<ActivityItem>>();
     expectTypeOf<Wire<ActivityItem>>().toExtend<Wire<z.infer<typeof ActivityItemSchema>>>();
@@ -590,8 +598,12 @@ describe("wire-schema parity", () => {
     expectTypeOf<Wire<z.infer<typeof WorkflowStatusSchema>>>().toExtend<Wire<WorkflowStatus>>();
     expectTypeOf<Wire<WorkflowStatus>>().toExtend<Wire<z.infer<typeof WorkflowStatusSchema>>>();
 
+    // One-directional by design: `WorkflowOriginSchema` is the closed
+    // wire catalog (OpenAPI enumerated values + client exhaustiveness)
+    // while the substrate `WorkflowOrigin` is an open `string`, so
+    // the schema's values are a strict subset of the substrate type. The
+    // reverse (open string -> closed enum) is intentionally not required.
     expectTypeOf<Wire<z.infer<typeof WorkflowOriginSchema>>>().toExtend<Wire<WorkflowOrigin>>();
-    expectTypeOf<Wire<WorkflowOrigin>>().toExtend<Wire<z.infer<typeof WorkflowOriginSchema>>>();
 
     expectTypeOf<Wire<z.infer<typeof WorkflowNodeStatusSchema>>>().toExtend<
       Wire<WorkflowNodeStatus>
@@ -640,8 +652,13 @@ describe("wire-schema parity", () => {
     expectTypeOf<Wire<z.infer<typeof WorkflowNodeSpecSchema>>>().toExtend<Wire<WorkflowNodeSpec>>();
     expectTypeOf<Wire<WorkflowNodeSpec>>().toExtend<Wire<z.infer<typeof WorkflowNodeSpecSchema>>>();
 
+    // `origin` widened to an open `string` on the substrate DTO (see the
+    // WorkflowOrigin note above); every other field stays in exact
+    // parity, so compare the reverse direction modulo `origin`.
     expectTypeOf<Wire<z.infer<typeof WorkflowHeaderSchema>>>().toExtend<Wire<WorkflowHeader>>();
-    expectTypeOf<Wire<WorkflowHeader>>().toExtend<Wire<z.infer<typeof WorkflowHeaderSchema>>>();
+    expectTypeOf<Wire<Omit<WorkflowHeader, "origin">>>().toExtend<
+      Wire<Omit<z.infer<typeof WorkflowHeaderSchema>, "origin">>
+    >();
 
     expectTypeOf<Wire<z.infer<typeof WorkflowNodeSchema>>>().toExtend<Wire<WorkflowNode>>();
     expectTypeOf<Wire<WorkflowNode>>().toExtend<Wire<z.infer<typeof WorkflowNodeSchema>>>();
@@ -649,8 +666,21 @@ describe("wire-schema parity", () => {
     expectTypeOf<Wire<z.infer<typeof WorkflowEdgeSchema>>>().toExtend<Wire<WorkflowEdge>>();
     expectTypeOf<Wire<WorkflowEdge>>().toExtend<Wire<z.infer<typeof WorkflowEdgeSchema>>>();
 
+    // `WorkflowDag` embeds a `WorkflowHeader`, so its only origin-bearing
+    // field is the nested `workflow.origin` — open `string` on the
+    // substrate vs the closed wire enum. Keep the schema-subset-of-dto
+    // direction whole, and assert the reverse modulo that nested origin
+    // (every other field is already in exact parity above).
     expectTypeOf<Wire<z.infer<typeof WorkflowDagSchema>>>().toExtend<Wire<WorkflowDag>>();
-    expectTypeOf<Wire<WorkflowDag>>().toExtend<Wire<z.infer<typeof WorkflowDagSchema>>>();
+    expectTypeOf<
+      Wire<Omit<WorkflowDag, "workflow"> & { workflow: Omit<WorkflowHeader, "origin"> }>
+    >().toExtend<
+      Wire<
+        Omit<z.infer<typeof WorkflowDagSchema>, "workflow"> & {
+          workflow: Omit<z.infer<typeof WorkflowHeaderSchema>, "origin">;
+        }
+      >
+    >();
 
     expectTypeOf<Wire<z.infer<typeof CreateWorkflowRequestSchema>>>().toExtend<
       Wire<CreateWorkflowRequest>

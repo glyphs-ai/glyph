@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, notInArray, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, notInArray, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import pino, { type Logger } from "pino";
 import { CorruptedTaskError, InvalidTaskIdError } from "./errors.js";
@@ -84,10 +84,7 @@ export class TaskRepository {
         : [opts.origin as TaskOrigin];
       if (origins.length > 0) filters.push(inArray(tasks.origin, origins));
     }
-    if (opts.metadataEquals !== undefined) {
-      const expr = resolveTaskMetadataExpr(opts.metadataEquals.key);
-      filters.push(sql`${expr} = ${opts.metadataEquals.value}`);
-    }
+    if (opts.originId !== undefined) filters.push(eq(tasks.originId, opts.originId));
     const query = this.db.select().from(tasks);
     const rows = filters.length > 0 ? query.where(and(...filters)).all() : query.all();
     const out: TaskEntity[] = [];
@@ -102,29 +99,24 @@ export class TaskRepository {
   }
 
   /**
-   * True if any task with the given `origin` and matching top-level
-   * metadata key/value is non-terminal (status not in
-   * {@link TERMINAL_TASK_STATUSES}). Origin-agnostic primitive;
-   * integration packages wrap with typed APIs.
-   *
-   * When `(origin, metadataKey)` matches a known partial expression
-   * index, the literal `json_extract` form is emitted so the planner
-   * engages the index without a full table scan.
+   * True if any task with the given `origin` and `originId` is
+   * non-terminal (status not in {@link TERMINAL_TASK_STATUSES}).
+   * Origin-agnostic primitive; integration packages wrap it with typed
+   * APIs. Queries the typed `(origin, origin_id)` pair so the planner
+   * engages `tasks_origin_pair_idx`.
    */
-  async hasInFlightByOriginMetadata(opts: {
+  async hasInFlightByOrigin(opts: {
     readonly origin: string;
-    readonly metadataKey: string;
-    readonly metadataValue: string;
+    readonly originId: string;
   }): Promise<boolean> {
-    const expr = resolveTaskMetadataExpr(opts.metadataKey);
     const row = this.db
       .select({ id: tasks.id })
       .from(tasks)
       .where(
         and(
           eq(tasks.origin, opts.origin),
+          eq(tasks.originId, opts.originId),
           notInArray(tasks.status, [...TERMINAL_TASK_STATUSES]),
-          sql`${expr} = ${opts.metadataValue}`,
         ),
       )
       .limit(1)
@@ -133,22 +125,13 @@ export class TaskRepository {
   }
 
   /**
-   * True if any task with `origin='workflow'` and
-   * `metadata.workflowNodeId === nodeId` is non-terminal (i.e. status
-   * is not in {@link TERMINAL_TASK_STATUSES}). Used by the workflow
-   * package's `hasInFlightForNode` reverse lookup for worker nodes
-   * (see `packages/api/src/wiring/workflow-worker-task-runner.ts`).
-   *
-   * Unlike indexed origin+key pairs, there is no functional
-   * index on `metadata.workflowNodeId`; the planner falls back to
-   * filtering by `origin='workflow'` first (still index-eligible
-   * via the same row's `origin` column path) and applying the
-   * `json_extract` predicate on the matched rows only.
-   *
-   * `workflowNodeId` is the canonical metadata key per
-   * `packages/workflow/src/types.ts:222` (substrate-side denorm of
-   * unit-of-work ids is explicitly forbidden; reverse lookup goes
-   * through this metadata key).
+   * True if any task with `origin='workflow'` and `originId === nodeId`
+   * is non-terminal (status not in {@link TERMINAL_TASK_STATUSES}).
+   * Used by the workflow package's `hasInFlightForNode` reverse lookup
+   * for worker nodes (see
+   * `packages/api/src/wiring/workflow-worker-task-runner.ts`). The node
+   * id lives in the first-class `origin_id` column, so this matches on
+   * the typed `(origin, origin_id)` pair.
    */
   async hasInFlightForWorkflowNode(nodeId: string): Promise<boolean> {
     const row = this.db
@@ -157,8 +140,8 @@ export class TaskRepository {
       .where(
         and(
           eq(tasks.origin, "workflow"),
+          eq(tasks.originId, nodeId),
           notInArray(tasks.status, [...TERMINAL_TASK_STATUSES]),
-          sql`json_extract(${tasks.metadata}, '$.workflowNodeId') = ${nodeId}`,
         ),
       )
       .limit(1)
@@ -167,10 +150,9 @@ export class TaskRepository {
   }
 
   /**
-   * List non-terminal tasks with `origin='workflow'` and
-   * `metadata.workflowNodeId === nodeId`. Used by the worker
-   * runner's `cancel(nodeId)` reverse-lookup to find which task(s)
-   * to cancel.
+   * List non-terminal tasks with `origin='workflow'` and `originId ===
+   * nodeId`. Used by the worker runner's `cancel(nodeId)`
+   * reverse-lookup to find which task(s) to cancel.
    *
    * Returns full entities (not just ids) because the caller needs
    * `task.id` for `tasks.cancel(...)` and the per-row error in
@@ -183,8 +165,8 @@ export class TaskRepository {
       .where(
         and(
           eq(tasks.origin, "workflow"),
+          eq(tasks.originId, nodeId),
           notInArray(tasks.status, [...TERMINAL_TASK_STATUSES]),
-          sql`json_extract(${tasks.metadata}, '$.workflowNodeId') = ${nodeId}`,
         ),
       )
       .all();
@@ -220,21 +202,14 @@ export class TaskRepository {
    * (only possible in the tight window between node insert and
    * worker dispatch; acceptable for the dashboard).
    *
-   * `workflowNodeId` is the canonical metadata key per
-   * `packages/workflow/src/types.ts:222`. Same `json_extract`
-   * predicate as the in-flight variants; filtering by `origin` stays
-   * index-eligible before the JSON predicate is applied.
+   * The node id lives in the first-class `origin_id` column; filtering
+   * by the typed `(origin, origin_id)` pair stays index-eligible.
    */
   async findTaskByWorkflowNode(nodeId: string): Promise<TaskEntity | null> {
     const row = this.db
       .select()
       .from(tasks)
-      .where(
-        and(
-          eq(tasks.origin, "workflow"),
-          sql`json_extract(${tasks.metadata}, '$.workflowNodeId') = ${nodeId}`,
-        ),
-      )
+      .where(and(eq(tasks.origin, "workflow"), eq(tasks.originId, nodeId)))
       .orderBy(desc(tasks.createdAt))
       .limit(1)
       .get();
@@ -252,8 +227,8 @@ export class TaskRepository {
 
   /**
    * Bulk-delete every TERMINAL task with the given `origin` and
-   * matching top-level metadata key/value. Returns deleted entities
-   * so the caller can enqueue per-task background work.
+   * `originId`. Returns deleted entities so the caller can enqueue
+   * per-task background work.
    *
    * Two-step (SELECT → DELETE) instead of `RETURNING` so that we can
    * map rows to entities BEFORE removing them: if a corrupted row
@@ -264,16 +239,14 @@ export class TaskRepository {
    * id, …)` list) so we sidestep SQLite's bound-variable limit at
    * large N.
    */
-  async deleteTerminalByOriginMetadata(opts: {
+  async deleteTerminalByOrigin(opts: {
     readonly origin: string;
-    readonly metadataKey: string;
-    readonly metadataValue: string;
+    readonly originId: string;
   }): Promise<TaskEntity[]> {
-    const expr = resolveTaskMetadataExpr(opts.metadataKey);
     const predicate = and(
       eq(tasks.origin, opts.origin),
+      eq(tasks.originId, opts.originId),
       inArray(tasks.status, [...TERMINAL_TASK_STATUSES]),
-      sql`${expr} = ${opts.metadataValue}`,
     );
     const rows = this.db.select().from(tasks).where(predicate).all();
     if (rows.length === 0) return [];
@@ -284,7 +257,7 @@ export class TaskRepository {
       } catch (err) {
         this.logger.warn(
           { taskId: row.id ?? null, err },
-          "tasks: skipping corrupted task row during deleteTerminalByOriginMetadata",
+          "tasks: skipping corrupted task row during deleteTerminalByOrigin",
         );
       }
     }
@@ -293,27 +266,21 @@ export class TaskRepository {
   }
 
   /**
-   * Origin-agnostic aggregation primitive. Returns per-metadataValue
-   * counts for tasks matching the given `origin` and top-level
-   * `metadataKey`. Single `origin` per call, single key per call.
-   *
-   * When `(origin, metadataKey)` matches a known partial expression
-   * index, the literal `json_extract` form is used so the planner
-   * can engage the index.
+   * Origin-agnostic aggregation primitive. Returns per-`originId`
+   * counts for tasks matching the given `origin` and the listed
+   * `originIds`. Single `origin` per call. Queries the typed `(origin,
+   * origin_id)` pair so the planner engages `tasks_origin_pair_idx`.
    */
-  async aggregateByOriginMetadataKey(opts: {
+  async aggregateByOrigin(opts: {
     readonly origin: string;
-    readonly metadataKey: string;
-    readonly metadataValues: readonly string[];
+    readonly originIds: readonly string[];
     readonly statusIn?: readonly string[];
   }): Promise<ReadonlyMap<string, { readonly totalCount: number; readonly runningCount: number }>> {
-    if (opts.metadataValues.length === 0) return new Map();
-
-    const metadataExpr = resolveTaskMetadataExpr(opts.metadataKey);
+    if (opts.originIds.length === 0) return new Map();
 
     const predicates: SQL[] = [
       eq(tasks.origin, opts.origin),
-      inArray(metadataExpr, [...opts.metadataValues]),
+      inArray(tasks.originId, [...opts.originIds]),
     ];
     if (opts.statusIn !== undefined && opts.statusIn.length > 0) {
       predicates.push(inArray(tasks.status, [...opts.statusIn]));
@@ -321,7 +288,7 @@ export class TaskRepository {
 
     const matchedRows = this.db
       .select({
-        metadataValue: metadataExpr,
+        originId: tasks.originId,
         status: tasks.status,
       })
       .from(tasks)
@@ -330,32 +297,16 @@ export class TaskRepository {
 
     const map = new Map<string, { totalCount: number; runningCount: number }>();
     for (const row of matchedRows) {
-      const current = map.get(row.metadataValue) ?? { totalCount: 0, runningCount: 0 };
+      if (row.originId === null) continue;
+      const current = map.get(row.originId) ?? { totalCount: 0, runningCount: 0 };
       current.totalCount += 1;
       if (row.status === "running") {
         current.runningCount += 1;
       }
-      map.set(row.metadataValue, current);
+      map.set(row.originId, current);
     }
     return map;
   }
-}
-
-/**
- * Known partial expression indexes on the `tasks` table. When the
- * caller's metadataKey matches a known entry, the repository emits the
- * literal SQL form so SQLite's query planner can prove syntactic
- * equivalence with the index expression and engage it. For unindexed
- * keys, falls back to dynamic path concatenation.
- */
-const TASK_INDEXED_METADATA_KEYS: ReadonlyMap<string, ReturnType<typeof sql<string>>> = new Map([
-  ["scheduleId", sql<string>`json_extract(${tasks.metadata}, '$.scheduleId')`],
-]);
-
-function resolveTaskMetadataExpr(metadataKey: string) {
-  const indexed = TASK_INDEXED_METADATA_KEYS.get(metadataKey);
-  if (indexed) return indexed;
-  return sql<string>`json_extract(${tasks.metadata}, '$.' || ${metadataKey})`;
 }
 
 function taskToRowFields(task: TaskEntity): {
@@ -366,6 +317,7 @@ function taskToRowFields(task: TaskEntity): {
   brief: string;
   details: string | null;
   origin: TaskOrigin;
+  originId: string | null;
   createdAt: string;
   startedAt: string;
   endedAt: string | null;
@@ -390,6 +342,7 @@ function taskToRowFields(task: TaskEntity): {
     brief: task.brief,
     details: task.details ?? null,
     origin: task.origin,
+    originId: task.originId ?? null,
     createdAt: task.createdAt,
     startedAt: task.startedAt,
     endedAt: task.endedAt ?? null,
@@ -428,6 +381,7 @@ function rowToTask(row: TaskRow): TaskEntity {
     brief: row.brief,
     ...(row.details !== null ? { details: row.details } : {}),
     origin: row.origin as TaskOrigin,
+    ...(row.originId !== null ? { originId: row.originId } : {}),
     status: row.status as TaskStatus,
     metadata,
     createdAt: row.createdAt,

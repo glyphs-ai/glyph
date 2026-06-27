@@ -13,7 +13,7 @@
  *     catalog throw
  *   - `mergePatch` RFC 7396 semantics + `changedKeys` accuracy
  *   - `dispatch` synthesises `origin: "schedule"` +
- *     `metadata: { scheduleId, firedAt }`, conditional-spreads
+ *     `originId: scheduleId` + `metadata: { firedAt }`, conditional-spreads
  *     `details` / `runtime`, returns `{ id }`
  *   - `hasInFlightForSchedule` / `deleteForSchedule` delegation
  */
@@ -33,29 +33,29 @@ function stubDeps(
   tasks: TaskService;
   getAgent: ReturnType<typeof vi.fn>;
   dispatch: ReturnType<typeof vi.fn>;
-  hasInFlightByOriginMetadata: ReturnType<typeof vi.fn>;
-  deleteTerminalByOriginMetadata: ReturnType<typeof vi.fn>;
+  hasInFlightByOrigin: ReturnType<typeof vi.fn>;
+  deleteTerminalByOrigin: ReturnType<typeof vi.fn>;
 } {
   const getAgent = vi.fn(async (_fqn: string) => {
     if (opts.getAgentThrows !== undefined) throw opts.getAgentThrows;
     return opts.agent === undefined ? { name: "default-agent" } : opts.agent;
   });
   const dispatch = vi.fn(async () => opts.dispatchReturn ?? { id: "task-xyz" });
-  const hasInFlightByOriginMetadata = vi.fn(async () => false);
-  const deleteTerminalByOriginMetadata = vi.fn(async () => ({ deletedCount: 0 }));
+  const hasInFlightByOrigin = vi.fn(async () => false);
+  const deleteTerminalByOrigin = vi.fn(async () => ({ deletedCount: 0 }));
   const catalog = { getAgent } as unknown as CatalogService;
   const tasks = {
     dispatch,
-    hasInFlightByOriginMetadata,
-    deleteTerminalByOriginMetadata,
+    hasInFlightByOrigin,
+    deleteTerminalByOrigin,
   } as unknown as TaskService;
   return {
     catalog,
     tasks,
     getAgent,
     dispatch,
-    hasInFlightByOriginMetadata,
-    deleteTerminalByOriginMetadata,
+    hasInFlightByOrigin,
+    deleteTerminalByOrigin,
   };
 }
 
@@ -267,7 +267,8 @@ describe("makeTaskKindHandler.dispatch", () => {
     expect(call.agent).toBe("writer");
     expect(call.brief).toBe("Summarize");
     expect(call.origin).toBe("schedule");
-    expect(call.metadata).toEqual({ scheduleId: "sched-abc", firedAt: "2026-06-01T00:00:00.000Z" });
+    expect(call.originId).toBe("sched-abc");
+    expect(call.metadata).toEqual({ firedAt: "2026-06-01T00:00:00.000Z" });
   });
 
   it("conditional-spreads details + runtime (omits when not on data)", async () => {
@@ -298,27 +299,25 @@ describe("makeTaskKindHandler.dispatch", () => {
 });
 
 describe("makeTaskKindHandler.hasInFlightForSchedule + deleteForSchedule", () => {
-  it("hasInFlightForSchedule delegates to hasInFlightByOriginMetadata", async () => {
+  it("hasInFlightForSchedule delegates to hasInFlightByOrigin", async () => {
     const deps = stubDeps();
-    deps.hasInFlightByOriginMetadata.mockResolvedValueOnce(true);
+    deps.hasInFlightByOrigin.mockResolvedValueOnce(true);
     const h = makeTaskKindHandler({ catalog: deps.catalog, tasks: deps.tasks });
     expect(await h.hasInFlightForSchedule("sched-abc")).toBe(true);
-    expect(deps.hasInFlightByOriginMetadata).toHaveBeenCalledWith({
+    expect(deps.hasInFlightByOrigin).toHaveBeenCalledWith({
       origin: "schedule",
-      metadataKey: "scheduleId",
-      metadataValue: "sched-abc",
+      originId: "sched-abc",
     });
   });
 
-  it("deleteForSchedule delegates to deleteTerminalByOriginMetadata", async () => {
+  it("deleteForSchedule delegates to deleteTerminalByOrigin", async () => {
     const deps = stubDeps();
-    deps.deleteTerminalByOriginMetadata.mockResolvedValueOnce({ deletedCount: 17 });
+    deps.deleteTerminalByOrigin.mockResolvedValueOnce({ deletedCount: 17 });
     const h = makeTaskKindHandler({ catalog: deps.catalog, tasks: deps.tasks });
     expect(await h.deleteForSchedule("sched-abc")).toEqual({ deletedCount: 17 });
-    expect(deps.deleteTerminalByOriginMetadata).toHaveBeenCalledWith({
+    expect(deps.deleteTerminalByOrigin).toHaveBeenCalledWith({
       origin: "schedule",
-      metadataKey: "scheduleId",
-      metadataValue: "sched-abc",
+      originId: "sched-abc",
     });
   });
 });

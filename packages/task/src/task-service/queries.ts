@@ -47,8 +47,8 @@ export async function listTasks(
 
 /**
  * True if any non-terminal task with `origin='workflow'` and
- * `metadata.workflowNodeId === nodeId` exists. Used by the workflow
- * worker runner's `hasInFlightForNode` implementation (see
+ * `originId === nodeId` exists. Used by the workflow worker runner's
+ * `hasInFlightForNode` implementation (see
  * `packages/api/src/wiring/workflow-worker-task-runner.ts`).
  */
 export async function hasInFlightForWorkflowNode(

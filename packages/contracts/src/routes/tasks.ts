@@ -43,7 +43,7 @@ export interface ScheduledTaskListQuery {
   readonly createdSince?: string;
   /** Comma-separated list of {@link TaskStatus}. */
   readonly status?: string;
-  /** Exact match on `metadata.scheduleId`. */
+  /** Exact match on the launching schedule's id (the typed `origin_id` column). */
   readonly scheduleId?: string;
 }
 

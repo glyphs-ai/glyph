@@ -39,16 +39,14 @@ export type WorkflowStatus = "running" | "succeeded" | "failed" | "cancelled";
 // ─── Origin discriminator ───────────────────────────────────────────
 
 /**
- * Who launched this workflow. Mirrors `TaskOrigin` from
- * `@glyphs-ai/task`. The discriminator partitions workflows into
- * disjoint surfaces — `GET /workflows` returns only `"standalone"`,
- * while origin-specific routes return their respective subset.
- *
- *   - `standalone` — created directly by a user via the dashboard,
- *     CLI, or MCP call.
- *   - `schedule` — created by an integration handler.
+ * Who launched this workflow. An open string discriminator rather than
+ * a closed enum: `"standalone"` is reserved for user-created workflows
+ * (dashboard / CLI / MCP); integration handlers supply their own origin
+ * (e.g. `"schedule"`) paired with a typed `originId`. The default
+ * `GET /workflows` endpoint filters to `"standalone"`, while origin-
+ * specific routes return their respective subset.
  */
-export type WorkflowOrigin = "standalone" | "schedule";
+export type WorkflowOrigin = string;
 
 // ─── Terminal payloads ──────────────────────────────────────────────
 
@@ -365,9 +363,9 @@ export interface WorkflowNodeRunner {
   /**
    * Fire the unit of work backing this node. Called by the substrate
    * when the node transitions `not_started|ready → running`. The
-   * runner dispatches whatever it needs (e.g. a task) and stamps
-   * `{ workflowId, workflowNodeId }` into the unit's metadata so the
-   * reverse-lookup partial indexes engage.
+   * runner dispatches whatever it needs (e.g. a task) and stamps the
+   * node id into the unit's typed `origin_id` column (alongside
+   * `origin: "workflow"`) so the reverse-lookup partial index engages.
    *
    * The runner MUST invoke `opts.onTerminal` exactly once per dispatch
    * when (and only when) it has observed a terminal outcome
@@ -389,8 +387,9 @@ export interface WorkflowNodeRunner {
    * The runner SHOULD log its substrate-side identifier (e.g. task
    * id) at info level inside `dispatch` so operators can correlate
    * substrate events with the unit-of-work. The substrate itself
-   * does NOT persist that id — reverse lookup goes through the
-   * unit's metadata (e.g. `task.metadata.workflowNodeId`), not
+   * does NOT persist that id — reverse lookup goes through the unit's
+   * typed `(origin, origin_id)` column pair (e.g. a task with
+   * `origin: "workflow"` and `origin_id` = the node id), not
    * through a `workflow_nodes` column. (Persisting it would create a
    * denorm the substrate would have to keep in sync with the
    * unit-of-work side.)
@@ -537,6 +536,12 @@ export interface CreateWorkflowOpts {
    */
   readonly origin?: WorkflowOrigin;
   /**
+   * Typed routing id for the originating integration (e.g. the
+   * schedule id for `origin: "schedule"`). Persisted to the first-class
+   * `origin_id` column, NOT `metadata`. Omit for `standalone`.
+   */
+  readonly originId?: string;
+  /**
    * Opaque caller-supplied metadata persisted onto the workflow row.
    * Forwarded verbatim to {@link WorkflowEntity.metadata}; defaults
    * to `{}` when omitted.
@@ -661,4 +666,11 @@ export interface ListWorkflowOpts {
    * every origin.
    */
   readonly origin?: WorkflowOrigin | readonly WorkflowOrigin[];
+  /**
+   * Filter to workflows whose typed `origin_id` column equals the given
+   * value. Pairs with `origin` (e.g. `{ origin: "schedule", originId }`)
+   * to resolve the originating integration's rows straight from the
+   * `workflows_origin_pair_idx` partial index. Omit to disable.
+   */
+  readonly originId?: string;
 }

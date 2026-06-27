@@ -71,6 +71,7 @@ export class WorkflowRepository {
     readonly createdSince?: string;
     readonly idLike?: string;
     readonly origin?: string | readonly string[];
+    readonly originId?: string;
   }): Promise<readonly WorkflowEntity[]> {
     const predicates = [];
     if (opts?.coordinatorAgent !== undefined) {
@@ -86,6 +87,9 @@ export class WorkflowRepository {
     if (opts?.origin !== undefined) {
       const origins: string[] = Array.isArray(opts.origin) ? [...opts.origin] : [opts.origin];
       if (origins.length > 0) predicates.push(inArray(workflows.origin, origins));
+    }
+    if (opts?.originId !== undefined) {
+      predicates.push(eq(workflows.originId, opts.originId));
     }
     const where = predicates.length === 0 ? undefined : and(...predicates);
     const rows =
@@ -209,9 +213,9 @@ export class WorkflowRepository {
   }
 
   /**
-   * Origin-agnostic aggregation primitive. Returns per-metadataValue
-   * counts for workflows matching the given `origin` and top-level
-   * `metadataKey`. Single `origin` per call, single key per call.
+   * Origin-agnostic aggregation primitive. Returns per-`originId`
+   * counts for workflows matching the given `origin` and the supplied
+   * `originIds`. Single `origin` per call.
    *
    * `statusIn`, when supplied, restricts to workflows with one of the
    * given statuses. When omitted, all statuses are included.
@@ -219,10 +223,9 @@ export class WorkflowRepository {
    * `awaitingCount` = number of matched workflows that have ≥1 running
    * human-kind node.
    */
-  async aggregateByOriginMetadataKey(opts: {
+  async aggregateByOrigin(opts: {
     readonly origin: string;
-    readonly metadataKey: string;
-    readonly metadataValues: readonly string[];
+    readonly originIds: readonly string[];
     readonly statusIn?: readonly string[];
   }): Promise<
     ReadonlyMap<
@@ -230,17 +233,14 @@ export class WorkflowRepository {
       { readonly totalCount: number; readonly runningCount: number; readonly awaitingCount: number }
     >
   > {
-    if (opts.metadataValues.length === 0) return new Map();
+    if (opts.originIds.length === 0) return new Map();
 
-    // When the (origin, metadataKey) pair matches a known partial
-    // expression index, emit the literal json_extract form so SQLite's
-    // query planner engages the index. Dynamic `'$.' || ?` prevents
-    // index usage because the planner matches expressions syntactically.
-    const metadataExpr = resolveWorkflowMetadataExpr(opts.origin, opts.metadataKey);
-
+    // `(origin, origin_id)` is a first-class composite column pair backed
+    // by the `workflows_origin_pair_idx` partial index, so the planner
+    // can serve this straight from the index — no json_extract probing.
     const predicates = [
       eq(workflows.origin, opts.origin),
-      inArray(metadataExpr, [...opts.metadataValues]),
+      inArray(workflows.originId, [...opts.originIds]),
     ];
     if (opts.statusIn !== undefined && opts.statusIn.length > 0) {
       predicates.push(inArray(workflows.status, [...opts.statusIn]));
@@ -248,7 +248,7 @@ export class WorkflowRepository {
 
     const matchedRows = this.db
       .select({
-        metadataValue: metadataExpr,
+        originId: workflows.originId,
         workflowId: workflows.id,
         status: workflows.status,
       })
@@ -280,7 +280,8 @@ export class WorkflowRepository {
       { totalCount: number; runningCount: number; awaitingCount: number }
     >();
     for (const row of matchedRows) {
-      const current = map.get(row.metadataValue) ?? {
+      if (row.originId === null) continue;
+      const current = map.get(row.originId) ?? {
         totalCount: 0,
         runningCount: 0,
         awaitingCount: 0,
@@ -292,7 +293,7 @@ export class WorkflowRepository {
           current.awaitingCount += 1;
         }
       }
-      map.set(row.metadataValue, current);
+      map.set(row.originId, current);
     }
     return map;
   }
@@ -674,35 +675,6 @@ export class WorkflowRepository {
  */
 function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, "\\$&");
-}
-
-/**
- * Known partial expression indexes on the `workflows` table. Each entry
- * maps an `(origin, metadataKey)` pair to the literal `json_extract`
- * expression that the DDL uses. When the caller's arguments match a
- * known entry, the repository emits the literal SQL form so SQLite's
- * query planner can prove syntactic equivalence with the index expression
- * and use the index. For unindexed pairs, falls back to dynamic path
- * concatenation (`'$.' || ?`).
- */
-const WORKFLOW_INDEXED_METADATA: ReadonlyArray<{
-  origin: string;
-  metadataKey: string;
-  expr: ReturnType<typeof sql<string>>;
-}> = [
-  {
-    origin: "schedule",
-    metadataKey: "scheduleId",
-    expr: sql<string>`json_extract(${workflows.metadata}, '$.scheduleId')`,
-  },
-];
-
-function resolveWorkflowMetadataExpr(origin: string, metadataKey: string) {
-  const indexed = WORKFLOW_INDEXED_METADATA.find(
-    (e) => e.origin === origin && e.metadataKey === metadataKey,
-  );
-  if (indexed) return indexed.expr;
-  return sql<string>`json_extract(${workflows.metadata}, '$.' || ${metadataKey})`;
 }
 
 // Re-export row helpers so the service layer keeps a single import root.

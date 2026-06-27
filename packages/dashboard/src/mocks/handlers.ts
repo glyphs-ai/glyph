@@ -177,25 +177,21 @@ export const handlers = [
     const scheduleId = url.searchParams.get("scheduleId");
     let rows = store.tasks.filter((t) => t.origin === "schedule");
     if (scheduleId !== null) {
-      rows = rows.filter((t) => {
-        const rowScheduleId = (t.metadata as Record<string, unknown> | undefined)?.scheduleId;
-        return typeof rowScheduleId === "string" && rowScheduleId === scheduleId;
-      });
+      rows = rows.filter((t) => t.originId === scheduleId);
     }
     return HttpResponse.json(rows);
   }),
   // `/scheduled-workflows` is the workflow-kind sibling of
   // `/scheduled-tasks`: it carries the workflow runs a schedule has
   // launched, surfaced by the schedule detail's "Recent fires" panel
-  // for workflow-kind schedules. Workflows have no `origin` field, so
-  // "schedule-launched" is inferred from a string `metadata.scheduleId`.
+  // for workflow-kind schedules. "schedule-launched" is identified by
+  // the typed `originId` (set when `origin === "schedule"`).
   http.get(`/api/workspaces/${W}/scheduled-workflows`, ({ request }) => {
     const url = new URL(request.url);
     const scheduleId = url.searchParams.get("scheduleId");
     const rows = workflowsState.filter((w) => {
-      const rowScheduleId = (w.metadata as Record<string, unknown> | undefined)?.scheduleId;
-      if (typeof rowScheduleId !== "string") return false;
-      return scheduleId === null || rowScheduleId === scheduleId;
+      if (typeof w.originId !== "string") return false;
+      return scheduleId === null || w.originId === scheduleId;
     });
     return HttpResponse.json(rows);
   }),
@@ -541,7 +537,7 @@ export const handlers = [
     synthFireSeq += 1;
     const firedAt = new Date().toISOString();
     // Workflow-kind schedules synthesise a freshly-running workflow
-    // (header + single-coordinator DAG) tagged with `metadata.scheduleId`
+    // (header + single-coordinator DAG) tagged with the typed `originId`
     // so the detail surface's "Recent fires" panel (which polls
     // `/scheduled-workflows?scheduleId=…`) surfaces it, and clicking the
     // row swaps the right-pane into the workflow Mode B pane
@@ -562,8 +558,9 @@ export const handlers = [
           : {}),
         status: "running",
         origin: "schedule",
+        originId: row.id,
         coordinatorAgent: wfTarget.coordinatorAgent,
-        metadata: { scheduleId: row.id, firedAt },
+        metadata: { firedAt },
         awaitingHumanCount: 0,
         createdAt: firedAt,
         startedAt: firedAt,
@@ -602,11 +599,11 @@ export const handlers = [
       agent: dispatchAgent,
       brief: `${row.name} (manual run)`,
       origin: "schedule",
+      originId: row.id,
       status: "running",
       metadata: {
         workdir: `/mock/workspaces/designer/tasks/${dispatchId}`,
         ...(dispatchRuntime !== undefined ? { runtime: dispatchRuntime } : {}),
-        scheduleId: row.id,
         firedAt,
       },
       createdAt: firedAt,

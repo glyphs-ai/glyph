@@ -31,7 +31,11 @@ import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlit
  *
  * Indexes serve two read patterns: dashboard listings filter on
  * `status`, and the "list workflows currently run by agent X" admin
- * lookup filters on `coordinator_agent`.
+ * lookup filters on `coordinator_agent`. `origin_id` is the
+ * first-class routing id for a cross-package origin (the schedule id
+ * for `origin = 'schedule'` rows; NULL for `standalone`), backed by
+ * the `(origin, origin_id)` partial index so schedule lookups query a
+ * typed pair instead of probing `metadata` JSON.
  */
 export const workflows = sqliteTable(
   "workflows",
@@ -46,6 +50,7 @@ export const workflows = sqliteTable(
     failure: text("failure"),
     metadata: text("metadata").notNull().default("{}"),
     origin: text("origin").notNull().default("standalone"),
+    originId: text("origin_id"),
     startedAt: text("started_at"),
     status: text("status").notNull(),
     success: text("success"),
@@ -54,6 +59,10 @@ export const workflows = sqliteTable(
     index("workflows_status_idx").on(t.status),
     index("workflows_coordinator_agent_idx").on(t.coordinatorAgent),
     index("workflows_origin_idx").on(t.origin),
+    // workflows_origin_pair_idx is a composite partial index defined
+    // in drizzle/0004_workflows_origin_id.sql ((origin, origin_id)
+    // WHERE origin_id IS NOT NULL); drizzle-kit can't express partial
+    // indexes in the TS schema.
   ],
 );
 

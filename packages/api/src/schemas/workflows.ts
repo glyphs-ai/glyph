@@ -11,6 +11,13 @@ import { z } from "zod";
 
 export const WorkflowStatusSchema = z.enum(["running", "succeeded", "failed", "cancelled"]);
 
+// `origin` is route-closed and never inbound: the server hard-codes it
+// per route ("standalone" by default; "schedule" synthesized in the
+// schedule wiring), so this schema is not request validation — it is
+// the OpenAPI enumerated-values catalog plus the client-side response
+// type. Keep it an explicit enum even though the workflow substrate
+// stores `origin` as an open `string`; a future integration adds one
+// member here and one route, with no substrate change.
 export const WorkflowOriginSchema = z.enum(["standalone", "schedule"]);
 
 export const WorkflowNodeStatusSchema = z.enum([
@@ -83,6 +90,7 @@ export const WorkflowHeaderSchema = z.object({
   coordinatorAgent: z.string(),
   status: WorkflowStatusSchema,
   origin: WorkflowOriginSchema,
+  originId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()),
   iterationCount: z.number().optional(),
   awaitingHumanCount: z.number(),

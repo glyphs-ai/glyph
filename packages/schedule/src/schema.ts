@@ -12,8 +12,7 @@ import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
  * drizzle-kit cannot express functional partial indexes in schema; the
  * runtime query in `schedule-repository.ts` MUST use
  * `sql\`json_extract(${schedules.targetJson}, '$.agent')\`` against
- * `target_json` to engage it. The same pattern is used in
- * `@glyphs-ai/task` for `tasks_schedule_id_idx`.
+ * `target_json` to engage it.
  *
  * `next_fire_at` is persisted (despite being derivable from
  * trigger + last_fired_at) so the list endpoint can ORDER BY

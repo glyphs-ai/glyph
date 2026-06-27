@@ -582,6 +582,7 @@ export type GetApiWorkspacesByIdTasksResponses = {
         brief: string;
         details?: string;
         origin: 'standalone' | 'workflow' | 'schedule';
+        originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
             [key: string]: unknown;
@@ -648,6 +649,7 @@ export type PostApiWorkspacesByIdTasksResponses = {
         brief: string;
         details?: string;
         origin: 'standalone' | 'workflow' | 'schedule';
+        originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
             [key: string]: unknown;
@@ -751,6 +753,7 @@ export type GetApiWorkspacesByIdTasksByTidResponses = {
         brief: string;
         details?: string;
         origin: 'standalone' | 'workflow' | 'schedule';
+        originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
             [key: string]: unknown;
@@ -827,6 +830,7 @@ export type PostApiWorkspacesByIdTasksByTidCancelResponses = {
         brief: string;
         details?: string;
         origin: 'standalone' | 'workflow' | 'schedule';
+        originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
             [key: string]: unknown;
@@ -1094,6 +1098,7 @@ export type GetApiWorkspacesByIdScheduledTasksResponses = {
         brief: string;
         details?: string;
         origin: 'standalone' | 'workflow' | 'schedule';
+        originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
             [key: string]: unknown;
@@ -1159,6 +1164,7 @@ export type GetApiWorkspacesByIdScheduledWorkflowsResponses = {
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         origin: 'standalone' | 'schedule';
+        originId?: string;
         metadata: {
             [key: string]: unknown;
         };
@@ -1735,6 +1741,7 @@ export type GetApiWorkspacesByIdWorkflowsResponses = {
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         origin: 'standalone' | 'schedule';
+        originId?: string;
         metadata: {
             [key: string]: unknown;
         };
@@ -1796,6 +1803,7 @@ export type PostApiWorkspacesByIdWorkflowsResponses = {
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         origin: 'standalone' | 'schedule';
+        originId?: string;
         metadata: {
             [key: string]: unknown;
         };
@@ -1890,6 +1898,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidResponses = {
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         origin: 'standalone' | 'schedule';
+        originId?: string;
         metadata: {
             [key: string]: unknown;
         };
@@ -1950,6 +1959,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
             coordinatorAgent: string;
             status: 'running' | 'succeeded' | 'failed' | 'cancelled';
             origin: 'standalone' | 'schedule';
+            originId?: string;
             metadata: {
                 [key: string]: unknown;
             };
@@ -2155,6 +2165,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidCancelResponses = {
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         origin: 'standalone' | 'schedule';
+        originId?: string;
         metadata: {
             [key: string]: unknown;
         };
@@ -2491,6 +2502,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponses = {
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         origin: 'standalone' | 'schedule';
+        originId?: string;
         metadata: {
             [key: string]: unknown;
         };

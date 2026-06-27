@@ -47,6 +47,7 @@ export const TaskSchema = z.object({
   brief: z.string(),
   details: z.string().optional(),
   origin: z.enum(["standalone", "workflow", "schedule"]),
+  originId: z.string().optional(),
   status: z.enum(["running", "succeeded", "failed", "cancelled"]),
   metadata: z.record(z.string(), z.unknown()),
   createdAt: z.string(),

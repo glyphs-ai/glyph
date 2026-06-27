@@ -28,7 +28,6 @@ function makeWf(
   id: string,
   opts: { scheduleId?: string; status?: string; createdAt?: string } = {},
 ): WorkflowEntity {
-  const metadata = opts.scheduleId === undefined ? {} : { scheduleId: opts.scheduleId };
   return WorkflowEntity.fromRow({
     id,
     brief: `brief ${id}`,
@@ -36,7 +35,8 @@ function makeWf(
     coordinatorAgent: "official/engineer",
     status: (opts.status ?? "running") as never,
     origin: opts.scheduleId !== undefined ? "schedule" : "standalone",
-    metadata: JSON.stringify(metadata),
+    originId: opts.scheduleId ?? null,
+    metadata: "{}",
     createdAt: opts.createdAt ?? "2026-06-01T00:00:00.000Z",
     startedAt: null,
     endedAt: null,
@@ -74,16 +74,14 @@ describe("scheduledWorkflowsRoutes", () => {
     expect(list).toHaveBeenCalledWith({ origin: "schedule" });
   });
 
-  it("GET /?scheduleId=<id> narrows to that schedule", async () => {
-    const list = vi.fn(async () => [
-      makeWf(WF_A, { scheduleId: "sched-abc" }),
-      makeWf(WF_B, { scheduleId: "sched-xyz" }),
-    ]);
+  it("GET /?scheduleId=<id> narrows via the typed origin_id column", async () => {
+    const list = vi.fn(async () => [makeWf(WF_A, { scheduleId: "sched-abc" })]);
     const svc = stubService({ list });
     const res = await scheduledWorkflowsRoutes(() => svc).request("/?scheduleId=sched-abc");
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.map((w: { id: string }) => w.id)).toEqual([WF_A]);
+    expect(list).toHaveBeenCalledWith({ origin: "schedule", originId: "sched-abc" });
   });
 
   it("projects every row to the wire header — REQUIRED awaitingHumanCount is always present", async () => {

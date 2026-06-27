@@ -268,19 +268,33 @@ describe("TaskEntity.fromStored", () => {
     ).toThrow(/status must be one of/);
   });
 
-  it("throws CorruptedTaskError on an unknown origin", () => {
+  it("throws CorruptedTaskError on an empty origin", () => {
     expect(() =>
       TaskEntity.fromStored({
         id: FIXED_ID,
         agent: "a",
         brief: "do",
-        origin: "alien" as never,
+        origin: "",
         status: "running",
         metadata: {},
         createdAt: fixedNow,
         startedAt: fixedNow,
       }),
-    ).toThrow(/origin must be one of/);
+    ).toThrow(/origin must be a non-empty string/);
+  });
+
+  it("accepts an origin outside the built-in set (open substrate)", () => {
+    const t = TaskEntity.fromStored({
+      id: FIXED_ID,
+      agent: "a",
+      brief: "do",
+      origin: "webhook",
+      status: "running",
+      metadata: {},
+      createdAt: fixedNow,
+      startedAt: fixedNow,
+    });
+    expect(t.origin).toBe("webhook");
   });
 
   it("throws CorruptedTaskError on non-object metadata", () => {
