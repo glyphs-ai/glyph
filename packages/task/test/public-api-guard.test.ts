@@ -117,7 +117,11 @@ describe("@glyphs-ai/task public API guard", () => {
     // status arms here ripples to every consumer that branches on them.
     expectTypeOf<TaskStatus>().toEqualTypeOf<"running" | "succeeded" | "failed" | "cancelled">();
     expectTypeOf<TerminalStatus>().toEqualTypeOf<"succeeded" | "failed" | "cancelled">();
-    expectTypeOf<TaskOrigin>().toEqualTypeOf<"standalone" | "workflow" | "schedule">();
+    // `origin`, by contrast, is an open string discriminator at the
+    // substrate: the kind-agnostic task table never enumerates its
+    // consumers. The closed, enumerable catalog of known origins
+    // lives at the contract / wire boundary, not here.
+    expectTypeOf<TaskOrigin>().toEqualTypeOf<string>();
 
     // Terminal payloads — discriminated unions; assert the discriminator
     // surface so a missing variant trips at compile time.

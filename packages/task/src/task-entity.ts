@@ -10,7 +10,6 @@ import type {
 import { assertValidTaskId, generateTaskId, TASK_ID_RE } from "./validate.js";
 
 const VALID_STATUSES = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
-const VALID_ORIGINS = new Set<TaskOrigin>(["standalone", "workflow", "schedule"]);
 
 /**
  * Args accepted by {@link TaskEntity.create}. `agent` and `brief` are
@@ -187,11 +186,8 @@ export class TaskEntity {
     if (args.details !== undefined && typeof args.details !== "string") {
       throw new CorruptedTaskError(args.id, "task.details, when present, must be a string");
     }
-    if (typeof args.origin !== "string" || !VALID_ORIGINS.has(args.origin as TaskOrigin)) {
-      throw new CorruptedTaskError(
-        args.id,
-        `task.origin must be one of: ${[...VALID_ORIGINS].join(", ")}`,
-      );
+    if (typeof args.origin !== "string" || args.origin.length === 0) {
+      throw new CorruptedTaskError(args.id, "task.origin must be a non-empty string");
     }
     if (args.originId !== undefined && typeof args.originId !== "string") {
       throw new CorruptedTaskError(args.id, "task.origin_id, when present, must be a string");

@@ -6017,7 +6017,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "object",
                       },
                       "origin": {
-                        "minLength": 1,
+                        "enum": [
+                          "standalone",
+                          "schedule",
+                        ],
                         "type": "string",
                       },
                       "originId": {
@@ -9417,7 +9420,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "object",
                       },
                       "origin": {
-                        "minLength": 1,
+                        "enum": [
+                          "standalone",
+                          "schedule",
+                        ],
                         "type": "string",
                       },
                       "originId": {
@@ -9581,7 +9587,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "minLength": 1,
+                      "enum": [
+                        "standalone",
+                        "schedule",
+                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -9799,7 +9808,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "minLength": 1,
+                      "enum": [
+                        "standalone",
+                        "schedule",
+                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -10141,7 +10153,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "minLength": 1,
+                      "enum": [
+                        "standalone",
+                        "schedule",
+                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -10503,7 +10518,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "type": "object",
                         },
                         "origin": {
-                          "minLength": 1,
+                          "enum": [
+                            "standalone",
+                            "schedule",
+                          ],
                           "type": "string",
                         },
                         "originId": {
@@ -10791,7 +10809,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "minLength": 1,
+                      "enum": [
+                        "standalone",
+                        "schedule",
+                      ],
                       "type": "string",
                     },
                     "originId": {

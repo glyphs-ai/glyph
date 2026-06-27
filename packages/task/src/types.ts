@@ -61,12 +61,17 @@ export const TERMINAL_TASK_STATUSES = [
 ] as const satisfies readonly TerminalStatus[];
 
 /**
- * Who launched this task. A first-class column on the row that lets
- * tasks from different origins share the same T1 task table. New
- * dispatches default to `'standalone'` (a direct CLI / dashboard /
- * MCP call).
+ * Who launched this task. An open string discriminator rather than a
+ * closed enum: `"standalone"` is reserved for direct user dispatches
+ * (CLI / dashboard / MCP), while integration handlers supply their own
+ * origin (e.g. `"schedule"`, `"workflow"`) paired with a typed
+ * `originId`. The substrate deliberately does NOT enumerate its
+ * consumers; that decoupling is the point — adding a future origin
+ * (e.g. a webhook) needs no task-substrate change. The closed,
+ * enumerable catalog of currently-known origins lives at the
+ * contract / wire boundary (`@glyphs-ai/api` zod schemas), not here.
  */
-export type TaskOrigin = "standalone" | "workflow" | "schedule";
+export type TaskOrigin = string;
 
 /**
  * Payload attached when a Task transitions to `succeeded`. Both fields

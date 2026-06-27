@@ -1163,7 +1163,7 @@ export type GetApiWorkspacesByIdScheduledWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: string;
+        origin: 'standalone' | 'schedule';
         originId?: string;
         metadata: {
             [key: string]: unknown;
@@ -1740,7 +1740,7 @@ export type GetApiWorkspacesByIdWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: string;
+        origin: 'standalone' | 'schedule';
         originId?: string;
         metadata: {
             [key: string]: unknown;
@@ -1802,7 +1802,7 @@ export type PostApiWorkspacesByIdWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: string;
+        origin: 'standalone' | 'schedule';
         originId?: string;
         metadata: {
             [key: string]: unknown;
@@ -1897,7 +1897,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: string;
+        origin: 'standalone' | 'schedule';
         originId?: string;
         metadata: {
             [key: string]: unknown;
@@ -1958,7 +1958,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
             details?: string;
             coordinatorAgent: string;
             status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-            origin: string;
+            origin: 'standalone' | 'schedule';
             originId?: string;
             metadata: {
                 [key: string]: unknown;
@@ -2164,7 +2164,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidCancelResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: string;
+        origin: 'standalone' | 'schedule';
         originId?: string;
         metadata: {
             [key: string]: unknown;
@@ -2501,7 +2501,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: string;
+        origin: 'standalone' | 'schedule';
         originId?: string;
         metadata: {
             [key: string]: unknown;

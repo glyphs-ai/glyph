@@ -55,7 +55,7 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
       "\nUPDATE `workflows` SET `origin_id` = json_extract(`metadata`, '$.scheduleId')\n  WHERE `origin` = 'schedule' AND json_extract(`metadata`, '$.scheduleId') IS NOT NULL;\n",
       "\nCREATE INDEX `workflows_origin_pair_idx` ON `workflows` (`origin`, `origin_id`) WHERE `origin_id` IS NOT NULL;\n",
       "\nCREATE TEMP TABLE `_assert_workflows_origin_backfill` (`x`);\n",
-      "\nCREATE TEMP TRIGGER `_assert_workflows_origin_backfill_trg` BEFORE INSERT ON `_assert_workflows_origin_backfill`\nBEGIN\n  SELECT RAISE(FAIL, 'workflows backfill incomplete: non-standalone row without origin_id')\n  WHERE EXISTS (SELECT 1 FROM `workflows` WHERE `origin` != 'standalone' AND `origin_id` IS NULL);\nEND;\n",
+      "\nCREATE TEMP TRIGGER `_assert_workflows_origin_backfill_trg` BEFORE INSERT ON `_assert_workflows_origin_backfill`\nBEGIN\n  SELECT RAISE(\n    FAIL,\n    'workflows backfill incomplete: '\n      || (SELECT count(*) FROM `workflows` WHERE `origin` != 'standalone' AND `origin_id` IS NULL)\n      || ' non-standalone row(s) without origin_id; offending ids: '\n      || (SELECT group_concat(`id`) FROM `workflows` WHERE `origin` != 'standalone' AND `origin_id` IS NULL)\n  )\n  WHERE EXISTS (SELECT 1 FROM `workflows` WHERE `origin` != 'standalone' AND `origin_id` IS NULL);\nEND;\n",
       "\nINSERT INTO `_assert_workflows_origin_backfill` VALUES (1);\n",
       "\nDROP TRIGGER `_assert_workflows_origin_backfill_trg`;\n",
       "\nDROP TABLE `_assert_workflows_origin_backfill`;\n",
@@ -63,7 +63,7 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     ],
     bps: true,
     folderMillis: 5,
-    hash: "a451e52624472b3ae6f63ed467bffa4c6006366fce1d31f80f082c8d89842c95",
+    hash: "cb8b6a4b630981e32a6d8abfd0cc17e62ff3aa626f91d8887102710f5ae28a1c",
   },
 ];
 
