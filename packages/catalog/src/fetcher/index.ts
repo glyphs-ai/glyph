@@ -2,16 +2,16 @@
  * Catalog fetchers — pluggable origin-URI fetchers used by catalog's
  * resolve + install pipeline. Owns:
  *
- *   - `parseOrigin` / `normalizeOrigin` — URI grammar
  *   - `Fetcher` interface (pure stream, fs-agnostic)
  *   - `FileFetcher`, `GitHubFetcher`, `AzureDevOpsFetcher` — built-in
  *     implementations
- *   - `FetcherRegistry` — scheme → fetcher dispatch
- *   - `OriginParseError`, `FetchError`
+ *   - `FetcherRegistry` — scheme to fetcher dispatch
+ *   - `FetchError`, `FetcherError`, `OriginParseError`
  *
- * Single responsibility: turn a URI into a stream of bytes. No
- * knowledge of frontmatter, scope, identity, or dependencies — those
- * live in the parent catalog package.
+ * Single responsibility: turn a URI into a stream of bytes. No knowledge
+ * of frontmatter, scope, identity, or dependencies — those live in the
+ * parent catalog package. Origin-URI grammar (`parseOrigin`,
+ * `safeNormalize`, …) is owned by `domain/catalog.origin.ts`.
  */
 
 export {

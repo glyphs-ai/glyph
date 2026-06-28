@@ -54,7 +54,7 @@ export function workspaceContextMiddleware(
 
     if (state === "not-registered") {
       return c.json(
-        { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegisteredError" },
+        { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegistered" },
         404,
       );
     }
@@ -70,7 +70,7 @@ export function workspaceContextMiddleware(
         // peek and get. Surface as 404 — caller's next request will
         // see "not-registered" on peek.
         return c.json(
-          { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegisteredError" },
+          { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegistered" },
           404,
         );
       }
@@ -123,7 +123,7 @@ export function workspaceContextMiddleware(
       // Workspace was unregistered between peek and load — surface
       // as 404 like a stable not-registered.
       return c.json(
-        { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegisteredError" },
+        { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegistered" },
         404,
       );
     }

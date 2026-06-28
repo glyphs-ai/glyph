@@ -508,13 +508,22 @@ everything else rides in one object.
 | param | role | type |
 |---|---|---|
 | `input` | the operation's request body, shared verbatim with the HTTP route | `*Request` |
-| `opts` | optional config, filtering, or dependency injection | `*Opts` |
+| `opts` | optional config / filtering, and a class's bundled dependencies | `*Opts` |
+| `deps` | a function's injected, test-swappable collaborators (defaulted to real impls) | `*Deps` |
 | `patch` | a repository partial update | `Partial<Pick<*Entity, …>>` |
 | `entity` | a repository write of a full domain entity | `*Entity` |
 
-`input` carries an operation's wire request body; `opts` carries internal
-config / filter / DI and never crosses the wire as a body. `opts` is the
-single name for every optional-config and DI bag, typed `*Opts`.
+`input` carries an operation's wire request body. `opts` carries
+configuration plus, for a class, the dependency bag the composition root
+assembles once (`constructor(opts: <Name>Opts)`).
+
+`deps` is the separate bag a stateless *function* takes for its injected,
+side-effecting collaborators — `spawn`, `exists`, a clock — defaulted to
+real implementations so production omits it and tests pass fakes
+(`spawnTerminalWith(cmd, deps)`, `launchCopilotHeadless(opts, deps)`). A
+constructor bundles config + deps into its one `opts` (assembled once); a
+function splits `opts` (per-call config) from `deps` (fixed injected
+collaborators).
 
 ### Identity stays out of the body
 
@@ -1055,56 +1064,56 @@ The guard is a few lines of security-critical path math and each BC owns
 its own root invariant; keep the copies in lockstep and do not reach
 across BCs for it.
 
-### Multi-entity BCs → mirror the four layers per entity + `facade/`
+### Multi-entity BCs → one set of four layers, entities namespaced by file prefix
 
-If the BC owns more than one rich entity that participates in
-cross-entity orchestration (catalog owns Agent + Skill + Mcp), mirror the
-standard dot-named files into per-entity areas while preserving the same
-four responsibilities:
+A BC that owns more than one rich entity participating in cross-entity
+orchestration (catalog owns Agent + Skill + Mcp) keeps the SAME top-level
+four layers as a single-entity package. Entities are namespaced inside
+each layer by the `<entity>.` file prefix — there is no per-entity subtree
+(`agent/domain/…`). The dot prefix (see § File naming convention) already
+makes every file's class location unique.
 
 ```
 src/
-  index.ts                       public barrel
-  catalog.compose.ts             composeCatalogModule({...})
+  index.ts                       public barrel (facade service + compose + result types)
+  catalog.compose.ts             composeCatalogModule({ ... })
 
   contract/
-    catalog.schemas.ts           cross-entity or facade schemas
     catalog.types.ts             cross-entity DTOs (bare nouns: Agent / Skill / Mcp)
-    catalog.errors.ts            facade-level errors
+    catalog.errors.ts            cross-entity error base + facade errors
+    catalog.schemas.ts           cross-entity / install-body validators
+    agent.errors.ts              per-entity errors (skill / mcp mirror)
+    agent.schemas.ts             per-entity validators (skill / mcp mirror)
     index.ts
+
+  domain/
+    agent.entity.ts              AgentEntity (internal; skill / mcp mirror)
+    agent.frontmatter.ts         entity-specific codec (mcp.format.ts, …)
+    catalog.dep-keys.ts          cross-entity domain helpers (origin grammar, …)
+
+  application/
+    agent.service.ts             per-entity write logic (internal; skill / mcp mirror)
+    catalog.service.ts           unified read+write facade across all entities
+    catalog.service/             facade split subdir (only past the split threshold)
+    catalog.projection.ts        cross-entity orchestration helpers (plan-types, pipeline, …)
 
   persistence/
-    tables.ts                    cross-entity table definitions
-    migrations.ts
-    catalog.db.ts
-
-  agent/
-    domain/agent.entity.ts       AgentEntity class (internal)
-    application/agent.service.ts per-entity write logic (internal)
-    persistence/agent.repository.ts
-    contract/agent.schemas.ts
-    contract/agent.errors.ts
-    index.ts                     optional internal barrel
-
-  skill/                         mirror
-  mcp/
-    domain/mcp.entity.ts
-    application/mcp.service.ts
-    persistence/mcp.repository.ts
-    contract/mcp.schemas.ts
-    contract/mcp.errors.ts
-    mcp.format.ts                entity-specific format helpers
-    index.ts
-
-  facade/
-    catalog.service.ts           unified read+write surface across all entities
-    projection.ts                pure projection helpers (Row → DTO)
-    index.ts                     facade barrel
+    tables.ts  migrations.ts  catalog.db.ts
+    agent.repository.ts          per-entity repository (skill / mcp mirror)
 ```
 
+Naming follows one rule: cross-entity files take the bare-noun `catalog.`
+aggregate prefix (`catalog.service`, `catalog.projection`, `catalog.origin`);
+per-entity files take the `agent.` / `skill.` / `mcp.` prefix.
+
 The per-entity `<entity>.service.ts` classes are **internal** to the BC;
-they are not exported from the package barrel. External callers go
-through the facade only.
+they are not exported from the package barrel. External callers reach the
+BC through the facade (`index.ts`) and the DTOs / errors / schemas
+(`./contract`) only.
+
+An outbound infrastructure adapter that belongs to none of the four layers
+(catalog's content `fetcher/` — origin URI → bytes) stays in its own
+top-level dir, a peer of `persistence/`.
 
 ### Test seams (clock, randomness)
 

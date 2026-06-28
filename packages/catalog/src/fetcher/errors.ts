@@ -1,22 +1,17 @@
-import { CatalogError } from "../errors.js";
-
 /**
- * Error types thrown by the `src/fetcher/` subdir. Re-exported from
- * the package barrel (`src/index.ts`) so consumers don't reach across
- * subdir boundaries to construct them. The fetcher subdir intentionally
- * doesn't import from sibling subdirs — it's the catalog's bytes-on-disk
- * layer, with no knowledge of frontmatter, scope, identity, or deps.
+ * Error types thrown by the `src/fetcher/` adapter. The fetcher subdir is
+ * the catalog's bytes-on-disk layer — origin-URI grammar + remote fetch —
+ * with no knowledge of frontmatter, scope, identity, or deps.
  */
 
-export class FetcherError extends CatalogError {
+export class FetcherError extends Error {
   override readonly name: string = "FetcherError";
 }
 
 /**
- * Origin URI failed to parse. Surfaces the raw URI plus the reason so the
- * dashboard / CLI can echo it back to the user without exposing internal
- * paths. Supported origins are GitHub tree URLs, Azure DevOps Services
- * item URLs, and `file:<absolutePath>`.
+ * Origin URI failed provider parsing. Surfaces the raw URI plus the reason
+ * so the dashboard / CLI can echo it back. Supported origins are GitHub
+ * tree URLs, Azure DevOps Services item URLs, and `file:<absolutePath>`.
  */
 export class OriginParseError extends FetcherError {
   override readonly name = "OriginParseError";

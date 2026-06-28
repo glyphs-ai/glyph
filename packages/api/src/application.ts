@@ -2,10 +2,16 @@ import type { RuntimeRegistry } from "@glyphs-ai/runtime";
 import { spawnTerminal } from "@glyphs-ai/terminal";
 import {
   composeWorkspaceModule,
+  type DatabaseUnavailable,
+  type GetWorkspaceResponse,
+  type ProvisioningFailed,
+  type WorkspaceId,
+  type WorkspaceModule,
   type WorkspaceModuleOptions,
-  type WorkspaceService,
+  type WorkspaceName,
+  type WorkspaceNotRegistered,
 } from "@glyphs-ai/workspace";
-import type { RenameWorkspaceRequest, Workspace } from "@glyphs-ai/workspace/contract";
+import { ResultAsync } from "neverthrow";
 import type { Logger } from "pino";
 import {
   type WorkspaceContext,
@@ -21,12 +27,12 @@ import {
  * `Application`; other in-process hosts can do the same without
  * exposing this layer to UI surfaces.
  *
- * Beyond per-workspace context resolution, this surface exposes the
- * cross-cutting orchestration methods that invalidate the per-workspace
- * context cache (`renameWorkspace`, `unregisterWorkspace`,
- * `reloadWorkspace`) so transport layers stay thin. Single-domain
- * workspace operations with no cross-cutting concern (e.g. create) are
- * NOT mirrored here — transports call `workspaceService` directly.
+ * The `workspace` module bundles the eight workspace use-cases as
+ * dependency-injected `<UseCase>.execute(request)` instances;
+ * transports (HTTP routes, CLI, MCP) call them directly. The methods
+ * mounted on `Application` itself are the small cross-cutting subset
+ * that also has to invalidate the per-workspace context cache
+ * (`renameWorkspace`, `unregisterWorkspace`, `reloadWorkspace`).
  *
  * The per-workspace `WorkspaceContextRegistry` is a private
  * implementation detail — consumers reach contexts via
@@ -34,21 +40,28 @@ import {
  * and never touch the registry class directly.
  */
 export interface Application {
-  readonly workspaceService: WorkspaceService;
+  readonly workspace: WorkspaceModule;
 
   /**
    * Rename a workspace. Invalidates the per-workspace context so the
-   * next request rebuilds with the fresh metadata. Returns the
-   * canonical post-rename {@link Workspace}, or `null` if the workspaceId
-   * is absent (rare; concurrent unregister).
+   * next request rebuilds with the fresh metadata. Returns
+   * `Result.Ok<Workspace | null>` (`null` when the workspaceId is
+   * absent — rare; concurrent unregister) or `Err` over the workspace
+   * domain errors.
    */
-  renameWorkspace(workspaceId: string, input: RenameWorkspaceRequest): Promise<Workspace | null>;
+  renameWorkspace(
+    workspaceId: string,
+    input: { readonly name: WorkspaceName },
+  ): ResultAsync<GetWorkspaceResponse, WorkspaceNotRegistered | DatabaseUnavailable>;
 
   /**
-   * Unregister a workspace. Idempotent (no error if the workspaceId is unknown).
-   * Invalidates the per-workspace context afterwards.
+   * Unregister a workspace. Idempotent (no error if the workspaceId is
+   * unknown). Invalidates the per-workspace context afterwards.
    */
-  unregisterWorkspace(workspaceId: string, opts?: { readonly purge?: boolean }): Promise<void>;
+  unregisterWorkspace(
+    workspaceId: string,
+    opts?: { readonly purge?: boolean },
+  ): ResultAsync<void, ProvisioningFailed | DatabaseUnavailable>;
 
   /**
    * Force-rebuild the cached per-workspace container. Throws
@@ -56,7 +69,7 @@ export interface Application {
    * when reload would orphan live task subprocesses; returns `null`
    * when the workspaceId is absent.
    */
-  reloadWorkspace(workspaceId: string): Promise<Workspace | null>;
+  reloadWorkspace(workspaceId: string): Promise<GetWorkspaceResponse>;
 
   /**
    * Resolve the per-workspace {@link WorkspaceContext}, building it on
@@ -93,27 +106,37 @@ export interface ApplicationOpts {
 }
 
 export async function composeApplication(opts: ApplicationOpts): Promise<Application> {
-  const workspaceModule = await composeWorkspaceModule(opts.workspace);
+  const workspace = await composeWorkspaceModule(opts.workspace);
   const registry = new WorkspaceContextRegistry({
-    workspaceService: workspaceModule.service,
+    getWorkspace: workspace.getWorkspace,
     runtimeRegistry: opts.runtimeRegistry,
     spawnFn: spawnTerminal,
     ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
   });
-  const workspaceService = workspaceModule.service;
 
   return {
-    workspaceService,
+    workspace,
 
-    async renameWorkspace(workspaceId, input) {
-      await workspaceService.rename(workspaceId, input);
-      await registry.invalidate(workspaceId);
-      return workspaceService.get(workspaceId);
+    renameWorkspace(workspaceId, input) {
+      // `workspaceId` is a raw `string` from the URL/CLI; the
+      // use-case re-parses through `WorkspaceIdSchema` on entry, so
+      // the brand cast is just to thread it through the typed
+      // signature. Same applies below.
+      const id = workspaceId as WorkspaceId;
+      return workspace.renameWorkspace
+        .execute({ id, name: input.name })
+        .andThen(() =>
+          ResultAsync.fromSafePromise(registry.invalidate(workspaceId)).andThen(() =>
+            workspace.getWorkspace.execute({ id }),
+          ),
+        );
     },
 
-    async unregisterWorkspace(workspaceId, opts = {}) {
-      await workspaceService.unregister(workspaceId, opts);
-      await registry.invalidate(workspaceId);
+    unregisterWorkspace(workspaceId, opts = {}) {
+      const id = workspaceId as WorkspaceId;
+      return workspace.unregisterWorkspace
+        .execute({ id, ...(opts.purge !== undefined ? { purge: opts.purge } : {}) })
+        .andThen(() => ResultAsync.fromSafePromise(registry.invalidate(workspaceId)));
     },
 
     async reloadWorkspace(workspaceId) {
@@ -152,7 +175,7 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
       // resource ownership (the composer composes -> the composer
       // disposes, top-down).
       await registry.closeAll();
-      await workspaceModule.close();
+      await workspace.close();
     },
   };
 }

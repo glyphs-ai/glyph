@@ -10,7 +10,6 @@ import {
   AgentNotFoundError,
   InvalidTransition,
   ManagerShuttingDownError,
-  TaskIdAllocationFailedError,
   TaskNotFoundError,
 } from "../errors.js";
 import { safeJoinUnderRoot } from "../paths.js";
@@ -21,8 +20,6 @@ import { assertValidTaskId, generateTaskId } from "../validate.js";
 import { pickRuntime, resolveDispatchAgent } from "./agent-resolver.js";
 import { runDispatch } from "./dispatch.js";
 import { applyTerminal } from "./terminal.js";
-
-const MAX_CREATE_RETRIES = 5;
 
 /**
  * Public dispatch entry. Resolves the agent, picks the runtime,
@@ -52,27 +49,20 @@ export async function dispatchTask(ctx: TaskServiceCtx, opts: DispatchOpts): Pro
   const runtimeKind = opts.runtime ?? DEFAULT_RUNTIME;
   const runtime = pickRuntime(ctx, runtimeKind);
 
-  // 3. Reserve a workdir via exclusive mkdir, retrying on EEXIST.
-  await mkdir(ctx.tasksDir, { recursive: true });
-  let id: string | null = null;
-  let workdir: string | null = null;
-  for (let attempt = 0; attempt < MAX_CREATE_RETRIES; attempt++) {
-    const candidateId = generateTaskId(ctx.now, ctx.randomBytes);
-    const candidateDir = safeJoinUnderRoot(ctx.tasksDir, candidateId);
-    try {
-      await mkdir(candidateDir, { recursive: false });
-      id = candidateId;
-      workdir = candidateDir;
-      break;
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code === "EEXIST") continue;
-      throw err;
-    }
-  }
-  if (id === null || workdir === null) {
-    throw new TaskIdAllocationFailedError(MAX_CREATE_RETRIES);
-  }
+  // 3. Reserve a workdir via exclusive mkdir.
+  //    Source of truth for id uniqueness is the `tasks.id` PRIMARY KEY
+  //    — the disk dir is a "workspace attachment" for the row. The
+  //    generated id (`YYYYMMDD-<4-hex>`) collides only under
+  //    vanishingly rare load; an EEXIST here (orphan dir from a
+  //    crashed prior dispatch) or a downstream PK violation surfaces
+  //    as an unexpected failure that the caller retries.
+  //    `ctx.tasksDir` is owned and pre-created by
+  //    @glyphs-ai/workspace's provisioner during workspace `register`,
+  //    so `{recursive: false}` makes a missing parent surface as
+  //    ENOENT (composition bug) rather than silently self-healing.
+  const id = generateTaskId(ctx.now, ctx.randomBytes);
+  const workdir = safeJoinUnderRoot(ctx.tasksDir, id);
+  await mkdir(workdir, { recursive: false });
 
   // From here the workdir exists on disk, so a freshly constructed
   // sibling `TaskService` for the same `tasksDir` — e.g. one built

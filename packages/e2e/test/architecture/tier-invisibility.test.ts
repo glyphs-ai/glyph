@@ -72,8 +72,9 @@ const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..", "..");
 const PACKAGES_DIR = path.join(REPO_ROOT, "packages");
 const ARCHITECTURE_DOC = path.join(REPO_ROOT, "docs", "architecture.md");
 // Real packages that are deliberately outside the tier model: the scaffold
-// template and this cross-cutting e2e harness.
-const NON_TIERED_PKGS = new Set(["_template", "e2e"]);
+// template, this cross-cutting e2e harness, and the catalogv2 reference
+// skeleton (used as a migration target template, not shipped).
+const NON_TIERED_PKGS = new Set(["_template", "e2e", "catalogv2"]);
 const T0_PKGS = ["workspace", "runtime", "schedule", "terminal", "catalog"] as const;
 const T1_PKGS = ["session", "task", "workflow"] as const;
 const T2_PKGS = ["api", "sdk"] as const;

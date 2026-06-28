@@ -6,8 +6,7 @@ import { composeScheduleModule, type ScheduleService } from "@glyphs-ai/schedule
 import { composeSessionModule, type SessionService, type SpawnFn } from "@glyphs-ai/session";
 import { composeTaskModule, type TaskService } from "@glyphs-ai/task";
 import { composeWorkflowModule, type WorkflowService } from "@glyphs-ai/workflow";
-import type { WorkspaceService } from "@glyphs-ai/workspace";
-import type { Workspace } from "@glyphs-ai/workspace/contract";
+import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";
@@ -16,6 +15,14 @@ import { makeHumanNodeRunner } from "./wiring/workflow-human-node-runner.js";
 import { makeWorkerNodeRunner } from "./wiring/workflow-worker-task-runner.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
+
+/**
+ * Wire DTO for a registered workspace. Same shape `GetWorkspaceResponse`
+ * carries when the workspace exists — narrowed to non-null because
+ * the context registry only ever holds entries for workspaces that
+ * have been resolved successfully.
+ */
+type Workspace = NonNullable<GetWorkspaceResponse>;
 
 /**
  * Thrown by `WorkspaceContextRegistry.reload` when the cached context
@@ -117,7 +124,7 @@ export interface WorkspaceContext {
  * the package surface.
  */
 export class WorkspaceContextRegistry {
-  private readonly workspaceService: WorkspaceService;
+  private readonly getWorkspace: WorkspaceModule["getWorkspace"];
   private readonly runtimeRegistry: RuntimeRegistry;
   private readonly spawnFn: SpawnFn;
   private readonly logger: Logger;
@@ -125,12 +132,12 @@ export class WorkspaceContextRegistry {
   private readonly inflight = new Map<string, Promise<WorkspaceContext | null>>();
 
   constructor(opts: {
-    workspaceService: WorkspaceService;
+    getWorkspace: WorkspaceModule["getWorkspace"];
     runtimeRegistry: RuntimeRegistry;
     spawnFn: SpawnFn;
     logger?: Logger;
   }) {
-    this.workspaceService = opts.workspaceService;
+    this.getWorkspace = opts.getWorkspace;
     this.runtimeRegistry = opts.runtimeRegistry;
     this.spawnFn = opts.spawnFn;
     this.logger = opts.logger ?? silentLogger;
@@ -164,8 +171,18 @@ export class WorkspaceContextRegistry {
   async peek(workspaceId: string): Promise<WorkspaceContextState> {
     if (this.entries.has(workspaceId)) return "cached";
     if (this.inflight.has(workspaceId)) return "loading";
-    const workspace = await this.workspaceService.get(workspaceId);
-    return workspace === null ? "not-registered" : "unloaded";
+    // DatabaseUnavailable from the registry surfaces here as a thrown
+    // error — re-throw the underlying driver cause so callers (e.g.
+    // middleware, Application.getContext) see the same shape they'd
+    // have seen before the Result refactor.
+    //
+    // `workspaceId` is a raw `string` from a URL parameter; the
+    // use-case re-parses through `WorkspaceIdSchema` on entry, so
+    // the brand cast here is just to thread it through the use-case
+    // signature without a redundant pre-parse.
+    const result = await this.getWorkspace.execute({ id: workspaceId as WorkspaceId });
+    if (result.isErr()) throw result.error.cause;
+    return result.value === null ? "not-registered" : "unloaded";
   }
 
   async invalidate(workspaceId: string): Promise<void> {
@@ -262,7 +279,14 @@ export class WorkspaceContextRegistry {
   }
 
   private async load(workspaceId: string): Promise<WorkspaceContext | null> {
-    const workspace = await this.workspaceService.get(workspaceId);
+    const result = await this.getWorkspace.execute({ id: workspaceId as WorkspaceId });
+    if (result.isErr()) {
+      // Re-throw the driver cause so `Application.getContext` wraps
+      // it as `WorkspaceLoadError(workspaceId, cause)` and every host
+      // sees the same shape they did before the Result refactor.
+      throw result.error.cause;
+    }
+    const workspace = result.value;
     if (!workspace) return null;
 
     const dbFile = path.join(workspace.workspaceDir, "workspace.db");

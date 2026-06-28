@@ -68,18 +68,23 @@ describe("WorkflowService — workflowDir lifecycle", () => {
     expect(readdirSync(wfDir)).toEqual([]);
   });
 
-  it("a pre-existing workflowDir is tolerated (mkdir recursive: true is idempotent)", async () => {
-    // Reserve the dir at the deterministic path the next workflow
-    // id will resolve to. `randomBytes` seq is `aaaaaaaa` + the
-    // pinned UTC date, so the first workflowId is `20260607-aaaaaaaa`.
+  it("EEXIST on the leaf workflowDir surfaces as an unexpected mkdir failure", async () => {
+    // After the source-of-truth split (DB PK is canonical for id
+    // uniqueness; the on-disk dir is a workspace attachment), the
+    // leaf `mkdir(wfDir, { recursive: false })` no longer tolerates
+    // a pre-existing dir. A leftover dir from a crashed prior run
+    // is an "orphan" condition the operator clears; the substrate
+    // surfaces it as EEXIST rather than silently reusing the dir
+    // (which would risk leaking stale files into the fresh
+    // workflow).
     const expectedWorkflowId = "20260607-aaaaaaaa";
     const wfDir = workflowDir(h.workspaceDir, expectedWorkflowId);
     mkdirSync(wfDir, { recursive: true });
     writeFileSync(path.join(wfDir, "pre-existing.txt"), "leftover from a previous run");
 
-    // Should not throw — and should NOT clobber the pre-existing file.
-    const { workflowId } = await bootstrap(h);
-    expect(workflowId).toBe(expectedWorkflowId);
+    await expect(bootstrap(h)).rejects.toMatchObject({ code: "EEXIST" });
+    // Pre-existing file is preserved — the substrate threw before any
+    // tx ran, so no rollback `safeRmDir` triggered.
     expect(existsSync(path.join(wfDir, "pre-existing.txt"))).toBe(true);
   });
 

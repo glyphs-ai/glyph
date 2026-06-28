@@ -103,11 +103,14 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "TerminalSpawnFailedError",
   "UnsupportedPlatformError",
   // @glyphs-ai/workspace
-  "RegistryError",
-  "WorkspaceError",
-  "WorkspaceIdConflictError",
-  "WorkspaceNotRegisteredError",
-  "WorkspacePathConflictError",
+  //   Class-based: `WorkspaceHasLiveTasksError` + `WorkspaceLoadError`
+  //   are api-owned (see workspace-context.ts) and surfaced as thrown
+  //   classes — covered by the entries in the @glyphs-ai/api section.
+  //   DU-based: `WorkspaceIdConflict` / `WorkspaceNotRegistered` /
+  //   `WorkspacePathConflict` / `DatabaseUnavailable` /
+  //   `ProvisioningFailed` flow through `respondWorkspaceError`,
+  //   which builds the wire body directly from the DU `type` and
+  //   bypasses this allow-list entirely.
   // @glyphs-ai/workflow
   "WorkflowError",
   "WorkflowNotFoundError",

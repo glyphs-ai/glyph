@@ -47,37 +47,43 @@ What this package **does not** do:
 
 ## Exports
 
-- `@glyphs-ai/catalog` — public DTOs, entity classes, per-entity service
-  namespaces, fetcher helpers, validators, errors, and
-  `composeCatalogModule`.
-- `@glyphs-ai/catalog/testing` — `openTestCatalogDb` for in-memory
-  better-sqlite3 tests.
+- `@glyphs-ai/catalog` — the `CatalogService` facade, `composeCatalogModule`,
+  and the service's result / param types.
+- `@glyphs-ai/catalog/contract` — wire DTOs, error classes, install-body
+  validators, and FQN grammar helpers.
 
 ## Layout
 
 ```
 packages/catalog/src/
-  schema.ts                Drizzle tables (private; only types exported)
-  types.ts                 Cross-entity DTOs (Agent / Skill / Mcp + entries + resolve results)
-  validate.ts              FQN / name / install-body validators
-  agent/                   Per-entity service + errors + entity class
-  skill/
-  mcp/
-  facade/
-    catalog-service.ts     Unified read+write surface across all entities
-    resolve-pipeline.ts    Three-phase resolve: upstream closure → local closure → diff
-    projection.ts          Pure projection helpers (Row → DTO)
-    plan-types.ts          Shared cross-entity plan DTOs
-    errors.ts              Cross-entity facade errors (HasDependentsError)
-    index.ts               Facade barrel
-  fetcher/                 Origin parser + remote bytes fetcher
-  _shared/                 Package-private utilities (dep-keys, etc.)
-  migrations.ts            applyCatalogMigrations (drizzle migration applier)
-  compose.ts               composeCatalogModule({ dbFile, logger? })
-  testing.ts               openTestCatalogDb helper (via /testing subpath)
-  index.ts                 public barrel
+  index.ts                 public barrel (facade service + compose + result types)
+  catalog.compose.ts       composeCatalogModule({ dbFile, logger? })
+  contract/                published surface (./contract)
+    catalog.types.ts       cross-entity DTOs (Agent / Skill / Mcp + entries + resolve results)
+    catalog.errors.ts      CatalogError + HasDependentsError
+    catalog.schemas.ts     install-body validators
+    agent.errors.ts        per-entity errors (skill / mcp mirror)
+    agent.schemas.ts       per-entity FQN grammar / validators (skill / mcp mirror)
+    index.ts               contract barrel
+  domain/                  entity classes + grammar (package-private)
+    agent.entity.ts        AgentEntity (+ agent.frontmatter.ts; skill / mcp mirror)
+    mcp.format.ts          MCP file codec
+    catalog.dep-keys.ts    parametric dep-key helpers (shared by agent + skill)
+    catalog.origin.ts      origin-URI grammar (parse / normalize / sameOrigin)
+  application/             services + facade (package-private)
+    agent.service.ts       per-entity write logic (skill / mcp mirror)
+    catalog.service.ts     unified read+write facade (+ catalog.service/ split)
+    catalog.resolve-pipeline.ts  three-phase resolve: upstream → local → diff
+    catalog.projection.ts  pure projection helpers (Row → DTO)
+    catalog.plan-types.ts  shared cross-entity plan / result DTOs
+  persistence/
+    tables.ts              Drizzle tables (private; only types exported)
+    migrations.ts          applyCatalogMigrations
+    catalog.db.ts          openDb(dbFile): prod + test factory
+    agent.repository.ts    per-entity repository (skill / mcp mirror)
+  fetcher/                 outbound content adapter (origin → bytes): File / GitHub / ADO
 drizzle/                   generated SQL migrations (committed)
-drizzle.config.ts          drizzle-kit config
+drizzle.config.ts          drizzle-kit config (→ src/persistence/tables.ts)
 ```
 
 ## On-disk

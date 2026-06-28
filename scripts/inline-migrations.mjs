@@ -31,7 +31,12 @@ const PKGS = [
   },
   { dir: "session", entity: "Session", tableSuffix: "session" },
   { dir: "task", entity: "Task", tableSuffix: "task" },
-  { dir: "catalog", entity: "Catalog", tableSuffix: "catalog" },
+  {
+    dir: "catalog",
+    entity: "Catalog",
+    tableSuffix: "catalog",
+    migrationsFile: "src/persistence/migrations.ts",
+  },
   { dir: "workflow", entity: "Workflow", tableSuffix: "workflow" },
   { dir: "schedule", entity: "Schedule", tableSuffix: "schedule" },
   // Template uses placeholder tokens substituted by scripts/new-pkg.mjs.

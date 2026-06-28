@@ -30,7 +30,7 @@
  */
 
 import { workspacesRoutes } from "@glyphs-ai/api";
-import { AgentNotFoundError as CatalogAgentNotFoundError } from "@glyphs-ai/catalog";
+import { AgentNotFoundError as CatalogAgentNotFoundError } from "@glyphs-ai/catalog/contract";
 import {
   AgentNotFoundError as SessionAgentNotFoundError,
   AgentResolutionFailedError as SessionAgentResolutionFailedError,
@@ -44,8 +44,9 @@ import {
   TaskIdAllocationFailedError,
   type TaskService,
 } from "@glyphs-ai/task";
-import { RegisterWorkspaceRequestSchema } from "@glyphs-ai/workspace/contract";
+import { RegisterWorkspaceRequestSchema } from "@glyphs-ai/workspace";
 import { Hono } from "hono";
+import { errAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { requestId } from "../src/middleware/request-id.js";
 import { requestLogger } from "../src/middleware/request-logger.js";
@@ -256,16 +257,21 @@ describe("respondError contract — unmapped-fault observability gap-closes", ()
     expect(fault?.msg).toBe("sessions.list: unmapped error fell through to 400");
   });
 
-  it("workspaces route unmapped error → 400 + structured log line", async () => {
-    // Mirrors the sessions POST-path unmapped test above for the
-    // workspaces domain. Pinning both domains prevents a future
-    // regression from silently dropping the log line from either route
-    // family.
-    const register = vi.fn(async () => {
-      throw new Error("ENOSPC: workspace dir mkdir failed");
-    });
+  it("workspaces route ProvisioningFailed → 500 + 5xx fault log line", async () => {
+    // After the Result/DU refactor, a workspace tech failure surfaces
+    // as `Err(ProvisioningFailed)` from the service. The route's
+    // `.match()` routes it through `respondWorkspaceError`, which maps
+    // the DU type to a 500 and writes the structured `5xx fault` log
+    // line so operators see the underlying disk/permission cause.
+    const register = vi.fn(() =>
+      errAsync({
+        type: "ProvisioningFailed",
+        workspaceDir: "/scratch/demo",
+        cause: new Error("ENOSPC: workspace dir mkdir failed"),
+      }),
+    );
     const workspacesCtx = {
-      workspaceService: { register },
+      workspace: { registerWorkspace: { execute: register } },
     };
     const { app, cap } = await buildAppWithLogger((a) => {
       a.route("/", workspacesRoutes(workspacesCtx as never));
@@ -275,16 +281,15 @@ describe("respondError contract — unmapped-fault observability gap-closes", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "demo" }),
     });
-    expect(res.status).toBe(400);
-    const body = await res.json();
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { code: string; error: string };
+    expect(body.code).toBe("ProvisioningFailed");
     expect(body.error).toBe("internal error");
 
-    const fault = cap.entries.find((e) => e.msg?.includes("unmapped"));
+    const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
     expect(fault).toBeDefined();
     expect(fault?.level).toBe(50);
-    expect(fault?.msg).toBe("workspaces.create: unmapped error fell through to 400");
-    expect(fault?.name).toBe("Error");
-    expect(fault?.message).toContain("ENOSPC");
+    expect(fault?.msg).toBe("workspaces.create: 5xx fault");
   });
 
   it("scheduled-tasks unmapped error → 400 + log line (sanity check)", async () => {
@@ -578,14 +583,16 @@ describe("respondError contract — ZodError → 400 ValidationError", () => {
     // the service is converted to the same { code: "ValidationError",
     // issues } 400 envelope the request defaultHook produces.
     const application = {
-      workspaceService: {
-        list: vi.fn(async () => []),
-        get: vi.fn(),
-        getLastOpenedId: vi.fn(),
-        register: vi.fn(async () => {
-          // Simulate the service's own input-schema parse failing.
-          RegisterWorkspaceRequestSchema.parse({ name: "a".repeat(65) });
-        }),
+      workspace: {
+        listWorkspaces: { execute: vi.fn(async () => []) },
+        getWorkspace: { execute: vi.fn() },
+        getLastOpenedWorkspaceId: { execute: vi.fn() },
+        registerWorkspace: {
+          execute: vi.fn(async () => {
+            // Simulate the use-case's own input-schema parse failing.
+            RegisterWorkspaceRequestSchema.parse({ name: "a".repeat(65) });
+          }),
+        },
       },
     } as unknown as Parameters<typeof workspacesRoutes>[0];
 

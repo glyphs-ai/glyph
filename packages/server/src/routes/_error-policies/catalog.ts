@@ -36,7 +36,7 @@ import {
   SkillNameInvalidError,
   SkillNotFoundError,
   SkillOriginConflictError,
-} from "@glyphs-ai/catalog";
+} from "@glyphs-ai/catalog/contract";
 import type { ErrorPolicy } from "../_respond-error.js";
 
 export const catalogErrorPolicy: ErrorPolicy = {

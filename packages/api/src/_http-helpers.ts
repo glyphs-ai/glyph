@@ -30,6 +30,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Env } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ZodType } from "zod";
+import { ZodError } from "zod";
 
 /**
  * Construct an `OpenAPIHono` sub-app with the shared validation hook.
@@ -67,6 +68,24 @@ export function createApiApp<E extends Env = Env>(): OpenAPIHono<E> {
         );
       }
       return err.getResponse();
+    }
+    // Service-layer input-schema parse failures (a `Schema.parse(...)`
+    // call in `WorkspaceService.register` / `open` etc.) surface here
+    // as a thrown `ZodError`. Convert to the same `ValidationError`
+    // envelope `defaultHook` produces so body validation and
+    // service-input validation look identical on the wire.
+    if (err instanceof ZodError) {
+      return c.json(
+        {
+          error: "request validation failed",
+          code: "ValidationError",
+          issues: err.issues.map((issue) => ({
+            path: issue.path.map(String).join("."),
+            message: issue.message,
+          })),
+        },
+        400,
+      );
     }
     throw err;
   });

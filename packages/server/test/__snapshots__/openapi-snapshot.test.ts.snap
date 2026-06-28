@@ -180,6 +180,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "string",
                       },
                       "id": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i",
                         "type": "string",
                       },
                       "lastOpenedAt": {
@@ -195,8 +196,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "required": [
                       "id",
                       "name",
-                      "createdAt",
                       "workspaceDir",
+                      "createdAt",
                       "lastOpenedAt",
                     ],
                     "type": "object",
@@ -249,6 +250,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i",
                       "type": "string",
                     },
                     "lastOpenedAt": {
@@ -264,8 +266,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                   "required": [
                     "id",
                     "name",
-                    "createdAt",
                     "workspaceDir",
+                    "createdAt",
                     "lastOpenedAt",
                   ],
                   "type": "object",
@@ -436,6 +438,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i",
                       "type": "string",
                     },
                     "lastOpenedAt": {
@@ -451,8 +454,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                   "required": [
                     "id",
                     "name",
-                    "createdAt",
                     "workspaceDir",
+                    "createdAt",
                     "lastOpenedAt",
                   ],
                   "type": "object",
@@ -513,6 +516,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i",
                       "type": "string",
                     },
                     "lastOpenedAt": {
@@ -528,8 +532,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                   "required": [
                     "id",
                     "name",
-                    "createdAt",
                     "workspaceDir",
+                    "createdAt",
                     "lastOpenedAt",
                   ],
                   "type": "object",

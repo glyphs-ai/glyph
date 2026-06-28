@@ -26,6 +26,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Runtime, RuntimeCapabilities } from "@glyphs-ai/runtime";
 import { RuntimeRegistry } from "@glyphs-ai/runtime";
+import type { WorkspaceName } from "@glyphs-ai/workspace";
+import type { Result, ResultAsync } from "neverthrow";
+import { errAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type Application,
@@ -33,6 +36,20 @@ import {
   WorkspaceHasLiveTasksError,
   WorkspaceLoadError,
 } from "../src/index.js";
+
+/**
+ * Test helper: drain a `ResultAsync` and unwrap the `Ok` value, raising
+ * a synthetic Error if the chain resolved as `Err`. Tests use it
+ * wherever they would have written `await service.X(...)` before
+ * Phase 3b — the result-flavoured call sites are a side-effect of the
+ * @glyphs-ai/workspace error-channel refactor, not what these tests
+ * are about.
+ */
+async function ok<T, E>(r: ResultAsync<T, E> | Promise<Result<T, E>>): Promise<T> {
+  const res = await r;
+  if (res.isErr()) throw new Error(`unexpected Err: ${JSON.stringify(res.error)}`);
+  return res.value;
+}
 
 // Minimal Runtime stub: the registry's load() path constructs session +
 // task modules whose composers require a runtime to be registered, but
@@ -121,42 +138,49 @@ describe("composeApplication", () => {
 describe("Application orchestration", () => {
   it("register mints a uuid and uses defaultWorkspaceParent when dir is omitted", async () => {
     const app = await makeApp();
-    const ws = await app.workspaceService.register({ name: "demo" });
+    const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));
     expect(ws.id).toMatch(/^[0-9a-f]{8}-/);
     expect(ws.workspaceDir.startsWith(path.join(scratch, "workspaces"))).toBe(true);
     expect(ws.workspaceDir.endsWith(ws.id)).toBe(true);
     expect(ws.name).toBe("demo");
     // Re-read via workspaceService confirms persistence
-    const view = await app.workspaceService.get(ws.id);
+    const view = await ok(app.workspace.getWorkspace.execute({ id: ws.id }));
     expect(view?.name).toBe("demo");
   });
 
   it("register honours an explicit workspaceDir", async () => {
     const app = await makeApp();
     const dir = path.join(scratch, "explicit");
-    const ws = await app.workspaceService.register({ name: "explicit", workspaceDir: dir });
+    const ws = await ok(
+      app.workspace.registerWorkspace.execute({
+        name: "explicit" as WorkspaceName,
+        workspaceDir: dir,
+      }),
+    );
     expect(ws.workspaceDir).toBe(path.resolve(dir));
   });
 
   it("renameWorkspace invalidates the per-workspace context", async () => {
     const app = await makeApp();
-    const ws = await app.workspaceService.register({ name: "before" });
+    const ws = await ok(
+      app.workspace.registerWorkspace.execute({ name: "before" as WorkspaceName }),
+    );
     // Touch the context once so there's something to invalidate.
     await app.getContext(ws.id);
     expect(app.loadedContexts()).toHaveLength(1);
-    const renamed = await app.renameWorkspace(ws.id, { name: "after" });
+    const renamed = await ok(app.renameWorkspace(ws.id, { name: "after" as WorkspaceName }));
     expect(renamed?.name).toBe("after");
     expect(app.loadedContexts()).toHaveLength(0);
   });
 
   it("unregisterWorkspace invalidates the per-workspace context", async () => {
     const app = await makeApp();
-    const ws = await app.workspaceService.register({ name: "demo" });
+    const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));
     await app.getContext(ws.id);
     expect(app.loadedContexts()).toHaveLength(1);
-    await app.unregisterWorkspace(ws.id);
+    await ok(app.unregisterWorkspace(ws.id));
     expect(app.loadedContexts()).toHaveLength(0);
-    expect(await app.workspaceService.get(ws.id)).toBeNull();
+    expect(await ok(app.workspace.getWorkspace.execute({ id: ws.id }))).toBeNull();
   });
 
   it("close disposes the registry and the workspace module", async () => {
@@ -164,7 +188,7 @@ describe("Application orchestration", () => {
       workspace: { dbFile: ":memory:", defaultWorkspaceParent: path.join(scratch, "workspaces") },
       runtimeRegistry: makeRegistry(),
     });
-    const ws = await app.workspaceService.register({ name: "demo" });
+    const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));
     await app.getContext(ws.id);
     expect(app.loadedContexts()).toHaveLength(1);
     await app.close();
@@ -176,11 +200,11 @@ describe("Application orchestration", () => {
 describe("Application.getContext", () => {
   it("dedupes concurrent loads", async () => {
     const app = await makeApp();
-    const ws = await app.workspaceService.register({ name: "demo" });
+    const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));
     // Spy on the workspaceService.get to count how many times load()
     // actually fetches the workspace — should be exactly once across
     // both concurrent getContext() calls.
-    const spy = vi.spyOn(app.workspaceService, "get");
+    const spy = vi.spyOn(app.workspace.getWorkspace, "execute");
     const [a, b] = await Promise.all([app.getContext(ws.id), app.getContext(ws.id)]);
     expect(a).toBe(b); // same reference — memoised
     expect(spy).toHaveBeenCalledTimes(1);
@@ -189,12 +213,16 @@ describe("Application.getContext", () => {
 
   it("wraps a cold-load failure in WorkspaceLoadError carrying the raw cause", async () => {
     const app = await makeApp();
-    const ws = await app.workspaceService.register({ name: "demo" });
+    const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));
     const boom = new Error("workspace.db is unreadable");
-    // Force the load() path's `workspaceService.get` to throw a raw
-    // error — the facade must surface it as a typed WorkspaceLoadError
-    // (not the bare fs-flavoured throw) so every host maps it uniformly.
-    const spy = vi.spyOn(app.workspaceService, "get").mockRejectedValue(boom);
+    // Force the load() path's `workspaceService.get` to return an
+    // `Err(DatabaseUnavailable)` carrying the raw fs/driver failure as
+    // its `cause`. The registry's `load()` re-throws that `cause` and
+    // the facade wraps it in a typed `WorkspaceLoadError` so every
+    // host maps it uniformly.
+    const spy = vi
+      .spyOn(app.workspace.getWorkspace, "execute")
+      .mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause: boom }));
     try {
       const rejection = app.getContext(ws.id);
       await expect(rejection).rejects.toBeInstanceOf(WorkspaceLoadError);
@@ -219,7 +247,7 @@ describe("Application.peekContextState", () => {
 
   it('returns "unloaded" for a registered-but-uncached workspace', async () => {
     const app = await makeApp();
-    const ws = await app.workspaceService.register({ name: "demo" });
+    const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));
     const state = await app.peekContextState(ws.id);
     expect(state).toBe("unloaded");
     // peek MUST NOT have triggered a load.
@@ -228,7 +256,7 @@ describe("Application.peekContextState", () => {
 
   it('returns "cached" after a successful getContext()', async () => {
     const app = await makeApp();
-    const ws = await app.workspaceService.register({ name: "demo" });
+    const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));
     await app.getContext(ws.id);
     const state = await app.peekContextState(ws.id);
     expect(state).toBe("cached");
@@ -244,7 +272,7 @@ describe("Application.reloadWorkspace", () => {
 
   it("refuses with WorkspaceHasLiveTasksError when live tasks exist", async () => {
     const app = await makeApp();
-    const ws = await app.workspaceService.register({ name: "demo" });
+    const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));
     const ctx = await app.getContext(ws.id);
     if (ctx === null) throw new Error("expected context");
     // Stub liveCount() to fake an in-flight task. The context is the

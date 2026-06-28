@@ -18,7 +18,7 @@
  * exists only because `WorkflowRunners` requires both fields.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { CatalogService } from "@glyphs-ai/catalog";
@@ -101,6 +101,9 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
   // reuse this same dir as the root for
   // `workflowDir(workspaceDir, wfid)`.
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-coord-runner-int-"));
+  // Mirror @glyphs-ai/workspace's provisioner: createWorkflow now
+  // requires `workflows/` to exist (mkdir leaf is `{recursive:false}`).
+  mkdirSync(path.join(workspaceDir, "workflows"));
 
   const coordRunner = makeCoordNodeRunner({
     tasks,

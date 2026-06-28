@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Application } from "@glyphs-ai/api";
-import type { CatalogService, Skill } from "@glyphs-ai/catalog";
-import type { WorkspaceService } from "@glyphs-ai/workspace";
+import type { CatalogService } from "@glyphs-ai/catalog";
+import type { Skill } from "@glyphs-ai/catalog/contract";
+import type { WorkspaceModule, WorkspaceName } from "@glyphs-ai/workspace";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { catalogRoutes } from "../../../src/routes/catalog/index.js";
@@ -22,13 +23,13 @@ import {
 
 let scratch: string;
 let sys: ServerTestSubsystem;
-let service: WorkspaceService;
+let workspace: WorkspaceModule;
 let application: Application;
 
 beforeEach(async () => {
   scratch = await mkdtemp(path.join(tmpdir(), "glyph-server-sync-"));
   sys = await setupTestSubsystem({ scratch });
-  service = sys.service;
+  workspace = sys.workspace;
   application = sys.application;
 });
 
@@ -39,8 +40,12 @@ afterEach(async () => {
 
 async function ensureWorkspace(name: string): Promise<{ id: string; workspaceDir: string }> {
   const workspaceDir = path.join(scratch, name);
-  const result = await service.register({ workspaceDir, name });
-  return { id: result.id, workspaceDir: path.resolve(workspaceDir) };
+  const result = await workspace.registerWorkspace.execute({
+    workspaceDir,
+    name: name as WorkspaceName,
+  });
+  if (result.isErr()) throw new Error(`register failed: ${JSON.stringify(result.error)}`);
+  return { id: result.value.id, workspaceDir: path.resolve(workspaceDir) };
 }
 
 function mountApp() {
@@ -51,7 +56,7 @@ function mountApp() {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "missing workspace id" }, 400);
     const ctx = await application.getContext(id);
-    if (!ctx) return c.json({ error: "not registered", code: "WorkspaceNotRegisteredError" }, 404);
+    if (!ctx) return c.json({ error: "not registered", code: "WorkspaceNotRegistered" }, 404);
     c.set("catalog", ctx.catalog);
     await next();
   });

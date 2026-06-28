@@ -26,7 +26,7 @@
  * change — same test runner, no port allocation, no subprocess.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -113,6 +113,9 @@ async function makeHarness(): Promise<Harness> {
   const worker = makeAutoSucceedRunner("worker", { gated: false });
   const dbHandle = openTestWorkflowDb();
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-e2e-coord-"));
+  // Mirror @glyphs-ai/workspace's provisioner: createWorkflow now
+  // requires `workflows/` to exist (mkdir leaf is `{recursive:false}`).
+  mkdirSync(path.join(workspaceDir, "workflows"));
   const module = await composeWorkflowModule({
     db: dbHandle.db,
     workspaceDir,

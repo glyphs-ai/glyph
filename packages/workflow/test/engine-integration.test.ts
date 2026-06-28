@@ -24,7 +24,7 @@
  *   9. structural rules still fire (worker requires ≥1 parent)
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
@@ -139,6 +139,9 @@ async function makeHarness(): Promise<Harness> {
   const worker = makeAutoSucceedRunner("worker");
   const dbHandle = openTestWorkflowDb();
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-engine-test-"));
+  // Mirror the workspace provisioner: createWorkflow now requires
+  // `workflows/` to exist (mkdir leaf is `{recursive: false}`).
+  mkdirSync(path.join(workspaceDir, "workflows"));
   const module = await composeWorkflowModule({
     db: dbHandle.db,
     workspaceDir,

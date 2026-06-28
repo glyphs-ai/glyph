@@ -209,7 +209,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   });
   logger.info({ file: globalDbPath(home) }, "global.db opened via workspace pkg");
 
-  const workspaceService = composition.workspaceService;
+  const workspace = composition.workspace;
   const application = composition;
 
   const app = new OpenAPIHono();
@@ -252,7 +252,11 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
       host: hostname,
       port,
       pathSeparator: pathSep,
-      currentWorkspaceId: () => workspaceService.getLastOpenedId(),
+      currentWorkspaceId: async () => {
+        const res = await workspace.getLastOpenedWorkspaceId.execute({}).map((r) => r.id);
+        if (res.isErr()) throw res.error.cause;
+        return res.value;
+      },
     }),
   );
   app.route("/api/runtimes", runtimesRoutes(runtimeRegistry));
@@ -378,7 +382,14 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   }
 
   const displayHost = hostname === "0.0.0.0" ? "localhost" : hostname;
-  const wsList = await workspaceService.list();
+  const wsListResult = await workspace.listWorkspaces.execute({});
+  if (wsListResult.isErr()) {
+    // Boot-time global-registry failure: cannot enumerate workspaces.
+    // Surface the underlying cause so the operator sees the driver
+    // error rather than a typed envelope.
+    throw wsListResult.error.cause;
+  }
+  const wsList = wsListResult.value;
   logger.info(
     {
       listen: `http://${displayHost}:${port}`,

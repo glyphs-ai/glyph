@@ -393,17 +393,24 @@ export class WorkflowService {
     assertCoordinatorSpecAgent(validatedSpec);
 
     // Reserve (mkdir) the per-workflow shared dir BEFORE inserting
-    // the workflows row so a mkdir failure leaves no orphan row.
-    // Mirrors `@glyphs-ai/task`'s `dispatch` flow, which reserves the
-    // workdir before the row insert + `safeRm` on rollback. The dir
-    // is empty on creation; the coordinator owns the internal
-    // layout.
+    // the workflows row so a mkdir failure leaves no orphan row. The
+    // parent (`<workspaceDir>/workflows/`) is owned and pre-created
+    // by @glyphs-ai/workspace's provisioner during workspace
+    // `register`; we only mkdir the per-workflow leaf
+    // (`<workflowsDir>/<workflowId>/`) with `{recursive: false}` so
+    // a missing parent surfaces ENOENT (composition bug) rather
+    // than silently self-healing.
+    //
+    // Source of truth for id uniqueness is the `workflows.id`
+    // PRIMARY KEY — EEXIST here (orphan dir from a crashed prior
+    // create) or a downstream PK violation surfaces as an unexpected
+    // failure that the caller retries.
     //
     // Order matters: mkdir → tx → if tx fails, `safeRmDir`. A dir-
     // without-row is rolled back here; a row-without-dir is
     // impossible because the mkdir happens first.
     const wfDir = workflowDir(this.workspaceDir, workflowId);
-    await mkdir(wfDir, { recursive: true });
+    await mkdir(wfDir, { recursive: false });
 
     try {
       this.db.transaction((tx) => {

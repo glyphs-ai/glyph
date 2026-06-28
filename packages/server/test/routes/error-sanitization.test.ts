@@ -17,7 +17,7 @@ import {
   SkillNameInvalidError,
   SkillNotFoundError,
   SkillOriginConflictError,
-} from "@glyphs-ai/catalog";
+} from "@glyphs-ai/catalog/contract";
 import {
   RuntimeHeadlessLaunchFailed,
   RuntimeProvisionFailed,
@@ -152,12 +152,11 @@ describe("errorBody", () => {
       "ScheduleError",
       "ScheduleHasInFlightError",
       "ScheduleNotFoundError",
-      // workspace
-      "RegistryError",
-      "WorkspaceError",
-      "WorkspaceIdConflictError",
-      "WorkspaceNotRegisteredError",
-      "WorkspacePathConflictError",
+      // workspace (api owns WorkspaceLoadError + WorkspaceHasLiveTasksError;
+      // the workspace pkg returns DU values for the rest — they bypass
+      // SAFE_ERROR_NAMES since `respondWorkspaceError` writes the body
+      // directly from the DU `type` discriminator and doesn't go
+      // through `errorBody`).
       // api / workflow
       "TaskScheduleTargetError",
       "WorkspaceHasLiveTasksError",

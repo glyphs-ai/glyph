@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { workspacesRoutes } from "@glyphs-ai/api";
-import type { WorkspaceService } from "@glyphs-ai/workspace";
+import type { WorkspaceId, WorkspaceModule, WorkspaceName } from "@glyphs-ai/workspace";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { requestId } from "../src/middleware/request-id.js";
@@ -32,40 +32,41 @@ async function makeApp() {
   openSubsystems.push(sys);
   return {
     app: workspacesRoutes(sys.application),
-    service: sys.service,
+    workspace: sys.workspace,
     application: sys.application,
     defaultWorkspaceParent: sys.defaultWorkspaceParent,
   };
 }
 
 async function register(
-  service: WorkspaceService,
+  workspace: WorkspaceModule,
   args: { workspaceDir: string; name: string },
 ): Promise<string> {
-  const result = await service.register({
+  const result = await workspace.registerWorkspace.execute({
     workspaceDir: args.workspaceDir,
-    name: args.name,
+    name: args.name as WorkspaceName,
   });
-  return result.id;
+  if (result.isErr()) throw new Error(`register failed: ${JSON.stringify(result.error)}`);
+  return result.value.id;
 }
 
 describe("workspacesRoutes — empty registry", () => {
   it("GET / returns []", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
   });
 
   it("GET /current returns null", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/current");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id: null });
   });
 
   it("PUT /current rejects unknown id", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/current", {
       method: "PUT",
       headers: { "content-type": "application/json" },
@@ -75,7 +76,7 @@ describe("workspacesRoutes — empty registry", () => {
   });
 
   it("DELETE /:id is idempotent for unknown id (204)", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/22222222-2222-4222-8222-222222222222", { method: "DELETE" });
     expect(res.status).toBe(204);
   });
@@ -83,7 +84,7 @@ describe("workspacesRoutes — empty registry", () => {
 
 describe("workspacesRoutes — POST /", () => {
   it("creates a workspace with a generated UUID and registers it", async () => {
-    const { app, service } = await makeApp();
+    const { app, workspace } = await makeApp();
     const wsDir = path.join(scratch, "ws1");
     const res = await app.request("/", {
       method: "POST",
@@ -95,11 +96,13 @@ describe("workspacesRoutes — POST /", () => {
     expect(body.name).toBe("Workspace One");
     expect(body.workspaceDir).toBe(path.resolve(wsDir));
     expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(await service.get(body.id)).not.toBeNull();
+    expect(
+      (await workspace.getWorkspace.execute({ id: body.id as WorkspaceId }))._unsafeUnwrap(),
+    ).not.toBeNull();
   });
 
   it("rejects missing name", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -124,7 +127,7 @@ describe("workspacesRoutes — POST /", () => {
   });
 
   it("rejects empty-string workspaceDir (use omission to pick the default)", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -134,7 +137,7 @@ describe("workspacesRoutes — POST /", () => {
   });
 
   it("returns 409 on duplicate workspaceDir", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const wsDir = path.join(scratch, "ws-dup");
     const post = async () =>
       app.request("/", {
@@ -147,7 +150,7 @@ describe("workspacesRoutes — POST /", () => {
   });
 
   it("returns 400 on empty display name", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -157,7 +160,7 @@ describe("workspacesRoutes — POST /", () => {
   });
 
   it("accepts unicode display names", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -188,9 +191,9 @@ describe("workspacesRoutes — POST /", () => {
 
 describe("workspacesRoutes — list / get / current / delete", () => {
   it("GET / lists registered workspaces", async () => {
-    const { app, service } = await makeApp();
-    await register(service, { name: "A", workspaceDir: path.join(scratch, "a") });
-    await register(service, { name: "B", workspaceDir: path.join(scratch, "b") });
+    const { app, workspace } = await makeApp();
+    await register(workspace, { name: "A", workspaceDir: path.join(scratch, "a") });
+    await register(workspace, { name: "B", workspaceDir: path.join(scratch, "b") });
     const res = await app.request("/");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { name: string }[];
@@ -198,8 +201,8 @@ describe("workspacesRoutes — list / get / current / delete", () => {
   });
 
   it("GET /:id returns the workspace", async () => {
-    const { app, service } = await makeApp();
-    const id = await register(service, { name: "Hello", workspaceDir: path.join(scratch, "h") });
+    const { app, workspace } = await makeApp();
+    const id = await register(workspace, { name: "Hello", workspaceDir: path.join(scratch, "h") });
     const res = await app.request(`/${id}`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { id: string; name: string };
@@ -208,39 +211,43 @@ describe("workspacesRoutes — list / get / current / delete", () => {
   });
 
   it("GET /:id returns 404 for unknown id", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/00000000-0000-0000-0000-000000000000");
     expect(res.status).toBe(404);
   });
 
   it("PUT /current sets the current workspace", async () => {
-    const { app, service } = await makeApp();
-    const id = await register(service, { name: "Cur", workspaceDir: path.join(scratch, "cur") });
+    const { app, workspace } = await makeApp();
+    const id = await register(workspace, { name: "Cur", workspaceDir: path.join(scratch, "cur") });
     const res = await app.request("/current", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id }),
     });
     expect(res.status).toBe(200);
-    expect(await service.getLastOpenedId()).toBe(id);
+    expect(
+      (await workspace.getLastOpenedWorkspaceId.execute({}).map((r) => r.id))._unsafeUnwrap(),
+    ).toBe(id);
   });
 
   it("DELETE /:id default removes only metadata; user files preserved", async () => {
-    const { app, service } = await makeApp();
+    const { app, workspace } = await makeApp();
     const workspaceDir = path.join(scratch, "del");
-    const id = await register(service, { name: "Del", workspaceDir });
+    const id = await register(workspace, { name: "Del", workspaceDir });
     const fs = await import("node:fs/promises");
     await fs.writeFile(path.join(workspaceDir, "user-file.txt"), "user", "utf8");
     const res = await app.request(`/${id}`, { method: "DELETE" });
     expect(res.status).toBe(204);
-    expect(await service.get(id)).toBeNull();
+    expect(
+      (await workspace.getWorkspace.execute({ id: id as WorkspaceId }))._unsafeUnwrap(),
+    ).toBeNull();
     expect(await fs.readFile(path.join(workspaceDir, "user-file.txt"), "utf8")).toBe("user");
   });
 
   it("DELETE /:id?purge=1 also removes glyph-owned subdirs", async () => {
-    const { app, service } = await makeApp();
+    const { app, workspace } = await makeApp();
     const workspaceDir = path.join(scratch, "purge");
-    const id = await register(service, { name: "Purge", workspaceDir });
+    const id = await register(workspace, { name: "Purge", workspaceDir });
     const fs = await import("node:fs/promises");
     await fs.writeFile(path.join(workspaceDir, "user-file.txt"), "user", "utf8");
     await fs.writeFile(path.join(workspaceDir, "sessions", "drop.txt"), "agent", "utf8");
@@ -254,8 +261,8 @@ describe("workspacesRoutes — list / get / current / delete", () => {
 
 describe("workspacesRoutes — PATCH /:id", () => {
   it("renames the display name", async () => {
-    const { app, service } = await makeApp();
-    const id = await register(service, { name: "Old", workspaceDir: path.join(scratch, "x") });
+    const { app, workspace } = await makeApp();
+    const id = await register(workspace, { name: "Old", workspaceDir: path.join(scratch, "x") });
     const res = await app.request(`/${id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -264,13 +271,14 @@ describe("workspacesRoutes — PATCH /:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { name: string };
     expect(body.name).toBe("New");
-    const stored = await service.get(id);
-    expect(stored?.name).toBe("New");
+    const storedRes = await workspace.getWorkspace.execute({ id: id as WorkspaceId });
+    expect(storedRes.isOk()).toBe(true);
+    expect(storedRes._unsafeUnwrap()?.name).toBe("New");
   });
 
   it("returns 400 when no patchable fields are present", async () => {
-    const { app, service } = await makeApp();
-    const id = await register(service, { name: "X", workspaceDir: path.join(scratch, "y") });
+    const { app, workspace } = await makeApp();
+    const id = await register(workspace, { name: "X", workspaceDir: path.join(scratch, "y") });
     const res = await app.request(`/${id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -280,8 +288,8 @@ describe("workspacesRoutes — PATCH /:id", () => {
   });
 
   it("returns 400 on empty display name", async () => {
-    const { app, service } = await makeApp();
-    const id = await register(service, { name: "X", workspaceDir: path.join(scratch, "z") });
+    const { app, workspace } = await makeApp();
+    const id = await register(workspace, { name: "X", workspaceDir: path.join(scratch, "z") });
     const res = await app.request(`/${id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -291,7 +299,7 @@ describe("workspacesRoutes — PATCH /:id", () => {
   });
 
   it("returns 404 for unknown id (and does not re-create the workspace)", async () => {
-    const { app, service } = await makeApp();
+    const { app, workspace } = await makeApp();
     const id = "00000000-0000-0000-0000-000000000000";
     const res = await app.request(`/${id}`, {
       method: "PATCH",
@@ -301,7 +309,9 @@ describe("workspacesRoutes — PATCH /:id", () => {
     expect(res.status).toBe(404);
     // Strict-update semantics: the rename atomically fails — no row
     // ever appeared.
-    expect(await service.get(id)).toBeNull();
+    expect(
+      (await workspace.getWorkspace.execute({ id: id as WorkspaceId }))._unsafeUnwrap(),
+    ).toBeNull();
   });
 });
 
@@ -311,15 +321,21 @@ describe("workspacesRoutes — PATCH /:id", () => {
 // `CatalogService` snapshot is stale) without restarting the server.
 describe("workspacesRoutes — POST /:id/reload", () => {
   it("returns 204 on cold cache (no entry yet)", async () => {
-    const { app, service } = await makeApp();
-    const id = await register(service, { name: "Cold", workspaceDir: path.join(scratch, "cold") });
+    const { app, workspace } = await makeApp();
+    const id = await register(workspace, {
+      name: "Cold",
+      workspaceDir: path.join(scratch, "cold"),
+    });
     const res = await app.request(`/${id}/reload`, { method: "POST" });
     expect(res.status).toBe(204);
   });
 
   it("returns 204 and rebuilds the cached container after a warm hit", async () => {
-    const { app, service, application } = await makeApp();
-    const id = await register(service, { name: "Warm", workspaceDir: path.join(scratch, "warm") });
+    const { app, workspace, application } = await makeApp();
+    const id = await register(workspace, {
+      name: "Warm",
+      workspaceDir: path.join(scratch, "warm"),
+    });
     const before = await application.getContext(id);
     expect(before).not.toBeNull();
     const res = await app.request(`/${id}/reload`, { method: "POST" });
@@ -331,18 +347,21 @@ describe("workspacesRoutes — POST /:id/reload", () => {
   });
 
   it("returns 404 for an unknown workspace id", async () => {
-    const { app, service } = await makeApp();
+    const { app } = await makeApp();
     const res = await app.request("/00000000-0000-0000-0000-000000000000/reload", {
       method: "POST",
     });
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string; code: string };
-    expect(body.code).toBe("WorkspaceNotRegisteredError");
+    expect(body.code).toBe("WorkspaceNotRegistered");
   });
 
   it("returns 409 with WorkspaceHasLiveTasksError when tasks are live", async () => {
-    const { app, service, application } = await makeApp();
-    const id = await register(service, { name: "Live", workspaceDir: path.join(scratch, "live") });
+    const { app, workspace, application } = await makeApp();
+    const id = await register(workspace, {
+      name: "Live",
+      workspaceDir: path.join(scratch, "live"),
+    });
     const ctx = await application.getContext(id);
     expect(ctx).not.toBeNull();
     // biome-ignore lint/suspicious/noExplicitAny: test-only stub.
@@ -374,7 +393,7 @@ describe("workspacesRoutes — observability", () => {
     return {
       root,
       cap,
-      service: sys.service,
+      workspace: sys.workspace,
       application: sys.application,
     };
   }
@@ -397,8 +416,8 @@ describe("workspacesRoutes — observability", () => {
   });
 
   it("DELETE /:id emits a 'workspace deleted' info line", async () => {
-    const { root, cap, service } = await makeWiredApp();
-    const id = await register(service, {
+    const { root, cap, workspace } = await makeWiredApp();
+    const id = await register(workspace, {
       name: "Doomed",
       workspaceDir: path.join(scratch, "doomed"),
     });

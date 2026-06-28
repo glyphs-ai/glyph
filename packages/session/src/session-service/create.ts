@@ -4,18 +4,13 @@
 
 import { mkdir } from "node:fs/promises";
 import type { ResolvedAgent } from "@glyphs-ai/runtime";
-import {
-  AgentNotFoundError,
-  AgentResolutionFailedError,
-  SessionIdAllocationFailedError,
-} from "../errors.js";
+import { AgentNotFoundError, AgentResolutionFailedError } from "../errors.js";
 import type { CreateSessionOpts, Session } from "../types.js";
 import { generateSessionId } from "../validate.js";
 import type { SessionServiceCtx } from "./_helpers.js";
 import { safeJoinUnderRoot, safeRm } from "./_helpers.js";
 
 const DEFAULT_RUNTIME = "copilot";
-const MAX_CREATE_RETRIES = 5;
 
 export async function createSession(
   ctx: SessionServiceCtx,
@@ -40,26 +35,22 @@ export async function createSession(
   const runtimeKind = opts.runtime ?? DEFAULT_RUNTIME;
   const runtime = ctx.runtimeRegistry.get(runtimeKind);
 
-  await mkdir(ctx.sessionsDir, { recursive: true });
-  let id: string | null = null;
-  let workdir: string | null = null;
-  for (let attempt = 0; attempt < MAX_CREATE_RETRIES; attempt++) {
-    const candidateId = generateSessionId(ctx.now, ctx.randomBytes);
-    const candidateDir = safeJoinUnderRoot(ctx.sessionsDir, candidateId);
-    try {
-      await mkdir(candidateDir, { recursive: false });
-      id = candidateId;
-      workdir = candidateDir;
-      break;
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code === "EEXIST") continue;
-      throw err;
-    }
-  }
-  if (id === null || workdir === null) {
-    throw new SessionIdAllocationFailedError(MAX_CREATE_RETRIES);
-  }
+  // Allocate the per-session workdir.
+  //
+  // Source of truth for id uniqueness is the `sessions.id` PRIMARY KEY
+  // — the disk dir is a "workspace attachment" for the row, not the
+  // gatekeeper. Generation is `YYYYMMDD-<4-hex>` so collisions are
+  // possible but vanishingly rare under realistic load; we accept that
+  // a collision surfaces as either EEXIST (this mkdir) or a PK
+  // constraint (the insert below) and lets the caller retry.
+  //
+  // `ctx.sessionsDir` is owned and pre-created by
+  // @glyphs-ai/workspace's provisioner during workspace `register`,
+  // so `{recursive: false}` here surfaces a missing parent as ENOENT
+  // (composition bug) rather than silently self-healing.
+  const id = generateSessionId(ctx.now, ctx.randomBytes);
+  const workdir = safeJoinUnderRoot(ctx.sessionsDir, id);
+  await mkdir(workdir, { recursive: false });
 
   let provisionedRuntimeSessionId: string | null = null;
   try {

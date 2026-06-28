@@ -23,7 +23,7 @@
  * compose time via the `runners: WorkflowRunners` field.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Logger } from "pino";
@@ -130,6 +130,10 @@ export function makeWorkflowTestHandle(
 ): WorkflowTestHandle {
   const db = openTestWorkflowDb();
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-test-"));
+  // Mirror @glyphs-ai/workspace's `register` provisioning step:
+  // create the `workflows/` parent that `WorkflowService.createWorkflow`
+  // assumes exists (mkdir leaf with `{recursive: false}`).
+  mkdirSync(path.join(workspaceDir, "workflows"));
   const coordRunner = opts.coordRunner ?? makeStubRunner();
   const workerRunner = opts.workerRunner ?? makeStubRunner();
   const runners: WorkflowRunners = {

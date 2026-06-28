@@ -28,8 +28,7 @@ import type { ScheduleService } from "@glyphs-ai/schedule";
 import type { SessionService, SpawnFn } from "@glyphs-ai/session";
 import type { TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
-import type { WorkspaceService } from "@glyphs-ai/workspace";
-import type { Workspace } from "@glyphs-ai/workspace/contract";
+import type { GetWorkspaceResponse, WorkspaceModule } from "@glyphs-ai/workspace";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface Gate {
@@ -164,26 +163,27 @@ vi.mock("../src/wiring/workflow-worker-task-runner.js", () => ({
   })),
 }));
 
+import { okAsync } from "neverthrow";
 import { WorkspaceContextRegistry } from "../src/workspace-context.js";
 
 function makeRegistry(opts: { workspaceExists?: boolean } = {}): WorkspaceContextRegistry {
   const exists = opts.workspaceExists ?? true;
-  const workspaceService = {
-    get: vi.fn(
-      async (id: string): Promise<Workspace | null> =>
-        exists
-          ? ({
-              id,
-              name: "test",
-              workspaceDir: "/tmp/registry-test",
-              createdAt: "2026-01-01T00:00:00.000Z",
-              lastOpenedAt: "2026-01-01T00:00:00.000Z",
-            } as Workspace)
-          : null,
+  type Entity = NonNullable<GetWorkspaceResponse>;
+  const getWorkspace = {
+    execute: vi.fn(({ id }: { id: string }) =>
+      exists
+        ? okAsync<GetWorkspaceResponse, never>({
+            id,
+            name: "test",
+            workspaceDir: "/tmp/registry-test",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            lastOpenedAt: "2026-01-01T00:00:00.000Z",
+          } as Entity)
+        : okAsync<GetWorkspaceResponse, never>(null),
     ),
-  } as unknown as WorkspaceService;
+  } as unknown as WorkspaceModule["getWorkspace"];
   return new WorkspaceContextRegistry({
-    workspaceService,
+    getWorkspace,
     runtimeRegistry: new RuntimeRegistry(),
     spawnFn: vi.fn() as unknown as SpawnFn,
   });

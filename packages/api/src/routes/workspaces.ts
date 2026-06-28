@@ -1,16 +1,20 @@
 import {
-  CurrentWorkspaceResponseSchema,
   RegisterWorkspaceRequestSchema,
   RenameWorkspaceRequestSchema,
-  SetCurrentWorkspaceRequestSchema,
-  WorkspacePathParamsSchema,
-  WorkspaceSchema,
-} from "@glyphs-ai/workspace/contract";
+  type WorkspaceId,
+  type WorkspaceName,
+} from "@glyphs-ai/workspace";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { workspacesErrorPolicy } from "../_error-policies/workspaces.js";
-import { logEvent, respondError } from "../_http-errors.js";
+import { respondWorkspaceError } from "../_error-policies/workspaces.js";
+import { logEvent } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
 import type { Application } from "../application.js";
+import {
+  CurrentWorkspaceResponseSchema,
+  SetCurrentWorkspaceRequestSchema,
+  WorkspacePathParamsSchema,
+  WorkspaceWireSchema,
+} from "./workspaces-wire.js";
 
 /**
  * Routes for `/api/workspaces/*`. Workspace-scoped resources (sessions,
@@ -18,13 +22,20 @@ import type { Application } from "../application.js";
  * separately so the workspace id is part of the resource URL.
  *
  * This is a thin transport adapter — every endpoint is parse body →
- * dispatch to the application layer → format response. The orchestration
- * (UUID minting, default workspaceDir, cache invalidation) lives in the
- * application so CLI / MCP / SDK consumers get it for free.
+ * dispatch to the workspace module's use-case → format response. The
+ * orchestration (UUID minting, default workspaceDir, cache
+ * invalidation) lives in the use-case + `Application` so CLI / MCP /
+ * SDK consumers get it for free.
+ *
+ * Workspace ids arriving from URL params are raw `string`s; we cast
+ * to the branded `WorkspaceId` at the call site because the use-case
+ * re-parses through `WorkspaceIdSchema` on entry (defense in depth)
+ * and surfaces a malformed id as a `ZodError` the
+ * `respondWorkspaceError` helper renders.
  */
 export function workspacesRoutes(application: Application): OpenAPIHono {
   const app = createApiApp();
-  const { workspaceService: service } = application;
+  const { workspace } = application;
 
   // List all registered workspaces.
   app.openapi(
@@ -34,25 +45,21 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       tags: ["workspaces"],
       summary: "List registered workspaces",
       responses: {
-        200: jsonResponse(WorkspaceSchema.array(), "Registered workspaces"),
+        200: jsonResponse(WorkspaceWireSchema.array(), "Registered workspaces"),
         500: errorResponse("Internal error"),
       },
     }),
     async (c) => {
-      try {
-        return c.json(await service.list());
-      } catch (err) {
-        return respondError(c, err, {
-          route: "workspaces.list",
-          policy: workspacesErrorPolicy,
-          defaultStatus: 500,
-        });
-      }
+      const res = await workspace.listWorkspaces.execute({});
+      return res.match(
+        (list) => c.json(list),
+        (err) => respondWorkspaceError(c, err, { route: "workspaces.list", defaultStatus: 500 }),
+      );
     },
   );
 
   // Create a workspace. `name` required. `workspaceDir` optional — when
-  // omitted, core mints `<defaultWorkspaceParent>/<uuid>/`.
+  // omitted, the use-case mints `<defaultWorkspaceParent>/<uuid>/`.
   app.openapi(
     createRoute({
       method: "post",
@@ -63,7 +70,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
         body: jsonRequest(RegisterWorkspaceRequestSchema),
       },
       responses: {
-        201: jsonResponse(WorkspaceSchema, "Created workspace"),
+        201: jsonResponse(WorkspaceWireSchema, "Created workspace"),
         400: errorResponse("Malformed request body"),
         409: errorResponse("Workspace directory already registered"),
         500: errorResponse("Internal error"),
@@ -71,20 +78,18 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
     }),
     async (c) => {
       const body = c.req.valid("json");
-      try {
-        const view = await service.register(body);
-        logEvent(c, "workspace created", {
-          workspaceId: view.id,
-          name: view.name,
-          workspaceDir: view.workspaceDir,
-        });
-        return c.json(view, 201);
-      } catch (err) {
-        return respondError(c, err, {
-          route: "workspaces.create",
-          policy: workspacesErrorPolicy,
-        });
-      }
+      const res = await workspace.registerWorkspace.execute(body);
+      return res.match(
+        (view) => {
+          logEvent(c, "workspace created", {
+            workspaceId: view.id,
+            name: view.name,
+            workspaceDir: view.workspaceDir,
+          });
+          return c.json(view, 201);
+        },
+        (err) => respondWorkspaceError(c, err, { route: "workspaces.create" }),
+      );
     },
   );
 
@@ -101,15 +106,15 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       },
     }),
     async (c) => {
-      try {
-        return c.json({ id: await service.getLastOpenedId() });
-      } catch (err) {
-        return respondError(c, err, {
-          route: "workspaces.getCurrent",
-          policy: workspacesErrorPolicy,
-          defaultStatus: 500,
-        });
-      }
+      const res = await workspace.getLastOpenedWorkspaceId.execute({});
+      return res.match(
+        (view) => c.json(view),
+        (err) =>
+          respondWorkspaceError(c, err, {
+            route: "workspaces.getCurrent",
+            defaultStatus: 500,
+          }),
+      );
     },
   );
 
@@ -132,16 +137,18 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
     }),
     async (c) => {
       const body = c.req.valid("json");
-      try {
-        await service.open(body.id);
-      } catch (err) {
-        return respondError(c, err, {
-          route: "workspaces.setCurrent",
-          policy: workspacesErrorPolicy,
-        });
-      }
-      logEvent(c, "workspace selected as current", { workspaceId: body.id });
-      return c.json({ id: body.id });
+      const res = await workspace.openWorkspace.execute({ id: body.id as WorkspaceId });
+      return res.match(
+        () => {
+          logEvent(c, "workspace selected as current", { workspaceId: body.id });
+          return c.json({ id: body.id });
+        },
+        (err) =>
+          respondWorkspaceError(c, err, {
+            route: "workspaces.setCurrent",
+            meta: { workspaceId: body.id },
+          }),
+      );
     },
   );
 
@@ -154,31 +161,31 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       summary: "Get a workspace",
       request: { params: WorkspacePathParamsSchema },
       responses: {
-        200: jsonResponse(WorkspaceSchema, "Workspace"),
+        200: jsonResponse(WorkspaceWireSchema, "Workspace"),
         404: errorResponse("Workspace not registered"),
         500: errorResponse("Internal error"),
       },
     }),
     async (c) => {
       const id = c.req.param("id");
-      let view: Awaited<ReturnType<typeof service.get>>;
-      try {
-        view = await service.get(id);
-      } catch (err) {
-        return respondError(c, err, {
-          route: "workspaces.get",
-          policy: workspacesErrorPolicy,
-          meta: { workspaceId: id },
-          defaultStatus: 500,
-        });
-      }
-      if (!view) {
-        return c.json(
-          { error: "workspace not registered", code: "WorkspaceNotRegisteredError" },
-          404,
-        );
-      }
-      return c.json(view);
+      const res = await workspace.getWorkspace.execute({ id: id as WorkspaceId });
+      return res.match(
+        (view) => {
+          if (!view) {
+            return c.json(
+              { error: "workspace not registered", code: "WorkspaceNotRegistered" },
+              404,
+            );
+          }
+          return c.json(view);
+        },
+        (err) =>
+          respondWorkspaceError(c, err, {
+            route: "workspaces.get",
+            meta: { workspaceId: id },
+            defaultStatus: 500,
+          }),
+      );
     },
   );
 
@@ -191,10 +198,10 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       summary: "Rename a workspace",
       request: {
         params: WorkspacePathParamsSchema,
-        body: jsonRequest(RenameWorkspaceRequestSchema),
+        body: jsonRequest(z.object({ name: z.string() }).strict()),
       },
       responses: {
-        200: jsonResponse(WorkspaceSchema, "Updated workspace"),
+        200: jsonResponse(WorkspaceWireSchema, "Updated workspace"),
         400: errorResponse("Malformed request body"),
         404: errorResponse("Workspace not registered"),
         500: errorResponse("Internal error"),
@@ -203,29 +210,35 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
     async (c) => {
       const id = c.req.param("id");
       const body = c.req.valid("json");
-      try {
-        const view = await application.renameWorkspace(id, body);
-        if (!view) {
-          return c.json(
-            { error: "workspace not registered", code: "WorkspaceNotRegisteredError" },
-            404,
-          );
-        }
-        logEvent(c, "workspace updated", { workspaceId: id, newName: body.name });
-        return c.json(view);
-      } catch (err) {
-        return respondError(c, err, {
-          route: "workspaces.patch",
-          policy: workspacesErrorPolicy,
-          meta: { workspaceId: id },
-          defaultStatus: 500,
-        });
-      }
+      // The PATCH body deliberately accepts a plain string and routes
+      // it through `Application.renameWorkspace`, which delegates to
+      // the use-case where `RenameWorkspaceRequestSchema` enforces the
+      // branded `WorkspaceName` shape. Validation failures surface as
+      // ZodError → 400 via the route's onError handler.
+      const res = await application.renameWorkspace(id, { name: body.name as WorkspaceName });
+      return res.match(
+        (view) => {
+          if (!view) {
+            return c.json(
+              { error: "workspace not registered", code: "WorkspaceNotRegistered" },
+              404,
+            );
+          }
+          logEvent(c, "workspace updated", { workspaceId: id, newName: body.name });
+          return c.json(view);
+        },
+        (err) =>
+          respondWorkspaceError(c, err, {
+            route: "workspaces.patch",
+            meta: { workspaceId: id },
+            defaultStatus: 500,
+          }),
+      );
     },
   );
 
   // Remove a workspace (idempotent). Default removes only metadata;
-  // `?purge=1` also deletes glyph-owned subdirs (sessions/, tasks/).
+  // `?purge=1` also deletes glyph-owned subdirs (sessions/, tasks/, workflows/).
   app.openapi(
     createRoute({
       method: "delete",
@@ -244,17 +257,18 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
     async (c) => {
       const id = c.req.param("id");
       const purge = c.req.query("purge") === "1";
-      try {
-        await application.unregisterWorkspace(id, { purge });
-      } catch (err) {
-        return respondError(c, err, {
-          route: "workspaces.delete",
-          policy: workspacesErrorPolicy,
-          meta: { workspaceId: id, purge },
-        });
-      }
-      logEvent(c, "workspace deleted", { workspaceId: id, purge });
-      return c.body(null, 204);
+      const res = await application.unregisterWorkspace(id, { purge });
+      return res.match(
+        () => {
+          logEvent(c, "workspace deleted", { workspaceId: id, purge });
+          return c.body(null, 204);
+        },
+        (err) =>
+          respondWorkspaceError(c, err, {
+            route: "workspaces.delete",
+            meta: { workspaceId: id, purge },
+          }),
+      );
     },
   );
 
@@ -284,17 +298,13 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       try {
         const view = await application.reloadWorkspace(id);
         if (view === null) {
-          return c.json(
-            { error: "workspace not registered", code: "WorkspaceNotRegisteredError" },
-            404,
-          );
+          return c.json({ error: "workspace not registered", code: "WorkspaceNotRegistered" }, 404);
         }
         logEvent(c, "workspace reload requested via API", { workspaceId: id });
         return c.body(null, 204);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkspaceError(c, err, {
           route: "workspaces.reload",
-          policy: workspacesErrorPolicy,
           meta: { workspaceId: id },
           defaultStatus: 500,
         });
