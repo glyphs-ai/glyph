@@ -23,7 +23,12 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const PKGS = [
-  { dir: "workspace", entity: "Workspace", tableSuffix: "workspace" },
+  {
+    dir: "workspace",
+    entity: "Workspace",
+    tableSuffix: "workspace",
+    migrationsFile: "src/persistence/migrations.ts",
+  },
   { dir: "session", entity: "Session", tableSuffix: "session" },
   { dir: "task", entity: "Task", tableSuffix: "task" },
   { dir: "catalog", entity: "Catalog", tableSuffix: "catalog" },
@@ -34,16 +39,23 @@ const PKGS = [
   // scaffold time, giving e.g. `__drizzle_migrations_event-bus`. SQLite
   // identifiers with hyphens are valid when quoted; drizzle's
   // `sql.identifier()` quotes automatically.
-  { dir: "_template", entity: "__Entity__", tableSuffix: "__PKG__" },
+  {
+    dir: "_template",
+    entity: "__Entity__",
+    tableSuffix: "__PKG__",
+    migrationsFile: "src/persistence/migrations.ts",
+  },
 ];
 
 function escapeForTemplateLiteral(s) {
   return s.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
-for (const { dir, entity, tableSuffix } of PKGS) {
+for (const { dir, entity, tableSuffix, migrationsFile } of PKGS) {
   const drizzleDir = join(repoRoot, "packages", dir, "drizzle");
-  const outFile = join(repoRoot, "packages", dir, "src", "migrations.ts");
+  // Four-layer packages keep the generated migrations under
+  // `src/persistence/`; flat packages default to `src/migrations.ts`.
+  const outFile = join(repoRoot, "packages", dir, ...(migrationsFile ?? "src/migrations.ts").split("/"));
 
   let files = [];
   try {
@@ -112,6 +124,6 @@ export function apply${entity}Migrations<T extends Record<string, unknown>>(
   mkdirSync(dirname(outFile), { recursive: true });
   writeFileSync(outFile, header + body, "utf8");
   console.log(
-    `inline-migrations: wrote packages/${dir}/src/migrations.ts (${entries.length} migration${entries.length === 1 ? "" : "s"})`,
+    `inline-migrations: wrote packages/${dir}/${migrationsFile ?? "src/migrations.ts"} (${entries.length} migration${entries.length === 1 ? "" : "s"})`,
   );
 }

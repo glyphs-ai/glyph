@@ -54,9 +54,7 @@ async function registerWs(
   service: WorkspaceService,
   args: { name: string; workspaceDir: string },
 ): Promise<{ id: string; workspaceDir: string }> {
-  const id = (await import("node:crypto")).randomUUID();
   const result = await service.register({
-    id,
     workspaceDir: args.workspaceDir,
     name: args.name,
   });
@@ -112,7 +110,7 @@ describe("WorkspaceContext observability", () => {
     // Renaming a workspace invalidates its cached context as a side
     // effect — the canonical public-surface path to exercising the
     // registry's invalidate observability hook.
-    await application.renameWorkspace(ws.id, { newName: "alpha-renamed" });
+    await application.renameWorkspace(ws.id, { name: "alpha-renamed" });
 
     const inv = cap.entries.find((e) => e.msg === "per-workspace container invalidated");
     expect(inv?.workspaceId).toBe(ws.id);

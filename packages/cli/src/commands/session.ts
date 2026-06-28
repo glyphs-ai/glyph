@@ -5,23 +5,14 @@
  * All commands take `--workspace-id <id>` or read `GLYPH_WORKSPACE`
  * (no server-side fallback — see `connect.ts:resolveWorkspace`).
  * Identifier flags are positional where unambiguous.
- *
- * These routes nest under `/api/workspaces/{id}/…`. The `@glyphs-ai/sdk`
- * generated operations for them omit the middleware-injected `{id}` path
- * param (see `sdk-client.ts`), so we consume the SDK's typed low-level
- * `client.<method>` instead, passing the full `path` map — same fetch /
- * serialization pipeline, correct URL, response typing from the generated
- * `*Responses` maps.
  */
 
-import type {
-  PostApiWorkspacesByIdSessionsBySidSpawnResponses,
-  PostApiWorkspacesByIdSessionsResponses,
-} from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdSessionsBySid,
   getApiWorkspacesByIdSessions,
   getApiWorkspacesByIdSessionsBySid,
+  postApiWorkspacesByIdSessions,
+  postApiWorkspacesByIdSessionsBySidSpawn,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../output.js";
@@ -79,14 +70,13 @@ export async function sessionNew(opts: SessionNewOpts): Promise<CommandResult> {
   if (typeof opts.agent !== "string" || opts.agent.trim() === "") {
     return { exitCode: 2, stderr: "missing required --agent <name>\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: { agent: string; runtime?: string } = { agent: opts.agent };
     if (opts.runtime !== undefined) body.runtime = opts.runtime;
     const session = unwrap(
-      await client.post<PostApiWorkspacesByIdSessionsResponses>({
-        url: "/api/workspaces/{id}/sessions",
+      await postApiWorkspacesByIdSessions({
         path: { id: workspaceId },
         body,
       }),
@@ -168,14 +158,13 @@ export async function sessionSpawn(
   if (typeof sessionId !== "string" || sessionId.trim() === "") {
     return { exitCode: 2, stderr: "session id is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: { remote?: boolean } = {};
     if (opts.remote) body.remote = true;
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdSessionsBySidSpawnResponses>({
-        url: "/api/workspaces/{id}/sessions/{sid}/spawn",
+      await postApiWorkspacesByIdSessionsBySidSpawn({
         path: { id: workspaceId, sid: sessionId },
         body,
       }),

@@ -3,14 +3,12 @@
  * sync over the workspace-scoped catalog MCPs HTTP surface.
  */
 
-import type {
-  PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses,
-  PostApiWorkspacesByIdCatalogMcpsResponses,
-} from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdCatalogMcpsByScopeByName,
   getApiWorkspacesByIdCatalogMcps,
   getApiWorkspacesByIdCatalogMcpsByScopeByName,
+  postApiWorkspacesByIdCatalogMcps,
+  postApiWorkspacesByIdCatalogMcpsByScopeByNameSync,
   postApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolve,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
@@ -77,12 +75,11 @@ export async function catalogMcpInstall(opts: CatalogMcpInstallOpts): Promise<Co
   // request body (see `validateMcpInstallInput`). The defense-in-depth
   // test in `cli/test/catalog-install-source.test.ts` pins this
   // contract; sending an extra `name` field would violate it.
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogMcpsResponses>({
-        url: "/api/workspaces/{id}/catalog/mcps",
+      await postApiWorkspacesByIdCatalogMcps({
         path: { id: workspaceId },
         body: { origin: built.origin },
       }),
@@ -158,13 +155,12 @@ export async function catalogMcpSync(
   if (typeof planToken !== "string" || planToken.trim() === "") {
     return { exitCode: 2, stderr: "--plan-token is required (mint with `mcp sync-resolve`)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const { scope, name: shortName } = splitCatalogFqn(fqn);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses>({
-        url: "/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync",
+      await postApiWorkspacesByIdCatalogMcpsByScopeByNameSync({
         path: { id: workspaceId, scope, name: shortName },
         body: { planToken },
       }),

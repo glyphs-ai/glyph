@@ -1,10 +1,10 @@
 /**
- * zod schemas for the `/api/workspaces/:id/schedules` wire shapes.
- * Mirrors the per-kind target DTOs + route request/response shapes in
- * the api `wire/` surface (`wire/schedules.ts` + `wire/routes/schedules.ts`)
- * plus the re-exported `Schedule` / `PreviewScheduleResult` domain types
- * from `@glyphs-ai/schedule`; parity pinned by the wire-schema parity
- * test.
+ * zod schemas for the `/api/workspaces/:id/schedules` wire shapes. Single
+ * source of truth for the server's OpenAPI projection and the inferred
+ * wire types (re-exported below via `z.infer`), covering the per-kind
+ * target DTOs + route request/response shapes, plus the re-exported
+ * `Schedule` / `PreviewScheduleResult` domain types from
+ * `@glyphs-ai/schedule`.
  */
 import { z } from "zod";
 
@@ -107,6 +107,121 @@ export const ScheduleRunResponseSchema = z.object({
   dispatchId: z.string(),
 });
 
+// ─── Request-specific strict schemas (body validation) ────────────
+
+export const ScheduleTriggerRequestSchema = z
+  .object({
+    kind: z.literal("cron"),
+    expr: z.string().refine((s) => s.trim().length > 0, {
+      message: "trigger.expr must be a non-empty string",
+    }),
+    tz: z.string().refine((s) => s.trim().length > 0, {
+      message: "trigger.tz must be a non-empty string",
+    }),
+  })
+  .strict();
+
+export const TaskTargetDataRequestSchema = z
+  .object({
+    agent: z.string().refine((s) => s.trim().length > 0, {
+      message: "target.agent must be a non-empty string",
+    }),
+    brief: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "target.brief must be a non-empty string",
+      })
+      .refine((s) => !s.includes("\n") && !s.includes("\r"), {
+        message: "target.brief must be a single line — pass long content via target.details",
+      })
+      .refine((s) => s.trim().length <= 200, {
+        message: "target.brief must be at most 200 chars",
+      }),
+    details: z.string().optional(),
+    runtime: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "target.runtime, when set, must be a non-empty string",
+      })
+      .optional(),
+  })
+  .strict();
+
+export const TaskTargetPatchRequestSchema = z
+  .object({
+    agent: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "target.agent must be a non-empty string",
+      })
+      .optional(),
+    brief: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "target.brief must be a non-empty string",
+      })
+      .refine((s) => !s.includes("\n") && !s.includes("\r"), {
+        message: "target.brief must be a single line — pass long content via target.details",
+      })
+      .refine((s) => s.trim().length <= 200, {
+        message: "target.brief must be at most 200 chars",
+      })
+      .optional(),
+    details: z.string().nullable().optional(),
+    runtime: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "target.runtime, when set, must be a non-empty string",
+      })
+      .nullable()
+      .optional(),
+  })
+  .strict();
+
+export const WorkflowTargetDataRequestSchema = z
+  .object({
+    coordinatorAgent: z.string().refine((s) => s.trim().length > 0, {
+      message: "target.coordinatorAgent must be a non-empty string",
+    }),
+    brief: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "target.brief must be a non-empty string",
+      })
+      .refine((s) => !s.includes("\n") && !s.includes("\r"), {
+        message: "target.brief must be a single line — pass long content via target.details",
+      })
+      .refine((s) => s.trim().length <= 200, {
+        message: "target.brief must be at most 200 chars",
+      }),
+    details: z.string().optional(),
+  })
+  .strict();
+
+export const WorkflowTargetPatchRequestSchema = z
+  .object({
+    coordinatorAgent: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "target.coordinatorAgent must be a non-empty string",
+      })
+      .optional(),
+    brief: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "target.brief must be a non-empty string",
+      })
+      .refine((s) => !s.includes("\n") && !s.includes("\r"), {
+        message: "target.brief must be a single line — pass long content via target.details",
+      })
+      .refine((s) => s.trim().length <= 200, {
+        message: "target.brief must be at most 200 chars",
+      })
+      .optional(),
+    details: z.string().nullable().optional(),
+  })
+  .strict();
+
 // ─── Query / request / path-param DTOs (routes/schedules.ts) ──────
 
 export const ScheduleListQuerySchema = z.object({
@@ -129,30 +244,66 @@ export const SchedulePathParamsSchema = z.object({
   sid: z.string(),
 });
 
-export const CreateTaskScheduleRequestSchema = z.object({
-  name: z.string(),
-  target: TaskTargetDataSchema,
-  trigger: ScheduleTriggerSchema,
-  enabled: z.boolean().optional(),
-});
+export const CreateTaskScheduleRequestSchema = z
+  .object({
+    name: z.string().refine((s) => s.trim().length > 0, {
+      message: "name must be a non-empty string",
+    }),
+    target: TaskTargetDataRequestSchema,
+    trigger: ScheduleTriggerRequestSchema,
+    enabled: z.boolean().optional(),
+  })
+  .strict();
 
-export const PatchTaskScheduleRequestSchema = z.object({
-  name: z.string().optional(),
-  target: TaskTargetPatchSchema.optional(),
-  trigger: ScheduleTriggerSchema.optional(),
-  enabled: z.boolean().optional(),
-});
+export const PatchTaskScheduleRequestSchema = z
+  .object({
+    name: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "name must be a non-empty string",
+      })
+      .optional(),
+    target: TaskTargetPatchRequestSchema.optional(),
+    trigger: ScheduleTriggerRequestSchema.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
 
-export const CreateWorkflowScheduleRequestSchema = z.object({
-  name: z.string(),
-  target: WorkflowTargetDataSchema,
-  trigger: ScheduleTriggerSchema,
-  enabled: z.boolean().optional(),
-});
+export const CreateWorkflowScheduleRequestSchema = z
+  .object({
+    name: z.string().refine((s) => s.trim().length > 0, {
+      message: "name must be a non-empty string",
+    }),
+    target: WorkflowTargetDataRequestSchema,
+    trigger: ScheduleTriggerRequestSchema,
+    enabled: z.boolean().optional(),
+  })
+  .strict();
 
-export const PatchWorkflowScheduleRequestSchema = z.object({
-  name: z.string().optional(),
-  target: WorkflowTargetPatchSchema.optional(),
-  trigger: ScheduleTriggerSchema.optional(),
-  enabled: z.boolean().optional(),
-});
+export const PatchWorkflowScheduleRequestSchema = z
+  .object({
+    name: z
+      .string()
+      .refine((s) => s.trim().length > 0, {
+        message: "name must be a non-empty string",
+      })
+      .optional(),
+    target: WorkflowTargetPatchRequestSchema.optional(),
+    trigger: ScheduleTriggerRequestSchema.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
+
+// Inferred wire types — single source of truth is the schemas above.
+export type ScheduleListQuery = z.infer<typeof ScheduleListQuerySchema>;
+export type CreateTaskScheduleRequest = z.infer<typeof CreateTaskScheduleRequestSchema>;
+export type PatchTaskScheduleRequest = z.infer<typeof PatchTaskScheduleRequestSchema>;
+export type CreateWorkflowScheduleRequest = z.infer<typeof CreateWorkflowScheduleRequestSchema>;
+export type PatchWorkflowScheduleRequest = z.infer<typeof PatchWorkflowScheduleRequestSchema>;
+export type SchedulePathParams = z.infer<typeof SchedulePathParamsSchema>;
+export type ScheduleGetResponse = z.infer<typeof ScheduleGetResponseSchema>;
+export type ScheduleHeader = z.infer<typeof ScheduleHeaderSchema>;
+export type SchedulePreviewQuery = z.infer<typeof SchedulePreviewQuerySchema>;
+export type SchedulePreviewCronQuery = z.infer<typeof SchedulePreviewCronQuerySchema>;
+export type ScheduleDeleteResponse = z.infer<typeof ScheduleDeleteResponseSchema>;
+export type ScheduleRunResponse = z.infer<typeof ScheduleRunResponseSchema>;

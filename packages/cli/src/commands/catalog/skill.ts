@@ -4,18 +4,16 @@
  * skills HTTP surface.
  */
 
-import type {
-  PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses,
-  PostApiWorkspacesByIdCatalogSkillsResolveResponses,
-  PostApiWorkspacesByIdCatalogSkillsResponses,
-} from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdCatalogSkillsByScopeByName,
   getApiWorkspacesByIdCatalogSkills,
   getApiWorkspacesByIdCatalogSkillsByScopeByName,
   getApiWorkspacesByIdCatalogSkillsByScopeByNameAnchor,
+  postApiWorkspacesByIdCatalogSkills,
   postApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqs,
+  postApiWorkspacesByIdCatalogSkillsByScopeByNameSync,
   postApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolve,
+  postApiWorkspacesByIdCatalogSkillsResolve,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
@@ -52,12 +50,11 @@ export async function catalogSkillResolve(opts: CatalogSkillResolveOpts): Promis
   if ("error" in built) {
     return { exitCode: 2, stderr: `${built.error}\n` };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const plan = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogSkillsResolveResponses>({
-        url: "/api/workspaces/{id}/catalog/skills/resolve",
+      await postApiWorkspacesByIdCatalogSkillsResolve({
         path: { id: workspaceId },
         body: { origin: built.origin },
       }),
@@ -114,12 +111,11 @@ export async function catalogSkillInstall(opts: CatalogSkillInstallOpts): Promis
   if ("error" in built) {
     return { exitCode: 2, stderr: `${built.error}\n` };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogSkillsResponses>({
-        url: "/api/workspaces/{id}/catalog/skills",
+      await postApiWorkspacesByIdCatalogSkills({
         path: { id: workspaceId },
         body: { origin: built.origin },
       }),
@@ -205,13 +201,12 @@ export async function catalogSkillSync(
   if (typeof planToken !== "string" || planToken.trim() === "") {
     return { exitCode: 2, stderr: "--plan-token is required (mint with `skill sync-resolve`)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const { scope, name: shortName } = splitCatalogFqn(name);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses>({
-        url: "/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync",
+      await postApiWorkspacesByIdCatalogSkillsByScopeByNameSync({
         path: { id: workspaceId, scope, name: shortName },
         body: { planToken },
       }),

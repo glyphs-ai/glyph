@@ -14,7 +14,8 @@
  * API surface, never the version string, drives the diff.
  */
 
-import { type Application, listRoutes, type WorkspaceContext } from "@glyphs-ai/api";
+import type { Application, WorkspaceContext } from "@glyphs-ai/api";
+import { workspacesRoutes } from "@glyphs-ai/api";
 import type { CatalogService } from "@glyphs-ai/catalog";
 import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
@@ -39,7 +40,6 @@ import { schedulesRoutes } from "../src/routes/schedules.js";
 import { sessionsRoutes } from "../src/routes/sessions.js";
 import { tasksRoutes } from "../src/routes/tasks.js";
 import { workflowsRoutes } from "../src/routes/workflows.js";
-import { workspacesRoutes } from "../src/routes/workspaces.js";
 
 /**
  * Mirror of `runServer`'s mount tree, parameterised over deps so the
@@ -140,28 +140,6 @@ describe("openapi spec", () => {
       }),
     );
     expect(doc).toMatchSnapshot();
-  });
-
-  it("documents one operation per registered route", () => {
-    const app = buildOpenApiAppForTest();
-    const doc = injectWorkspaceIdParam(
-      app.getOpenAPI31Document({
-        openapi: "3.1.0",
-        info: { title: "@glyphs-ai/server", version: "0.0.0" },
-      }),
-    );
-    const operationCount = Object.values(doc.paths ?? {}).reduce(
-      (sum, item) =>
-        sum +
-        Object.keys(item as Record<string, unknown>).filter((k) =>
-          ["get", "post", "patch", "delete", "put"].includes(k),
-        ).length,
-      0,
-    );
-    // The OpenAPI surface mirrors the route manifest exactly: every
-    // handler is registered via `app.openapi(...)`, so the count of
-    // documented operations equals the manifest's route count.
-    expect(operationCount).toBe(listRoutes().length);
   });
 
   it("GET /api/openapi.json serves the assembled 3.1 document", async () => {

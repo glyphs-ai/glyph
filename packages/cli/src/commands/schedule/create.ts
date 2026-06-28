@@ -3,9 +3,9 @@
  * task-kind or workflow-kind cron schedule.
  */
 
-import type {
-  PostApiWorkspacesByIdSchedulesTaskResponses,
-  PostApiWorkspacesByIdSchedulesWorkflowResponses,
+import {
+  postApiWorkspacesByIdSchedulesTask,
+  postApiWorkspacesByIdSchedulesWorkflow,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, pickFormat } from "../../output.js";
@@ -56,7 +56,7 @@ export async function scheduleCreate(opts: ScheduleCreateOpts): Promise<CommandR
   if (typeof opts.tz !== "string" || opts.tz.trim() === "") {
     return { exitCode: 2, stderr: "missing required --tz <iana>\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     // No `kind` field -- the URL (`POST /schedules/task`) declares it.
@@ -78,8 +78,7 @@ export async function scheduleCreate(opts: ScheduleCreateOpts): Promise<CommandR
       enabled: !opts.disabled,
     };
     const created = unwrap(
-      await client.post<PostApiWorkspacesByIdSchedulesTaskResponses>({
-        url: "/api/workspaces/{id}/schedules/task",
+      await postApiWorkspacesByIdSchedulesTask({
         path: { id: workspaceId },
         body,
       }),
@@ -134,7 +133,7 @@ export async function scheduleCreateWorkflow(
   if (typeof opts.tz !== "string" || opts.tz.trim() === "") {
     return { exitCode: 2, stderr: "missing required --tz <iana>\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const target: {
@@ -153,8 +152,7 @@ export async function scheduleCreateWorkflow(
       enabled: !opts.disabled,
     };
     const created = unwrap(
-      await client.post<PostApiWorkspacesByIdSchedulesWorkflowResponses>({
-        url: "/api/workspaces/{id}/schedules/workflow",
+      await postApiWorkspacesByIdSchedulesWorkflow({
         path: { id: workspaceId },
         body,
       }),

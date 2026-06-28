@@ -221,6 +221,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": false,
                 "properties": {
                   "name": {
                     "type": "string",
@@ -236,6 +237,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
           },
+          "required": true,
         },
         "responses": {
           "201": {
@@ -326,8 +328,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": false,
                 "properties": {
                   "id": {
+                    "minLength": 1,
                     "type": "string",
                   },
                 },
@@ -338,6 +342,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
           },
+          "required": true,
         },
         "responses": {
           "200": {
@@ -483,15 +488,20 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": false,
                 "properties": {
                   "name": {
                     "type": "string",
                   },
                 },
+                "required": [
+                  "name",
+                ],
                 "type": "object",
               },
             },
           },
+          "required": true,
         },
         "responses": {
           "200": {
@@ -785,6 +795,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "origin": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "origin",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "201": {
             "content": {
@@ -1012,6 +1042,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "origin": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "origin",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -2247,6 +2297,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "planToken": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "planToken",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -2934,6 +3004,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "origin": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "origin",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "201": {
             "content": {
@@ -3321,6 +3411,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "planToken": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "planToken",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -4226,6 +4336,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "origin": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "origin",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "201": {
             "content": {
@@ -4453,6 +4583,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "origin": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "origin",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -5382,6 +5532,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "planToken": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "planToken",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -6775,6 +6945,75 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                  "target": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "agent": {
+                        "type": "string",
+                      },
+                      "brief": {
+                        "type": "string",
+                      },
+                      "details": {
+                        "type": "string",
+                      },
+                      "runtime": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "agent",
+                      "brief",
+                    ],
+                    "type": "object",
+                  },
+                  "trigger": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expr": {
+                        "type": "string",
+                      },
+                      "kind": {
+                        "enum": [
+                          "cron",
+                        ],
+                        "type": "string",
+                      },
+                      "tz": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "expr",
+                      "tz",
+                    ],
+                    "type": "object",
+                  },
+                },
+                "required": [
+                  "name",
+                  "target",
+                  "trigger",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "201": {
             "content": {
@@ -6960,6 +7199,72 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                  "target": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "agent": {
+                        "type": "string",
+                      },
+                      "brief": {
+                        "type": "string",
+                      },
+                      "details": {
+                        "type": [
+                          "string",
+                          "null",
+                        ],
+                      },
+                      "runtime": {
+                        "type": [
+                          "string",
+                          "null",
+                        ],
+                      },
+                    },
+                    "type": "object",
+                  },
+                  "trigger": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expr": {
+                        "type": "string",
+                      },
+                      "kind": {
+                        "enum": [
+                          "cron",
+                        ],
+                        "type": "string",
+                      },
+                      "tz": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "expr",
+                      "tz",
+                    ],
+                    "type": "object",
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -7137,6 +7442,72 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                  "target": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "brief": {
+                        "type": "string",
+                      },
+                      "coordinatorAgent": {
+                        "type": "string",
+                      },
+                      "details": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "coordinatorAgent",
+                      "brief",
+                    ],
+                    "type": "object",
+                  },
+                  "trigger": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expr": {
+                        "type": "string",
+                      },
+                      "kind": {
+                        "enum": [
+                          "cron",
+                        ],
+                        "type": "string",
+                      },
+                      "tz": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "expr",
+                      "tz",
+                    ],
+                    "type": "object",
+                  },
+                },
+                "required": [
+                  "name",
+                  "target",
+                  "trigger",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "201": {
             "content": {
@@ -7322,6 +7693,66 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                  "target": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "brief": {
+                        "type": "string",
+                      },
+                      "coordinatorAgent": {
+                        "type": "string",
+                      },
+                      "details": {
+                        "type": [
+                          "string",
+                          "null",
+                        ],
+                      },
+                    },
+                    "type": "object",
+                  },
+                  "trigger": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expr": {
+                        "type": "string",
+                      },
+                      "kind": {
+                        "enum": [
+                          "cron",
+                        ],
+                        "type": "string",
+                      },
+                      "tz": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "expr",
+                      "tz",
+                    ],
+                    "type": "object",
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -7970,6 +8401,28 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                  },
+                  "runtime": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "agent",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "201": {
             "content": {
@@ -8215,6 +8668,22 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "remote": {
+                    "type": "boolean",
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": false,
+        },
         "responses": {
           "200": {
             "content": {
@@ -8572,6 +9041,35 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                  },
+                  "brief": {
+                    "type": "string",
+                  },
+                  "details": {
+                    "type": "string",
+                  },
+                  "runtime": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "agent",
+                  "brief",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "201": {
             "content": {
@@ -10111,6 +10609,32 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "brief": {
+                    "type": "string",
+                  },
+                  "coordinatorAgent": {
+                    "type": "string",
+                  },
+                  "details": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "brief",
+                  "coordinatorAgent",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "201": {
             "content": {
@@ -10717,6 +11241,41 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "cancellation": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "default": "user",
+                        "enum": [
+                          "user",
+                        ],
+                        "type": "string",
+                      },
+                      "message": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "message",
+                    ],
+                    "type": "object",
+                  },
+                },
+                "required": [
+                  "cancellation",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -11283,6 +11842,31 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "fromNodeId": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "toNodeId": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "fromNodeId",
+                  "toNodeId",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -11405,6 +11989,79 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "succeeded",
+                        ],
+                        "type": "string",
+                      },
+                      "success": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "output": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                        },
+                        "type": "object",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "failure": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "default": "coordinator",
+                            "enum": [
+                              "coordinator",
+                            ],
+                            "type": "string",
+                          },
+                          "message": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "message",
+                        ],
+                        "type": "object",
+                      },
+                      "kind": {
+                        "enum": [
+                          "failed",
+                        ],
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "failure",
+                    ],
+                    "type": "object",
+                  },
+                ],
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -11596,6 +12253,40 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "coordinator",
+                      "worker",
+                      "human",
+                    ],
+                    "type": "string",
+                  },
+                  "parents": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "spec": {},
+                },
+                "required": [
+                  "kind",
+                  "spec",
+                  "parents",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -12131,6 +12822,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "choiceId": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "input": {
+                    "type": "string",
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -12345,6 +13056,23 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "newSpec": {},
+                },
+                "required": [
+                  "newSpec",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {
@@ -12551,6 +13279,130 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "edges": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "from": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "nodeId": {
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "nodeId",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "tempId": {
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "tempId",
+                              ],
+                              "type": "object",
+                            },
+                          ],
+                        },
+                        "to": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "nodeId": {
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "nodeId",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "tempId": {
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "tempId",
+                              ],
+                              "type": "object",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "from",
+                        "to",
+                      ],
+                      "type": "object",
+                    },
+                    "type": "array",
+                  },
+                  "nodes": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "existingParents": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "kind": {
+                          "enum": [
+                            "coordinator",
+                            "worker",
+                            "human",
+                          ],
+                          "type": "string",
+                        },
+                        "spec": {},
+                        "tempId": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "tempId",
+                        "kind",
+                        "spec",
+                      ],
+                      "type": "object",
+                    },
+                    "type": "array",
+                  },
+                },
+                "required": [
+                  "nodes",
+                  "edges",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
         "responses": {
           "200": {
             "content": {

@@ -36,6 +36,8 @@
     "@glyphs-ai/terminal": "workspace:*",
     "@glyphs-ai/workflow": "workspace:*",
     "@glyphs-ai/workspace": "workspace:*",
+    "@hono/zod-openapi": "^1.4.0",
+    "hono": "^4.7.11",
     "pino": "^9.5.0",
     "zod": "^4.4.3"
   },

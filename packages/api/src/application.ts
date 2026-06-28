@@ -1,13 +1,11 @@
-import { randomUUID } from "node:crypto";
-import path from "node:path";
 import type { RuntimeRegistry } from "@glyphs-ai/runtime";
 import { spawnTerminal } from "@glyphs-ai/terminal";
 import {
   composeWorkspaceModule,
-  type Workspace,
   type WorkspaceModuleOptions,
   type WorkspaceService,
 } from "@glyphs-ai/workspace";
+import type { RenameWorkspaceRequest, Workspace } from "@glyphs-ai/workspace/contract";
 import type { Logger } from "pino";
 import {
   type WorkspaceContext,
@@ -24,9 +22,11 @@ import {
  * exposing this layer to UI surfaces.
  *
  * Beyond per-workspace context resolution, this surface exposes the
- * canonical cross-BC orchestration methods (`registerWorkspace`,
- * `renameWorkspace`, `unregisterWorkspace`, `reloadWorkspace`) so
- * transport layers (HTTP routes, CLI commands) become thin adapters.
+ * cross-cutting orchestration methods that invalidate the per-workspace
+ * context cache (`renameWorkspace`, `unregisterWorkspace`,
+ * `reloadWorkspace`) so transport layers stay thin. Single-domain
+ * workspace operations with no cross-cutting concern (e.g. create) are
+ * NOT mirrored here — transports call `workspaceService` directly.
  *
  * The per-workspace `WorkspaceContextRegistry` is a private
  * implementation detail — consumers reach contexts via
@@ -37,29 +37,12 @@ export interface Application {
   readonly workspaceService: WorkspaceService;
 
   /**
-   * Register a workspace. When `workspaceDir` is omitted the application
-   * mints a fresh UUID and uses `<defaultWorkspaceParent>/<uuid>` so the
-   * workspaceId and the directory basename stay coupled.
-   *
-   * Returns the canonical {@link Workspace} after register completes
-   * (so callers don't have to issue a follow-up read for the
-   * server-generated `createdAt`).
-   */
-  registerWorkspace(opts: {
-    readonly name: string;
-    readonly workspaceDir?: string;
-  }): Promise<Workspace>;
-
-  /**
    * Rename a workspace. Invalidates the per-workspace context so the
    * next request rebuilds with the fresh metadata. Returns the
    * canonical post-rename {@link Workspace}, or `null` if the workspaceId
    * is absent (rare; concurrent unregister).
    */
-  renameWorkspace(
-    workspaceId: string,
-    opts: { readonly newName: string },
-  ): Promise<Workspace | null>;
+  renameWorkspace(workspaceId: string, input: RenameWorkspaceRequest): Promise<Workspace | null>;
 
   /**
    * Unregister a workspace. Idempotent (no error if the workspaceId is unknown).
@@ -106,22 +89,10 @@ export interface Application {
 export interface ApplicationOpts {
   readonly workspace: WorkspaceModuleOptions;
   readonly runtimeRegistry: RuntimeRegistry;
-  /**
-   * Directory under which `registerWorkspace({ workspaceDir: undefined })`
-   * mints `<defaultWorkspaceParent>/<uuid>/`. Required because the
-   * default-dir policy is part of the registration contract; without a
-   * parent dir the caller MUST supply an explicit `workspaceDir`.
-   */
-  readonly defaultWorkspaceParent: string;
   readonly logger?: Logger;
 }
 
 export async function composeApplication(opts: ApplicationOpts): Promise<Application> {
-  if (!path.isAbsolute(opts.defaultWorkspaceParent)) {
-    throw new Error(
-      `composeApplication: defaultWorkspaceParent must be an absolute path; got ${JSON.stringify(opts.defaultWorkspaceParent)}`,
-    );
-  }
   const workspaceModule = await composeWorkspaceModule(opts.workspace);
   const registry = new WorkspaceContextRegistry({
     workspaceService: workspaceModule.service,
@@ -130,32 +101,12 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
     ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
   });
   const workspaceService = workspaceModule.service;
-  const defaultWorkspaceParent = opts.defaultWorkspaceParent;
 
   return {
     workspaceService,
 
-    async registerWorkspace({ name, workspaceDir }) {
-      const workspaceId = randomUUID();
-      const resolvedWorkspaceDir =
-        workspaceDir === undefined || workspaceDir.trim() === ""
-          ? path.join(defaultWorkspaceParent, workspaceId)
-          : path.resolve(workspaceDir);
-      await workspaceService.register({
-        id: workspaceId,
-        workspaceDir: resolvedWorkspaceDir,
-        name,
-      });
-      const view = await workspaceService.get(workspaceId);
-      if (view === null) {
-        // Should be impossible — we just inserted it. Surface as a fault.
-        throw new Error(`workspace registered but not readable back: ${workspaceId}`);
-      }
-      return view;
-    },
-
-    async renameWorkspace(workspaceId, { newName }) {
-      await workspaceService.rename(workspaceId, { newName });
+    async renameWorkspace(workspaceId, input) {
+      await workspaceService.rename(workspaceId, input);
       await registry.invalidate(workspaceId);
       return workspaceService.get(workspaceId);
     },

@@ -91,7 +91,9 @@ describe("schedulesRoutes — create workflow", () => {
       body: JSON.stringify({ target: validTarget, trigger: sampleWorkflowSchedule.trigger }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/name/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/name/);
     expect(svc.create).not.toHaveBeenCalled();
   });
 
@@ -107,7 +109,9 @@ describe("schedulesRoutes — create workflow", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/kind/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/kind/);
     expect(svc.create).not.toHaveBeenCalled();
   });
 
@@ -123,7 +127,9 @@ describe("schedulesRoutes — create workflow", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/coordinatorAgent/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/coordinatorAgent/);
     expect(svc.create).not.toHaveBeenCalled();
   });
 
@@ -139,7 +145,9 @@ describe("schedulesRoutes — create workflow", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/surprise|unknown key/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/surprise|unknown key/);
   });
 
   it("POST /workflow with a multi-line brief returns 400", async () => {
@@ -154,7 +162,9 @@ describe("schedulesRoutes — create workflow", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/single line/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/single line/);
   });
 });
 
@@ -197,7 +207,9 @@ describe("schedulesRoutes — patch workflow", () => {
       body: JSON.stringify({ target: { coordinatorAgent: null } }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/coordinatorAgent/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/coordinatorAgent/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 

@@ -34,7 +34,7 @@ export function isFinishOutcome(s: string): s is "succeeded" | "failed" {
  * `InvalidWorkflowNodeIdError` will catch malformed ids); only the
  * outer comma-split is trimmed.
  */
-export function parseParents(raw: string | undefined): readonly string[] {
+export function parseParents(raw: string | undefined): string[] {
   if (raw === undefined || raw === "") return [];
   return raw
     .split(",")
@@ -83,7 +83,7 @@ export function validateAddSubgraphRequest(
     }
 
     const existingParentsRaw = node.existingParents;
-    let existingParents: readonly string[] | undefined;
+    let existingParents: string[] | undefined;
     if (existingParentsRaw !== undefined) {
       if (!Array.isArray(existingParentsRaw)) {
         return { ok: false, error: `nodes[${i}].existingParents must be an array` };

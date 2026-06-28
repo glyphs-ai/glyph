@@ -8,20 +8,19 @@ process.env.UV_THREADPOOL_SIZE ??= "16";
 import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import path, { sep as pathSep } from "node:path";
-import { composeApplication } from "@glyphs-ai/api";
+import { composeApplication, workspacesRoutes } from "@glyphs-ai/api";
 import {
   assertCopilotSdkResolvable,
   CopilotRuntime,
   RuntimeRegistry,
   sharedDir,
 } from "@glyphs-ai/runtime";
-import { globalDbPath, workspacesParentDir } from "@glyphs-ai/workspace";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { assertBindIsSafe, isLoopbackBind } from "./auth.js";
-import { logsDir, resolveGlyphHome } from "./glyph-home.js";
+import { globalDbPath, logsDir, resolveGlyphHome, workspacesParentDir } from "./glyph-home.js";
 import { buildLogger, type Logger, type LogLevel } from "./log/build-logger.js";
 import { accessLog } from "./middleware/access-log.js";
 import { requestId } from "./middleware/request-id.js";
@@ -38,7 +37,6 @@ import { schedulesRoutes } from "./routes/schedules.js";
 import { sessionsRoutes } from "./routes/sessions.js";
 import { tasksRoutes } from "./routes/tasks.js";
 import { workflowsRoutes } from "./routes/workflows.js";
-import { workspacesRoutes } from "./routes/workspaces.js";
 import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-env.js";
 
 // Route manifest and wire types live in `@glyphs-ai/api` (its `wire/`
@@ -202,9 +200,11 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   await mkdir(home, { recursive: true });
 
   const composition = await composeApplication({
-    workspace: { dbFile: globalDbPath(home) },
+    workspace: {
+      dbFile: globalDbPath(home),
+      defaultWorkspaceParent: workspacesParentDir(home),
+    },
     runtimeRegistry,
-    defaultWorkspaceParent: workspacesParentDir(home),
     logger,
   });
   logger.info({ file: globalDbPath(home) }, "global.db opened via workspace pkg");

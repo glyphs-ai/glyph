@@ -19,8 +19,6 @@ export type {
   CatalogInstallResult,
   CatalogKind,
   CatalogSyncResult,
-  InstallAgentRequest,
-  InstallSkillRequest,
   Mcp,
   MissingDep,
   Skill,

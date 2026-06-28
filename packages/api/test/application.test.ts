@@ -5,7 +5,7 @@
  *
  *   - composeApplication rejects misconfiguration (relative
  *     defaultWorkspaceParent)
- *   - registerWorkspace mints a uuid, defaults the dir, persists
+ *   - register mints a uuid, defaults the dir, persists
  *   - unregisterWorkspace + renameWorkspace invalidate the per-workspace
  *     context
  *   - Application.getContext dedupes concurrent loads via the internal
@@ -95,9 +95,8 @@ afterEach(async () => {
 
 async function makeApp(): Promise<Application> {
   const app = await composeApplication({
-    workspace: { dbFile: ":memory:" },
+    workspace: { dbFile: ":memory:", defaultWorkspaceParent: path.join(scratch, "workspaces") },
     runtimeRegistry: makeRegistry(),
-    defaultWorkspaceParent: path.join(scratch, "workspaces"),
   });
   apps.push(app);
   return app;
@@ -107,9 +106,8 @@ describe("composeApplication", () => {
   it("rejects a relative defaultWorkspaceParent", async () => {
     await expect(
       composeApplication({
-        workspace: { dbFile: ":memory:" },
+        workspace: { dbFile: ":memory:", defaultWorkspaceParent: "relative/path" },
         runtimeRegistry: makeRegistry(),
-        defaultWorkspaceParent: "relative/path",
       }),
     ).rejects.toThrow(/absolute/);
   });
@@ -121,9 +119,9 @@ describe("composeApplication", () => {
 });
 
 describe("Application orchestration", () => {
-  it("registerWorkspace mints a uuid and uses defaultWorkspaceParent when dir is omitted", async () => {
+  it("register mints a uuid and uses defaultWorkspaceParent when dir is omitted", async () => {
     const app = await makeApp();
-    const ws = await app.registerWorkspace({ name: "demo" });
+    const ws = await app.workspaceService.register({ name: "demo" });
     expect(ws.id).toMatch(/^[0-9a-f]{8}-/);
     expect(ws.workspaceDir.startsWith(path.join(scratch, "workspaces"))).toBe(true);
     expect(ws.workspaceDir.endsWith(ws.id)).toBe(true);
@@ -133,27 +131,27 @@ describe("Application orchestration", () => {
     expect(view?.name).toBe("demo");
   });
 
-  it("registerWorkspace honours an explicit workspaceDir", async () => {
+  it("register honours an explicit workspaceDir", async () => {
     const app = await makeApp();
     const dir = path.join(scratch, "explicit");
-    const ws = await app.registerWorkspace({ name: "explicit", workspaceDir: dir });
+    const ws = await app.workspaceService.register({ name: "explicit", workspaceDir: dir });
     expect(ws.workspaceDir).toBe(path.resolve(dir));
   });
 
   it("renameWorkspace invalidates the per-workspace context", async () => {
     const app = await makeApp();
-    const ws = await app.registerWorkspace({ name: "before" });
+    const ws = await app.workspaceService.register({ name: "before" });
     // Touch the context once so there's something to invalidate.
     await app.getContext(ws.id);
     expect(app.loadedContexts()).toHaveLength(1);
-    const renamed = await app.renameWorkspace(ws.id, { newName: "after" });
+    const renamed = await app.renameWorkspace(ws.id, { name: "after" });
     expect(renamed?.name).toBe("after");
     expect(app.loadedContexts()).toHaveLength(0);
   });
 
   it("unregisterWorkspace invalidates the per-workspace context", async () => {
     const app = await makeApp();
-    const ws = await app.registerWorkspace({ name: "demo" });
+    const ws = await app.workspaceService.register({ name: "demo" });
     await app.getContext(ws.id);
     expect(app.loadedContexts()).toHaveLength(1);
     await app.unregisterWorkspace(ws.id);
@@ -163,11 +161,10 @@ describe("Application orchestration", () => {
 
   it("close disposes the registry and the workspace module", async () => {
     const app = await composeApplication({
-      workspace: { dbFile: ":memory:" },
+      workspace: { dbFile: ":memory:", defaultWorkspaceParent: path.join(scratch, "workspaces") },
       runtimeRegistry: makeRegistry(),
-      defaultWorkspaceParent: path.join(scratch, "workspaces"),
     });
-    const ws = await app.registerWorkspace({ name: "demo" });
+    const ws = await app.workspaceService.register({ name: "demo" });
     await app.getContext(ws.id);
     expect(app.loadedContexts()).toHaveLength(1);
     await app.close();
@@ -179,7 +176,7 @@ describe("Application orchestration", () => {
 describe("Application.getContext", () => {
   it("dedupes concurrent loads", async () => {
     const app = await makeApp();
-    const ws = await app.registerWorkspace({ name: "demo" });
+    const ws = await app.workspaceService.register({ name: "demo" });
     // Spy on the workspaceService.get to count how many times load()
     // actually fetches the workspace — should be exactly once across
     // both concurrent getContext() calls.
@@ -192,7 +189,7 @@ describe("Application.getContext", () => {
 
   it("wraps a cold-load failure in WorkspaceLoadError carrying the raw cause", async () => {
     const app = await makeApp();
-    const ws = await app.registerWorkspace({ name: "demo" });
+    const ws = await app.workspaceService.register({ name: "demo" });
     const boom = new Error("workspace.db is unreadable");
     // Force the load() path's `workspaceService.get` to throw a raw
     // error — the facade must surface it as a typed WorkspaceLoadError
@@ -222,7 +219,7 @@ describe("Application.peekContextState", () => {
 
   it('returns "unloaded" for a registered-but-uncached workspace', async () => {
     const app = await makeApp();
-    const ws = await app.registerWorkspace({ name: "demo" });
+    const ws = await app.workspaceService.register({ name: "demo" });
     const state = await app.peekContextState(ws.id);
     expect(state).toBe("unloaded");
     // peek MUST NOT have triggered a load.
@@ -231,7 +228,7 @@ describe("Application.peekContextState", () => {
 
   it('returns "cached" after a successful getContext()', async () => {
     const app = await makeApp();
-    const ws = await app.registerWorkspace({ name: "demo" });
+    const ws = await app.workspaceService.register({ name: "demo" });
     await app.getContext(ws.id);
     const state = await app.peekContextState(ws.id);
     expect(state).toBe("cached");
@@ -247,7 +244,7 @@ describe("Application.reloadWorkspace", () => {
 
   it("refuses with WorkspaceHasLiveTasksError when live tasks exist", async () => {
     const app = await makeApp();
-    const ws = await app.registerWorkspace({ name: "demo" });
+    const ws = await app.workspaceService.register({ name: "demo" });
     const ctx = await app.getContext(ws.id);
     if (ctx === null) throw new Error("expected context");
     // Stub liveCount() to fake an in-flight task. The context is the

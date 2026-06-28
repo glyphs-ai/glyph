@@ -6,12 +6,12 @@
  * JSON — runtime-neutral.
  */
 
-import type { PostApiWorkspacesByIdTasksResponses } from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdTasksByTid,
   getApiWorkspacesByIdTasks,
   getApiWorkspacesByIdTasksByTid,
   getApiWorkspacesByIdTasksByTidActivity,
+  postApiWorkspacesByIdTasks,
   postApiWorkspacesByIdTasksByTidCancel,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../connect.js";
@@ -112,7 +112,7 @@ export async function taskDispatch(opts: TaskDispatchOpts): Promise<CommandResul
   if (opts.brief.trim().length > 200) {
     return { exitCode: 2, stderr: "--brief must be 200 characters or fewer\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: { agent: string; brief: string; details?: string; runtime?: string } = {
@@ -122,8 +122,7 @@ export async function taskDispatch(opts: TaskDispatchOpts): Promise<CommandResul
     if (opts.details !== undefined) body.details = opts.details;
     if (opts.runtime !== undefined) body.runtime = opts.runtime;
     const task = unwrap(
-      await client.post<PostApiWorkspacesByIdTasksResponses>({
-        url: "/api/workspaces/{id}/tasks",
+      await postApiWorkspacesByIdTasks({
         path: { id: workspaceId },
         body,
       }),

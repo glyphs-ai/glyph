@@ -1,18 +1,19 @@
 import {
   CatalogInstallResultSchema,
   CatalogSyncResultSchema,
+  InstallMcpRequestSchema,
   McpSchema,
   McpWithContentSchema,
   OkResponseSchema,
   ResolveManifestSchema,
+  SyncCatalogRequestSchema,
 } from "@glyphs-ai/api";
 import type { CatalogService } from "@glyphs-ai/catalog";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
-import { createApiApp, errorResponse, jsonResponse } from "../_openapi.js";
+import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_openapi.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import { readInstallMcpRequest, readPlanToken } from "./helpers.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 
@@ -90,6 +91,7 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
       path: "/",
       tags: ["catalog"],
       summary: "Install an MCP from an origin",
+      request: { body: jsonRequest(InstallMcpRequestSchema) },
       responses: {
         201: jsonResponse(CatalogInstallResultSchema, "Install result"),
         400: errorResponse("Malformed request body"),
@@ -98,14 +100,13 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const parsed = await readInstallMcpRequest(c);
-      if ("error" in parsed) return c.json(parsed, 400);
+      const body = c.req.valid("json");
       try {
-        const result = await catalog.installMcpFromOrigin(parsed.origin);
+        const result = await catalog.installMcpFromOrigin(body.origin);
         const status = result.failed.length > 0 ? 207 : 201;
         logEvent(c, "catalog: mcp install completed", {
           kind: "mcp",
-          origin: parsed.origin,
+          origin: body.origin,
           installed: result.installed.length,
           skipped: result.skipped.length,
           failed: result.failed.length,
@@ -115,7 +116,7 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
         return respondError(c, err, {
           route: "catalog.mcps.install",
           policy: catalogErrorPolicy,
-          meta: { origin: parsed.origin },
+          meta: { origin: body.origin },
         });
       }
     },
@@ -158,7 +159,10 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
       path: "/{scope}/{name}/sync",
       tags: ["catalog"],
       summary: "Apply an MCP sync",
-      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
+      request: {
+        params: z.object({ scope: z.string().min(1), name: z.string().min(1) }),
+        body: jsonRequest(SyncCatalogRequestSchema),
+      },
       responses: {
         200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
@@ -168,9 +172,8 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono {
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const parsed = await readPlanToken(c);
-      if ("error" in parsed) return c.json(parsed, 400);
-      const plan = catalog.takePlan(parsed.planToken);
+      const body = c.req.valid("json");
+      const plan = catalog.takePlan(body.planToken);
       if (plan === null) {
         return c.json(
           {

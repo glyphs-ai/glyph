@@ -41,12 +41,12 @@ export const getApiWorkspaces = <ThrowOnError extends boolean = false>(options?:
 /**
  * Create a workspace
  */
-export const postApiWorkspaces = <ThrowOnError extends boolean = false>(options?: Options<PostApiWorkspacesData, ThrowOnError>): RequestResult<PostApiWorkspacesResponses, PostApiWorkspacesErrors, ThrowOnError> => (options?.client ?? client).post<PostApiWorkspacesResponses, PostApiWorkspacesErrors, ThrowOnError>({
+export const postApiWorkspaces = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesData, ThrowOnError>): RequestResult<PostApiWorkspacesResponses, PostApiWorkspacesErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesResponses, PostApiWorkspacesErrors, ThrowOnError>({
     url: '/api/workspaces',
     ...options,
     headers: {
         'Content-Type': 'application/json',
-        ...options?.headers
+        ...options.headers
     }
 });
 
@@ -58,12 +58,12 @@ export const getApiWorkspacesCurrent = <ThrowOnError extends boolean = false>(op
 /**
  * Set the current workspace
  */
-export const putApiWorkspacesCurrent = <ThrowOnError extends boolean = false>(options?: Options<PutApiWorkspacesCurrentData, ThrowOnError>): RequestResult<PutApiWorkspacesCurrentResponses, PutApiWorkspacesCurrentErrors, ThrowOnError> => (options?.client ?? client).put<PutApiWorkspacesCurrentResponses, PutApiWorkspacesCurrentErrors, ThrowOnError>({
+export const putApiWorkspacesCurrent = <ThrowOnError extends boolean = false>(options: Options<PutApiWorkspacesCurrentData, ThrowOnError>): RequestResult<PutApiWorkspacesCurrentResponses, PutApiWorkspacesCurrentErrors, ThrowOnError> => (options.client ?? client).put<PutApiWorkspacesCurrentResponses, PutApiWorkspacesCurrentErrors, ThrowOnError>({
     url: '/api/workspaces/current',
     ...options,
     headers: {
         'Content-Type': 'application/json',
-        ...options?.headers
+        ...options.headers
     }
 });
 
@@ -102,7 +102,14 @@ export const getApiWorkspacesByIdSessions = <ThrowOnError extends boolean = fals
 /**
  * Create a session
  */
-export const postApiWorkspacesByIdSessions = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdSessionsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdSessionsResponses, PostApiWorkspacesByIdSessionsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdSessionsResponses, PostApiWorkspacesByIdSessionsErrors, ThrowOnError>({ url: '/api/workspaces/{id}/sessions', ...options });
+export const postApiWorkspacesByIdSessions = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdSessionsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdSessionsResponses, PostApiWorkspacesByIdSessionsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdSessionsResponses, PostApiWorkspacesByIdSessionsErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/sessions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Delete a session
@@ -117,7 +124,14 @@ export const getApiWorkspacesByIdSessionsBySid = <ThrowOnError extends boolean =
 /**
  * Spawn an interactive terminal for a session
  */
-export const postApiWorkspacesByIdSessionsBySidSpawn = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdSessionsBySidSpawnData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdSessionsBySidSpawnResponses, PostApiWorkspacesByIdSessionsBySidSpawnErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdSessionsBySidSpawnResponses, PostApiWorkspacesByIdSessionsBySidSpawnErrors, ThrowOnError>({ url: '/api/workspaces/{id}/sessions/{sid}/spawn', ...options });
+export const postApiWorkspacesByIdSessionsBySidSpawn = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdSessionsBySidSpawnData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdSessionsBySidSpawnResponses, PostApiWorkspacesByIdSessionsBySidSpawnErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdSessionsBySidSpawnResponses, PostApiWorkspacesByIdSessionsBySidSpawnErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/sessions/{sid}/spawn',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * List standalone tasks
@@ -127,7 +141,14 @@ export const getApiWorkspacesByIdTasks = <ThrowOnError extends boolean = false>(
 /**
  * Dispatch a task
  */
-export const postApiWorkspacesByIdTasks = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdTasksData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdTasksResponses, PostApiWorkspacesByIdTasksErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdTasksResponses, PostApiWorkspacesByIdTasksErrors, ThrowOnError>({ url: '/api/workspaces/{id}/tasks', ...options });
+export const postApiWorkspacesByIdTasks = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdTasksData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdTasksResponses, PostApiWorkspacesByIdTasksErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdTasksResponses, PostApiWorkspacesByIdTasksErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/tasks',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Delete a task
@@ -177,7 +198,14 @@ export const getApiWorkspacesByIdSchedules = <ThrowOnError extends boolean = fal
 /**
  * Create a task-kind schedule
  */
-export const postApiWorkspacesByIdSchedulesTask = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdSchedulesTaskData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdSchedulesTaskResponses, PostApiWorkspacesByIdSchedulesTaskErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdSchedulesTaskResponses, PostApiWorkspacesByIdSchedulesTaskErrors, ThrowOnError>({ url: '/api/workspaces/{id}/schedules/task', ...options });
+export const postApiWorkspacesByIdSchedulesTask = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdSchedulesTaskData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdSchedulesTaskResponses, PostApiWorkspacesByIdSchedulesTaskErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdSchedulesTaskResponses, PostApiWorkspacesByIdSchedulesTaskErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/schedules/task',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Preview an arbitrary cron expression
@@ -197,17 +225,38 @@ export const getApiWorkspacesByIdSchedulesBySid = <ThrowOnError extends boolean 
 /**
  * Patch a task-kind schedule
  */
-export const patchApiWorkspacesByIdSchedulesTaskBySid = <ThrowOnError extends boolean = false>(options: Options<PatchApiWorkspacesByIdSchedulesTaskBySidData, ThrowOnError>): RequestResult<PatchApiWorkspacesByIdSchedulesTaskBySidResponses, PatchApiWorkspacesByIdSchedulesTaskBySidErrors, ThrowOnError> => (options.client ?? client).patch<PatchApiWorkspacesByIdSchedulesTaskBySidResponses, PatchApiWorkspacesByIdSchedulesTaskBySidErrors, ThrowOnError>({ url: '/api/workspaces/{id}/schedules/task/{sid}', ...options });
+export const patchApiWorkspacesByIdSchedulesTaskBySid = <ThrowOnError extends boolean = false>(options: Options<PatchApiWorkspacesByIdSchedulesTaskBySidData, ThrowOnError>): RequestResult<PatchApiWorkspacesByIdSchedulesTaskBySidResponses, PatchApiWorkspacesByIdSchedulesTaskBySidErrors, ThrowOnError> => (options.client ?? client).patch<PatchApiWorkspacesByIdSchedulesTaskBySidResponses, PatchApiWorkspacesByIdSchedulesTaskBySidErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/schedules/task/{sid}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Create a workflow-kind schedule
  */
-export const postApiWorkspacesByIdSchedulesWorkflow = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdSchedulesWorkflowData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdSchedulesWorkflowResponses, PostApiWorkspacesByIdSchedulesWorkflowErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdSchedulesWorkflowResponses, PostApiWorkspacesByIdSchedulesWorkflowErrors, ThrowOnError>({ url: '/api/workspaces/{id}/schedules/workflow', ...options });
+export const postApiWorkspacesByIdSchedulesWorkflow = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdSchedulesWorkflowData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdSchedulesWorkflowResponses, PostApiWorkspacesByIdSchedulesWorkflowErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdSchedulesWorkflowResponses, PostApiWorkspacesByIdSchedulesWorkflowErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/schedules/workflow',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Patch a workflow-kind schedule
  */
-export const patchApiWorkspacesByIdSchedulesWorkflowBySid = <ThrowOnError extends boolean = false>(options: Options<PatchApiWorkspacesByIdSchedulesWorkflowBySidData, ThrowOnError>): RequestResult<PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses, PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors, ThrowOnError> => (options.client ?? client).patch<PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses, PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors, ThrowOnError>({ url: '/api/workspaces/{id}/schedules/workflow/{sid}', ...options });
+export const patchApiWorkspacesByIdSchedulesWorkflowBySid = <ThrowOnError extends boolean = false>(options: Options<PatchApiWorkspacesByIdSchedulesWorkflowBySidData, ThrowOnError>): RequestResult<PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses, PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors, ThrowOnError> => (options.client ?? client).patch<PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses, PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Manually fire a schedule
@@ -227,7 +276,14 @@ export const getApiWorkspacesByIdWorkflows = <ThrowOnError extends boolean = fal
 /**
  * Create a workflow
  */
-export const postApiWorkspacesByIdWorkflows = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsResponses, PostApiWorkspacesByIdWorkflowsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsResponses, PostApiWorkspacesByIdWorkflowsErrors, ThrowOnError>({ url: '/api/workspaces/{id}/workflows', ...options });
+export const postApiWorkspacesByIdWorkflows = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsResponses, PostApiWorkspacesByIdWorkflowsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsResponses, PostApiWorkspacesByIdWorkflowsErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/workflows',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Delete a workflow
@@ -257,7 +313,14 @@ export const getApiWorkspacesByIdWorkflowsByWfidNodesByNid = <ThrowOnError exten
 /**
  * Cancel a workflow
  */
-export const postApiWorkspacesByIdWorkflowsByWfidCancel = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidCancelData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidCancelResponses, PostApiWorkspacesByIdWorkflowsByWfidCancelErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidCancelResponses, PostApiWorkspacesByIdWorkflowsByWfidCancelErrors, ThrowOnError>({ url: '/api/workspaces/{id}/workflows/{wfid}/cancel', ...options });
+export const postApiWorkspacesByIdWorkflowsByWfidCancel = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidCancelData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidCancelResponses, PostApiWorkspacesByIdWorkflowsByWfidCancelErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidCancelResponses, PostApiWorkspacesByIdWorkflowsByWfidCancelErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/workflows/{wfid}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * List workflow artifacts
@@ -272,17 +335,38 @@ export const getApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPath = <ThrowO
 /**
  * Add a node
  */
-export const postApiWorkspacesByIdWorkflowsByWfidNodes = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidNodesData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidNodesResponses, PostApiWorkspacesByIdWorkflowsByWfidNodesErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidNodesResponses, PostApiWorkspacesByIdWorkflowsByWfidNodesErrors, ThrowOnError>({ url: '/api/workspaces/{id}/workflows/{wfid}/nodes', ...options });
+export const postApiWorkspacesByIdWorkflowsByWfidNodes = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidNodesData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidNodesResponses, PostApiWorkspacesByIdWorkflowsByWfidNodesErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidNodesResponses, PostApiWorkspacesByIdWorkflowsByWfidNodesErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/workflows/{wfid}/nodes',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Add an edge
  */
-export const postApiWorkspacesByIdWorkflowsByWfidEdges = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidEdgesData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses, PostApiWorkspacesByIdWorkflowsByWfidEdgesErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses, PostApiWorkspacesByIdWorkflowsByWfidEdgesErrors, ThrowOnError>({ url: '/api/workspaces/{id}/workflows/{wfid}/edges', ...options });
+export const postApiWorkspacesByIdWorkflowsByWfidEdges = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidEdgesData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses, PostApiWorkspacesByIdWorkflowsByWfidEdgesErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses, PostApiWorkspacesByIdWorkflowsByWfidEdgesErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/workflows/{wfid}/edges',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Add a subgraph batch
  */
-export const postApiWorkspacesByIdWorkflowsByWfidSubgraph = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidSubgraphData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses, PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses, PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors, ThrowOnError>({ url: '/api/workspaces/{id}/workflows/{wfid}/subgraph', ...options });
+export const postApiWorkspacesByIdWorkflowsByWfidSubgraph = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidSubgraphData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses, PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses, PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/workflows/{wfid}/subgraph',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Cancel a worker node
@@ -292,7 +376,14 @@ export const postApiWorkspacesByIdWorkflowsByWfidNodesByNidCancel = <ThrowOnErro
 /**
  * Finish a workflow
  */
-export const postApiWorkspacesByIdWorkflowsByWfidFinish = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidFinishData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidFinishResponses, PostApiWorkspacesByIdWorkflowsByWfidFinishErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidFinishResponses, PostApiWorkspacesByIdWorkflowsByWfidFinishErrors, ThrowOnError>({ url: '/api/workspaces/{id}/workflows/{wfid}/finish', ...options });
+export const postApiWorkspacesByIdWorkflowsByWfidFinish = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidFinishData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidFinishResponses, PostApiWorkspacesByIdWorkflowsByWfidFinishErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidFinishResponses, PostApiWorkspacesByIdWorkflowsByWfidFinishErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/workflows/{wfid}/finish',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Delete an edge
@@ -302,12 +393,26 @@ export const deleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByTo = <ThrowOnErr
 /**
  * Replace a node's spec
  */
-export const patchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpec = <ThrowOnError extends boolean = false>(options: Options<PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData, ThrowOnError>): RequestResult<PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses, PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors, ThrowOnError> => (options.client ?? client).patch<PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses, PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors, ThrowOnError>({ url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec', ...options });
+export const patchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpec = <ThrowOnError extends boolean = false>(options: Options<PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData, ThrowOnError>): RequestResult<PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses, PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors, ThrowOnError> => (options.client ?? client).patch<PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses, PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Respond to a human node
  */
-export const postApiWorkspacesByIdWorkflowsByWfidNodesByNidRespond = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses, PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses, PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors, ThrowOnError>({ url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/respond', ...options });
+export const postApiWorkspacesByIdWorkflowsByWfidNodesByNidRespond = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses, PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses, PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/respond',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * List skill entries
@@ -317,12 +422,26 @@ export const getApiWorkspacesByIdCatalogSkills = <ThrowOnError extends boolean =
 /**
  * Install a skill from an origin
  */
-export const postApiWorkspacesByIdCatalogSkills = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogSkillsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogSkillsResponses, PostApiWorkspacesByIdCatalogSkillsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogSkillsResponses, PostApiWorkspacesByIdCatalogSkillsErrors, ThrowOnError>({ url: '/api/workspaces/{id}/catalog/skills', ...options });
+export const postApiWorkspacesByIdCatalogSkills = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogSkillsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogSkillsResponses, PostApiWorkspacesByIdCatalogSkillsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogSkillsResponses, PostApiWorkspacesByIdCatalogSkillsErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/catalog/skills',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Preview a skill install
  */
-export const postApiWorkspacesByIdCatalogSkillsResolve = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogSkillsResolveData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogSkillsResolveResponses, PostApiWorkspacesByIdCatalogSkillsResolveErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogSkillsResolveResponses, PostApiWorkspacesByIdCatalogSkillsResolveErrors, ThrowOnError>({ url: '/api/workspaces/{id}/catalog/skills/resolve', ...options });
+export const postApiWorkspacesByIdCatalogSkillsResolve = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogSkillsResolveData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogSkillsResolveResponses, PostApiWorkspacesByIdCatalogSkillsResolveErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogSkillsResolveResponses, PostApiWorkspacesByIdCatalogSkillsResolveErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/catalog/skills/resolve',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Get a skill's anchor content
@@ -352,7 +471,14 @@ export const postApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolve = <Throw
 /**
  * Apply a skill sync
  */
-export const postApiWorkspacesByIdCatalogSkillsByScopeByNameSync = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors, ThrowOnError>({ url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync', ...options });
+export const postApiWorkspacesByIdCatalogSkillsByScopeByNameSync = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Acknowledge a skill's prereqs
@@ -367,12 +493,26 @@ export const getApiWorkspacesByIdCatalogAgents = <ThrowOnError extends boolean =
 /**
  * Install an agent from an origin
  */
-export const postApiWorkspacesByIdCatalogAgents = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogAgentsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogAgentsResponses, PostApiWorkspacesByIdCatalogAgentsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogAgentsResponses, PostApiWorkspacesByIdCatalogAgentsErrors, ThrowOnError>({ url: '/api/workspaces/{id}/catalog/agents', ...options });
+export const postApiWorkspacesByIdCatalogAgents = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogAgentsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogAgentsResponses, PostApiWorkspacesByIdCatalogAgentsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogAgentsResponses, PostApiWorkspacesByIdCatalogAgentsErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/catalog/agents',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Preview an agent install
  */
-export const postApiWorkspacesByIdCatalogAgentsResolve = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogAgentsResolveData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogAgentsResolveResponses, PostApiWorkspacesByIdCatalogAgentsResolveErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogAgentsResolveResponses, PostApiWorkspacesByIdCatalogAgentsResolveErrors, ThrowOnError>({ url: '/api/workspaces/{id}/catalog/agents/resolve', ...options });
+export const postApiWorkspacesByIdCatalogAgentsResolve = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogAgentsResolveData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogAgentsResolveResponses, PostApiWorkspacesByIdCatalogAgentsResolveErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogAgentsResolveResponses, PostApiWorkspacesByIdCatalogAgentsResolveErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/catalog/agents/resolve',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Get an agent's anchor content
@@ -402,7 +542,14 @@ export const postApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolve = <Throw
 /**
  * Apply an agent sync
  */
-export const postApiWorkspacesByIdCatalogAgentsByScopeByNameSync = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors, ThrowOnError>({ url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync', ...options });
+export const postApiWorkspacesByIdCatalogAgentsByScopeByNameSync = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Acknowledge an agent's prereqs
@@ -427,7 +574,14 @@ export const getApiWorkspacesByIdCatalogMcps = <ThrowOnError extends boolean = f
 /**
  * Install an MCP from an origin
  */
-export const postApiWorkspacesByIdCatalogMcps = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogMcpsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogMcpsResponses, PostApiWorkspacesByIdCatalogMcpsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogMcpsResponses, PostApiWorkspacesByIdCatalogMcpsErrors, ThrowOnError>({ url: '/api/workspaces/{id}/catalog/mcps', ...options });
+export const postApiWorkspacesByIdCatalogMcps = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogMcpsData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogMcpsResponses, PostApiWorkspacesByIdCatalogMcpsErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogMcpsResponses, PostApiWorkspacesByIdCatalogMcpsErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/catalog/mcps',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Delete an MCP
@@ -447,7 +601,14 @@ export const postApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolve = <ThrowOn
 /**
  * Apply an MCP sync
  */
-export const postApiWorkspacesByIdCatalogMcpsByScopeByNameSync = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors, ThrowOnError>({ url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync', ...options });
+export const postApiWorkspacesByIdCatalogMcpsByScopeByNameSync = <ThrowOnError extends boolean = false>(options: Options<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncData, ThrowOnError>): RequestResult<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors, ThrowOnError> => (options.client ?? client).post<PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses, PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors, ThrowOnError>({
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Catalog overview counts

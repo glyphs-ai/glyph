@@ -8,34 +8,9 @@
  * global registry row (`global.db`).
  */
 
+export { WorkspaceService, type WorkspaceServiceOpts } from "./application/workspace.service.js";
 export {
   composeWorkspaceModule,
   type WorkspaceModule,
   type WorkspaceModuleOptions,
-} from "./compose.js";
-export {
-  RegistryError,
-  WorkspaceError,
-  WorkspaceIdConflictError,
-  WorkspaceIdInvalidError,
-  WorkspaceNameInvalidError,
-  WorkspaceNotRegisteredError,
-  WorkspacePathConflictError,
-  WorkspacePathInvalidError,
-} from "./errors.js";
-export {
-  globalDbPath,
-  type WorkspaceLayout,
-  workspaceLayout,
-  workspacesParentDir,
-} from "./layout.js";
-export type {
-  ListWorkspacesOpts,
-  RegisterWorkspaceOpts,
-  RegisterWorkspaceResult,
-  RenameWorkspaceOpts,
-  UnregisterWorkspaceOpts,
-  Workspace,
-} from "./types.js";
-export { InputValidationError } from "./validate.js";
-export { WorkspaceService, type WorkspaceServiceOpts } from "./workspace-service.js";
+} from "./workspace.compose.js";

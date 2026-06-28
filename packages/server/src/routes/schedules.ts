@@ -61,6 +61,10 @@ import type {
   WorkflowTargetPatch,
 } from "@glyphs-ai/api";
 import {
+  CreateTaskScheduleRequestSchema,
+  CreateWorkflowScheduleRequestSchema,
+  PatchTaskScheduleRequestSchema,
+  PatchWorkflowScheduleRequestSchema,
   PreviewScheduleResultSchema,
   ScheduleDeleteResponseSchema,
   ScheduleGetResponseSchema,
@@ -83,312 +87,12 @@ import type { WorkflowService } from "@glyphs-ai/workflow";
 // envelope on rejection.
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { schedulesErrorPolicy } from "./_error-policies/schedules.js";
-import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
+import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "./_openapi.js";
 import { respondError } from "./_respond-error.js";
-import {
-  errorBody,
-  logEvent,
-  parseJsonBody,
-  type ValidationFail,
-  type ValidationResult,
-} from "./_shared.js";
+import { errorBody, logEvent } from "./_shared.js";
 
 type ScheduleServiceResolver = (c: import("hono").Context) => ScheduleService;
 type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
-
-const ALLOWED_TASK_CREATE_KEYS = new Set(["name", "target", "trigger", "enabled"]);
-const ALLOWED_TASK_PATCH_KEYS = new Set(["name", "target", "trigger", "enabled"]);
-const ALLOWED_TASK_TARGET_KEYS = new Set(["agent", "brief", "details", "runtime"]);
-
-const ALLOWED_WORKFLOW_CREATE_KEYS = new Set(["name", "target", "trigger", "enabled"]);
-const ALLOWED_WORKFLOW_PATCH_KEYS = new Set(["name", "target", "trigger", "enabled"]);
-const ALLOWED_WORKFLOW_TARGET_KEYS = new Set(["coordinatorAgent", "brief", "details"]);
-
-/**
- * Reject a schedule-target body that sets `kind`: the target's kind is
- * implied by the URL segment (`/task` vs `/workflow`), so honouring a
- * body `kind` would let the caller contradict the route. Returns a
- * {@link ValidationFail} to propagate, or `null` when the body is clean.
- */
-function forbidUrlImpliedKind(
-  obj: Record<string, unknown>,
-  message: string,
-): ValidationFail | null {
-  return "kind" in obj ? { ok: false, error: message } : null;
-}
-
-/** Validate a raw value as a {@link TaskTargetData} for `POST /task`. */
-function validateTaskTargetData(raw: unknown): ValidationResult<TaskTargetData> {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    return { ok: false, error: "target must be an object" };
-  }
-  const obj = raw as Record<string, unknown>;
-  // `kind` is URL-implied; reject if the caller sends it to avoid
-  // contradictions with the URL discriminator.
-  const kindFail = forbidUrlImpliedKind(
-    obj,
-    "target.kind must not be set on POST /schedules/task (kind is implied by the URL)",
-  );
-  if (kindFail) return kindFail;
-  for (const k of Object.keys(obj)) {
-    if (!ALLOWED_TASK_TARGET_KEYS.has(k)) {
-      return { ok: false, error: `target has unknown key "${k}"` };
-    }
-  }
-  const { agent, brief, details, runtime } = obj;
-  if (typeof agent !== "string" || agent.trim().length === 0) {
-    return { ok: false, error: "target.agent must be a non-empty string" };
-  }
-  if (typeof brief !== "string" || brief.trim().length === 0) {
-    return { ok: false, error: "target.brief must be a non-empty string" };
-  }
-  if (brief.includes("\n") || brief.includes("\r")) {
-    return {
-      ok: false,
-      error: "target.brief must be a single line — pass long content via target.details",
-    };
-  }
-  if (brief.trim().length > 200) {
-    return { ok: false, error: "target.brief must be at most 200 chars" };
-  }
-  if (details !== undefined && typeof details !== "string") {
-    return { ok: false, error: "target.details, when set, must be a string" };
-  }
-  if (runtime !== undefined && (typeof runtime !== "string" || runtime.trim().length === 0)) {
-    return { ok: false, error: "target.runtime, when set, must be a non-empty string" };
-  }
-  return {
-    ok: true,
-    value: {
-      agent,
-      brief,
-      ...(details !== undefined ? { details } : {}),
-      ...(runtime !== undefined ? { runtime } : {}),
-    },
-  };
-}
-
-/**
- * Validate a raw value as a {@link TaskTargetPatch} for
- * `PATCH /task/:sid`. RFC 7396 semantics: `null` on optional
- * `details`/`runtime` deletes; `null` on required `agent`/`brief` is
- * rejected with a clear 400.
- */
-function validateTaskTargetPatch(raw: unknown): ValidationResult<TaskTargetPatch> {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    return { ok: false, error: "target must be an object" };
-  }
-  const obj = raw as Record<string, unknown>;
-  const kindFail = forbidUrlImpliedKind(
-    obj,
-    "target.kind must not be set on PATCH /schedules/task/:sid (kind is implied by the URL)",
-  );
-  if (kindFail) return kindFail;
-  for (const k of Object.keys(obj)) {
-    if (!ALLOWED_TASK_TARGET_KEYS.has(k)) {
-      return { ok: false, error: `target has unknown key "${k}"` };
-    }
-  }
-  const patch: {
-    agent?: string;
-    brief?: string;
-    details?: string | null;
-    runtime?: string | null;
-  } = {};
-  if ("agent" in obj) {
-    const v = obj.agent;
-    if (v === null) {
-      return { ok: false, error: "target.agent cannot be null (required field; omit to keep)" };
-    }
-    if (typeof v !== "string" || v.trim().length === 0) {
-      return { ok: false, error: "target.agent must be a non-empty string" };
-    }
-    patch.agent = v;
-  }
-  if ("brief" in obj) {
-    const v = obj.brief;
-    if (v === null) {
-      return { ok: false, error: "target.brief cannot be null (required field; omit to keep)" };
-    }
-    if (typeof v !== "string" || v.trim().length === 0) {
-      return { ok: false, error: "target.brief must be a non-empty string" };
-    }
-    if (v.includes("\n") || v.includes("\r")) {
-      return {
-        ok: false,
-        error: "target.brief must be a single line — pass long content via target.details",
-      };
-    }
-    if (v.trim().length > 200) {
-      return { ok: false, error: "target.brief must be at most 200 chars" };
-    }
-    patch.brief = v;
-  }
-  if ("details" in obj) {
-    const v = obj.details;
-    if (v === null) {
-      patch.details = null;
-    } else if (typeof v === "string") {
-      patch.details = v;
-    } else {
-      return {
-        ok: false,
-        error: "target.details must be a string (set), null (delete), or omitted (keep)",
-      };
-    }
-  }
-  if ("runtime" in obj) {
-    const v = obj.runtime;
-    if (v === null) {
-      patch.runtime = null;
-    } else if (typeof v === "string" && v.trim().length > 0) {
-      patch.runtime = v;
-    } else {
-      return {
-        ok: false,
-        error: "target.runtime must be a non-empty string (set), null (delete), or omitted (keep)",
-      };
-    }
-  }
-  return { ok: true, value: patch };
-}
-
-/** Validate a raw value as a full {@link ScheduleTrigger}. */
-function validateTrigger(raw: unknown): ValidationResult<ScheduleTrigger> {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    return { ok: false, error: "trigger must be an object" };
-  }
-  const obj = raw as Record<string, unknown>;
-  if (obj.kind !== "cron") {
-    return { ok: false, error: 'trigger.kind must be "cron"' };
-  }
-  if (typeof obj.expr !== "string" || obj.expr.trim().length === 0) {
-    return { ok: false, error: "trigger.expr must be a non-empty string" };
-  }
-  if (typeof obj.tz !== "string" || obj.tz.trim().length === 0) {
-    return { ok: false, error: "trigger.tz must be a non-empty string" };
-  }
-  return { ok: true, value: { kind: "cron", expr: obj.expr, tz: obj.tz } };
-}
-
-/** Validate a raw value as a {@link WorkflowTargetData} for `POST /workflow`. */
-function validateWorkflowTargetData(raw: unknown): ValidationResult<WorkflowTargetData> {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    return { ok: false, error: "target must be an object" };
-  }
-  const obj = raw as Record<string, unknown>;
-  const kindFail = forbidUrlImpliedKind(
-    obj,
-    "target.kind must not be set on POST /schedules/workflow (kind is implied by the URL)",
-  );
-  if (kindFail) return kindFail;
-  for (const k of Object.keys(obj)) {
-    if (!ALLOWED_WORKFLOW_TARGET_KEYS.has(k)) {
-      return { ok: false, error: `target has unknown key "${k}"` };
-    }
-  }
-  const { coordinatorAgent, brief, details } = obj;
-  if (typeof coordinatorAgent !== "string" || coordinatorAgent.trim().length === 0) {
-    return { ok: false, error: "target.coordinatorAgent must be a non-empty string" };
-  }
-  if (typeof brief !== "string" || brief.trim().length === 0) {
-    return { ok: false, error: "target.brief must be a non-empty string" };
-  }
-  if (brief.includes("\n") || brief.includes("\r")) {
-    return {
-      ok: false,
-      error: "target.brief must be a single line — pass long content via target.details",
-    };
-  }
-  if (brief.trim().length > 200) {
-    return { ok: false, error: "target.brief must be at most 200 chars" };
-  }
-  if (details !== undefined && typeof details !== "string") {
-    return { ok: false, error: "target.details, when set, must be a string" };
-  }
-  return {
-    ok: true,
-    value: {
-      coordinatorAgent,
-      brief,
-      ...(details !== undefined ? { details } : {}),
-    },
-  };
-}
-
-/**
- * Validate a raw value as a {@link WorkflowTargetPatch} for
- * `PATCH /workflow/:sid`. RFC 7396 semantics: `null` on optional
- * `details` deletes; `null` on required `coordinatorAgent`/`brief` is
- * rejected with a clear 400.
- */
-function validateWorkflowTargetPatch(raw: unknown): ValidationResult<WorkflowTargetPatch> {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    return { ok: false, error: "target must be an object" };
-  }
-  const obj = raw as Record<string, unknown>;
-  const kindFail = forbidUrlImpliedKind(
-    obj,
-    "target.kind must not be set on PATCH /schedules/workflow/:sid (kind is implied by the URL)",
-  );
-  if (kindFail) return kindFail;
-  for (const k of Object.keys(obj)) {
-    if (!ALLOWED_WORKFLOW_TARGET_KEYS.has(k)) {
-      return { ok: false, error: `target has unknown key "${k}"` };
-    }
-  }
-  const patch: {
-    coordinatorAgent?: string;
-    brief?: string;
-    details?: string | null;
-  } = {};
-  if ("coordinatorAgent" in obj) {
-    const v = obj.coordinatorAgent;
-    if (v === null) {
-      return {
-        ok: false,
-        error: "target.coordinatorAgent cannot be null (required field; omit to keep)",
-      };
-    }
-    if (typeof v !== "string" || v.trim().length === 0) {
-      return { ok: false, error: "target.coordinatorAgent must be a non-empty string" };
-    }
-    patch.coordinatorAgent = v;
-  }
-  if ("brief" in obj) {
-    const v = obj.brief;
-    if (v === null) {
-      return { ok: false, error: "target.brief cannot be null (required field; omit to keep)" };
-    }
-    if (typeof v !== "string" || v.trim().length === 0) {
-      return { ok: false, error: "target.brief must be a non-empty string" };
-    }
-    if (v.includes("\n") || v.includes("\r")) {
-      return {
-        ok: false,
-        error: "target.brief must be a single line — pass long content via target.details",
-      };
-    }
-    if (v.trim().length > 200) {
-      return { ok: false, error: "target.brief must be at most 200 chars" };
-    }
-    patch.brief = v;
-  }
-  if ("details" in obj) {
-    const v = obj.details;
-    if (v === null) {
-      patch.details = null;
-    } else if (typeof v === "string") {
-      patch.details = v;
-    } else {
-      return {
-        ok: false,
-        error: "target.details must be a string (set), null (delete), or omitted (keep)",
-      };
-    }
-  }
-  return { ok: true, value: patch };
-}
 
 /**
  * Project the internal `Schedule` envelope to the flat wire shape
@@ -529,6 +233,7 @@ export function schedulesRoutes(
       path: "/task",
       tags: ["schedules"],
       summary: "Create a task-kind schedule",
+      request: { body: jsonRequest(CreateTaskScheduleRequestSchema) },
       responses: {
         201: jsonResponse(ScheduleHeaderSchema, "Created schedule"),
         400: errorResponse("Malformed request body"),
@@ -537,40 +242,19 @@ export function schedulesRoutes(
       },
     }),
     async (c) => {
-      const parsed = await parseJsonBody<Record<string, unknown>>(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const body = parsed.body;
-      if (body === null || typeof body !== "object" || Array.isArray(body)) {
-        return c.json({ error: "request body must be an object" }, 400);
-      }
-      for (const k of Object.keys(body)) {
-        if (!ALLOWED_TASK_CREATE_KEYS.has(k)) {
-          return c.json({ error: `request body has unknown key "${k}"` }, 400);
-        }
-      }
-      const { name, target, trigger, enabled } = body;
-
-      if (typeof name !== "string" || name.trim().length === 0) {
-        return c.json({ error: "name must be a non-empty string" }, 400);
-      }
-      if (enabled !== undefined && typeof enabled !== "boolean") {
-        return c.json({ error: "enabled, when set, must be a boolean" }, 400);
-      }
-      const targetResult = validateTaskTargetData(target);
-      if (!targetResult.ok) return c.json({ error: targetResult.error }, 400);
-      const triggerResult = validateTrigger(trigger);
-      if (!triggerResult.ok) return c.json({ error: triggerResult.error }, 400);
-
+      const body = c.req.valid("json");
+      const target: TaskTargetData = body.target;
+      const trigger: ScheduleTrigger = body.trigger;
       try {
         const created = await resolve(c).create({
-          name,
-          trigger: triggerResult.value,
-          target: { kind: "task", data: targetResult.value },
-          ...(enabled !== undefined ? { enabled } : {}),
+          name: body.name,
+          trigger,
+          target: { kind: "task", data: target },
+          ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
         });
         logEvent(c, "schedule.create", {
           scheduleId: created.id,
-          agent: targetResult.value.agent,
+          agent: target.agent,
         });
         return c.json(projectScheduleHeader(created), 201);
       } catch (err) {
@@ -722,7 +406,10 @@ export function schedulesRoutes(
       path: "/task/{sid}",
       tags: ["schedules"],
       summary: "Patch a task-kind schedule",
-      request: { params: z.object({ sid: z.string() }) },
+      request: {
+        params: z.object({ sid: z.string() }),
+        body: jsonRequest(PatchTaskScheduleRequestSchema),
+      },
       responses: {
         200: jsonResponse(ScheduleHeaderSchema, "Updated schedule"),
         400: errorResponse("Malformed request body"),
@@ -732,71 +419,20 @@ export function schedulesRoutes(
     }),
     async (c) => {
       const sid = c.req.param("sid");
-      const parsed = await parseJsonBody<Record<string, unknown>>(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const body = parsed.body;
-      if (body === null || typeof body !== "object" || Array.isArray(body)) {
-        return c.json({ error: "request body must be an object" }, 400);
-      }
-      for (const k of Object.keys(body)) {
-        if (!ALLOWED_TASK_PATCH_KEYS.has(k)) {
-          return c.json({ error: `request body has unknown key "${k}"` }, 400);
-        }
-      }
-
-      const patch: {
-        name?: string;
-        enabled?: boolean;
-        trigger?: ScheduleTrigger;
-        target?: TaskTargetPatch;
-      } = {};
-
-      if ("name" in body) {
-        const v = body.name;
-        if (typeof v !== "string" || v.trim().length === 0) {
-          return c.json({ error: "name must be a non-empty string" }, 400);
-        }
-        patch.name = v;
-      }
-      if ("enabled" in body) {
-        const v = body.enabled;
-        if (typeof v !== "boolean") {
-          return c.json({ error: "enabled must be a boolean" }, 400);
-        }
-        patch.enabled = v;
-      }
-      if ("trigger" in body) {
-        const r = validateTrigger(body.trigger);
-        if (!r.ok) return c.json({ error: r.error }, 400);
-        patch.trigger = r.value;
-      }
-      if ("target" in body) {
-        const r = validateTaskTargetPatch(body.target);
-        if (!r.ok) return c.json({ error: r.error }, 400);
-        patch.target = r.value;
-      }
-
+      const body = c.req.valid("json");
+      const target: TaskTargetPatch | undefined = body.target;
+      const trigger: ScheduleTrigger | undefined = body.trigger;
       try {
-        // `expectedKind: "task"` lets the service throw
-        // `ScheduleKindMismatchError` (rather than blindly merging into
-        // a non-task envelope) when `:sid` resolves to a schedule of a
-        // different kind. We project the mismatch to a generic
-        // `ScheduleNotFoundError` envelope below so the wire shape
-        // doesn't leak the actual kind to the client.
         const updated = await resolve(c).patch(sid, {
-          ...(patch.name !== undefined ? { name: patch.name } : {}),
-          ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-          ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
-          ...(patch.target !== undefined ? { target: { patch: patch.target } } : {}),
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
+          ...(trigger !== undefined ? { trigger } : {}),
+          ...(target !== undefined ? { target: { patch: target } } : {}),
           expectedKind: "task",
         });
         logEvent(c, "schedule.patch", { scheduleId: sid });
         return c.json(projectScheduleHeader(updated));
       } catch (err) {
-        // Project `ScheduleKindMismatchError` to the standard
-        // `ScheduleNotFoundError` envelope so the wire shape does not
-        // leak whether the schedule exists under another kind. The
-        // server log still carries the original error for debugging.
         if (err instanceof ScheduleKindMismatchError) {
           logEvent(c, "schedule.patch.kind_mismatch", {
             scheduleId: sid,
@@ -820,6 +456,7 @@ export function schedulesRoutes(
       path: "/workflow",
       tags: ["schedules"],
       summary: "Create a workflow-kind schedule",
+      request: { body: jsonRequest(CreateWorkflowScheduleRequestSchema) },
       responses: {
         201: jsonResponse(ScheduleHeaderSchema, "Created schedule"),
         400: errorResponse("Malformed request body"),
@@ -828,40 +465,19 @@ export function schedulesRoutes(
       },
     }),
     async (c) => {
-      const parsed = await parseJsonBody<Record<string, unknown>>(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const body = parsed.body;
-      if (body === null || typeof body !== "object" || Array.isArray(body)) {
-        return c.json({ error: "request body must be an object" }, 400);
-      }
-      for (const k of Object.keys(body)) {
-        if (!ALLOWED_WORKFLOW_CREATE_KEYS.has(k)) {
-          return c.json({ error: `request body has unknown key "${k}"` }, 400);
-        }
-      }
-      const { name, target, trigger, enabled } = body;
-
-      if (typeof name !== "string" || name.trim().length === 0) {
-        return c.json({ error: "name must be a non-empty string" }, 400);
-      }
-      if (enabled !== undefined && typeof enabled !== "boolean") {
-        return c.json({ error: "enabled, when set, must be a boolean" }, 400);
-      }
-      const targetResult = validateWorkflowTargetData(target);
-      if (!targetResult.ok) return c.json({ error: targetResult.error }, 400);
-      const triggerResult = validateTrigger(trigger);
-      if (!triggerResult.ok) return c.json({ error: triggerResult.error }, 400);
-
+      const body = c.req.valid("json");
+      const target: WorkflowTargetData = body.target;
+      const trigger: ScheduleTrigger = body.trigger;
       try {
         const created = await resolve(c).create({
-          name,
-          trigger: triggerResult.value,
-          target: { kind: "workflow", data: targetResult.value },
-          ...(enabled !== undefined ? { enabled } : {}),
+          name: body.name,
+          trigger,
+          target: { kind: "workflow", data: target },
+          ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
         });
         logEvent(c, "schedule.create", {
           scheduleId: created.id,
-          coordinatorAgent: targetResult.value.coordinatorAgent,
+          coordinatorAgent: target.coordinatorAgent,
         });
         return c.json(projectScheduleHeader(created), 201);
       } catch (err) {
@@ -880,7 +496,10 @@ export function schedulesRoutes(
       path: "/workflow/{sid}",
       tags: ["schedules"],
       summary: "Patch a workflow-kind schedule",
-      request: { params: z.object({ sid: z.string() }) },
+      request: {
+        params: z.object({ sid: z.string() }),
+        body: jsonRequest(PatchWorkflowScheduleRequestSchema),
+      },
       responses: {
         200: jsonResponse(ScheduleHeaderSchema, "Updated schedule"),
         400: errorResponse("Malformed request body"),
@@ -890,56 +509,15 @@ export function schedulesRoutes(
     }),
     async (c) => {
       const sid = c.req.param("sid");
-      const parsed = await parseJsonBody<Record<string, unknown>>(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const body = parsed.body;
-      if (body === null || typeof body !== "object" || Array.isArray(body)) {
-        return c.json({ error: "request body must be an object" }, 400);
-      }
-      for (const k of Object.keys(body)) {
-        if (!ALLOWED_WORKFLOW_PATCH_KEYS.has(k)) {
-          return c.json({ error: `request body has unknown key "${k}"` }, 400);
-        }
-      }
-
-      const patch: {
-        name?: string;
-        enabled?: boolean;
-        trigger?: ScheduleTrigger;
-        target?: WorkflowTargetPatch;
-      } = {};
-
-      if ("name" in body) {
-        const v = body.name;
-        if (typeof v !== "string" || v.trim().length === 0) {
-          return c.json({ error: "name must be a non-empty string" }, 400);
-        }
-        patch.name = v;
-      }
-      if ("enabled" in body) {
-        const v = body.enabled;
-        if (typeof v !== "boolean") {
-          return c.json({ error: "enabled must be a boolean" }, 400);
-        }
-        patch.enabled = v;
-      }
-      if ("trigger" in body) {
-        const r = validateTrigger(body.trigger);
-        if (!r.ok) return c.json({ error: r.error }, 400);
-        patch.trigger = r.value;
-      }
-      if ("target" in body) {
-        const r = validateWorkflowTargetPatch(body.target);
-        if (!r.ok) return c.json({ error: r.error }, 400);
-        patch.target = r.value;
-      }
-
+      const body = c.req.valid("json");
+      const target: WorkflowTargetPatch | undefined = body.target;
+      const trigger: ScheduleTrigger | undefined = body.trigger;
       try {
         const updated = await resolve(c).patch(sid, {
-          ...(patch.name !== undefined ? { name: patch.name } : {}),
-          ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-          ...(patch.trigger !== undefined ? { trigger: patch.trigger } : {}),
-          ...(patch.target !== undefined ? { target: { patch: patch.target } } : {}),
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
+          ...(trigger !== undefined ? { trigger } : {}),
+          ...(target !== undefined ? { target: { patch: target } } : {}),
           expectedKind: "workflow",
         });
         logEvent(c, "schedule.patch", { scheduleId: sid });

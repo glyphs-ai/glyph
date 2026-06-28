@@ -29,6 +29,7 @@
  * cross-cutting safety net.
  */
 
+import { workspacesRoutes } from "@glyphs-ai/api";
 import { AgentNotFoundError as CatalogAgentNotFoundError } from "@glyphs-ai/catalog";
 import {
   AgentNotFoundError as SessionAgentNotFoundError,
@@ -43,6 +44,7 @@ import {
   TaskIdAllocationFailedError,
   type TaskService,
 } from "@glyphs-ai/task";
+import { RegisterWorkspaceRequestSchema } from "@glyphs-ai/workspace/contract";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { requestId } from "../src/middleware/request-id.js";
@@ -52,7 +54,6 @@ import { scheduledTasksRoutes } from "../src/routes/scheduled-tasks.js";
 import { schedulesRoutes } from "../src/routes/schedules.js";
 import { sessionsRoutes } from "../src/routes/sessions.js";
 import { tasksRoutes } from "../src/routes/tasks.js";
-import { workspacesRoutes } from "../src/routes/workspaces.js";
 import { captureLogger } from "./_capture-logger.js";
 
 const sampleTask: Task = {
@@ -260,12 +261,11 @@ describe("respondError contract — unmapped-fault observability gap-closes", ()
     // workspaces domain. Pinning both domains prevents a future
     // regression from silently dropping the log line from either route
     // family.
-    const registerWorkspace = vi.fn(async () => {
+    const register = vi.fn(async () => {
       throw new Error("ENOSPC: workspace dir mkdir failed");
     });
     const workspacesCtx = {
-      workspaceService: {} as never,
-      registerWorkspace,
+      workspaceService: { register },
     };
     const { app, cap } = await buildAppWithLogger((a) => {
       a.route("/", workspacesRoutes(workspacesCtx as never));
@@ -561,5 +561,44 @@ describe("respondError contract — AgentResolutionFailedError 500 path", () => 
     expect(fivexx?.level).toBe(50);
     const unmapped = cap.entries.find((e) => e.msg?.includes("unmapped"));
     expect(unmapped).toBeUndefined();
+  });
+});
+
+describe("respondError contract — ZodError → 400 ValidationError", () => {
+  // Service-layer input-schema parse failures surface as ZodError.
+  // respondError must convert them to the SAME { code: "ValidationError",
+  // issues } 400 envelope the request `defaultHook` produces, so a body
+  // validation failure and a service-input validation failure are
+  // indistinguishable on the wire.
+  it("a service method that raises ZodError → 400 ValidationError + issues", async () => {
+    // After wire/service schema unification the HTTP layer validates the
+    // body before the handler runs, so a service-layer ZodError only
+    // arises for non-HTTP callers (CLI/MCP) or as defense-in-depth. This
+    // pins respondError's ZodError branch directly: a ZodError raised by
+    // the service is converted to the same { code: "ValidationError",
+    // issues } 400 envelope the request defaultHook produces.
+    const application = {
+      workspaceService: {
+        list: vi.fn(async () => []),
+        get: vi.fn(),
+        getLastOpenedId: vi.fn(),
+        register: vi.fn(async () => {
+          // Simulate the service's own input-schema parse failing.
+          RegisterWorkspaceRequestSchema.parse({ name: "a".repeat(65) });
+        }),
+      },
+    } as unknown as Parameters<typeof workspacesRoutes>[0];
+
+    const res = await workspacesRoutes(application).request("/", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "demo" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; issues: unknown[] };
+    expect(body.code).toBe("ValidationError");
+    expect(Array.isArray(body.issues)).toBe(true);
+    expect(JSON.stringify(body.issues)).toMatch(/name/);
   });
 });

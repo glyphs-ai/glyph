@@ -71,6 +71,6 @@ export const removeWorkspace = async (
 
 export const updateWorkspaceMetadata = async (
   workspaceId: string,
-  patch: { name?: string },
+  patch: { name: string },
 ): Promise<WorkspaceListItem> =>
   unwrap(await patchApiWorkspacesById({ path: { id: workspaceId }, body: patch }));

@@ -1,12 +1,12 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { workspacesRoutes } from "@glyphs-ai/api";
 import type { WorkspaceService } from "@glyphs-ai/workspace";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { requestId } from "../src/middleware/request-id.js";
 import { requestLogger } from "../src/middleware/request-logger.js";
-import { workspacesRoutes } from "../src/routes/workspaces.js";
 import { captureLogger } from "./_capture-logger.js";
 import {
   type ServerTestSubsystem,
@@ -40,11 +40,9 @@ async function makeApp() {
 
 async function register(
   service: WorkspaceService,
-  args: { id?: string; workspaceDir: string; name: string },
+  args: { workspaceDir: string; name: string },
 ): Promise<string> {
-  const id = args.id ?? (await import("node:crypto")).randomUUID();
   const result = await service.register({
-    id,
     workspaceDir: args.workspaceDir,
     name: args.name,
   });
@@ -183,7 +181,7 @@ describe("workspacesRoutes — POST /", () => {
     });
     expect(res.status).toBe(400);
     expect((await res.json()) as Record<string, unknown>).toMatchObject({
-      error: 'request body has unknown key "workdir"',
+      code: "ValidationError",
     });
   });
 });

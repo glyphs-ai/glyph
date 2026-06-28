@@ -60,3 +60,19 @@ export const LOGS_SUBDIR = "logs";
 export function logsDir(home: string): string {
   return path.join(home, LOGS_SUBDIR);
 }
+
+/** Filename (under `<home>`) for the global SQLite database. */
+export const GLOBAL_DB_FILE = "global.db";
+
+/** Subdirectory (under `<home>`) for auto-allocated workspace directories. */
+export const WORKSPACES_PARENT_SUBDIR = "workspaces";
+
+/** Resolve `<home>/global.db`. */
+export function globalDbPath(home: string): string {
+  return path.join(home, GLOBAL_DB_FILE);
+}
+
+/** Resolve `<home>/workspaces/`. */
+export function workspacesParentDir(home: string): string {
+  return path.join(home, WORKSPACES_PARENT_SUBDIR);
+}

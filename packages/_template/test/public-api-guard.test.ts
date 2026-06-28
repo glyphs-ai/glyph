@@ -34,21 +34,21 @@
  *   update is a missing assertion.
  *
  * Worked example: see `packages/catalog/test/public-api-guard.test.ts`
- * for a fully-populated version locking 25+ methods and 19 error
- * classes on a real BC.
+ * for a fully-populated version on a real BC.
  */
 
 import { describe, expectTypeOf, it } from "vitest";
 import {
   type __Entity__,
+  __Entity__NotFoundError,
+  type Create__Entity__Request,
+  type List__Entity__Opts,
+} from "../src/contract/index.js";
+import {
   type __Entity__Module,
   type __Entity__ModuleOptions,
-  __Entity__NotFoundError,
   type __Entity__Service,
-  type Create__Entity__Args,
   compose__Entity__Module,
-  Invalid__Entity__IdError,
-  type List__Entity__Opts,
 } from "../src/index.js";
 
 describe("@glyphs-ai/__PKG__ public API guard", () => {
@@ -57,10 +57,7 @@ describe("@glyphs-ai/__PKG__ public API guard", () => {
     // signature; the array's element type acts as a structural check
     // that every class is still constructible the same way it was
     // before. Add a new entry here every time `errors.ts` grows.
-    const errs: Error[] = [
-      new __Entity__NotFoundError("some-id"),
-      new Invalid__Entity__IdError("bad-id"),
-    ];
+    const errs: Error[] = [new __Entity__NotFoundError("some-id")];
     expectTypeOf(errs[0]!).toExtend<Error>();
   });
 
@@ -72,7 +69,7 @@ describe("@glyphs-ai/__PKG__ public API guard", () => {
     expectTypeOf<__Entity__>().toHaveProperty("name");
     expectTypeOf<__Entity__>().toHaveProperty("createdAt");
 
-    expectTypeOf<Create__Entity__Args>().toHaveProperty("name");
+    expectTypeOf<Create__Entity__Request>().toHaveProperty("name");
     expectTypeOf<List__Entity__Opts>().toHaveProperty("nameStartsWith");
   });
 

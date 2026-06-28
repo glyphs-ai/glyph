@@ -6,7 +6,8 @@ import { composeScheduleModule, type ScheduleService } from "@glyphs-ai/schedule
 import { composeSessionModule, type SessionService, type SpawnFn } from "@glyphs-ai/session";
 import { composeTaskModule, type TaskService } from "@glyphs-ai/task";
 import { composeWorkflowModule, type WorkflowService } from "@glyphs-ai/workflow";
-import type { Workspace, WorkspaceService } from "@glyphs-ai/workspace";
+import type { WorkspaceService } from "@glyphs-ai/workspace";
+import type { Workspace } from "@glyphs-ai/workspace/contract";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";

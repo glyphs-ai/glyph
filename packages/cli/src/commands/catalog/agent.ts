@@ -4,20 +4,18 @@
  * workspace-scoped catalog agents HTTP surface.
  */
 
-import type {
-  PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses,
-  PostApiWorkspacesByIdCatalogAgentsResolveResponses,
-  PostApiWorkspacesByIdCatalogAgentsResponses,
-} from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdCatalogAgentsByScopeByName,
   getApiWorkspacesByIdCatalogAgents,
   getApiWorkspacesByIdCatalogAgentsByScopeByName,
   getApiWorkspacesByIdCatalogAgentsByScopeByNameAnchor,
+  postApiWorkspacesByIdCatalogAgents,
   postApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqs,
   postApiWorkspacesByIdCatalogAgentsByScopeByNameDisable,
   postApiWorkspacesByIdCatalogAgentsByScopeByNameEnable,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameSync,
   postApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolve,
+  postApiWorkspacesByIdCatalogAgentsResolve,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
@@ -54,12 +52,11 @@ export async function catalogAgentResolve(opts: CatalogAgentResolveOpts): Promis
   if ("error" in built) {
     return { exitCode: 2, stderr: `${built.error}\n` };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const plan = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogAgentsResolveResponses>({
-        url: "/api/workspaces/{id}/catalog/agents/resolve",
+      await postApiWorkspacesByIdCatalogAgentsResolve({
         path: { id: workspaceId },
         body: { origin: built.origin },
       }),
@@ -114,12 +111,11 @@ export async function catalogAgentInstall(opts: CatalogAgentInstallOpts): Promis
   if ("error" in built) {
     return { exitCode: 2, stderr: `${built.error}\n` };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogAgentsResponses>({
-        url: "/api/workspaces/{id}/catalog/agents",
+      await postApiWorkspacesByIdCatalogAgents({
         path: { id: workspaceId },
         body: { origin: built.origin },
       }),
@@ -195,13 +191,12 @@ export async function catalogAgentSync(
   if (typeof planToken !== "string" || planToken.trim() === "") {
     return { exitCode: 2, stderr: "--plan-token is required (mint with `agent sync-resolve`)\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const { scope, name: shortName } = splitCatalogFqn(name);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses>({
-        url: "/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync",
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameSync({
         path: { id: workspaceId, scope, name: shortName },
         body: { planToken },
       }),

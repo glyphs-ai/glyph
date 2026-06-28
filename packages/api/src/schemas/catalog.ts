@@ -1,10 +1,10 @@
 /**
- * zod schemas for the `/api/workspaces/:id/catalog/**` wire shapes.
- * Mirrors the catalog DTOs re-exported through the api `wire/` surface
- * (`Skill` / `Agent` / `Mcp` / entries / install + sync results from
- * `@glyphs-ai/catalog`), the wire-local route wrappers in
- * `wire/routes/catalog.ts`, and the `ResolveManifest` projection in
- * `wire/plan-to-manifest.ts`; parity pinned by the wire-schema parity test.
+ * zod schemas for the `/api/workspaces/:id/catalog/**` wire shapes. Single
+ * source of truth for the server's OpenAPI projection and the inferred
+ * wire types (re-exported below via `z.infer`), covering the catalog
+ * resource DTOs (`Skill` / `Agent` / `Mcp` / entries / install + sync
+ * results from `@glyphs-ai/catalog`), the request bodies, and the
+ * `ResolveManifest` projection.
  */
 import { z } from "zod";
 
@@ -104,13 +104,29 @@ export const AgentEntrySchema = z.object({
 
 // ─── Install request bodies ───────────────────────────────────────
 
-export const InstallSkillRequestSchema = z.object({
-  origin: z.string(),
-});
+export const InstallSkillRequestSchema = z
+  .object({
+    origin: z.string().min(1, {
+      message: "origin is required and must be a non-empty string",
+    }),
+  })
+  .strict();
 
-export const InstallAgentRequestSchema = z.object({
-  origin: z.string(),
-});
+export const InstallAgentRequestSchema = z
+  .object({
+    origin: z.string().min(1, {
+      message: "origin is required and must be a non-empty string",
+    }),
+  })
+  .strict();
+
+export const InstallMcpRequestSchema = z
+  .object({
+    origin: z.string().min(1, {
+      message: "origin is required and must be a non-empty string",
+    }),
+  })
+  .strict();
 
 // ─── Install + sync result shapes ─────────────────────────────────
 
@@ -173,9 +189,13 @@ export const CatalogFileEntrySchema = z.object({
   size: z.number(),
 });
 
-export const SyncCatalogRequestSchema = z.object({
-  planToken: z.string(),
-});
+export const SyncCatalogRequestSchema = z
+  .object({
+    planToken: z.string().min(1, {
+      message: "body must be { planToken: string } from a prior /sync/resolve response",
+    }),
+  })
+  .strict();
 
 export const CatalogOverviewSchema = z.object({
   counts: z.object({
@@ -283,3 +303,17 @@ export const ResolveManifestSchema = z.object({
   orphans: z.array(OrphanManifestEntrySchema),
   nodes: z.array(ResolveManifestNodeSchema),
 });
+
+// Inferred wire types — single source of truth is the schemas above.
+export type CatalogFileEntry = z.infer<typeof CatalogFileEntrySchema>;
+export type InstallAgentRequest = z.infer<typeof InstallAgentRequestSchema>;
+export type InstallSkillRequest = z.infer<typeof InstallSkillRequestSchema>;
+export type InstallMcpRequest = z.infer<typeof InstallMcpRequestSchema>;
+export type SyncCatalogRequest = z.infer<typeof SyncCatalogRequestSchema>;
+export type CatalogOverview = z.infer<typeof CatalogOverviewSchema>;
+export type SkillWithContent = z.infer<typeof SkillWithContentSchema>;
+export type AgentWithContent = z.infer<typeof AgentWithContentSchema>;
+export type AnchorResponse = z.infer<typeof AnchorResponseSchema>;
+export type McpWithContent = z.infer<typeof McpWithContentSchema>;
+export type OkResponse = z.infer<typeof OkResponseSchema>;
+export type CatalogResourcePathParams = z.infer<typeof CatalogResourcePathParamsSchema>;

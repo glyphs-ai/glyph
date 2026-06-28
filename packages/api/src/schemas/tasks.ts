@@ -1,9 +1,9 @@
 /**
  * zod schemas for the `/api/workspaces/:id/tasks` + `/scheduled-tasks`
- * wire shapes. Mirrors the DTOs in the api `wire/` surface
- * (`wire/routes/tasks.ts`) plus the re-exported `Task` domain type and the
- * `ActivityItem` / `TruncationInfo` runtime types; parity pinned by the
- * wire-schema parity test.
+ * wire shapes. Single source of truth for the server's OpenAPI projection
+ * and the inferred wire types (re-exported below via `z.infer`), plus the
+ * re-exported `Task` domain type and the `ActivityItem` / `TruncationInfo`
+ * runtime types.
  */
 import { z } from "zod";
 
@@ -175,12 +175,33 @@ export const ScheduledTaskListQuerySchema = z.object({
   scheduleId: z.string().optional(),
 });
 
-export const DispatchTaskRequestSchema = z.object({
-  agent: z.string(),
-  brief: z.string(),
-  details: z.string().optional(),
-  runtime: z.string().optional(),
-});
+/**
+ * Maximum length of `brief` accepted from clients. Sized to fit a single
+ * line in the dashboard list (~2 lines wrapped on a 360px column at the
+ * default font size); also bounds the SQLite column width and the
+ * displayed task title across CLI / dashboard tools.
+ */
+const BRIEF_MAX_LENGTH = 200;
+
+export const DispatchTaskRequestSchema = z
+  .object({
+    agent: z.string().refine((s) => s.trim().length > 0, "agent is required (string)"),
+    brief: z
+      .string()
+      .refine((s) => s.trim().length > 0, "brief must be non-empty after trim")
+      .refine(
+        (s) => !s.trim().includes("\n") && !s.trim().includes("\r"),
+        "brief must be a single line (no newline characters)",
+      )
+      .refine(
+        (s) => s.trim().length <= BRIEF_MAX_LENGTH,
+        `brief must be ${BRIEF_MAX_LENGTH} characters or fewer`,
+      )
+      .transform((s) => s.trim()),
+    details: z.string().optional(),
+    runtime: z.string().optional(),
+  })
+  .strict();
 
 export const TaskDeleteQuerySchema = z.object({
   purge: z.literal("1").optional(),
@@ -196,3 +217,11 @@ export const TaskPathParamsSchema = z.object({
   id: z.string(),
   tid: z.string(),
 });
+
+// Inferred wire types — single source of truth is the schemas above.
+export type TaskListQuery = z.infer<typeof TaskListQuerySchema>;
+export type ScheduledTaskListQuery = z.infer<typeof ScheduledTaskListQuerySchema>;
+export type DispatchTaskRequest = z.infer<typeof DispatchTaskRequestSchema>;
+export type TaskDeleteQuery = z.infer<typeof TaskDeleteQuerySchema>;
+export type TaskActivityQuery = z.infer<typeof TaskActivityQuerySchema>;
+export type TaskPathParams = z.infer<typeof TaskPathParamsSchema>;

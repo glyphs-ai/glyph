@@ -153,12 +153,9 @@ describe("errorBody", () => {
       "ScheduleHasInFlightError",
       "ScheduleNotFoundError",
       // workspace
-      "InputValidationError",
       "RegistryError",
       "WorkspaceError",
       "WorkspaceIdConflictError",
-      "WorkspaceIdInvalidError",
-      "WorkspaceNameInvalidError",
       "WorkspaceNotRegisteredError",
       "WorkspacePathConflictError",
       // api / workflow

@@ -18,14 +18,14 @@
  *
  *   - Response / domain shapes are sliced out of the generated success
  *     payloads via indexed-access types. The server's OpenAPI projection
- *     is interface-for-interface equal to the source domain types (guarded
- *     by `packages/api/test/wire-schema-parity.test.ts`), so a slice such
+ *     is structurally equal to the source domain types, so a slice such
  *     as `GetApiWorkspacesByIdWorkflowsResponse[number]` is structurally
  *     the `WorkflowHeader` the surfaces expect.
- *   - Request bodies are hand-authored: the hand-validated routes carry
- *     no request schema in the OpenAPI document (their generated `Data`
- *     types expose `body?: never`), so there is nothing to slice. Each
- *     shape below mirrors its server-side validator 1:1.
+ *   - Request bodies are sliced from the generated operation `Data`
+ *     types via `Data["body"]` indexed-access. The routes now declare
+ *     their request schemas in the OpenAPI document, so every mutation
+ *     operation carries a typed `body`. Named aliases here keep the
+ *     surface-layer type names stable.
  */
 
 import type {
@@ -38,7 +38,21 @@ import type {
   GetApiWorkspacesByIdWorkflowsByWfidDagResponse,
   GetApiWorkspacesByIdWorkflowsData,
   GetApiWorkspacesByIdWorkflowsResponse,
+  PatchApiWorkspacesByIdSchedulesTaskBySidData,
+  PatchApiWorkspacesByIdSchedulesWorkflowBySidData,
+  PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData,
+  PostApiWorkspacesByIdCatalogAgentsData,
   PostApiWorkspacesByIdCatalogAgentsResponse,
+  PostApiWorkspacesByIdCatalogSkillsData,
+  PostApiWorkspacesByIdSchedulesTaskData,
+  PostApiWorkspacesByIdSchedulesWorkflowData,
+  PostApiWorkspacesByIdWorkflowsByWfidCancelData,
+  PostApiWorkspacesByIdWorkflowsByWfidEdgesData,
+  PostApiWorkspacesByIdWorkflowsByWfidFinishData,
+  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData,
+  PostApiWorkspacesByIdWorkflowsByWfidNodesData,
+  PostApiWorkspacesByIdWorkflowsByWfidSubgraphData,
+  PostApiWorkspacesByIdWorkflowsData as PostWorkflowsData,
 } from "./generated/types.gen.js";
 
 // ─── Catalog domain shapes (sliced from list / install payloads) ─────
@@ -67,17 +81,13 @@ export type BlockedReason = NonNullable<SkillEntry["blockedReason"]>;
 /** A dependency the catalog could not resolve for an entry. */
 export type MissingDep = NonNullable<SkillEntry["missingDeps"]>[number];
 
-// ─── Catalog request bodies (hand-validated routes → no OpenAPI body) ─
+// ─── Catalog request bodies (sliced from generated operation bodies) ──
 
 /** POST `/catalog/agents` body — install an agent by origin URI. */
-export interface InstallAgentRequest {
-  readonly origin: string;
-}
+export type InstallAgentRequest = NonNullable<PostApiWorkspacesByIdCatalogAgentsData["body"]>;
 
 /** POST `/catalog/skills` body — install a skill by origin URI. */
-export interface InstallSkillRequest {
-  readonly origin: string;
-}
+export type InstallSkillRequest = NonNullable<PostApiWorkspacesByIdCatalogSkillsData["body"]>;
 
 // ─── Workflow domain shapes (sliced from list / DAG / artifacts) ─────
 
@@ -111,85 +121,55 @@ export type WorkflowArtifact = WorkflowArtifactsResponse["artifacts"][number];
 /** Query string for the workflow list endpoint. */
 export type WorkflowListQuery = NonNullable<GetApiWorkspacesByIdWorkflowsData["query"]>;
 
-// ─── Workflow request bodies (hand-validated routes → no OpenAPI body) ─
+// ─── Workflow request bodies (sliced from generated operation bodies) ──
 
 /** POST `/workflows` body — create a workflow. */
-export interface CreateWorkflowRequest {
-  readonly brief: string;
-  readonly details?: string;
-  readonly coordinatorAgent: string;
-}
+export type CreateWorkflowRequest = NonNullable<PostWorkflowsData["body"]>;
 
 /** POST `/workflows/:wfid/cancel` body. */
-export interface CancelWorkflowRequest {
-  readonly cancellation: {
-    readonly kind: "user";
-    readonly message: string;
-  };
-}
+export type CancelWorkflowRequest = NonNullable<
+  PostApiWorkspacesByIdWorkflowsByWfidCancelData["body"]
+>;
 
 /** POST `/workflows/:wfid/nodes/:nid/respond` body — answer a human node. */
-export interface RespondHumanNodeRequest {
-  readonly choiceId?: string;
-  readonly input?: string;
-}
+export type RespondHumanNodeRequest = NonNullable<
+  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData["body"]
+>;
 
-// ─── Workflow mutation bodies (coord-callback routes, hand-validated) ─
+// ─── Workflow mutation bodies (sliced from generated operation bodies) ──
 
 /** POST `/workflows/:wfid/nodes` body — insert one node under `parents`. */
-export interface AddNodeRequest {
-  readonly kind: WorkflowNodeKind;
-  readonly spec: unknown;
-  readonly parents: readonly string[];
-}
+export type AddNodeRequest = NonNullable<PostApiWorkspacesByIdWorkflowsByWfidNodesData["body"]>;
 
 /** POST `/workflows/:wfid/edges` body — link `fromNodeId` → `toNodeId`. */
-export interface AddEdgeRequest {
-  readonly fromNodeId: string;
-  readonly toNodeId: string;
-}
+export type AddEdgeRequest = NonNullable<PostApiWorkspacesByIdWorkflowsByWfidEdgesData["body"]>;
+
+/** POST `/workflows/:wfid/subgraph` body — insert a batch of nodes + edges. */
+export type AddSubgraphRequest = NonNullable<
+  PostApiWorkspacesByIdWorkflowsByWfidSubgraphData["body"]
+>;
+
+/** One declared temp node in an `addSubgraph` batch. */
+export type AddSubgraphRequestNode = AddSubgraphRequest["nodes"][number];
+
+/** One declared edge in an `addSubgraph` batch. */
+export type AddSubgraphRequestEdge = AddSubgraphRequest["edges"][number];
 
 /**
  * Reference to a node in an `addSubgraph` batch — either an existing
  * node (`nodeId`) or a temp node declared in the same batch (`tempId`).
  */
-export type WorkflowNodeRef = { readonly nodeId: string } | { readonly tempId: string };
-
-/** One declared temp node in an `addSubgraph` batch. */
-export interface AddSubgraphRequestNode {
-  readonly tempId: string;
-  readonly kind: WorkflowNodeKind;
-  readonly spec: unknown;
-  readonly existingParents?: readonly string[];
-}
-
-/** One declared edge in an `addSubgraph` batch. */
-export interface AddSubgraphRequestEdge {
-  readonly from: WorkflowNodeRef;
-  readonly to: WorkflowNodeRef;
-}
-
-/** POST `/workflows/:wfid/subgraph` body — insert a batch of nodes + edges. */
-export interface AddSubgraphRequest {
-  readonly nodes: readonly AddSubgraphRequestNode[];
-  readonly edges: readonly AddSubgraphRequestEdge[];
-}
+export type WorkflowNodeRef = AddSubgraphRequestEdge["from"];
 
 /** PATCH `/workflows/:wfid/nodes/:nid/spec` body — re-validate + replace spec. */
-export interface ReplaceNodeSpecRequest {
-  readonly newSpec: unknown;
-}
+export type ReplaceNodeSpecRequest = NonNullable<
+  PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData["body"]
+>;
 
 /** POST `/workflows/:wfid/finish` body — flip the workflow terminal. */
-export type FinishWorkflowRequest =
-  | {
-      readonly kind: "succeeded";
-      readonly success?: { readonly output?: string | null };
-    }
-  | {
-      readonly kind: "failed";
-      readonly failure: { readonly kind: "coordinator"; readonly message: string };
-    };
+export type FinishWorkflowRequest = NonNullable<
+  PostApiWorkspacesByIdWorkflowsByWfidFinishData["body"]
+>;
 
 // ─── Schedule domain shapes (sliced from list / preview payloads) ────
 
@@ -208,73 +188,37 @@ export type WorkflowScheduleTarget = Extract<ScheduleTarget, { kind: "workflow" 
 /** Cron preview result — human description plus the next fire timestamps. */
 export type PreviewScheduleResult = GetApiWorkspacesByIdSchedulesPreviewCronResponse;
 
-// ─── Schedule request bodies (hand-validated routes → no OpenAPI body) ─
-
-/** Task-kind target data payload (create body, URL-implied `kind`). */
-export interface TaskTargetData {
-  readonly agent: string;
-  readonly brief: string;
-  readonly details?: string;
-  readonly runtime?: string;
-}
-
-/** RFC 7396 deep-merge patch for a task target (`null` deletes optionals). */
-export interface TaskTargetPatch {
-  readonly agent?: string;
-  readonly brief?: string;
-  readonly details?: string | null;
-  readonly runtime?: string | null;
-}
-
-/** Workflow-kind target data payload (create body, URL-implied `kind`). */
-export interface WorkflowTargetData {
-  readonly coordinatorAgent: string;
-  readonly brief: string;
-  readonly details?: string;
-}
-
-/** RFC 7396 deep-merge patch for a workflow target (`null` deletes optionals). */
-export interface WorkflowTargetPatch {
-  readonly coordinatorAgent?: string;
-  readonly brief?: string;
-  readonly details?: string | null;
-}
-
-/** Shared cron trigger shape carried by the schedule create bodies. */
-export interface ScheduleCronTrigger {
-  readonly kind: "cron";
-  readonly expr: string;
-  readonly tz: string;
-}
+// ─── Schedule request bodies (sliced from generated operation bodies) ──
 
 /** POST `/schedules/task` body. */
-export interface CreateTaskScheduleRequest {
-  readonly name: string;
-  readonly target: TaskTargetData;
-  readonly trigger: ScheduleCronTrigger;
-  readonly enabled?: boolean;
-}
+export type CreateTaskScheduleRequest = NonNullable<PostApiWorkspacesByIdSchedulesTaskData["body"]>;
 
 /** PATCH `/schedules/task/:sid` body. */
-export interface PatchTaskScheduleRequest {
-  readonly name?: string;
-  readonly target?: TaskTargetPatch;
-  readonly trigger?: ScheduleCronTrigger;
-  readonly enabled?: boolean;
-}
+export type PatchTaskScheduleRequest = NonNullable<
+  PatchApiWorkspacesByIdSchedulesTaskBySidData["body"]
+>;
 
 /** POST `/schedules/workflow` body. */
-export interface CreateWorkflowScheduleRequest {
-  readonly name: string;
-  readonly target: WorkflowTargetData;
-  readonly trigger: ScheduleCronTrigger;
-  readonly enabled?: boolean;
-}
+export type CreateWorkflowScheduleRequest = NonNullable<
+  PostApiWorkspacesByIdSchedulesWorkflowData["body"]
+>;
 
 /** PATCH `/schedules/workflow/:sid` body. */
-export interface PatchWorkflowScheduleRequest {
-  readonly name?: string;
-  readonly target?: WorkflowTargetPatch;
-  readonly trigger?: ScheduleCronTrigger;
-  readonly enabled?: boolean;
-}
+export type PatchWorkflowScheduleRequest = NonNullable<
+  PatchApiWorkspacesByIdSchedulesWorkflowBySidData["body"]
+>;
+
+/** Task-kind target data payload (create body, URL-implied `kind`). */
+export type TaskTargetData = CreateTaskScheduleRequest["target"];
+
+/** RFC 7396 deep-merge patch for a task target (`null` deletes optionals). */
+export type TaskTargetPatch = NonNullable<PatchTaskScheduleRequest["target"]>;
+
+/** Workflow-kind target data payload (create body, URL-implied `kind`). */
+export type WorkflowTargetData = CreateWorkflowScheduleRequest["target"];
+
+/** RFC 7396 deep-merge patch for a workflow target (`null` deletes optionals). */
+export type WorkflowTargetPatch = NonNullable<PatchWorkflowScheduleRequest["target"]>;
+
+/** Shared cron trigger shape carried by the schedule create bodies. */
+export type ScheduleCronTrigger = CreateTaskScheduleRequest["trigger"];

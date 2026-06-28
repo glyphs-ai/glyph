@@ -32,9 +32,8 @@ bundles. See
 ```
 packages/api/src/
 ├── application.ts            ← Application interface + composeApplication
-├── route-manifest.ts         ← flat route inventory (listRoutes over ROUTES) for the server reflection test
 ├── workspace-context.ts      ← WorkspaceContext + WorkspaceContextRegistry
-├── schemas/                  ← zod wire schemas, one module per domain; transport-agnostic source of truth for the server's OpenAPI spec, pinned 1:1 to the wire/ types by test/wire-schema-parity.test.ts
+├── schemas/                  ← zod wire schemas, one module per domain; transport-agnostic single source of truth for the server's OpenAPI spec and the inferred wire types (z.infer)
 │   └── index.ts              ← schemas barrel (re-exported from the package root)
 ├── wiring/                   ← per-kind handler wiring (cross-package glue)
 │   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskService
@@ -166,12 +165,10 @@ with Swagger UI at `/api/docs`); the schemas are the single source of
 truth for both the documented response shapes and the runtime 400
 request validation.
 
-Each schema is pinned 1:1 to its `wire/` surface type by
-`test/wire-schema-parity.test.ts`, a **compile-time** parity guard:
-`z.infer<typeof FooSchema>` must equal the wire interface in both
-directions. Dropping or renaming a field on either side fails
-`pnpm --filter @glyphs-ai/api typecheck`, so the schemas can never
-silently drift from the wire contracts.
+Each schema's wire type is its `z.infer` — exported alongside the schema
+(e.g. `export type HealthResponse = z.infer<typeof HealthResponseSchema>`).
+The runtime validator and the TS type derive from one definition, so they
+cannot drift.
 
 ```ts
 import { HealthResponseSchema, type HealthResponse } from "@glyphs-ai/api";

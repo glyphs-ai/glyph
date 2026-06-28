@@ -5,14 +5,12 @@
  * partial updates.
  */
 
-import type {
-  GetApiWorkspacesByIdSchedulesBySidResponse,
-  PatchApiWorkspacesByIdSchedulesTaskBySidResponses,
-  PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses,
-} from "@glyphs-ai/sdk";
+import type { GetApiWorkspacesByIdSchedulesBySidResponse } from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdSchedulesBySid,
   getApiWorkspacesByIdSchedulesBySid,
+  patchApiWorkspacesByIdSchedulesTaskBySid,
+  patchApiWorkspacesByIdSchedulesWorkflowBySid,
   postApiWorkspacesByIdSchedulesBySidRun,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
@@ -47,7 +45,7 @@ async function patchEnabled(
   if (typeof scheduleId !== "string" || scheduleId.trim() === "") {
     return { exitCode: 2, stderr: "schedule id is required\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     // Detect the schedule's kind so we route to the correct patch endpoint.
@@ -63,15 +61,13 @@ async function patchEnabled(
     const updated =
       kind === "workflow"
         ? unwrap(
-            await client.patch<PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses>({
-              url: "/api/workspaces/{id}/schedules/workflow/{sid}",
+            await patchApiWorkspacesByIdSchedulesWorkflowBySid({
               path,
               body: { enabled },
             }),
           )
         : unwrap(
-            await client.patch<PatchApiWorkspacesByIdSchedulesTaskBySidResponses>({
-              url: "/api/workspaces/{id}/schedules/task/{sid}",
+            await patchApiWorkspacesByIdSchedulesTaskBySid({
               path,
               body: { enabled },
             }),
@@ -228,7 +224,7 @@ export async function schedulePatch(
     };
   }
 
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
 
@@ -307,8 +303,7 @@ export async function schedulePatch(
     }
 
     const updated = unwrap(
-      await client.patch<PatchApiWorkspacesByIdSchedulesTaskBySidResponses>({
-        url: "/api/workspaces/{id}/schedules/task/{sid}",
+      await patchApiWorkspacesByIdSchedulesTaskBySid({
         path: { id: workspaceId, sid: scheduleId },
         body,
       }),
@@ -380,7 +375,7 @@ export async function schedulePatchWorkflow(
     };
   }
 
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
 
@@ -439,8 +434,7 @@ export async function schedulePatchWorkflow(
     }
 
     const updated = unwrap(
-      await client.patch<PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses>({
-        url: "/api/workspaces/{id}/schedules/workflow/{sid}",
+      await patchApiWorkspacesByIdSchedulesWorkflowBySid({
         path: { id: workspaceId, sid: scheduleId },
         body,
       }),

@@ -12,17 +12,17 @@ import type {
   AddEdgeRequest,
   AddNodeRequest,
   FinishWorkflowRequest,
-  PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses,
-  PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses,
-  PostApiWorkspacesByIdWorkflowsByWfidFinishResponses,
-  PostApiWorkspacesByIdWorkflowsByWfidNodesResponses,
-  PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses,
   ReplaceNodeSpecRequest,
 } from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByTo,
   deleteApiWorkspacesByIdWorkflowsByWfidNodesByNid,
+  patchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpec,
+  postApiWorkspacesByIdWorkflowsByWfidEdges,
+  postApiWorkspacesByIdWorkflowsByWfidFinish,
+  postApiWorkspacesByIdWorkflowsByWfidNodes,
   postApiWorkspacesByIdWorkflowsByWfidNodesByNidCancel,
+  postApiWorkspacesByIdWorkflowsByWfidSubgraph,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../../output.js";
@@ -109,7 +109,7 @@ export async function workflowAddNode(
     return { exitCode: 2, stderr: `${specResult.error}\n` };
   }
   const spec = specResult.value;
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: AddNodeRequest = {
@@ -118,8 +118,7 @@ export async function workflowAddNode(
       parents: parseParents(opts.parentNodeIds),
     };
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdWorkflowsByWfidNodesResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/nodes",
+      await postApiWorkspacesByIdWorkflowsByWfidNodes({
         path: { id: workspaceId, wfid: workflowId },
         body,
       }),
@@ -161,12 +160,11 @@ export async function workflowAddSubgraph(
     return { exitCode: 2, stderr: `${bodyResult.error}\n` };
   }
   const { body } = bodyResult;
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/subgraph",
+      await postApiWorkspacesByIdWorkflowsByWfidSubgraph({
         path: { id: workspaceId, wfid: workflowId },
         body,
       }),
@@ -203,13 +201,12 @@ export async function workflowAddEdge(
   if (typeof toNodeId !== "string" || toNodeId.trim() === "") {
     return { exitCode: 2, stderr: "missing required <to-node-id>\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: AddEdgeRequest = { fromNodeId, toNodeId };
     const result = unwrap(
-      await client.post<PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/edges",
+      await postApiWorkspacesByIdWorkflowsByWfidEdges({
         path: { id: workspaceId, wfid: workflowId },
         body,
       }),
@@ -316,13 +313,12 @@ export async function workflowReplaceSpec(
     return { exitCode: 2, stderr: `${newSpecResult.error}\n` };
   }
   const newSpec = newSpecResult.value;
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: ReplaceNodeSpecRequest = { newSpec };
     const updated = unwrap(
-      await client.patch<PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec",
+      await patchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpec({
         path: { id: workspaceId, wfid: workflowId, nid: nodeId },
         body,
       }),
@@ -411,7 +407,7 @@ export async function workflowFinish(
       stderr: "--summary is only valid with --outcome succeeded; use --message instead\n",
     };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: FinishWorkflowRequest =
@@ -419,8 +415,7 @@ export async function workflowFinish(
         ? { kind: "succeeded", success: { output: opts.summary ?? null } }
         : { kind: "failed", failure: { kind: "coordinator", message: opts.message ?? "" } };
     const updated = unwrap(
-      await client.post<PostApiWorkspacesByIdWorkflowsByWfidFinishResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/finish",
+      await postApiWorkspacesByIdWorkflowsByWfidFinish({
         path: { id: workspaceId, wfid: workflowId },
         body,
       }),

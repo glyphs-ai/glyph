@@ -242,8 +242,7 @@ export const cancelTask = (taskId: string): Promise<TaskRecord> => {
  * The shapes here MIRROR `@glyphs-ai/runtime`'s exports — they are
  * NOT imported because dashboard is a browser bundle that doesn't
  * pull from server-side packages. Keep them in lock-step manually
- * (the route-manifest test would catch divergence on the wire
- * shape; runtime-internal types like `Runtime` are excluded).
+ * (runtime-internal types like `Runtime` are excluded).
  *
  * Returns `null` (404 NoEventsYet) when the runtime doesn't implement
  * structured activity or when the log isn't on disk yet.

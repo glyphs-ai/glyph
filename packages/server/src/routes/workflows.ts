@@ -82,9 +82,17 @@ import type {
   WorkflowStatus,
 } from "@glyphs-ai/api";
 import {
+  AddEdgeRequestSchema,
   AddEdgeResponseSchema,
+  AddNodeRequestSchema,
   AddNodeResponseSchema,
+  AddSubgraphRequestSchema,
   AddSubgraphResponseSchema,
+  CancelWorkflowRequestSchema,
+  CreateWorkflowRequestSchema,
+  FinishWorkflowRequestSchema,
+  ReplaceNodeSpecRequestSchema,
+  RespondHumanNodeRequestSchema,
   WorkflowArtifactsResponseSchema,
   WorkflowDagSchema,
   WorkflowHeaderSchema,
@@ -99,9 +107,9 @@ import {
 } from "@glyphs-ai/workflow";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
-import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
+import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "./_openapi.js";
 import { respondError } from "./_respond-error.js";
-import { errorBody, logEvent, parseJsonBody } from "./_shared.js";
+import { errorBody, logEvent } from "./_shared.js";
 import {
   countAwaitingHuman,
   iterationCountForNodes,
@@ -110,17 +118,7 @@ import {
   projectWorkflowNodeWithTaskId,
 } from "./_workflow-projection.js";
 import { handleListArtifacts, handleStreamArtifact } from "./workflows/_artifacts.js";
-import {
-  resolveNodeRef,
-  validateAddEdgeRequest,
-  validateAddNodeRequest,
-  validateAddSubgraphRequest,
-  validateCancelWorkflowRequest,
-  validateCreatedSinceQuery,
-  validateCreateWorkflowRequest,
-  validateFinishWorkflowRequest,
-  validateReplaceNodeSpecRequest,
-} from "./workflows/_validators.js";
+import { resolveNodeRef, validateCreatedSinceQuery } from "./workflows/_validators.js";
 
 type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
 type WorkflowTasksResolver = (c: import("hono").Context) => TaskService;
@@ -201,6 +199,7 @@ export function workflowsRoutes(
       path: "/",
       tags: ["workflows"],
       summary: "Create a workflow",
+      request: { body: jsonRequest(CreateWorkflowRequestSchema) },
       responses: {
         201: jsonResponse(WorkflowHeaderSchema, "Created workflow"),
         400: errorResponse("Malformed request body"),
@@ -209,11 +208,7 @@ export function workflowsRoutes(
       },
     }),
     async (c) => {
-      const parsed = await parseJsonBody(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const validated = validateCreateWorkflowRequest(parsed.body);
-      if (!validated.ok) return c.json({ error: validated.error }, 400);
-      const body = validated.value;
+      const body = c.req.valid("json");
       try {
         const { workflowId } = await resolve(c).createWorkflow({
           brief: body.brief,
@@ -353,7 +348,10 @@ export function workflowsRoutes(
       path: "/{wfid}/cancel",
       tags: ["workflows"],
       summary: "Cancel a workflow",
-      request: { params: z.object({ wfid: z.string() }) },
+      request: {
+        params: z.object({ wfid: z.string() }),
+        body: jsonRequest(CancelWorkflowRequestSchema),
+      },
       responses: {
         200: jsonResponse(WorkflowHeaderSchema, "Updated workflow header"),
         400: errorResponse("Malformed request body"),
@@ -364,11 +362,8 @@ export function workflowsRoutes(
     }),
     async (c) => {
       const wfid = c.req.param("wfid");
-      const parsed = await parseJsonBody(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const validated = validateCancelWorkflowRequest(parsed.body);
-      if (!validated.ok) return c.json({ error: validated.error }, 400);
-      const { cancellation } = validated.value;
+      const body = c.req.valid("json");
+      const { cancellation } = body;
       try {
         await resolve(c).cancelWorkflow(wfid, {
           cancellation: { kind: cancellation.kind, message: cancellation.message },
@@ -436,7 +431,10 @@ export function workflowsRoutes(
       path: "/{wfid}/nodes",
       tags: ["workflows"],
       summary: "Add a node",
-      request: { params: z.object({ wfid: z.string() }) },
+      request: {
+        params: z.object({ wfid: z.string() }),
+        body: jsonRequest(AddNodeRequestSchema),
+      },
       responses: {
         200: jsonResponse(AddNodeResponseSchema, "Inserted node"),
         400: errorResponse("Malformed request body"),
@@ -447,11 +445,7 @@ export function workflowsRoutes(
     }),
     async (c) => {
       const wfid = c.req.param("wfid");
-      const parsed = await parseJsonBody(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const validated = validateAddNodeRequest(parsed.body);
-      if (!validated.ok) return c.json({ error: validated.error }, 400);
-      const body = validated.value;
+      const body = c.req.valid("json");
       try {
         const result = await resolve(c).addNode(wfid, {
           kind: body.kind,
@@ -481,7 +475,10 @@ export function workflowsRoutes(
       path: "/{wfid}/edges",
       tags: ["workflows"],
       summary: "Add an edge",
-      request: { params: z.object({ wfid: z.string() }) },
+      request: {
+        params: z.object({ wfid: z.string() }),
+        body: jsonRequest(AddEdgeRequestSchema),
+      },
       responses: {
         200: jsonResponse(AddEdgeResponseSchema, "Inserted edge"),
         400: errorResponse("Malformed request body"),
@@ -492,11 +489,7 @@ export function workflowsRoutes(
     }),
     async (c) => {
       const wfid = c.req.param("wfid");
-      const parsed = await parseJsonBody(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const validated = validateAddEdgeRequest(parsed.body);
-      if (!validated.ok) return c.json({ error: validated.error }, 400);
-      const body = validated.value;
+      const body = c.req.valid("json");
       try {
         const result = await resolve(c).addEdge(wfid, {
           fromNodeId: body.fromNodeId,
@@ -534,7 +527,10 @@ export function workflowsRoutes(
       path: "/{wfid}/subgraph",
       tags: ["workflows"],
       summary: "Add a subgraph batch",
-      request: { params: z.object({ wfid: z.string() }) },
+      request: {
+        params: z.object({ wfid: z.string() }),
+        body: jsonRequest(AddSubgraphRequestSchema),
+      },
       responses: {
         200: jsonResponse(AddSubgraphResponseSchema, "Inserted nodes"),
         400: errorResponse("Malformed request body"),
@@ -545,11 +541,7 @@ export function workflowsRoutes(
     }),
     async (c) => {
       const wfid = c.req.param("wfid");
-      const parsed = await parseJsonBody(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const validated = validateAddSubgraphRequest(parsed.body);
-      if (!validated.ok) return c.json({ error: validated.error }, 400);
-      const body = validated.value;
+      const body = c.req.valid("json");
       try {
         const result = await resolve(c).addSubgraph(wfid, {
           nodes: body.nodes.map((n) => ({
@@ -623,7 +615,10 @@ export function workflowsRoutes(
       path: "/{wfid}/finish",
       tags: ["workflows"],
       summary: "Finish a workflow",
-      request: { params: z.object({ wfid: z.string() }) },
+      request: {
+        params: z.object({ wfid: z.string() }),
+        body: jsonRequest(FinishWorkflowRequestSchema),
+      },
       responses: {
         200: jsonResponse(WorkflowHeaderSchema, "Updated workflow header"),
         400: errorResponse("Malformed request body"),
@@ -634,11 +629,7 @@ export function workflowsRoutes(
     }),
     async (c) => {
       const wfid = c.req.param("wfid");
-      const parsed = await parseJsonBody(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const validated = validateFinishWorkflowRequest(parsed.body);
-      if (!validated.ok) return c.json({ error: validated.error }, 400);
-      const body = validated.value;
+      const body = c.req.valid("json");
       try {
         if (body.kind === "succeeded") {
           await resolve(c).finishWorkflow(wfid, {
@@ -876,7 +867,10 @@ export function workflowsRoutes(
       path: "/{wfid}/nodes/{nid}/spec",
       tags: ["workflows"],
       summary: "Replace a node's spec",
-      request: { params: z.object({ wfid: z.string(), nid: z.string() }) },
+      request: {
+        params: z.object({ wfid: z.string(), nid: z.string() }),
+        body: jsonRequest(ReplaceNodeSpecRequestSchema),
+      },
       responses: {
         200: jsonResponse(WorkflowNodeSchema, "Updated node"),
         400: errorResponse("Malformed request body"),
@@ -888,11 +882,7 @@ export function workflowsRoutes(
     async (c) => {
       const wfid = c.req.param("wfid");
       const nid = c.req.param("nid");
-      const parsed = await parseJsonBody(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const validated = validateReplaceNodeSpecRequest(parsed.body);
-      if (!validated.ok) return c.json({ error: validated.error }, 400);
-      const body = validated.value;
+      const body = c.req.valid("json");
       try {
         await resolve(c).replaceSpec(wfid, nid, {
           newSpec: body.newSpec,
@@ -922,7 +912,10 @@ export function workflowsRoutes(
       path: "/{wfid}/nodes/{nid}/respond",
       tags: ["workflows"],
       summary: "Respond to a human node",
-      request: { params: z.object({ wfid: z.string(), nid: z.string() }) },
+      request: {
+        params: z.object({ wfid: z.string(), nid: z.string() }),
+        body: jsonRequest(RespondHumanNodeRequestSchema),
+      },
       responses: {
         200: jsonResponse(WorkflowNodeSchema, "Updated node"),
         400: errorResponse("Malformed request body"),
@@ -934,27 +927,10 @@ export function workflowsRoutes(
     async (c) => {
       const wfid = c.req.param("wfid");
       const nid = c.req.param("nid");
-      const parsed = await parseJsonBody(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const body = parsed.body as Record<string, unknown>;
-      if (body === null || typeof body !== "object" || Array.isArray(body)) {
-        return c.json({ error: "request body must be an object" }, 400);
-      }
-      const { choiceId, input } = body;
-      if (choiceId !== undefined && (typeof choiceId !== "string" || choiceId.length === 0)) {
-        return c.json({ error: "choiceId, when set, must be a non-empty string" }, 400);
-      }
-      if (choiceId === undefined) {
-        if (typeof input !== "string" || input.trim().length === 0) {
-          return c.json({ error: "input is required when choiceId is absent" }, 400);
-        }
-      }
-      if (input !== undefined && typeof input !== "string") {
-        return c.json({ error: "input, when set, must be a string" }, 400);
-      }
+      const body = c.req.valid("json");
       const response: RespondHumanNodeRequest = {
-        ...(choiceId !== undefined ? { choiceId } : {}),
-        ...(input !== undefined ? { input } : {}),
+        ...(body.choiceId !== undefined ? { choiceId: body.choiceId } : {}),
+        ...(body.input !== undefined ? { input: body.input } : {}),
       };
       try {
         const node = await resolve(c).respondHumanNode(wfid, nid, response);

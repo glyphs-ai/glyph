@@ -15,6 +15,7 @@
  *    trailing-slash strip on the base URL.
  */
 
+import { client } from "@glyphs-ai/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, configureClient, unwrap } from "../src/sdk-client.js";
 
@@ -97,7 +98,7 @@ afterEach(() => {
 describe("configureClient serialization", () => {
   it("a body-less GET sends Accept only (no Content-Type, no body)", async () => {
     const { calls } = stubFetch();
-    const { client } = configureClient("http://test.local");
+    configureClient("http://test.local");
     await client.get({ url: "/api/health" });
     expect(calls[0]?.method).toBe("GET");
     expect(calls[0]?.url).toBe("http://test.local/api/health");
@@ -108,7 +109,7 @@ describe("configureClient serialization", () => {
 
   it("a POST with a body sends both Accept and Content-Type plus JSON", async () => {
     const { calls } = stubFetch();
-    const { client } = configureClient("http://test.local");
+    configureClient("http://test.local");
     await client.post({ url: "/api/workspaces", body: { name: "Sandbox" } });
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.accept).toBe("application/json");
@@ -118,7 +119,7 @@ describe("configureClient serialization", () => {
 
   it("substitutes path params and encodes the query the URLSearchParams way", async () => {
     const { calls } = stubFetch();
-    const { client } = configureClient("http://test.local");
+    configureClient("http://test.local");
     await client.get({
       url: "/api/workspaces/{id}/tasks",
       path: { id: "ws-1" },
@@ -132,7 +133,7 @@ describe("configureClient serialization", () => {
 
   it("strips trailing slashes from the base URL", async () => {
     const { calls } = stubFetch();
-    const { client } = configureClient("http://test.local///");
+    configureClient("http://test.local///");
     await client.get({ url: "/api/health" });
     expect(calls[0]?.url).toBe("http://test.local/api/health");
   });

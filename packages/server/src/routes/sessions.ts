@@ -1,10 +1,16 @@
-import type { CreateSessionRequest, SpawnSessionResponse, WorkspaceContext } from "@glyphs-ai/api";
-import { SessionListQuerySchema, SessionSchema, SpawnSessionResponseSchema } from "@glyphs-ai/api";
+import type { SpawnSessionResponse, WorkspaceContext } from "@glyphs-ai/api";
+import {
+  CreateSessionRequestSchema,
+  SessionListQuerySchema,
+  SessionSchema,
+  SpawnSessionRequestSchema,
+  SpawnSessionResponseSchema,
+} from "@glyphs-ai/api";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { sessionsErrorPolicy } from "./_error-policies/sessions.js";
-import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
+import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "./_openapi.js";
 import { respondError } from "./_respond-error.js";
-import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared.js";
+import { logEvent } from "./_shared.js";
 
 /**
  * Resolver passed into `sessionsRoutes` so the routes can pull the
@@ -16,10 +22,6 @@ import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared
  * session" call site.
  */
 type WorkspaceContextResolver = (c: import("hono").Context) => WorkspaceContext;
-
-type CreateSessionRequestRaw = { [K in keyof CreateSessionRequest]?: unknown };
-const SESSION_CREATE_KEYS = new Set(["agent", "runtime"]);
-const SESSION_SPAWN_KEYS = new Set(["remote"]);
 
 const SessionPathSchema = z.object({ sid: z.string() });
 
@@ -91,16 +93,14 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
     },
   );
 
-  // Create a session. `agent` required; `runtime` optional. The body is
-  // parsed + validated in the handler (it must return a specific
-  // `/JSON/` 400 on a non-`application/json` malformed body, which a
-  // zod body validator cannot express — it throws 500 there instead).
+  // Create a session. `agent` required (non-empty); `runtime` optional.
   app.openapi(
     createRoute({
       method: "post",
       path: "/",
       tags: ["sessions"],
       summary: "Create a session",
+      request: { body: jsonRequest(CreateSessionRequestSchema) },
       responses: {
         201: jsonResponse(SessionSchema, "Created session"),
         400: errorResponse("Malformed request body"),
@@ -108,24 +108,11 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       },
     }),
     async (c) => {
-      const parsed = await parseJsonBody<CreateSessionRequestRaw>(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const body = parsed.body;
-      if (!isJsonObject(body)) return c.json({ error: "request body must be an object" }, 400);
-      const unknown = unknownBodyKey(body, SESSION_CREATE_KEYS);
-      if (unknown !== undefined) {
-        return c.json({ error: `request body has unknown key "${unknown}"` }, 400);
-      }
-      if (typeof body.agent !== "string" || body.agent.trim() === "") {
-        return c.json({ error: "agent is required (string)" }, 400);
-      }
-      if (body.runtime !== undefined && typeof body.runtime !== "string") {
-        return c.json({ error: "runtime, when present, must be a string" }, 400);
-      }
+      const body = c.req.valid("json");
       try {
         const rec = await resolve(c).sessions.create({
           agent: body.agent,
-          ...(typeof body.runtime === "string" ? { runtime: body.runtime } : {}),
+          ...(body.runtime !== undefined ? { runtime: body.runtime } : {}),
         });
         logEvent(c, "session created", {
           sessionId: rec.id,
@@ -216,19 +203,21 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
   );
 
   // One-click launch: build the interactive launch command and hand it
-  // to the terminal spawner. Body `{ remote?: boolean }` selects the
-  // spawn variant. On any spawn failure the route returns 200 with
-  // `{ ok: false, display, ... }` so the dashboard can fall back to a
-  // copy-paste command without a second round-trip. The body is parsed
-  // in-handler (it is optional — an absent body is valid — which a zod
-  // body validator cannot express without throwing on the empty body).
+  // to the terminal spawner. Body `{ remote?: boolean }` is optional —
+  // an absent body defaults `remote` to false. On any spawn failure the
+  // route returns 200 with `{ ok: false, display, ... }` so the
+  // dashboard can fall back to a copy-paste command without a second
+  // round-trip.
   app.openapi(
     createRoute({
       method: "post",
       path: "/{sid}/spawn",
       tags: ["sessions"],
       summary: "Spawn an interactive terminal for a session",
-      request: { params: SessionPathSchema },
+      request: {
+        params: SessionPathSchema,
+        body: jsonRequest(SpawnSessionRequestSchema, false),
+      },
       responses: {
         200: jsonResponse(SpawnSessionResponseSchema, "Spawn outcome (ok=false on launch failure)"),
         400: errorResponse("Malformed request body"),
@@ -238,26 +227,8 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
     }),
     async (c) => {
       const id = c.req.param("sid");
-
-      let remote = false;
-      if (
-        c.req.header("content-length") !== "0" &&
-        c.req.header("content-type")?.includes("json")
-      ) {
-        const parsed = await parseJsonBody<{ remote?: unknown }>(c);
-        if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-        if (!isJsonObject(parsed.body)) {
-          return c.json({ error: "request body must be an object" }, 400);
-        }
-        const unknown = unknownBodyKey(parsed.body, SESSION_SPAWN_KEYS);
-        if (unknown !== undefined) {
-          return c.json({ error: `request body has unknown key "${unknown}"` }, 400);
-        }
-        if (parsed.body.remote === true) remote = true;
-        else if (parsed.body.remote !== undefined && parsed.body.remote !== false) {
-          return c.json({ error: "`remote`, when present, must be a boolean" }, 400);
-        }
-      }
+      const body = c.req.valid("json");
+      const remote = body?.remote === true;
 
       let result: Awaited<ReturnType<WorkspaceContext["sessions"]["spawnInteractive"]>>;
       try {

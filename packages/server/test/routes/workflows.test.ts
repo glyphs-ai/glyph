@@ -294,7 +294,9 @@ describe("workflowsRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/bogus/);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/bogus/);
   });
 
   it("POST / with a metadata key returns 400 (no longer a caller-facing input)", async () => {
@@ -309,7 +311,9 @@ describe("workflowsRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/metadata/);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/metadata/);
     expect(svc.createWorkflow).not.toHaveBeenCalled();
   });
 

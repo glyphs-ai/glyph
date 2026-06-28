@@ -20,12 +20,29 @@
  * rationale.
  */
 
+export {
+  type ErrorPolicy,
+  errorBody,
+  INTERNAL_ERROR_NAMES,
+  logEvent,
+  logFault,
+  type RespondErrorOpts,
+  respondError,
+  SAFE_ERROR_NAMES,
+  unmappedFaultMeta,
+} from "./_http-errors.js";
+// HTTP route helpers — shared OpenAPI app factory and error utilities.
+// Consumed by `@glyphs-ai/server` (re-exports them to its own route
+// modules) and by route modules co-located here in api.
+export { createApiApp, errorResponse, jsonRequest, jsonResponse } from "./_http-helpers.js";
 // Orchestration (composeApplication + per-workspace WorkspaceContext)
 export {
   type Application,
   composeApplication,
 } from "./application.js";
-export { listRoutes } from "./route-manifest.js";
+// Route factories — each returns an OpenAPIHono sub-app mountable by
+// the server's transport layer.
+export { workspacesRoutes } from "./routes/workspaces.js";
 // Transport-agnostic zod schemas mirroring every wire contract. The
 // OpenAPI projection in `@glyphs-ai/server` consumes these; other
 // (non-HTTP) consumers can reuse them without an HTTP round-trip.

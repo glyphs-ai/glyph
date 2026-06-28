@@ -169,7 +169,8 @@ describe("tasksRoutes", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/brief/);
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/brief/);
     expect(m.dispatch).not.toHaveBeenCalled();
   });
 
@@ -182,7 +183,8 @@ describe("tasksRoutes", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/non-empty/);
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/non-empty/);
     expect(m.dispatch).not.toHaveBeenCalled();
   });
 
@@ -195,7 +197,8 @@ describe("tasksRoutes", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/single line/);
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/single line/);
     expect(m.dispatch).not.toHaveBeenCalled();
   });
 
@@ -220,7 +223,8 @@ describe("tasksRoutes", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/200 characters/);
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/200 characters/);
     expect(m.dispatch).not.toHaveBeenCalled();
   });
 
@@ -245,7 +249,8 @@ describe("tasksRoutes", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/details/);
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/details/);
     expect(m.dispatch).not.toHaveBeenCalled();
   });
 
@@ -267,7 +272,7 @@ describe("tasksRoutes", () => {
       body: JSON.stringify({ agent: "writer", brief: "hi", origin: "schedule" }),
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: 'request body has unknown key "origin"' });
+    expect(await res.json()).toMatchObject({ code: "ValidationError" });
     expect(m.dispatch).not.toHaveBeenCalled();
   });
 

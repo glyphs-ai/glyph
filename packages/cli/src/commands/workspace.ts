@@ -126,7 +126,7 @@ export async function workspaceUpdate(
   if (opts.name === undefined) {
     return { exitCode: 2, stderr: "pass --name <s>\n" };
   }
-  const body: { name?: string } = { name: opts.name };
+  const body: { name: string } = { name: opts.name };
   await makeSdkClient(opts);
   try {
     const ws = unwrap(await patchApiWorkspacesById({ path: { id: workspaceId }, body }));

@@ -5,18 +5,15 @@
  * `../../registrars/workflow.ts`.
  */
 
-import type {
-  CancelWorkflowRequest,
-  CreateWorkflowRequest,
-  PostApiWorkspacesByIdWorkflowsByWfidCancelResponses,
-  PostApiWorkspacesByIdWorkflowsResponses,
-} from "@glyphs-ai/sdk";
+import type { CancelWorkflowRequest, CreateWorkflowRequest } from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdWorkflowsByWfid,
   getApiWorkspacesByIdWorkflows,
   getApiWorkspacesByIdWorkflowsByWfid,
   getApiWorkspacesByIdWorkflowsByWfidDag,
   getApiWorkspacesByIdWorkflowsByWfidNodesByNid,
+  postApiWorkspacesByIdWorkflows,
+  postApiWorkspacesByIdWorkflowsByWfidCancel,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
@@ -102,7 +99,7 @@ export async function workflowCreate(opts: WorkflowCreateOpts): Promise<CommandR
   if (typeof opts.coordAgent !== "string" || opts.coordAgent.trim() === "") {
     return { exitCode: 2, stderr: "missing required --coord-agent <fqn>\n" };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: CreateWorkflowRequest = {
@@ -111,8 +108,7 @@ export async function workflowCreate(opts: WorkflowCreateOpts): Promise<CommandR
       ...(opts.details !== undefined ? { details: opts.details } : {}),
     };
     const created = unwrap(
-      await client.post<PostApiWorkspacesByIdWorkflowsResponses>({
-        url: "/api/workspaces/{id}/workflows",
+      await postApiWorkspacesByIdWorkflows({
         path: { id: workspaceId },
         body,
       }),
@@ -258,15 +254,14 @@ export async function workflowCancel(
   if (opts.kind !== undefined && opts.kind !== "user") {
     return { exitCode: 2, stderr: '--kind must be "user" when supplied\n' };
   }
-  const { client } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const body: CancelWorkflowRequest = {
       cancellation: { kind: "user", message: opts.message ?? "" },
     };
     const updated = unwrap(
-      await client.post<PostApiWorkspacesByIdWorkflowsByWfidCancelResponses>({
-        url: "/api/workspaces/{id}/workflows/{wfid}/cancel",
+      await postApiWorkspacesByIdWorkflowsByWfidCancel({
         path: { id: workspaceId, wfid: workflowId },
         body,
       }),

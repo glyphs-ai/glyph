@@ -20,11 +20,11 @@ where `<wsid>` is the workspace's opaque UUID — stable for the
 lifetime of the registry entry, so dashboard URLs survive workspace
 renames.
 
-The canonical list lives in `@glyphs-ai/api`'s `ROUTES` manifest (under
-its `wire/` surface);
-`test/route-manifest.test.ts` pins the registered handlers against it.
-If this overview drifts from the manifest, the test stays green --
-prefer the manifest. Braced rows below group sibling manifest entries.
+The canonical list is the assembled OpenAPI document
+(`GET /api/openapi.json`), from which `@glyphs-ai/sdk` is generated;
+`test/openapi-snapshot.test.ts` pins it. If this overview drifts from
+the served document, prefer the document. Braced rows below group
+sibling endpoints.
 Workflows are a first-class T1 surface alongside sessions and tasks,
 not a task sub-layer.
 
@@ -161,9 +161,8 @@ with the `respondError` envelope for business errors.
 
 Two invariants are pinned by tests:
 
-- **`test/openapi-snapshot.test.ts`** snapshots the assembled document
-  and asserts one documented operation per `ROUTES` manifest entry, so
-  any method / path / param / body / response change surfaces as a
+- **`test/openapi-snapshot.test.ts`** snapshots the assembled document,
+  so any method / path / param / body / response change surfaces as a
   reviewable diff.
 - Response bodies are **not** runtime-validated — the schema is the
   documented shape only, so wire JSON stays byte-identical to the

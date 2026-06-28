@@ -1,9 +1,9 @@
 /**
  * zod schemas for the `/api/workspaces/:id/workflows` +
- * `/scheduled-workflows` wire shapes. Mirrors the DTOs in the api
- * `wire/` surface (`wire/workflows.ts` + `wire/routes/workflows.ts`) plus
- * the re-exported workflow domain enums / terminal payloads from
- * `@glyphs-ai/workflow`; parity pinned by the wire-schema parity test.
+ * `/scheduled-workflows` wire shapes. Single source of truth for the
+ * server's OpenAPI projection and the inferred wire types (re-exported
+ * below via `z.infer`), plus the re-exported workflow domain enums /
+ * terminal payloads from `@glyphs-ai/workflow`.
  */
 import { z } from "zod";
 
@@ -129,27 +129,37 @@ export const WorkflowDagSchema = z.object({
 
 // ─── Mutation request / response DTOs ─────────────────────────────
 
-export const CreateWorkflowRequestSchema = z.object({
-  brief: z.string(),
-  details: z.string().optional(),
-  coordinatorAgent: z.string(),
-});
+export const CreateWorkflowRequestSchema = z
+  .object({
+    brief: z.string().refine((s) => s.trim().length > 0, {
+      message: "brief must be a non-empty string",
+    }),
+    details: z.string().optional(),
+    coordinatorAgent: z.string().refine((s) => s.trim().length > 0, {
+      message: "coordinatorAgent must be a non-empty string",
+    }),
+  })
+  .strict();
 
-export const AddNodeRequestSchema = z.object({
-  kind: WorkflowNodeKindSchema,
-  spec: z.unknown(),
-  parents: z.array(z.string()),
-});
+export const AddNodeRequestSchema = z
+  .object({
+    kind: WorkflowNodeKindSchema,
+    spec: z.unknown().refine((v) => v !== undefined, { message: "spec is required" }),
+    parents: z.array(z.string().min(1, { message: "parents entries must be non-empty strings" })),
+  })
+  .strict();
 
 export const AddNodeResponseSchema = z.object({
   nodeId: z.string(),
   phase: z.number(),
 });
 
-export const AddEdgeRequestSchema = z.object({
-  fromNodeId: z.string(),
-  toNodeId: z.string(),
-});
+export const AddEdgeRequestSchema = z
+  .object({
+    fromNodeId: z.string().min(1, { message: "fromNodeId must be a non-empty string" }),
+    toNodeId: z.string().min(1, { message: "toNodeId must be a non-empty string" }),
+  })
+  .strict();
 
 export const AddEdgeResponseSchema = z.object({
   fromNodeId: z.string(),
@@ -158,26 +168,40 @@ export const AddEdgeResponseSchema = z.object({
 });
 
 export const WorkflowNodeRefSchema = z.union([
-  z.object({ nodeId: z.string() }),
-  z.object({ tempId: z.string() }),
+  z
+    .object({
+      nodeId: z.string().min(1, { message: "ref.nodeId must be a non-empty string" }),
+    })
+    .strict(),
+  z
+    .object({
+      tempId: z.string().min(1, { message: "ref.tempId must be a non-empty string" }),
+    })
+    .strict(),
 ]);
 
-export const AddSubgraphRequestNodeSchema = z.object({
-  tempId: z.string(),
-  kind: WorkflowNodeKindSchema,
-  spec: z.unknown(),
-  existingParents: z.array(z.string()).optional(),
-});
+export const AddSubgraphRequestNodeSchema = z
+  .object({
+    tempId: z.string().min(1, { message: "tempId must be a non-empty string" }),
+    kind: WorkflowNodeKindSchema,
+    spec: z.unknown().refine((v) => v !== undefined, { message: "spec is required" }),
+    existingParents: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
 
-export const AddSubgraphRequestEdgeSchema = z.object({
-  from: WorkflowNodeRefSchema,
-  to: WorkflowNodeRefSchema,
-});
+export const AddSubgraphRequestEdgeSchema = z
+  .object({
+    from: WorkflowNodeRefSchema,
+    to: WorkflowNodeRefSchema,
+  })
+  .strict();
 
-export const AddSubgraphRequestSchema = z.object({
-  nodes: z.array(AddSubgraphRequestNodeSchema),
-  edges: z.array(AddSubgraphRequestEdgeSchema),
-});
+export const AddSubgraphRequestSchema = z
+  .object({
+    nodes: z.array(AddSubgraphRequestNodeSchema),
+    edges: z.array(AddSubgraphRequestEdgeSchema),
+  })
+  .strict();
 
 export const AddSubgraphResponseInsertedNodeSchema = z.object({
   tempId: z.string(),
@@ -189,29 +213,64 @@ export const AddSubgraphResponseSchema = z.object({
   insertedNodes: z.array(AddSubgraphResponseInsertedNodeSchema),
 });
 
-export const ReplaceNodeSpecRequestSchema = z.object({
-  newSpec: z.unknown(),
-});
+export const ReplaceNodeSpecRequestSchema = z
+  .object({
+    newSpec: z.unknown().refine((v) => v !== undefined, { message: "newSpec is required" }),
+  })
+  .strict();
 
 export const FinishWorkflowRequestSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("succeeded"),
-    success: z.object({ output: z.string().nullable().optional() }).optional(),
-  }),
-  z.object({
-    kind: z.literal("failed"),
-    failure: z.object({ kind: z.literal("coordinator"), message: z.string() }),
-  }),
+  z
+    .object({
+      kind: z.literal("succeeded"),
+      success: z.object({ output: z.string().nullable().optional() }).strict().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("failed"),
+      failure: z
+        .object({
+          kind: z.literal("coordinator").default("coordinator"),
+          message: z.string(),
+        })
+        .strict(),
+    })
+    .strict(),
 ]);
 
-export const CancelWorkflowRequestSchema = z.object({
-  cancellation: z.object({ kind: z.literal("user"), message: z.string() }),
-});
+export const CancelWorkflowRequestSchema = z
+  .object({
+    cancellation: z
+      .object({
+        kind: z.literal("user").default("user"),
+        message: z.string(),
+      })
+      .strict(),
+  })
+  .strict();
 
-export const RespondHumanNodeRequestSchema = z.object({
-  choiceId: z.string().optional(),
-  input: z.string().optional(),
-});
+export const RespondHumanNodeRequestSchema = z
+  .object({
+    choiceId: z
+      .string()
+      .min(1, { message: "choiceId, when set, must be a non-empty string" })
+      .optional(),
+    input: z.string().optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (
+      data.choiceId === undefined &&
+      (typeof data.input !== "string" || data.input.trim().length === 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["input"],
+        message: "input is required when choiceId is absent",
+      });
+    }
+  });
 
 // ─── Artifacts ────────────────────────────────────────────────────
 
@@ -275,3 +334,10 @@ export const WorkflowArtifactPathParamsSchema = z.object({
   wfid: z.string(),
   encodedPath: z.string(),
 });
+
+// Inferred wire types — single source of truth is the schemas above.
+export type WorkflowDeleteQuery = z.infer<typeof WorkflowDeleteQuerySchema>;
+export type WorkflowPathParams = z.infer<typeof WorkflowPathParamsSchema>;
+export type WorkflowNodePathParams = z.infer<typeof WorkflowNodePathParamsSchema>;
+export type WorkflowEdgePathParams = z.infer<typeof WorkflowEdgePathParamsSchema>;
+export type WorkflowArtifactPathParams = z.infer<typeof WorkflowArtifactPathParamsSchema>;

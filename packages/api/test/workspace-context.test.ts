@@ -28,7 +28,8 @@ import type { ScheduleService } from "@glyphs-ai/schedule";
 import type { SessionService, SpawnFn } from "@glyphs-ai/session";
 import type { TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
-import type { Workspace, WorkspaceService } from "@glyphs-ai/workspace";
+import type { WorkspaceService } from "@glyphs-ai/workspace";
+import type { Workspace } from "@glyphs-ai/workspace/contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface Gate {

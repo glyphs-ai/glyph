@@ -1,7 +1,7 @@
 /**
  * Public wire surface of `@glyphs-ai/api` (the `./wire` subtree).
  *
- * Pure types plus the route manifest (`ROUTES` / `defineRoute`). No
+ * Pure wire DTO types. No
  * orchestration, no DB handles, no subprocess spawning. The api barrel
  * re-exports this subtree; the SPA and CLI consume the same shapes
  * through the generated `@glyphs-ai/sdk`.
@@ -16,7 +16,6 @@
 export * from "./domain.js";
 export * from "./health.js";
 export * from "./plan-to-manifest.js";
-export * from "./routes.js";
 export * from "./runtimes.js";
 export * from "./schedules.js";
 export * from "./server-config.js";

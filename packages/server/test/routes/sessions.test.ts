@@ -229,7 +229,7 @@ describe("sessionsRoutes", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/JSON/);
+    expect(body.code).toBe("ValidationError");
   });
 
   it("POST / requires agent string", async () => {
@@ -260,7 +260,7 @@ describe("sessionsRoutes", () => {
       body: JSON.stringify({ agent: "demo", workdir: "ignored" }),
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: 'request body has unknown key "workdir"' });
+    expect(await res.json()).toMatchObject({ code: "ValidationError" });
     expect(m.create).not.toHaveBeenCalled();
   });
 
@@ -467,7 +467,7 @@ describe("sessionsRoutes", () => {
         body: JSON.stringify({ remote: true, mode: "remote" }),
       });
       expect(res.status).toBe(400);
-      expect(await res.json()).toMatchObject({ error: 'request body has unknown key "mode"' });
+      expect(await res.json()).toMatchObject({ code: "ValidationError" });
       expect(m.buildInteractiveLaunch).not.toHaveBeenCalled();
     });
 

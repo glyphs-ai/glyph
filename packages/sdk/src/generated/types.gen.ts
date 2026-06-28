@@ -124,7 +124,7 @@ export type GetApiWorkspacesResponses = {
 export type GetApiWorkspacesResponse = GetApiWorkspacesResponses[keyof GetApiWorkspacesResponses];
 
 export type PostApiWorkspacesData = {
-    body?: {
+    body: {
         name: string;
         workspaceDir?: string;
     };
@@ -189,7 +189,7 @@ export type GetApiWorkspacesCurrentResponses = {
 export type GetApiWorkspacesCurrentResponse = GetApiWorkspacesCurrentResponses[keyof GetApiWorkspacesCurrentResponses];
 
 export type PutApiWorkspacesCurrentData = {
-    body?: {
+    body: {
         id: string;
     };
     path?: never;
@@ -286,8 +286,8 @@ export type GetApiWorkspacesByIdResponses = {
 export type GetApiWorkspacesByIdResponse = GetApiWorkspacesByIdResponses[keyof GetApiWorkspacesByIdResponses];
 
 export type PatchApiWorkspacesByIdData = {
-    body?: {
-        name?: string;
+    body: {
+        name: string;
     };
     path: {
         id: string;
@@ -403,7 +403,10 @@ export type GetApiWorkspacesByIdSessionsResponses = {
 export type GetApiWorkspacesByIdSessionsResponse = GetApiWorkspacesByIdSessionsResponses[keyof GetApiWorkspacesByIdSessionsResponses];
 
 export type PostApiWorkspacesByIdSessionsData = {
-    body?: never;
+    body: {
+        agent: string;
+        runtime?: string;
+    };
     path: {
         id: string;
     };
@@ -514,7 +517,9 @@ export type GetApiWorkspacesByIdSessionsBySidResponses = {
 export type GetApiWorkspacesByIdSessionsBySidResponse = GetApiWorkspacesByIdSessionsBySidResponses[keyof GetApiWorkspacesByIdSessionsBySidResponses];
 
 export type PostApiWorkspacesByIdSessionsBySidSpawnData = {
-    body?: never;
+    body?: {
+        remote?: boolean;
+    };
     path: {
         id: string;
         sid: string;
@@ -631,7 +636,12 @@ export type GetApiWorkspacesByIdTasksResponses = {
 export type GetApiWorkspacesByIdTasksResponse = GetApiWorkspacesByIdTasksResponses[keyof GetApiWorkspacesByIdTasksResponses];
 
 export type PostApiWorkspacesByIdTasksData = {
-    body?: never;
+    body: {
+        agent: string;
+        brief: string;
+        details?: string;
+        runtime?: string;
+    };
     path: {
         id: string;
     };
@@ -1279,7 +1289,21 @@ export type GetApiWorkspacesByIdSchedulesResponses = {
 export type GetApiWorkspacesByIdSchedulesResponse = GetApiWorkspacesByIdSchedulesResponses[keyof GetApiWorkspacesByIdSchedulesResponses];
 
 export type PostApiWorkspacesByIdSchedulesTaskData = {
-    body?: never;
+    body: {
+        name: string;
+        target: {
+            agent: string;
+            brief: string;
+            details?: string;
+            runtime?: string;
+        };
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        enabled?: boolean;
+    };
     path: {
         id: string;
     };
@@ -1476,7 +1500,21 @@ export type GetApiWorkspacesByIdSchedulesBySidResponses = {
 export type GetApiWorkspacesByIdSchedulesBySidResponse = GetApiWorkspacesByIdSchedulesBySidResponses[keyof GetApiWorkspacesByIdSchedulesBySidResponses];
 
 export type PatchApiWorkspacesByIdSchedulesTaskBySidData = {
-    body?: never;
+    body: {
+        name?: string;
+        target?: {
+            agent?: string;
+            brief?: string;
+            details?: string | null;
+            runtime?: string | null;
+        };
+        trigger?: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        enabled?: boolean;
+    };
     path: {
         id: string;
         sid: string;
@@ -1542,7 +1580,20 @@ export type PatchApiWorkspacesByIdSchedulesTaskBySidResponses = {
 export type PatchApiWorkspacesByIdSchedulesTaskBySidResponse = PatchApiWorkspacesByIdSchedulesTaskBySidResponses[keyof PatchApiWorkspacesByIdSchedulesTaskBySidResponses];
 
 export type PostApiWorkspacesByIdSchedulesWorkflowData = {
-    body?: never;
+    body: {
+        name: string;
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        enabled?: boolean;
+    };
     path: {
         id: string;
     };
@@ -1607,7 +1658,20 @@ export type PostApiWorkspacesByIdSchedulesWorkflowResponses = {
 export type PostApiWorkspacesByIdSchedulesWorkflowResponse = PostApiWorkspacesByIdSchedulesWorkflowResponses[keyof PostApiWorkspacesByIdSchedulesWorkflowResponses];
 
 export type PatchApiWorkspacesByIdSchedulesWorkflowBySidData = {
-    body?: never;
+    body: {
+        name?: string;
+        target?: {
+            coordinatorAgent?: string;
+            brief?: string;
+            details?: string | null;
+        };
+        trigger?: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        enabled?: boolean;
+    };
     path: {
         id: string;
         sid: string;
@@ -1808,7 +1872,11 @@ export type GetApiWorkspacesByIdWorkflowsResponses = {
 export type GetApiWorkspacesByIdWorkflowsResponse = GetApiWorkspacesByIdWorkflowsResponses[keyof GetApiWorkspacesByIdWorkflowsResponses];
 
 export type PostApiWorkspacesByIdWorkflowsData = {
-    body?: never;
+    body: {
+        brief: string;
+        details?: string;
+        coordinatorAgent: string;
+    };
     path: {
         id: string;
     };
@@ -2171,7 +2239,12 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses = {
 export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponse = GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses[keyof GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidCancelData = {
-    body?: never;
+    body: {
+        cancellation: {
+            kind?: 'user';
+            message: string;
+        };
+    };
     path: {
         id: string;
         wfid: string;
@@ -2319,7 +2392,11 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathResponses =
 };
 
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesData = {
-    body?: never;
+    body: {
+        kind: 'coordinator' | 'worker' | 'human';
+        spec: unknown;
+        parents: Array<string>;
+    };
     path: {
         id: string;
         wfid: string;
@@ -2360,7 +2437,10 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesResponses = {
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesResponse = PostApiWorkspacesByIdWorkflowsByWfidNodesResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesResponses];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidEdgesData = {
-    body?: never;
+    body: {
+        fromNodeId: string;
+        toNodeId: string;
+    };
     path: {
         id: string;
         wfid: string;
@@ -2402,7 +2482,26 @@ export type PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses = {
 export type PostApiWorkspacesByIdWorkflowsByWfidEdgesResponse = PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphData = {
-    body?: never;
+    body: {
+        nodes: Array<{
+            tempId: string;
+            kind: 'coordinator' | 'worker' | 'human';
+            spec: unknown;
+            existingParents?: Array<string>;
+        }>;
+        edges: Array<{
+            from: {
+                nodeId: string;
+            } | {
+                tempId: string;
+            };
+            to: {
+                nodeId: string;
+            } | {
+                tempId: string;
+            };
+        }>;
+    };
     path: {
         id: string;
         wfid: string;
@@ -2515,7 +2614,18 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses = {
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponse = PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidFinishData = {
-    body?: never;
+    body: {
+        kind: 'succeeded';
+        success?: {
+            output?: string | null;
+        };
+    } | {
+        kind: 'failed';
+        failure: {
+            kind?: 'coordinator';
+            message: string;
+        };
+    };
     path: {
         id: string;
         wfid: string;
@@ -2620,7 +2730,9 @@ export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses = {
 export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponse = DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses[keyof DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses];
 
 export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData = {
-    body?: never;
+    body: {
+        newSpec: unknown;
+    };
     path: {
         id: string;
         wfid: string;
@@ -2693,7 +2805,10 @@ export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses = {
 export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponse = PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses[keyof PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData = {
-    body?: never;
+    body: {
+        choiceId?: string;
+        input?: string;
+    };
     path: {
         id: string;
         wfid: string;
@@ -2829,7 +2944,9 @@ export type GetApiWorkspacesByIdCatalogSkillsResponses = {
 export type GetApiWorkspacesByIdCatalogSkillsResponse = GetApiWorkspacesByIdCatalogSkillsResponses[keyof GetApiWorkspacesByIdCatalogSkillsResponses];
 
 export type PostApiWorkspacesByIdCatalogSkillsData = {
-    body?: never;
+    body: {
+        origin: string;
+    };
     path: {
         id: string;
     };
@@ -2893,7 +3010,9 @@ export type PostApiWorkspacesByIdCatalogSkillsResponses = {
 export type PostApiWorkspacesByIdCatalogSkillsResponse = PostApiWorkspacesByIdCatalogSkillsResponses[keyof PostApiWorkspacesByIdCatalogSkillsResponses];
 
 export type PostApiWorkspacesByIdCatalogSkillsResolveData = {
-    body?: never;
+    body: {
+        origin: string;
+    };
     path: {
         id: string;
     };
@@ -3241,7 +3360,9 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses];
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncData = {
-    body?: never;
+    body: {
+        planToken: string;
+    };
     path: {
         id: string;
         scope: string;
@@ -3428,7 +3549,9 @@ export type GetApiWorkspacesByIdCatalogAgentsResponses = {
 export type GetApiWorkspacesByIdCatalogAgentsResponse = GetApiWorkspacesByIdCatalogAgentsResponses[keyof GetApiWorkspacesByIdCatalogAgentsResponses];
 
 export type PostApiWorkspacesByIdCatalogAgentsData = {
-    body?: never;
+    body: {
+        origin: string;
+    };
     path: {
         id: string;
     };
@@ -3492,7 +3615,9 @@ export type PostApiWorkspacesByIdCatalogAgentsResponses = {
 export type PostApiWorkspacesByIdCatalogAgentsResponse = PostApiWorkspacesByIdCatalogAgentsResponses[keyof PostApiWorkspacesByIdCatalogAgentsResponses];
 
 export type PostApiWorkspacesByIdCatalogAgentsResolveData = {
-    body?: never;
+    body: {
+        origin: string;
+    };
     path: {
         id: string;
     };
@@ -3844,7 +3969,9 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses];
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncData = {
-    body?: never;
+    body: {
+        planToken: string;
+    };
     path: {
         id: string;
         scope: string;
@@ -4094,7 +4221,9 @@ export type GetApiWorkspacesByIdCatalogMcpsResponses = {
 export type GetApiWorkspacesByIdCatalogMcpsResponse = GetApiWorkspacesByIdCatalogMcpsResponses[keyof GetApiWorkspacesByIdCatalogMcpsResponses];
 
 export type PostApiWorkspacesByIdCatalogMcpsData = {
-    body?: never;
+    body: {
+        origin: string;
+    };
     path: {
         id: string;
     };
@@ -4316,7 +4445,9 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses = 
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses];
 
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncData = {
-    body?: never;
+    body: {
+        planToken: string;
+    };
     path: {
         id: string;
         scope: string;

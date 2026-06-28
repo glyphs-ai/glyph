@@ -30,9 +30,8 @@ afterEach(async () => {
 });
 
 async function ensureWorkspace(name: string): Promise<{ id: string; workspaceDir: string }> {
-  const id = (await import("node:crypto")).randomUUID();
   const workspaceDir = path.join(scratch, name);
-  const result = await service.register({ id, workspaceDir, name });
+  const result = await service.register({ workspaceDir, name });
   return { id: result.id, workspaceDir: path.resolve(workspaceDir) };
 }
 

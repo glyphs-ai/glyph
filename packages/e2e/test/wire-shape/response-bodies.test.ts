@@ -93,7 +93,7 @@ describe.skipIf(!BIN_AVAILABLE).sequential("wire-shape: GET response bodies", ()
     expect(runtimes.map((r) => r.kind)).toContain("copilot");
   });
 
-  it("GET /api/workspaces items match WorkspaceSummary keys", async () => {
+  it("GET /api/workspaces items match Workspace keys", async () => {
     const body = await getJson("/api/workspaces");
     expect(Array.isArray(body)).toBe(true);
     const workspaces = body as Array<Record<string, unknown>>;

@@ -3,19 +3,20 @@ import {
   CatalogFileEntrySchema,
   CatalogInstallResultSchema,
   CatalogSyncResultSchema,
+  InstallSkillRequestSchema,
   OkResponseSchema,
   ResolveManifestSchema,
   SkillEntrySchema,
   SkillSchema,
   SkillWithContentSchema,
+  SyncCatalogRequestSchema,
 } from "@glyphs-ai/api";
 import type { CatalogService } from "@glyphs-ai/catalog";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
-import { createApiApp, errorResponse, jsonResponse } from "../_openapi.js";
+import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_openapi.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import { readInstallSkillRequest, readPlanToken } from "./helpers.js";
 import { mimeFromExt } from "./mime.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
@@ -59,6 +60,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
       path: "/resolve",
       tags: ["catalog"],
       summary: "Preview a skill install",
+      request: { body: jsonRequest(InstallSkillRequestSchema) },
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
         400: errorResponse("Malformed request body"),
@@ -67,10 +69,9 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const parsed = await readInstallSkillRequest(c);
-      if ("error" in parsed) return c.json(parsed, 400);
+      const body = c.req.valid("json");
       try {
-        const plan = await catalog.resolveSkill(parsed.origin);
+        const plan = await catalog.resolveSkill(body.origin);
         return c.json(planToManifest(plan));
       } catch (err) {
         return respondError(c, err, {
@@ -205,6 +206,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
       path: "/",
       tags: ["catalog"],
       summary: "Install a skill from an origin",
+      request: { body: jsonRequest(InstallSkillRequestSchema) },
       responses: {
         201: jsonResponse(CatalogInstallResultSchema, "Install result"),
         400: errorResponse("Malformed request body"),
@@ -213,14 +215,13 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const parsed = await readInstallSkillRequest(c);
-      if ("error" in parsed) return c.json(parsed, 400);
+      const body = c.req.valid("json");
       try {
-        const result = await catalog.installSkill(parsed.origin);
+        const result = await catalog.installSkill(body.origin);
         const status = result.failed.length > 0 ? 207 : 201;
         logEvent(c, "catalog: skill install completed", {
           kind: "skill",
-          origin: parsed.origin,
+          origin: body.origin,
           installed: result.installed.length,
           skipped: result.skipped.length,
           failed: result.failed.length,
@@ -230,7 +231,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
         return respondError(c, err, {
           route: "catalog.skills.install",
           policy: catalogErrorPolicy,
-          meta: { origin: parsed.origin },
+          meta: { origin: body.origin },
         });
       }
     },
@@ -277,7 +278,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
       path: "/{scope}/{name}/sync",
       tags: ["catalog"],
       summary: "Apply a skill sync",
-      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
+      request: {
+        params: z.object({ scope: z.string().min(1), name: z.string().min(1) }),
+        body: jsonRequest(SyncCatalogRequestSchema),
+      },
       responses: {
         200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
@@ -287,9 +291,8 @@ export function skillsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const parsed = await readPlanToken(c);
-      if ("error" in parsed) return c.json(parsed, 400);
-      const plan = catalog.takePlan(parsed.planToken);
+      const body = c.req.valid("json");
+      const plan = catalog.takePlan(body.planToken);
       if (plan === null) {
         // Token unknown / already taken / expired → tell the caller to
         // re-preview. 410 Gone matches the "the resource you referenced

@@ -6,16 +6,17 @@ import {
   CatalogFileEntrySchema,
   CatalogInstallResultSchema,
   CatalogSyncResultSchema,
+  InstallAgentRequestSchema,
   OkResponseSchema,
   ResolveManifestSchema,
+  SyncCatalogRequestSchema,
 } from "@glyphs-ai/api";
 import type { CatalogService } from "@glyphs-ai/catalog";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { catalogErrorPolicy } from "../_error-policies/catalog.js";
-import { createApiApp, errorResponse, jsonResponse } from "../_openapi.js";
+import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_openapi.js";
 import { respondError } from "../_respond-error.js";
 import { logEvent } from "../_shared.js";
-import { readInstallAgentRequest, readPlanToken } from "./helpers.js";
 import { mimeFromExt } from "./mime.js";
 import { planToManifest } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
@@ -57,6 +58,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
       path: "/resolve",
       tags: ["catalog"],
       summary: "Preview an agent install",
+      request: { body: jsonRequest(InstallAgentRequestSchema) },
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
         400: errorResponse("Malformed request body"),
@@ -65,10 +67,9 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const parsed = await readInstallAgentRequest(c);
-      if ("error" in parsed) return c.json(parsed, 400);
+      const body = c.req.valid("json");
       try {
-        const plan = await catalog.resolveAgentFromOrigin(parsed.origin);
+        const plan = await catalog.resolveAgentFromOrigin(body.origin);
         return c.json(planToManifest(plan));
       } catch (err) {
         return respondError(c, err, {
@@ -203,6 +204,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
       path: "/",
       tags: ["catalog"],
       summary: "Install an agent from an origin",
+      request: { body: jsonRequest(InstallAgentRequestSchema) },
       responses: {
         201: jsonResponse(CatalogInstallResultSchema, "Install result"),
         400: errorResponse("Malformed request body"),
@@ -211,14 +213,13 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const parsed = await readInstallAgentRequest(c);
-      if ("error" in parsed) return c.json(parsed, 400);
+      const body = c.req.valid("json");
       try {
-        const result = await catalog.installAgent(parsed.origin);
+        const result = await catalog.installAgent(body.origin);
         const status = result.failed.length > 0 ? 207 : 201;
         logEvent(c, "catalog: agent install completed", {
           kind: "agent",
-          origin: parsed.origin,
+          origin: body.origin,
           installed: result.installed.length,
           skipped: result.skipped.length,
           failed: result.failed.length,
@@ -228,7 +229,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
         return respondError(c, err, {
           route: "catalog.agents.install",
           policy: catalogErrorPolicy,
-          meta: { origin: parsed.origin },
+          meta: { origin: body.origin },
         });
       }
     },
@@ -271,7 +272,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
       path: "/{scope}/{name}/sync",
       tags: ["catalog"],
       summary: "Apply an agent sync",
-      request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
+      request: {
+        params: z.object({ scope: z.string().min(1), name: z.string().min(1) }),
+        body: jsonRequest(SyncCatalogRequestSchema),
+      },
       responses: {
         200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
@@ -281,9 +285,8 @@ export function agentsRoutes(arg: CatalogResolver | CatalogService): OpenAPIHono
     }),
     async (c) => {
       const catalog = getCatalog(c);
-      const parsed = await readPlanToken(c);
-      if ("error" in parsed) return c.json(parsed, 400);
-      const plan = catalog.takePlan(parsed.planToken);
+      const body = c.req.valid("json");
+      const plan = catalog.takePlan(body.planToken);
       if (plan === null) {
         return c.json(
           {

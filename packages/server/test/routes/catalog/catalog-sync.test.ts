@@ -38,9 +38,8 @@ afterEach(async () => {
 });
 
 async function ensureWorkspace(name: string): Promise<{ id: string; workspaceDir: string }> {
-  const id = (await import("node:crypto")).randomUUID();
   const workspaceDir = path.join(scratch, name);
-  const result = await service.register({ id, workspaceDir, name });
+  const result = await service.register({ workspaceDir, name });
   return { id: result.id, workspaceDir: path.resolve(workspaceDir) };
 }
 
@@ -203,6 +202,75 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
     ).json()) as { agent: { disabledByUser: boolean }; status: string };
     expect(entry.agent.disabledByUser).toBe(false);
     expect(entry.status).toBe("ready");
+  });
+
+  it("validates install and sync request bodies with zod schemas", async () => {
+    const ws = await ensureWorkspace("alpha");
+    const app = mountApp();
+
+    const skillInstall = await app.request(`/api/workspaces/${ws.id}/catalog/skills`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ origin: "" }),
+    });
+    expect(skillInstall.status).toBe(400);
+    expect(await skillInstall.json()).toMatchObject({
+      code: "ValidationError",
+      issues: [
+        {
+          path: "origin",
+          message: "origin is required and must be a non-empty string",
+        },
+      ],
+    });
+
+    const agentInstall = await app.request(`/api/workspaces/${ws.id}/catalog/agents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ origin: "", extra: true }),
+    });
+    expect(agentInstall.status).toBe(400);
+    const agentBody = (await agentInstall.json()) as {
+      code: string;
+      issues: { path: string; message: string }[];
+    };
+    expect(agentBody.code).toBe("ValidationError");
+    expect(JSON.stringify(agentBody.issues)).toMatch(
+      /origin is required and must be a non-empty string/,
+    );
+    expect(JSON.stringify(agentBody.issues)).toMatch(/extra|unknown key/i);
+
+    const mcpInstall = await app.request(`/api/workspaces/${ws.id}/catalog/mcps`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ origin: "" }),
+    });
+    expect(mcpInstall.status).toBe(400);
+    expect(await mcpInstall.json()).toMatchObject({
+      code: "ValidationError",
+      issues: [
+        {
+          path: "origin",
+          message: "origin is required and must be a non-empty string",
+        },
+      ],
+    });
+
+    const sync = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool/sync`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ planToken: "" }),
+    });
+    expect(sync.status).toBe(400);
+    expect(await sync.json()).toMatchObject({
+      code: "ValidationError",
+      issues: [
+        {
+          path: "planToken",
+          message: "body must be { planToken: string } from a prior /sync/resolve response",
+        },
+      ],
+    });
   });
 
   it("overview counts include orphaned entries after a dropped-dep sync", async () => {

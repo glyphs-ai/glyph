@@ -72,6 +72,12 @@ interface FlatException {
  * Rule-compliant files and stale subject groupings do not belong here.
  */
 const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
+  // _template
+  {
+    file: "packages/_template/test/application/__entity-kebab__.service.test.ts",
+    rationale:
+      "London-style mocked service test (scaffold exemplar); value-imports span application/ (service) + contract/ (error class for instanceof assertions). Kept in application/ to mirror the layered layout, same as workspace.",
+  },
   // catalog
   {
     file: "packages/catalog/test/agent/agent-service.test.ts",
@@ -201,12 +207,17 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
   {
     file: "packages/server/test/openapi-snapshot.test.ts",
     rationale:
-      "umbrella reflection test that mounts every route group to assemble the OpenAPI document + assert its operation count against the route manifest. Imports happen to share subdir 'routes' but the test is the spec's umbrella, not a route subject — kept flat to mirror its scope (sibling of route-manifest.test.ts).",
+      "umbrella reflection test that mounts every route group to assemble the OpenAPI document. Imports happen to share subdir 'routes' but the test is the spec's umbrella, not a route subject — kept flat to mirror its scope.",
   },
   {
-    file: "packages/server/test/route-manifest.test.ts",
+    file: "packages/server/test/routes/request-validation.test.ts",
     rationale:
-      "umbrella reflection test that mounts every route group + middleware to compare Hono's app.routes against ROUTES. Imports happen to share subdir 'routes' but the test is the manifest's umbrella, not a route subject — kept flat to mirror its scope.",
+      "grouped by area (routes/); workspace route factory now lives in @glyphs-ai/api so zero in-pkg src value-imports remain — rule says flat. Test validates the validation-hook behaviour of the route factory, grouped by transport concern.",
+  },
+  {
+    file: "packages/server/test/workspaces.test.ts",
+    rationale:
+      "workspace route integration test; route factory migrated to @glyphs-ai/api so remaining in-pkg imports are middleware-only — rule says middleware/. Kept flat: subject is the workspace API surface, not the middleware.",
   },
   // terminal
   {
@@ -223,6 +234,12 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
     file: "packages/terminal/test/platforms/windows.test.ts",
     rationale:
       "grouped by platform (platforms/); imports span platforms/ + sibling top-level src/ files — rule says flat. Platform coverage stays grouped by OS.",
+  },
+  // workspace
+  {
+    file: "packages/workspace/test/application/workspace.service.test.ts",
+    rationale:
+      "London-style mocked service test; value-imports span application/ (service) + contract/ (error classes for instanceof assertions). Placed in application/ per §16.2 layered layout.",
   },
 ];
 

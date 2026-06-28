@@ -229,7 +229,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/name/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/name/);
   });
 
   it("POST /task rejects target.kind in body (URL discriminates)", async () => {
@@ -244,7 +246,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/kind/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/kind/);
     expect(svc.create).not.toHaveBeenCalled();
   });
 
@@ -260,7 +264,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/target/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/target/);
   });
 
   it("POST /task with unknown nested target key returns 400", async () => {
@@ -275,7 +281,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/surprise|unknown key/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/surprise|unknown key/);
   });
 
   it("POST /task with unknown top-level body key returns 400", async () => {
@@ -291,7 +299,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/extra|unknown key/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/extra|unknown key/);
   });
 
   it("POST /task with missing target.brief returns 400 (route-layer rejection)", async () => {
@@ -306,7 +316,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/brief/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/brief/);
     expect(svc.create).not.toHaveBeenCalled();
   });
 
@@ -322,7 +334,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/200/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/200/);
   });
 
   it("POST /task with target.brief containing newline returns 400", async () => {
@@ -337,7 +351,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/single line/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/single line/);
   });
 
   it("POST /task with target.brief containing carriage return returns 400", async () => {
@@ -352,7 +368,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/single line/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/single line/);
   });
 
   it("POST /task with target.details set to empty string returns 201 (mirrors @glyphs-ai/task)", async () => {
@@ -383,7 +401,9 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/details/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/details/);
   });
 
   it("POST /task with target.details omitted returns 201", async () => {
@@ -519,7 +539,7 @@ describe("schedulesRoutes — patch", () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/JSON/);
+    expect(body.code).toBe("ValidationError");
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -598,7 +618,9 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ target: { kind: "task", agent: "writer" } }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/kind/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/kind/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -610,7 +632,9 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ target: null }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/target/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/target/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -622,7 +646,9 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ target: { agent: null } }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/agent/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/agent/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -634,7 +660,9 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ target: { brief: null } }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/brief/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/brief/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -646,7 +674,9 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ trigger: null }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/trigger/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/trigger/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -658,7 +688,9 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ trigger: { kind: "cron", expr: "0 9 * * *" } }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/trigger/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/trigger/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -670,7 +702,9 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ target: { surprise: 1 } }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/surprise|unknown key/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/surprise|unknown key/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -682,7 +716,9 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ extra: 1 }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/extra|unknown key/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/extra|unknown key/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -696,7 +732,9 @@ describe("schedulesRoutes — patch", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/200/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/200/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 
@@ -710,7 +748,9 @@ describe("schedulesRoutes — patch", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/single line/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/single line/);
   });
 
   it("PATCH /task/:sid with target.details non-string returns 400", async () => {
@@ -723,7 +763,9 @@ describe("schedulesRoutes — patch", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/details/);
+    const body = await res.json();
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/details/);
     expect(svc.patch).not.toHaveBeenCalled();
   });
 

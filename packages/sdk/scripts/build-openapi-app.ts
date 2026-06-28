@@ -21,6 +21,7 @@
  */
 
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
+import { workspacesRoutes } from "@glyphs-ai/api";
 import type { CatalogService } from "@glyphs-ai/catalog";
 import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
@@ -39,7 +40,6 @@ import { schedulesRoutes } from "../../server/src/routes/schedules.js";
 import { sessionsRoutes } from "../../server/src/routes/sessions.js";
 import { tasksRoutes } from "../../server/src/routes/tasks.js";
 import { workflowsRoutes } from "../../server/src/routes/workflows.js";
-import { workspacesRoutes } from "../../server/src/routes/workspaces.js";
 
 /**
  * Codegen-only identity for the assembled spec — NOT the runtime `info`.

@@ -27,9 +27,8 @@ export async function setupTestSubsystem(opts: {
   );
   const defaultWorkspaceParent = path.join(opts.scratch, "default-workspaces");
   const composition = await composeApplication({
-    workspace: { dbFile: ":memory:" },
+    workspace: { dbFile: ":memory:", defaultWorkspaceParent },
     runtimeRegistry,
-    defaultWorkspaceParent,
     ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
   });
   return {
@@ -55,10 +54,9 @@ export async function teardownTestSubsystem(sys: ServerTestSubsystem): Promise<v
 
 export async function registerTestWorkspace(
   sys: ServerTestSubsystem,
-  args: { readonly id: string; readonly workspaceDir: string; readonly name: string },
+  args: { readonly workspaceDir: string; readonly name: string },
 ): Promise<string> {
   const result = await sys.service.register({
-    id: args.id,
     workspaceDir: args.workspaceDir,
     name: args.name,
   });

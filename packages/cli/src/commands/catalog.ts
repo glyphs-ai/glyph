@@ -7,7 +7,7 @@
  *  - `mcp   {list, show, install, rm, sync-resolve, sync}`
  *
  * Plus `catalog overview` for the per-workspace counts. Each exported
- * function maps 1:1 to a `ROUTES` manifest entry.
+ * function maps 1:1 to a catalog HTTP endpoint.
  *
  * Facade: one cohesive sub-concern per sibling module under `./catalog/`
  * (`overview`, `skill`, `agent`, `mcp`); the shared `--url` / `--file`

@@ -11,7 +11,7 @@ re-state the monorepo-wide conventions. Those live in
 [`docs/pkg-template.md`](../../docs/pkg-template.md) and apply
 verbatim:
 
-- Per-pkg `src/` layout, file naming, `<entity>-<role>.ts` prefix
+- Per-pkg `src/` layout, file naming, `<entity>.<role>.ts` prefix
   rule, where DTOs live → `docs/pkg-template.md` §§ Layout, File
   naming convention, Where DTOs live.
 - Test placement (mirror src; flat-only for cross-cutting) →

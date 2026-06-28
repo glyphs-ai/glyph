@@ -97,18 +97,13 @@ function querySerializer(query: Record<string, unknown>): string {
 }
 
 /**
- * Handle returned by {@link configureClient}: the configured SDK client plus
- * the resolved base URL. `baseUrl` is needed by the SSE path in
- * `commands/task.ts` (raw streaming, which the SDK does not cover); `client`
- * is the typed low-level entry point retained for the body-bearing writes
- * whose request bodies the server validates by hand rather than declaring in
- * its OpenAPI document — the generated typed operations type `body` as
- * `never`, so they cannot carry those payloads (catalog install / resolve /
- * sync, task dispatch, session create / spawn, workflow node + edge
- * mutations, schedule create / edit).
+ * Handle returned by {@link configureClient}: the resolved base URL.
+ * `baseUrl` is needed by the SSE path in `commands/task.ts` (raw
+ * streaming, which the SDK does not cover). The typed SDK operations
+ * use the shared `client` singleton configured by {@link configureClient}
+ * directly — no escape hatch needed.
  */
 export interface SdkClient {
-  readonly client: typeof client;
   readonly baseUrl: string;
 }
 
@@ -132,5 +127,5 @@ export function configureClient(baseUrl: string): SdkClient {
     headers: { Accept: "application/json" },
     querySerializer,
   });
-  return { client, baseUrl: normalized };
+  return { baseUrl: normalized };
 }

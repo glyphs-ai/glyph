@@ -172,8 +172,7 @@ inlined).
 The CLI ships many grouped commands across the resource subtrees
 (workspace, session, task, workflow, catalog, schedule, runtime, plus
 lifecycle and singleton commands) — each wrapping a server route via
-the typed `client.call(...)` helper from
-`packages/api/src/wire/routes.ts` (`workspace list`,
+the generated typed operations from `@glyphs-ai/sdk` (`workspace list`,
 `catalog skill install`, ...). `cac` matches commands by single argv
 tokens, so `cli.command("workspace list", ...)` would register a
 literal `"workspace list"` name that nothing can invoke. Commander

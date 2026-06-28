@@ -15,9 +15,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "import": "./dist/testing.js"
+    "./contract": {
+      "types": "./dist/contract/index.d.ts",
+      "import": "./dist/contract/index.js"
     }
   },
   "files": [
@@ -35,7 +35,7 @@
   "dependencies": {
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
-    "pino": "^9.5.0"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

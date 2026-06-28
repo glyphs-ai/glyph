@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import type { DispatchTaskRequest } from "@glyphs-ai/api";
 import {
+  DispatchTaskRequestSchema,
   TaskActivityQuerySchema,
   TaskActivityResponseSchema,
   TaskListQuerySchema,
@@ -17,17 +17,9 @@ import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { contentTypeFor } from "../util/mime-bucket.js";
 import { streamFileAsResponse } from "../util/stream-file.js";
 import { tasksErrorPolicy } from "./_error-policies/tasks.js";
-import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
+import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "./_openapi.js";
 import { respondError } from "./_respond-error.js";
-import { isJsonObject, logEvent, parseJsonBody, unknownBodyKey } from "./_shared.js";
-
-/**
- * Defensive parse alias for the dispatch body. See `sessions.ts` for
- * the rationale — the manifest type is the wire contract for callers,
- * the *Raw alias keeps runtime guards TS-meaningful.
- */
-type DispatchTaskRequestRaw = { [K in keyof DispatchTaskRequest]?: unknown };
-const TASK_DISPATCH_KEYS = new Set(["agent", "brief", "details", "runtime"]);
+import { logEvent } from "./_shared.js";
 
 const TaskPathSchema = z.object({ tid: z.string() });
 const ArtifactPathSchema = z.object({ tid: z.string(), name: z.string() });
@@ -166,6 +158,7 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): OpenAPIHon
       path: "/",
       tags: ["tasks"],
       summary: "Dispatch a task",
+      request: { body: jsonRequest(DispatchTaskRequestSchema) },
       responses: {
         201: jsonResponse(TaskSchema, "Dispatched task"),
         400: errorResponse("Malformed request body"),
@@ -173,46 +166,13 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): OpenAPIHon
       },
     }),
     async (c) => {
-      const parsed = await parseJsonBody<DispatchTaskRequestRaw>(c);
-      if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-      const body = parsed.body;
-      if (!isJsonObject(body)) return c.json({ error: "request body must be an object" }, 400);
-      const unknown = unknownBodyKey(body, TASK_DISPATCH_KEYS);
-      if (unknown !== undefined) {
-        return c.json({ error: `request body has unknown key "${unknown}"` }, 400);
-      }
-      if (typeof body.agent !== "string" || body.agent.trim() === "") {
-        return c.json({ error: "agent is required (string)" }, 400);
-      }
-      if (typeof body.brief !== "string") {
-        return c.json({ error: "brief is required (string)" }, 400);
-      }
-      const briefTrimmed = body.brief.trim();
-      if (briefTrimmed.length === 0) {
-        return c.json({ error: "brief must be non-empty after trim" }, 400);
-      }
-      if (briefTrimmed.includes("\n") || briefTrimmed.includes("\r")) {
-        // Brief is the displayed label everywhere — task list rows,
-        // detail panel header, CLI table. Multi-line input would
-        // break the layout and tooltips. Keep the single-line
-        // contract enforced at the wire boundary.
-        return c.json({ error: "brief must be a single line (no newline characters)" }, 400);
-      }
-      if (briefTrimmed.length > BRIEF_MAX_LENGTH) {
-        return c.json({ error: `brief must be ${BRIEF_MAX_LENGTH} characters or fewer` }, 400);
-      }
-      if (body.details !== undefined && typeof body.details !== "string") {
-        return c.json({ error: "details, when present, must be a string" }, 400);
-      }
-      if (body.runtime !== undefined && typeof body.runtime !== "string") {
-        return c.json({ error: "runtime, when present, must be a string" }, 400);
-      }
+      const body = c.req.valid("json");
       try {
         const task = await getManager(c).dispatch({
           agent: body.agent,
-          brief: briefTrimmed,
-          ...(typeof body.details === "string" ? { details: body.details } : {}),
-          ...(typeof body.runtime === "string" ? { runtime: body.runtime } : {}),
+          brief: body.brief,
+          ...(body.details !== undefined ? { details: body.details } : {}),
+          ...(body.runtime !== undefined ? { runtime: body.runtime } : {}),
         });
         logEvent(c, "task dispatched", {
           taskId: task.id,
@@ -667,12 +627,3 @@ export function tasksRoutes(resolveTaskService: TaskServiceResolver): OpenAPIHon
 const TASK_ACTIVITY_DEFAULT_LIMIT = 50;
 /** Hard maximum `limit` accepted from callers. Defends the dashboard / MCP from blowing memory. */
 const TASK_ACTIVITY_MAX_LIMIT = 500;
-
-/**
- * Maximum length of `brief` accepted from clients. Surfaced from the
- * dispatch route as a 400 when exceeded. Sized to fit a single line in
- * the dashboard list (~2 lines wrapped on a 360px column at the
- * default font size); also bounds the SQLite column width and the
- * displayed task title across CLI / dashboard tools.
- */
-const BRIEF_MAX_LENGTH = 200;

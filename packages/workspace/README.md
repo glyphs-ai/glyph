@@ -20,28 +20,37 @@ timestamp; there is no per-workspace metadata sidecar file.
 
 ```
 packages/workspace/src/
-  schema.ts                  Drizzle table def (private; only types exported)
-  errors.ts                  Domain error classes (exported)
-  types.ts                   Public DTOs (Workspace) (exported)
-  validate.ts                Input schemas + assertValid* helpers
-  workspace-repository.ts    Drizzle CRUD (private; never exported)
-  workspace-entity.ts        WorkspaceEntity (private; service projects to DTO)
-  workspace-service.ts       WorkspaceService — register/open/rename/unregister + reads
-  layout.ts                  Pure path helpers (workspaceLayout, globalDbPath, ...)
-  migrations.ts              applyWorkspaceMigrations (drizzle migration applier)
-  compose.ts                 composeWorkspaceModule({ dbFile, logger? })
-  index.ts                   public barrel
-drizzle/                     generated SQL migrations (committed)
-drizzle.config.ts            drizzle-kit config
+  persistence/
+    tables.ts                  Drizzle table def (private; only types exported)
+    workspace.db.ts            openDb() factory + Db handle type
+    migrations.ts              applyWorkspaceMigrations (drizzle migration applier)
+    workspace.layout.ts        buildWorkspaceLayout() — conventional sub-path layout
+    workspace.repository.ts    Drizzle CRUD (private; never exported)
+  domain/
+    workspace.entity.ts        WorkspaceEntity (pkg-owned domain shape; private)
+  application/
+    workspace.service.ts       WorkspaceService + projectWorkspace (Entity → wire DTO)
+  contract/
+    workspace.errors.ts        Public error classes (exported via ./contract)
+    workspace.schemas.ts       Zod wire schemas + reusable scalar schemas
+    workspace.types.ts         Inferred wire DTO + request/response types
+    index.ts                   Public ./contract barrel
+  workspace.compose.ts         composeWorkspaceModule({ dbFile, defaultWorkspaceParent, logger? })
+  index.ts                     Public . barrel (service + compose only)
+drizzle/                       generated SQL migrations (committed)
+drizzle.config.ts              drizzle-kit config
 ```
 
 ## Public API
 
+The `.` entrypoint exports only the service class and the composition surface:
+
 ```ts
-import { composeWorkspaceModule, WorkspaceService } from "@glyphs-ai/workspace";
+import { composeWorkspaceModule, type WorkspaceService } from "@glyphs-ai/workspace";
 
 const { service, close } = await composeWorkspaceModule({
   dbFile: "/abs/path/to/global.db",
+  defaultWorkspaceParent: "/abs/path/to/$GLYPH_HOME/workspaces",
 });
 
 // Reads
@@ -51,12 +60,26 @@ await service.getLastOpened();                  // Workspace | null
 await service.getLastOpenedId();                // string | null
 
 // Writes
-await service.register({ id, workspaceDir, name });
+await service.register({ name, workspaceDir });  // workspaceDir optional; the id is minted
 await service.open(id);
-await service.rename(id, { newName });
+await service.rename(id, { name });
 await service.unregister(id, { purge: false });
 
 await close();                                  // closes the SQLite handle
+```
+
+Errors, DTOs, and wire schemas are reached via the `./contract` subpath:
+
+```ts
+import {
+  WorkspaceError,
+  WorkspaceNotRegisteredError,
+  type Workspace,
+  type RegisterWorkspaceRequest,
+  WorkspaceSchema,
+  WorkspaceIdSchema,
+  WorkspaceNameSchema,
+} from "@glyphs-ai/workspace/contract";
 ```
 
 The service owns reads + writes. There is no separate `Queries`
@@ -93,25 +116,27 @@ Per-workspace metadata (`name`, `createdAt`) lives in the same
 
 ## Errors
 
+All error classes live in `contract/workspace.errors.ts` and are exported via
+the `./contract` subpath:
+
 ```
-WorkspaceError
-├── InputValidationError               400 — register() opts failed the zod schema
-├── WorkspaceNameInvalidError          400 — name failed validation
+WorkspaceError                          (base — `instanceof` catch-all)
 └── RegistryError                      500 — registry-level failure (base)
-    ├── WorkspaceIdInvalidError        400 — id is not a valid UUID
-    ├── WorkspacePathInvalidError      400 — workspaceDir empty / relative / non-string
     ├── WorkspaceNotRegisteredError    404 — id has no entry in the registry
-    ├── WorkspaceIdConflictError       409 — register({id}) collision
+    ├── WorkspaceIdConflictError       409 — workspace id (primary key) collision
     └── WorkspacePathConflictError     409 — workspaceDir already registered
 ```
 
-A single `catch (e) { if (e instanceof WorkspaceError) … }` block
-catches all workspace-package failures, including input-validation
-errors from the zod shape check.
+These are **precondition / conflict** errors. Input *format* validation
+(id grammar, name rules, absolute-path) is NOT a typed error: the
+service parses its inputs with the zod schemas in `contract/workspace.schemas.ts`,
+so a malformed id / name / workspaceDir raises a `ZodError`, which the
+api layer maps to a 400 `ValidationError` envelope.
 
-`get(id)` throws `WorkspaceIdInvalidError` for malformed ids and
-returns `null` only for valid-but-unknown ids. All methods validate
-their id parameter consistently.
+A single `catch (e) { if (e instanceof WorkspaceError) … }` block
+catches all workspace-package precondition failures. `get(id)` raises a
+`ZodError` for a malformed id and returns `null` only for a
+valid-but-unknown id.
 
 Concurrency: `register`'s pre-flight conflict checks are best-effort
 UX. Two concurrent registers can race past them; the UNIQUE / PRIMARY
@@ -121,33 +146,14 @@ errors back into typed domain errors.
 
 ## Layout helper
 
-`workspaceLayout()` returns `sessions/`, `tasks/`, and `workflows`.
-This T0 package actively manages only `sessions/` and `tasks/`:
-`register` creates them and `unregister({ purge: true })` removes
-them. The `workflows` path belongs to the T1 `@glyphs-ai/workflow`
-package.
+`buildWorkspaceLayout()` (in `persistence/workspace.layout.ts`, internal to the package) returns `sessions/`,
+`tasks/`, and `workflows/`. This T0 package actively manages only
+`sessions/` and `tasks/`: `register` creates them and
+`unregister({ purge: true })` removes them. The `workflows` path
+belongs to the T1 `@glyphs-ai/workflow` package.
 
-```ts
-import { workspaceLayout, globalDbPath, workspacesParentDir } from "@glyphs-ai/workspace";
-
-workspaceLayout("/abs/workspace-dir");
-// {
-//   sessions: "/abs/workspace-dir/sessions",
-//   tasks:     "/abs/workspace-dir/tasks",
-//   workflows: "/abs/workspace-dir/workflows", // T1 workflow owns this directory
-// }
-
-globalDbPath("/abs/home");        // "/abs/home/global.db"
-workspacesParentDir("/abs/home"); // "/abs/home/workspaces"
-```
-
-All pure functions; no fs side effects. `workspaceLayout` is used by
-this package's `WorkspaceService` for the `sessions/` and `tasks/`
-filesystem work in `register` and `unregister({ purge: true })`. T1
-workflow code owns `workflows/` through its own `workflowRoot()` helper.
-`globalDbPath` and `workspacesParentDir` are consumed by
-`@glyphs-ai/server` to locate the global DB and the auto-allocation
-parent for new workspaces.
+`globalDbPath()` and `workspacesParentDir()` live in
+`@glyphs-ai/server` (`packages/server/src/glyph-home.ts`).
 
 ## Testing
 
@@ -155,7 +161,7 @@ parent for new workspaces.
 pnpm --filter @glyphs-ai/workspace test
 ```
 
-Tests run against `dbFile: ":memory:"` opened via the same
-`composeWorkspaceModule` so the schema goes through the real
-migrator. Vitest runs in `forks` pool (better-sqlite3's native
-binding segfaults on worker-thread teardown on Windows).
+Repository tests open `dbFile: ":memory:"` via `openDb` so the schema
+goes through the real migrator; service tests mock the repository.
+Vitest runs in `forks` pool (better-sqlite3's native binding segfaults
+on worker-thread teardown on Windows).

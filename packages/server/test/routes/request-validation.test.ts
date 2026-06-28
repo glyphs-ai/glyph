@@ -11,8 +11,8 @@
  */
 
 import type { Application } from "@glyphs-ai/api";
+import { workspacesRoutes } from "@glyphs-ai/api";
 import { describe, expect, it } from "vitest";
-import { workspacesRoutes } from "../../src/routes/workspaces.js";
 
 /**
  * Construction-time stub: `workspacesRoutes` destructures
