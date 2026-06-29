@@ -27,7 +27,7 @@ const PKGS = [
     dir: "workspace",
     entity: "Workspace",
     tableSuffix: "workspace",
-    migrationsFile: "src/persistence/migrations.ts",
+    migrationsFile: "src/infrastructure/drizzle/workspace-migrations.ts",
   },
   { dir: "session", entity: "Session", tableSuffix: "session" },
   { dir: "task", entity: "Task", tableSuffix: "task" },

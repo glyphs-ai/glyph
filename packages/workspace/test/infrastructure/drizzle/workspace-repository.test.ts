@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { WorkspaceEntity } from "../../../src/domain/workspace-entity.js";
 import type { WorkspaceId } from "../../../src/domain/workspace-id.js";
 import type { WorkspaceName } from "../../../src/domain/workspace-name.js";
-import { openDb } from "../../../src/infrastructure/drizzle/db.js";
+import { openDb } from "../../../src/infrastructure/drizzle/workspace-db.js";
 import { DrizzleWorkspaceRepository } from "../../../src/infrastructure/drizzle/workspace-repository.js";
 
 function setupRepo(): DrizzleWorkspaceRepository {

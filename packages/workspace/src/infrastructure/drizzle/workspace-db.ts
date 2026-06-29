@@ -1,6 +1,6 @@
 import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
 import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
-import { applyWorkspaceMigrations } from "./migrations.js";
+import { applyWorkspaceMigrations } from "./workspace-migrations.js";
 import * as schema from "./workspace-schema.js";
 
 /** The pkg's drizzle DB handle, parameterized by the workspace tables. */

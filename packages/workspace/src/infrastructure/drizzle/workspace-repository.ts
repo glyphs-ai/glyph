@@ -9,7 +9,7 @@ import type {
   WorkspacePathConflict,
   WorkspaceRepository,
 } from "../../domain/workspace-repository.js";
-import type { Db } from "./db.js";
+import type { Db } from "./workspace-db.js";
 import { WorkspaceMapper } from "./workspace-mapper.js";
 import { workspaces } from "./workspace-schema.js";
 

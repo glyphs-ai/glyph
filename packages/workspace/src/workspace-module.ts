@@ -8,7 +8,7 @@ import { OpenWorkspaceUseCase } from "./application/open-workspace.js";
 import { RegisterWorkspaceUseCase } from "./application/register-workspace.js";
 import { RenameWorkspaceUseCase } from "./application/rename-workspace.js";
 import { UnregisterWorkspaceUseCase } from "./application/unregister-workspace.js";
-import { openDb } from "./infrastructure/drizzle/db.js";
+import { openDb } from "./infrastructure/drizzle/workspace-db.js";
 import { DrizzleWorkspaceRepository } from "./infrastructure/drizzle/workspace-repository.js";
 import { LocalWorkspaceProvisioner } from "./infrastructure/file/local-workspace-provisioner.js";
 
