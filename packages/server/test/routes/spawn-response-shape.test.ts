@@ -23,7 +23,7 @@
  */
 
 import type { WorkspaceContext } from "@glyphs-ai/api";
-import type { CatalogService } from "@glyphs-ai/catalog";
+import type { CatalogModule } from "@glyphs-ai/catalog";
 import {
   type LaunchCommand,
   type Session,
@@ -113,7 +113,7 @@ function buildContext(service: SessionService): WorkspaceContext {
   // interactive session" call site.
   const ctx: Partial<WorkspaceContext> = {
     sessions: service,
-    catalog: {} as CatalogService,
+    catalog: {} as CatalogModule,
     tasks: {} as TaskService,
   };
   return ctx as WorkspaceContext;

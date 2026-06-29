@@ -1,23 +1,7 @@
 /**
- * @glyphs-ai/workspace — workspace registry on Drizzle.
- *
- * A *workspace* is the user-chosen working directory that holds
- * glyph's per-workspace state. Each workspace is identified by an
- * opaque UUID `id` (the URL routing key) and lives at an absolute
- * filesystem `workspaceDir`. Display name + metadata live in the
- * global registry row (`global.db`).
- *
- * Architecture: composition root → `composeWorkspaceModule` returns a
- * {@link WorkspaceModule}, a typed container of use-case instances.
- * Consumers (HTTP routes, CLI, MCP) call
- * `module.<useCase>.execute(request)` directly.
- *
- * Layering invariant: this file imports ONLY from
- * `./application/*` and the package-root composition module. Domain
- * adapters and the persistence layer stay internal — `workspace-public`
- * is the application-layer barrel that re-exports the small set of
- * domain symbols (value objects, error DUs) that flow across the
- * package boundary.
+ * Workspace registry package. The public surface is use-case schemas,
+ * use-case result types, shared value objects/errors, and the
+ * `composeWorkspaceModule` composition root.
  */
 
 export {
@@ -56,10 +40,7 @@ export {
   OpenWorkspaceResponseSchema,
 } from "./application/open-workspace.js";
 // ─── Per-use-case wire contracts ─────────────────────────────────
-// Schemas drive OpenAPI generation in @glyphs-ai/api; types align
-// CLI / dashboard call sites. Use-case CLASSES and DEPS interfaces
-// stay private — the module owns instantiation, callers consume
-// instances through the module.
+// Schemas drive OpenAPI generation; use-case classes stay private.
 export {
   type RegisterWorkspaceError,
   type RegisterWorkspaceRequest,

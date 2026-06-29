@@ -1463,6 +1463,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Deleted",
           },
+          "409": {
+            "description": "Agent still has dependents",
+          },
           "500": {
             "description": "Internal error",
           },
@@ -3295,6 +3298,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Deleted",
           },
+          "409": {
+            "description": "MCP still has dependents",
+          },
           "500": {
             "description": "Internal error",
           },
@@ -5003,6 +5009,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Deleted",
+          },
+          "409": {
+            "description": "Skill still has dependents",
           },
           "500": {
             "description": "Internal error",

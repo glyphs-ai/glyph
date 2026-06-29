@@ -46,7 +46,7 @@ describe("LocalWorkspaceProvisioner.provision", () => {
 
   it("returns ProvisioningFailed when mkdir cannot succeed (file at the target path)", async () => {
     const wsDir = path.join(scratch, "ws-c");
-    // Block the path: a regular file where the dir would go.
+    // A regular file blocks creation of the workspace directory.
     await writeFile(wsDir, "block");
     const res = await provisioner.provision(wsDir);
     expect(res.isErr()).toBe(true);
@@ -60,7 +60,7 @@ describe("LocalWorkspaceProvisioner.teardown", () => {
   it("removes sessions/, tasks/, and workflows/ (leaves workspaceDir in place)", async () => {
     const wsDir = path.join(scratch, "ws-t1");
     await provisioner.provision(wsDir);
-    // Seed a file in each subdir so the rm is non-trivial.
+    // Each managed subdirectory contains a file before teardown.
     for (const sub of ["sessions", "tasks", "workflows"]) {
       await writeFile(path.join(wsDir, sub, "x.txt"), "x");
     }
@@ -71,8 +71,7 @@ describe("LocalWorkspaceProvisioner.teardown", () => {
     for (const sub of ["sessions", "tasks", "workflows"]) {
       expect(existsSync(path.join(wsDir, sub))).toBe(false);
     }
-    // workspaceDir itself preserved — operator may have stashed unrelated
-    // files there.
+    // Teardown removes managed subdirectories, not the workspace root.
     expect(existsSync(wsDir)).toBe(true);
   });
 
@@ -89,7 +88,7 @@ describe("LocalWorkspaceProvisioner.teardown", () => {
   it("is idempotent on a never-provisioned workspaceDir (rm force=true)", async () => {
     const wsDir = path.join(scratch, "ws-t3");
     await mkdir(wsDir, { recursive: true });
-    // No sessions/, tasks/, workflows/ exist.
+    // Managed subdirectories do not exist before teardown.
     const res = await provisioner.teardown(wsDir);
     expect(res.isOk()).toBe(true);
   });

@@ -8,7 +8,7 @@ process.env.UV_THREADPOOL_SIZE ??= "16";
 import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import path, { sep as pathSep } from "node:path";
-import { composeApplication, workspacesRoutes } from "@glyphs-ai/api";
+import { catalogRoutes, composeApplication, workspacesRoutes } from "@glyphs-ai/api";
 import {
   assertCopilotSdkResolvable,
   CopilotRuntime,
@@ -27,7 +27,6 @@ import { requestId } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { type WorkspaceVars, workspaceContextMiddleware } from "./middleware/workspace-context.js";
 import { createApiApp, registerOpenApiDoc } from "./routes/_openapi.js";
-import { catalogRoutes } from "./routes/catalog/index.js";
 import { configRoutes } from "./routes/config.js";
 import { healthRoutes } from "./routes/health.js";
 import { runtimesRoutes } from "./routes/runtimes.js";

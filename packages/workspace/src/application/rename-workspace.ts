@@ -27,15 +27,7 @@ export interface RenameWorkspaceDeps {
 
 const silentLogger: Logger = pino({ level: "silent" });
 
-/**
- * Update a workspace's display name.
- *
- * The state transition lives on the entity (`entity.rename`); the
- * no-op semantics for "same name" are absorbed inside that method.
- * The use-case unconditionally calls `repo.save` afterwards — the
- * possible redundant write trades one cheap UPDATE for an
- * unambiguous load → mutate → persist orchestration.
- */
+/** Update a workspace's display name. */
 export class RenameWorkspaceUseCase
   implements UseCase<RenameWorkspaceRequest, RenameWorkspaceResponse, RenameWorkspaceError>
 {

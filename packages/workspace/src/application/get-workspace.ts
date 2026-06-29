@@ -28,13 +28,7 @@ export interface GetWorkspaceDeps {
 
 const silentLogger: Logger = pino({ level: "silent" });
 
-/**
- * Look up a workspace by id. Returns `null` when not registered (the
- * route layer maps to 404); only tech failures surface in the `Err`
- * channel. "Not registered" is not modelled as an error here because
- * read paths (peek, middleware probes) want a non-throwing 3-way
- * distinction — found, absent, or broken DB.
- */
+/** Look up a workspace by id; absent rows return `null`. */
 export class GetWorkspaceUseCase
   implements UseCase<GetWorkspaceRequest, GetWorkspaceResponse, GetWorkspaceError>
 {

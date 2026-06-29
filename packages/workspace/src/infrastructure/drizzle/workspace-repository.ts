@@ -4,7 +4,6 @@ import type { WorkspaceEntity } from "../../domain/workspace-entity.js";
 import type { WorkspaceId } from "../../domain/workspace-id.js";
 import type {
   DatabaseUnavailable,
-  InsertWorkspaceError,
   WorkspaceIdConflict,
   WorkspacePathConflict,
   WorkspaceRepository,
@@ -13,27 +12,7 @@ import type { Db } from "./workspace-db.js";
 import { WorkspaceMapper } from "./workspace-mapper.js";
 import { workspaces } from "./workspace-schema.js";
 
-/**
- * Drizzle-backed adapter for {@link WorkspaceRepository}. Sync at the
- * SQLite layer (better-sqlite3 driver); each method wraps a sync call
- * in `ResultAsync` (via an inline async IIFE so sync throws surface as
- * promise rejections that `ResultAsync.fromPromise` can route into the
- * `Err` channel) so the application composes with `andThen` / `match`
- * chains without ad-hoc try/catch.
- *
- * Adapter boundary: public methods speak the domain `WorkspaceEntity`;
- * the row ↔ entity translation is delegated to
- * {@link WorkspaceMapper} so this file stays pure persistence
- * orchestration. The Drizzle row/insert types never cross this
- * boundary.
- *
- * Error translation: this adapter is the only place in the package
- * allowed to inspect SQLite error codes. Driver failures translate to
- * `DatabaseUnavailable`; constraint violations on `insert` translate
- * to the specific business errors `WorkspaceIdConflict` and
- * `WorkspacePathConflict` so the application matches on a closed
- * union instead of poking at SQL state.
- */
+/** Drizzle-backed adapter for {@link WorkspaceRepository}. */
 export class DrizzleWorkspaceRepository implements WorkspaceRepository {
   private readonly db: Db;
 
@@ -102,7 +81,9 @@ export class DrizzleWorkspaceRepository implements WorkspaceRepository {
     ).map((row) => row?.id as WorkspaceId | undefined);
   }
 
-  insert(entity: WorkspaceEntity): ResultAsync<void, InsertWorkspaceError> {
+  insert(
+    entity: WorkspaceEntity,
+  ): ResultAsync<void, DatabaseUnavailable | WorkspaceIdConflict | WorkspacePathConflict> {
     return ResultAsync.fromPromise(
       (async () => {
         this.db.insert(workspaces).values(WorkspaceMapper.toRow(entity)).run();
@@ -134,15 +115,14 @@ export class DrizzleWorkspaceRepository implements WorkspaceRepository {
   }
 
   /**
-   * Translate SQLite UNIQUE / PRIMARY KEY constraint violations into
-   * typed domain errors. The pre-flight `findByPath` check in
-   * `register` is best-effort UX; this backstop is deterministic and
-   * race-free. The `existingId` for a path conflict is looked up via
-   * a sync `select` — if no row matches (rare; the conflict was
-   * triggered by a concurrent delete), a sentinel `"<unknown>"` is
-   * used so the original conflict is still surfaced.
+   * Translate SQLite constraint violations into typed domain errors.
+   * Pre-flight path checks are best-effort UX; constraints are the
+   * race-free backstop.
    */
-  private translateInsertError(cause: unknown, entity: WorkspaceEntity): InsertWorkspaceError {
+  private translateInsertError(
+    cause: unknown,
+    entity: WorkspaceEntity,
+  ): DatabaseUnavailable | WorkspaceIdConflict | WorkspacePathConflict {
     const e = cause as { code?: string; message?: string };
     if (typeof e.code === "string" && e.code.startsWith("SQLITE_CONSTRAINT")) {
       const msg = e.message ?? "";
@@ -151,11 +131,7 @@ export class DrizzleWorkspaceRepository implements WorkspaceRepository {
         return err;
       }
       if (msg.includes("workspaces.workspace_dir")) {
-        // Best-effort lookup of the colliding workspace's id. The
-        // conflict surfaces with `existingId: undefined` if the
-        // lookup itself fails — rare; the row clearly exists since
-        // the constraint just triggered on it, but a concurrent
-        // delete could remove it before this read lands.
+        // Best-effort lookup of the colliding workspace id.
         let existingId: WorkspaceId | undefined;
         try {
           const existing = this.db

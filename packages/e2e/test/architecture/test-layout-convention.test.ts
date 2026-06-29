@@ -72,15 +72,6 @@ interface FlatException {
  * Rule-compliant files and stale subject groupings do not belong here.
  */
 const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
-  // _template
-  {
-    file: "packages/_template/test/application/__entity-kebab__.service.test.ts",
-    rationale:
-      "London-style mocked service test (scaffold exemplar); value-imports span application/ (service) + contract/ (error class for instanceof assertions). Kept in application/ to mirror the layered layout, same as workspace.",
-  },
-  // catalog
-  // cli
-  // dashboard
   {
     file: "packages/dashboard/test/hooks/useWorkflowArtifacts.test.ts",
     rationale:
@@ -347,19 +338,32 @@ function classifyTest(absPath: string): ClassifiedTest {
     inPkgSrcSubdirs.push(srcSubdirOf(resolved, pkg));
   }
 
+  // Domain demotion: `src/domain/` holds the package's foundational
+  // entities / value objects, which ANY layer's test legitimately
+  // constructs as input data (a use-case test builds entities to stub its
+  // mocked ports; a repository test builds entities to round-trip). Such
+  // imports must NOT drag a test toward `flat` — a test is located by its
+  // highest-layer (non-domain) subject. Domain imports locate a test only
+  // when they are ALL it imports (a domain unit test → `test/domain/`).
+  const isDomainSubdir = (s: string): boolean => s === "domain" || s.startsWith("domain/");
+  const nonDomain = inPkgSrcSubdirs.filter((s) => !isDomainSubdir(s));
+  const locating = nonDomain.length > 0 ? nonDomain : inPkgSrcSubdirs;
+  const demoted = nonDomain.length > 0 && nonDomain.length < inPkgSrcSubdirs.length;
+
   let requiredLocation: "flat" | string;
   let reason: string;
-  if (inPkgSrcSubdirs.length === 0) {
+  if (locating.length === 0) {
     requiredLocation = "flat";
     reason = "zero in-pkg src value-imports";
   } else {
-    const lcp = longestCommonDir(inPkgSrcSubdirs);
+    const lcp = longestCommonDir(locating);
+    const suffix = demoted ? " (domain imports demoted — foundational, not locating)" : "";
     if (lcp.length === 0) {
       requiredLocation = "flat";
-      reason = "in-pkg src value-imports share no common subdir below src/";
+      reason = `in-pkg src value-imports share no common subdir below src/${suffix}`;
     } else {
       requiredLocation = lcp;
-      reason = `every in-pkg src value-import shares subdir "${lcp}"`;
+      reason = `every locating value-import shares subdir "${lcp}"${suffix}`;
     }
   }
 
@@ -375,6 +379,11 @@ function classifyTest(absPath: string): ClassifiedTest {
 
 function findAllTests(): readonly string[] {
   const out: string[] = [];
+  // `test/` holds only hand-authored specs, never the generated
+  // `drizzle/*.sql` migrations the default skip set targets — so walking
+  // with the default would wrongly hide a real spec subdir
+  // (`test/infrastructure/drizzle/`). Skip only vendored / build output.
+  const testSkipDirs: ReadonlySet<string> = new Set(["node_modules", "dist"]);
   // Walk each package's test/ dir.
   const pkgs = readdirSync(PACKAGES_DIR, { withFileTypes: true, encoding: "utf8" });
   for (const pkg of pkgs) {
@@ -387,7 +396,7 @@ function findAllTests(): readonly string[] {
       continue;
     }
     if (!s.isDirectory()) continue;
-    for (const absFile of walkFiles(testRoot, { match: isTestFile })) {
+    for (const absFile of walkFiles(testRoot, { match: isTestFile, skipDirs: testSkipDirs })) {
       out.push(absFile);
     }
   }

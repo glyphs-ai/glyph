@@ -15,12 +15,7 @@ import type {
 } from "../domain/workspace-repository.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-/**
- * Request body for `RegisterWorkspaceUseCase`. `name` is required;
- * `workspaceDir` is optional — when omitted the use-case mints
- * `<defaultWorkspaceParent>/<uuid>/`. `id` is server-minted inside
- * the use-case, never supplied by the caller (hence `.strict()`).
- */
+/** Request body for creating a workspace; ids are minted internally. */
 export const RegisterWorkspaceRequestSchema = z
   .object({
     name: WorkspaceNameSchema,
@@ -50,12 +45,7 @@ export type RegisterWorkspaceError =
 export interface RegisterWorkspaceDeps {
   readonly repo: WorkspaceRepository;
   readonly provisioner: WorkspaceProvisioner;
-  /**
-   * Absolute directory under which `register({ workspaceDir: undefined })`
-   * mints `<defaultWorkspaceParent>/<uuid>/`. Injected by the host so
-   * the package owns the directory-layout convention while the host
-   * owns the root location (`$GLYPH_HOME`).
-   */
+  /** Parent directory for auto-created workspace directories. */
   readonly defaultWorkspaceParent: string;
   readonly logger?: Logger;
 }
@@ -63,17 +53,9 @@ export interface RegisterWorkspaceDeps {
 const silentLogger: Logger = pino({ level: "silent" });
 
 /**
- * Mint a fresh workspace and persist it.
- *
- * Order: pre-flight `findByPath` (best-effort UX) → `provision` (FS
- * side-effect, idempotent) → `insert` (DB write; SQLite constraint
- * violations translate to `WorkspaceIdConflict` /
- * `WorkspacePathConflict` at the adapter boundary so the result
- * surfaces deterministically even when the pre-flight races).
- *
- * Provision-before-insert means a crash mid-register leaves an empty
- * skeleton instead of a registry row pointing at a non-existent
- * directory; retries are idempotent.
+ * Create the workspace skeleton, then insert the registry row.
+ * Pre-flight path checks improve UX; SQLite constraints remain the
+ * race-free conflict backstop.
  */
 export class RegisterWorkspaceUseCase
   implements UseCase<RegisterWorkspaceRequest, RegisterWorkspaceResponse, RegisterWorkspaceError>
@@ -87,11 +69,7 @@ export class RegisterWorkspaceUseCase
     request: RegisterWorkspaceRequest,
   ): UseCaseResult<RegisterWorkspaceResponse, RegisterWorkspaceError> {
     const parsed = RegisterWorkspaceRequestSchema.parse(request);
-    // Cast at the mint boundary: `randomUUID()` produces a string we
-    // know to be a valid UUID, so it satisfies the `WorkspaceId`
-    // brand by construction — re-parsing through the schema would be
-    // wasted work. This is the only place in the package allowed to
-    // mint a `WorkspaceId` without going through schema parse.
+    // Cast at the mint boundary: `randomUUID()` satisfies the UUID brand.
     const id = randomUUID() as WorkspaceId;
     const workspaceDir =
       parsed.workspaceDir === undefined
@@ -123,13 +101,12 @@ export class RegisterWorkspaceUseCase
       })
       .map((entity): RegisterWorkspaceResponse => {
         this.logger.debug({ useCase: "registerWorkspace", id: entity.id }, "executed");
-        // lastOpenedAt is non-null here — `create` seeds it to `now`.
         return {
           id: entity.id,
           name: entity.name,
           workspaceDir: entity.workspaceDir,
           createdAt: entity.createdAt,
-          // biome-ignore lint/style/noNonNullAssertion: create() seeds lastOpenedAt to now.
+          // lastOpenedAt is non-null after create() seeds it to now.
           lastOpenedAt: entity.lastOpenedAt!,
         };
       })

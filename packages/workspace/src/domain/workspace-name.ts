@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-/**
- * Display name for a workspace. Non-empty after trim, ≤ 64 chars, no
- * ASCII control characters. Branded so a raw string can't be passed
- * where a validated name is required (see `workspace-id.ts` for the
- * brand-naming convention).
- */
+/** Validated workspace display name: non-empty, <= 64 chars, no controls. */
 export const WorkspaceNameSchema = z
   .string()
   .refine((s) => s.trim().length > 0, "must be non-empty after trim")

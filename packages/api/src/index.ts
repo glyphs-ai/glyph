@@ -20,6 +20,7 @@
  * rationale.
  */
 
+export { catalogErrorPolicy } from "./_error-policies/catalog.js";
 export {
   type ErrorPolicy,
   errorBody,
@@ -42,6 +43,7 @@ export {
 } from "./application.js";
 // Route factories — each returns an OpenAPIHono sub-app mountable by
 // the server's transport layer.
+export { type CatalogResolver, catalogRoutes } from "./routes/catalog/index.js";
 export { workspacesRoutes } from "./routes/workspaces.js";
 // Transport-agnostic zod schemas mirroring every wire contract. The
 // OpenAPI projection in `@glyphs-ai/server` consumes these; other

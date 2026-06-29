@@ -1,7 +1,10 @@
-import type { CatalogService } from "@glyphs-ai/catalog";
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type { TaskTargetData, TaskTargetPatch } from "../wire/index.js";
+
+interface CatalogAgentLookup {
+  getAgent(fqn: string): Promise<unknown | null>;
+}
 
 /**
  * Sole module knowing about all of `@glyphs-ai/schedule`,
@@ -30,7 +33,7 @@ import type { TaskTargetData, TaskTargetPatch } from "../wire/index.js";
  */
 export function makeTaskKindHandler(opts: {
   readonly tasks: TaskService;
-  readonly catalog: CatalogService;
+  readonly catalog: CatalogAgentLookup;
 }): ScheduleKindHandler {
   const tasks = opts.tasks;
   const catalog = opts.catalog;

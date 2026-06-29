@@ -63,7 +63,6 @@
  *   `onTerminal({status: 'failed', reason: 'tasks.get exhausted: ...'})`.
  */
 
-import type { CatalogService } from "@glyphs-ai/catalog";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type {
   WorkflowNodeRunner,
@@ -74,6 +73,14 @@ import pino, { type Logger } from "pino";
 import type { WorkflowWorkerNodeSpec } from "../wire/index.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
+
+interface CatalogAgent {
+  readonly dependencies?: { readonly agents?: readonly { readonly fqn: string }[] };
+}
+
+interface CatalogAgentLookup {
+  getAgent(fqn: string): Promise<CatalogAgent | null>;
+}
 
 /** Default poll cadence for `tasks.get(taskId)` in the worker runner. */
 export const DEFAULT_WORKER_POLL_INTERVAL_MS = 2000;
@@ -118,7 +125,7 @@ export class WorkflowWorkerNotInCoordMenuError extends Error {
 
 export interface MakeWorkerNodeRunnerOpts {
   readonly tasks: TaskService;
-  readonly catalog: CatalogService;
+  readonly catalog: CatalogAgentLookup;
   readonly logger?: Logger;
   /**
    * Override the default `tasks.get(...)` poll cadence. Tests pass

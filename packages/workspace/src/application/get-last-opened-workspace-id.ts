@@ -23,12 +23,7 @@ export interface GetLastOpenedWorkspaceIdDeps {
 
 const silentLogger: Logger = pino({ level: "silent" });
 
-/**
- * Cheap variant of `GetLastOpenedWorkspaceUseCase` that returns just
- * the id (or `null` when empty). The HTTP `/current` route + bootstrap
- * paths only need the routing key, so this avoids hydrating the full
- * row.
- */
+/** Return the last-opened workspace id, or `null` when empty. */
 export class GetLastOpenedWorkspaceIdUseCase
   implements
     UseCase<

@@ -1,8 +1,15 @@
-import type { CatalogService } from "@glyphs-ai/catalog";
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import { AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import type { WorkflowTargetData, WorkflowTargetPatch } from "../wire/index.js";
+
+interface CatalogAgent {
+  readonly dependencies?: { readonly agents?: readonly { readonly fqn: string }[] };
+}
+
+interface CatalogAgentLookup {
+  getAgent(fqn: string): Promise<CatalogAgent | null>;
+}
 
 /**
  * Sole module knowing about all of `@glyphs-ai/schedule`,
@@ -41,7 +48,7 @@ import type { WorkflowTargetData, WorkflowTargetPatch } from "../wire/index.js";
 export function makeWorkflowKindHandler(opts: {
   readonly workflows: WorkflowService;
   readonly tasks: TaskService;
-  readonly catalog: CatalogService;
+  readonly catalog: CatalogAgentLookup;
 }): ScheduleKindHandler {
   const workflows = opts.workflows;
   const tasks = opts.tasks;

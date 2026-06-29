@@ -24,14 +24,7 @@ export interface OpenWorkspaceDeps {
 
 const silentLogger: Logger = pino({ level: "silent" });
 
-/**
- * Mark a workspace as "currently open" by bumping its
- * `lastOpenedAt` timestamp. The freshness signal drives
- * `getLastOpenedWorkspace*` ordering.
- *
- * The state transition lives on the entity (`entity.markOpened`); the
- * use-case is a pure orchestrator: load → mutate → save.
- */
+/** Mark a workspace as opened by updating `lastOpenedAt`. */
 export class OpenWorkspaceUseCase
   implements UseCase<OpenWorkspaceRequest, OpenWorkspaceResponse, OpenWorkspaceError>
 {

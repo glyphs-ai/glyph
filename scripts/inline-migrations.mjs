@@ -35,7 +35,7 @@ const PKGS = [
     dir: "catalog",
     entity: "Catalog",
     tableSuffix: "catalog",
-    migrationsFile: "src/persistence/migrations.ts",
+    migrationsFile: "src/infrastructure/drizzle/catalog-migrations.ts",
   },
   { dir: "workflow", entity: "Workflow", tableSuffix: "workflow" },
   { dir: "schedule", entity: "Schedule", tableSuffix: "schedule" },
@@ -48,7 +48,7 @@ const PKGS = [
     dir: "_template",
     entity: "__Entity__",
     tableSuffix: "__PKG__",
-    migrationsFile: "src/persistence/migrations.ts",
+    migrationsFile: "src/infrastructure/drizzle/__entity-kebab__-migrations.ts",
   },
 ];
 

@@ -4,14 +4,8 @@ import { describe, expect, it } from "vitest";
 import { MIGRATIONS } from "../../../src/infrastructure/drizzle/workspace-migrations.js";
 
 /**
- * Drift guard: if `pnpm db:generate` produces a new `*.sql` in
- * `drizzle/`, you must add a matching `?raw` import + `meta(...)`
- * entry in `src/migrations.ts`. This test fails loudly when the two
- * go out of sync.
- *
- * Shape assertions check the `MigrationMeta` invariants that drizzle's
- * official applier relies on (non-empty `sql`/`hash`, monotonic
- * `folderMillis`).
+ * Drift guard: every `drizzle/*.sql` file must have a matching inlined
+ * migration entry. Shape assertions cover non-empty SQL, hashes, and order.
  */
 describe("migrations", () => {
   const onDiskCount = readdirSync(join(import.meta.dirname, "..", "..", "..", "drizzle")).filter(

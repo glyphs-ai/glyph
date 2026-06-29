@@ -318,7 +318,7 @@ describe("workspacesRoutes — PATCH /:id", () => {
 //: a force-rebuild endpoint for the per-workspace
 // container cache so the dashboard can recover from catalog drift
 // (user added an agent yaml from outside glyph and the cached
-// `CatalogService` snapshot is stale) without restarting the server.
+// `CatalogModule` snapshot is stale) without restarting the server.
 describe("workspacesRoutes — POST /:id/reload", () => {
   it("returns 204 on cold cache (no entry yet)", async () => {
     const { app, workspace } = await makeApp();

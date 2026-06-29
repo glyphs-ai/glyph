@@ -28,15 +28,9 @@ export interface UnregisterWorkspaceDeps {
 const silentLogger: Logger = pino({ level: "silent" });
 
 /**
- * Remove a workspace from the registry. Idempotent — succeeds without
- * error when the id is unknown.
- *
- * `purge: true` also tears down the glyph-owned subdirs (`sessions/`,
- * `tasks/`) via the provisioner. Order is teardown-then-delete:
- * deleting the row first would orphan the directories because the row
- * is the only thing that tells us which dirs to clean up. Crashes
- * mid-unregister leave the row in place, and a re-run finishes the
- * cleanup.
+ * Remove a workspace from the registry. Unknown ids succeed. With
+ * `purge: true`, managed subdirectories are removed before the row is
+ * deleted so cleanup still has the workspace path.
  */
 export class UnregisterWorkspaceUseCase
   implements

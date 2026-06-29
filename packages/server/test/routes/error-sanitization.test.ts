@@ -1,23 +1,4 @@
-import {
-  AgentFrontmatterError,
-  AgentNameInvalidError,
-  AgentNotFoundError,
-  AgentOriginConflictError,
-  AgentPlanStaleError,
-  CyclicDependencyError,
-  FetchError,
-  HasDependentsError,
-  McpInvalidJsonError,
-  McpNameInvalidError,
-  McpNotFoundError,
-  McpOriginConflictError,
-  OriginParseError,
-  PlanStaleError,
-  SkillFrontmatterError,
-  SkillNameInvalidError,
-  SkillNotFoundError,
-  SkillOriginConflictError,
-} from "@glyphs-ai/catalog/contract";
+import { catalogErrorPolicy } from "@glyphs-ai/api";
 import {
   RuntimeHeadlessLaunchFailed,
   RuntimeProvisionFailed,
@@ -25,7 +6,6 @@ import {
   RuntimeStateDeletionFailed,
 } from "@glyphs-ai/runtime";
 import { describe, expect, it } from "vitest";
-import { catalogErrorPolicy } from "../../src/routes/_error-policies/catalog.js";
 import { errorBody, INTERNAL_ERROR_NAMES } from "../../src/routes/_shared.js";
 
 // These tests pin the security-critical behavior of `errorBody`: only
@@ -33,39 +13,30 @@ import { errorBody, INTERNAL_ERROR_NAMES } from "../../src/routes/_shared.js";
 // other error (generic Error, FS errors, third-party library errors)
 // flattens to the opaque "internal error" so host paths and stack
 // traces never reach the dashboard.
-//
-// The catalog-policy status block below MUST instantiate REAL catalog
-// errors (not `new Error(); err.name = "..."`). The policy is
-// instanceof-based, so faking `err.name` will not match; every
-// faked-name test must fall through to null.
 
 /**
- * Walks `catalogErrorPolicy.statuses` like respondError does, returning
+ * Walks `catalogErrorPolicy.codeStatuses` like respondError does, returning
  * the first matching status or `null` if no entry matches. Used here
  * to test the policy data without coupling these cases to the full
  * respondError + Hono mount.
  */
 function catalogPolicyStatus(err: unknown): number | null {
-  if (!(err instanceof Error)) return null;
-  for (const [klass, status] of catalogErrorPolicy.statuses) {
-    if (err instanceof klass) return status;
+  if (typeof err !== "object" || err === null || !("code" in err)) return null;
+  const code = err.code;
+  if (typeof code !== "string") return null;
+  for (const [entryCode, status] of catalogErrorPolicy.codeStatuses ?? []) {
+    if (code === entryCode) return status;
   }
   return null;
 }
 
-describe("errorBody", () => {
-  it("exposes message + code for known typed catalog errors", () => {
-    const notFound = new SkillNotFoundError("public/foo");
-    expect(errorBody(notFound)).toEqual({
-      error: notFound.message,
-      code: "SkillNotFoundError",
-    });
+function catalogRouteError(code: string): unknown {
+  return { tag: "CatalogRouteError", code, message: `canonical message for ${code}` };
+}
 
-    const nameInvalid = new SkillNameInvalidError("bad/name", "must be kebab-case");
-    expect(errorBody(nameInvalid)).toEqual({
-      error: nameInvalid.message,
-      code: "SkillNameInvalidError",
-    });
+describe("errorBody", () => {
+  it("keeps catalog DU route errors out of the global class allow-list", () => {
+    expect(errorBody(catalogRouteError("SkillNotFound"))).toEqual({ error: "internal error" });
   });
 
   it("flattens generic Error to 'internal error' (no leak)", () => {
@@ -112,26 +83,6 @@ describe("errorBody", () => {
       "NoTerminalFoundError",
       "TerminalSpawnFailedError",
       "UnsupportedPlatformError",
-      // catalog (real per-entity class names; aliases like
-      // "NotFound"/"NameInvalid"/"FrontmatterError" are intentionally
-      // absent — the catalog never emits instances with those names.
-      "AgentFrontmatterError",
-      "SkillFrontmatterError",
-      "FetchError",
-      "HasDependentsError",
-      "McpInvalidJsonError",
-      "McpNameInvalidError",
-      "SkillNameInvalidError",
-      "AgentNameInvalidError",
-      "SkillNotFoundError",
-      "McpNotFoundError",
-      "SkillOriginConflictError",
-      "AgentOriginConflictError",
-      "McpOriginConflictError",
-      "OriginParseError",
-      "PlanStaleError",
-      "AgentPlanStaleError",
-      "CyclicDependencyError",
       // task
       "CorruptedTaskError",
       "DispatchKernelEnvCollisionError",
@@ -209,108 +160,46 @@ describe("errorBody", () => {
 });
 
 describe("catalogErrorPolicy mapping", () => {
-  // Real instances only — mapping must work against `instanceof`
-  // checks against the catalog-package classes. The policy uses
-  // per-class instanceof entries so adding a new typed error class
-  // becomes a TypeScript-visible change (the
-  // policy file's imports won't compile against a missing class).
-  const cases: Array<[label: string, err: Error, status: number]> = [
-    ["SkillNameInvalidError", new SkillNameInvalidError("bad", "must be kebab"), 400],
-    ["AgentNameInvalidError", new AgentNameInvalidError("bad", "must be kebab"), 400],
-    ["McpNameInvalidError", new McpNameInvalidError("bad", "must be kebab"), 400],
-    ["SkillFrontmatterError", new SkillFrontmatterError("source", "missing version"), 400],
-    ["AgentFrontmatterError", new AgentFrontmatterError("source", "missing version"), 400],
-    ["McpInvalidJsonError", new McpInvalidJsonError("source", "trailing comma"), 400],
-    ["OriginParseError", new OriginParseError("garbage://x", "unsupported scheme"), 400],
-    ["PlanStaleError", new PlanStaleError("public/foo", "file:/x", "abc", "def"), 400],
-    ["AgentPlanStaleError", new AgentPlanStaleError("public/foo", "file:/x", "abc", "def"), 400],
-    [
-      "CyclicDependencyError",
-      new CyclicDependencyError(["file:/abs/a", "file:/abs/b", "file:/abs/a"]),
-      400,
-    ],
+  const cases: Array<[label: string, err: unknown, status: number]> = [
+    ["OriginInvalid", catalogRouteError("OriginInvalid"), 400],
+    ["ManifestInvalid", catalogRouteError("ManifestInvalid"), 400],
 
-    ["SkillNotFoundError", new SkillNotFoundError("public/foo"), 404],
-    ["AgentNotFoundError", new AgentNotFoundError("public/foo"), 404],
-    ["McpNotFoundError", new McpNotFoundError("a/b"), 404],
+    ["SkillNotFound", catalogRouteError("SkillNotFound"), 404],
+    ["AgentNotFound", catalogRouteError("AgentNotFound"), 404],
+    ["McpNotFound", catalogRouteError("McpNotFound"), 404],
 
-    [
-      "HasDependentsError",
-      new HasDependentsError("public/foo", [{ kind: "skill", name: "public/bar" }]),
-      409,
-    ],
-    [
-      "SkillOriginConflictError",
-      new SkillOriginConflictError("public/foo", "file:/old", "file:/new"),
-      409,
-    ],
-    [
-      "AgentOriginConflictError",
-      new AgentOriginConflictError("public/foo", "file:/old", "file:/new"),
-      409,
-    ],
-    ["McpOriginConflictError", new McpOriginConflictError("a/b", "file:/old", "file:/new"), 409],
+    ["SkillOriginConflict", catalogRouteError("SkillOriginConflict"), 409],
+    ["AgentOriginConflict", catalogRouteError("AgentOriginConflict"), 409],
+    ["McpOriginConflict", catalogRouteError("McpOriginConflict"), 409],
+
+    ["SourceUnavailable", catalogRouteError("SourceUnavailable"), 502],
+    ["DatabaseUnavailable", catalogRouteError("DatabaseUnavailable"), 500],
   ];
 
-  it.each(cases)("maps real %s to %d", (_label, err, status) => {
+  it.each(cases)("maps catalog DU code %s to %d", (_label, err, status) => {
     expect(catalogPolicyStatus(err)).toBe(status);
   });
 
-  it("maps a real FetchError instance to 502", () => {
-    // Real instances match; name-spoofed generic errors do not.
-    expect(catalogPolicyStatus(new FetchError("https://example", "connect ECONNREFUSED"))).toBe(
-      502,
-    );
+  it("returns null for unknown DU codes", () => {
+    expect(catalogPolicyStatus(catalogRouteError("WeirdoError"))).toBeNull();
   });
 
-  it("returns null for a fabricated FetchError name (instanceof check now)", () => {
-    const e = new Error("connect ECONNREFUSED");
-    e.name = "FetchError";
-    expect(catalogPolicyStatus(e)).toBeNull();
-  });
-
-  it("returns null for unknown error class names", () => {
-    const e = new Error("x");
-    e.name = "WeirdoError";
-    expect(catalogPolicyStatus(e)).toBeNull();
-  });
-
-  it("returns null for non-Error values", () => {
+  it("returns null for non-coded values", () => {
+    expect(catalogPolicyStatus(new Error("x"))).toBeNull();
     expect(catalogPolicyStatus("string")).toBeNull();
     expect(catalogPolicyStatus(null)).toBeNull();
     expect(catalogPolicyStatus(undefined)).toBeNull();
   });
 
-  it("returns null for phantom names that no real class produces", () => {
-    // No class with these names appears in the statuses array, so the
-    // policy cannot accept them by name spoofing.
+  it("rejects removed catalog class and alias names", () => {
     for (const name of [
       "CatalogError",
-      "CatalogStateError",
-      "CycleDetected",
-      "MissingDependencies",
-      "UnsupportedCatalogVersionError",
-    ]) {
-      const e = new Error("x");
-      e.name = name;
-      expect(catalogPolicyStatus(e)).toBeNull();
-    }
-  });
-
-  it("rejects alias names", () => {
-    // The policy is instanceof-based, so alias names can't match by
-    // construction.
-    for (const alias of [
+      "FetchError",
+      "AgentNotFoundError",
       "NotFound",
-      "NameInvalid",
-      "FrontmatterError",
       "OriginConflictError",
-      "InvalidMcpJsonError",
-      "HasDependents",
     ]) {
-      const e = new Error("x");
-      e.name = alias;
-      expect(catalogPolicyStatus(e)).toBeNull();
+      expect(catalogPolicyStatus(catalogRouteError(name))).toBeNull();
     }
   });
 });

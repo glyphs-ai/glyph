@@ -83,7 +83,7 @@ describe("OpenWorkspaceUseCase — happy path", () => {
     expect(res.isOk()).toBe(true);
 
     expect(repo.save).toHaveBeenCalledWith(entity);
-    // lastOpenedAt is now a fresh ISO timestamp ≥ `before`.
+    // markOpened assigns a fresh ISO timestamp.
     expect(entity.lastOpenedAt).not.toBeNull();
     expect(entity.lastOpenedAt!).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(entity.lastOpenedAt! >= before).toBe(true);

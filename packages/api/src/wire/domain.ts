@@ -11,17 +11,12 @@
  * orchestration barrel proper (`../index.ts`), not this wire subtree.
  */
 
-export type { CatalogConflict, CatalogInstallResult, CatalogSyncResult } from "@glyphs-ai/catalog";
 export type {
-  Agent,
-  AgentEntry,
-  BlockedReason,
+  CatalogConflict,
   CatalogKind,
-  Mcp,
-  MissingDep,
-  Skill,
-  SkillEntry,
-} from "@glyphs-ai/catalog/contract";
+  ListAgentEntriesResponse,
+  ListSkillEntriesResponse,
+} from "@glyphs-ai/catalog";
 export type { ActivityItem, TruncationInfo } from "@glyphs-ai/runtime";
 export type { PreviewScheduleResult, Schedule } from "@glyphs-ai/schedule";
 export type { Session } from "@glyphs-ai/session";
@@ -35,3 +30,12 @@ export type {
   WorkflowStatus,
   WorkflowSuccess,
 } from "@glyphs-ai/workflow";
+export type {
+  Agent,
+  AgentEntry,
+  BlockedReason,
+  Mcp,
+  MissingDep,
+  Skill,
+  SkillEntry,
+} from "../schemas/catalog.js";

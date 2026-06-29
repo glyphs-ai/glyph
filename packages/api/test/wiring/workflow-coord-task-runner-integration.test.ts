@@ -21,7 +21,6 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { CatalogService } from "@glyphs-ai/catalog";
 import type { TaskService } from "@glyphs-ai/task";
 import {
   composeWorkflowModule,
@@ -32,6 +31,8 @@ import { openTestWorkflowDb } from "@glyphs-ai/workflow/testing";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeCoordNodeRunner } from "../../src/wiring/workflow-coord-task-runner.js";
+
+type CatalogAgentLookup = Parameters<typeof makeCoordNodeRunner>[0]["catalog"];
 
 const silentLogger = pino({ level: "silent" });
 
@@ -88,7 +89,7 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
     // coord node.
     dependencies: { agents: [{ fqn: "worker" }] },
   }));
-  const catalog = { getAgent } as unknown as CatalogService;
+  const catalog = { getAgent } as unknown as CatalogAgentLookup;
 
   // Two-phase init holder. Populated after `composeWorkflowModule`
   // returns, matching the engine ↔ service composition pattern.

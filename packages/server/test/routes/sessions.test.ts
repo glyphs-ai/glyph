@@ -1,5 +1,5 @@
 import type { WorkspaceContext } from "@glyphs-ai/api";
-import type { CatalogService } from "@glyphs-ai/catalog";
+import type { CatalogModule } from "@glyphs-ai/catalog";
 import type { SpawnSessionResult } from "@glyphs-ai/session";
 import {
   AgentNotFoundError,
@@ -104,7 +104,7 @@ function stubContext(
   };
   const context: Partial<WorkspaceContext> = {
     sessions: sessionsWithSpawn,
-    catalog: {} as CatalogService,
+    catalog: {} as CatalogModule,
     tasks: {} as TaskService,
   };
   return context as WorkspaceContext;

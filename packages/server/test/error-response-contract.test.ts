@@ -4,11 +4,10 @@
  *
  * These tests pin the cross-cutting behavior the refactor introduced:
  *
- *   1. The 3 `AgentNotFoundError` classes (catalog / task / session)
- *      keep independent mappings despite sharing the same `.name`
- *      string and having different `.status` values per domain. The
- *      schedule pkg no longer owns its own class; its routes reuse the
- *      task-pkg class via the kind handler.
+ *   1. Catalog `AgentNotFound` DU errors map to 404 on catalog routes,
+ *      while task / session `AgentNotFoundError` classes remain 400 on
+ *      their own routes. The schedule pkg no longer owns its own class;
+ *      its routes reuse the task-pkg class via the kind handler.
  *   2. `routes/sessions.ts` and `routes/workspaces.ts` now emit the
  *      structured "unmapped error fell through" log line for
  *      unrecognised errors, closing the observability gap for these
@@ -29,8 +28,7 @@
  * cross-cutting safety net.
  */
 
-import { workspacesRoutes } from "@glyphs-ai/api";
-import { AgentNotFoundError as CatalogAgentNotFoundError } from "@glyphs-ai/catalog/contract";
+import { catalogRoutes, workspacesRoutes } from "@glyphs-ai/api";
 import {
   AgentNotFoundError as SessionAgentNotFoundError,
   AgentResolutionFailedError as SessionAgentResolutionFailedError,
@@ -50,7 +48,6 @@ import { errAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { requestId } from "../src/middleware/request-id.js";
 import { requestLogger } from "../src/middleware/request-logger.js";
-import { catalogRoutes } from "../src/routes/catalog/index.js";
 import { scheduledTasksRoutes } from "../src/routes/scheduled-tasks.js";
 import { schedulesRoutes } from "../src/routes/schedules.js";
 import { sessionsRoutes } from "../src/routes/sessions.js";
@@ -93,12 +90,9 @@ async function buildAppWithLogger(mount: (app: Hono) => void) {
 }
 
 describe("respondError contract — cross-domain status preservation", () => {
-  // The four `AgentNotFoundError` classes share the same .name string
-  // but extend different bases. The per-domain policies use
-  // `instanceof` (not name-string switch), so each route catches the
-  // class from its own package and maps independently. Earlier
-  // versions of the refactor would have collapsed these if the
-  // policies had shared a single error-class set.
+  // Catalog now emits a DU code (`AgentNotFound`) rather than a class,
+  // while task / session / schedule still throw their domain classes.
+  // Per-domain policies keep those routes independent.
 
   it("task route's AgentNotFoundError (task package) → 400", async () => {
     const m = stubTaskService({
@@ -169,21 +163,16 @@ describe("respondError contract — cross-domain status preservation", () => {
     expect(body.code).toBe("AgentNotFoundError");
   });
 
-  it("catalog route's AgentNotFoundError (catalog package) → 404 (NOT 400)", async () => {
-    // The landmine: the catalog's AgentNotFoundError shares the .name
-    // string with the three above, but the catalog-routes policy
-    // maps it to 404 (the requested entity isn't in the local
-    // catalog). The instanceof-based policy must keep package-specific
-    // routing without accidentally widening.
+  it("catalog route's AgentNotFound DU → 404 (NOT 400)", async () => {
     const catalog = {
-      getAgentEntry: vi.fn(async () => {
-        throw new CatalogAgentNotFoundError("public/ghost");
-      }),
+      getAgentEntry: {
+        execute: vi.fn(() => errAsync({ type: "AgentNotFound", fqn: "public/ghost" })),
+      },
     } as never;
     const res = await catalogRoutes(() => catalog).request("/agents/public/ghost");
     expect(res.status).toBe(404);
     const body = await res.json();
-    expect(body.code).toBe("AgentNotFoundError");
+    expect(body.code).toBe("AgentNotFound");
   });
 });
 

@@ -64,7 +64,6 @@
  *     `onTerminal({status: 'failed', reason: 'tasks.get exhausted: ...'})`.
  */
 
-import type { CatalogService } from "@glyphs-ai/catalog";
 import {
   AgentNotFoundError,
   AgentResolutionFailedError,
@@ -82,6 +81,14 @@ import pino, { type Logger } from "pino";
 import type { WorkflowCoordinatorNodeSpec } from "../wire/index.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
+
+interface CatalogAgent {
+  readonly dependencies?: { readonly agents?: readonly { readonly fqn: string }[] };
+}
+
+interface CatalogAgentLookup {
+  getAgent(fqn: string): Promise<CatalogAgent | null>;
+}
 
 /** Default poll cadence for `tasks.get(taskId)` in the coord runner. */
 export const DEFAULT_COORD_POLL_INTERVAL_MS = 2000;
@@ -168,7 +175,7 @@ export class WorkflowCoordAgentNotCapableError extends Error {
 
 export interface MakeCoordNodeRunnerOpts {
   readonly tasks: TaskService;
-  readonly catalog: CatalogService;
+  readonly catalog: CatalogAgentLookup;
   /**
    * Lazy getter for the {@link WorkflowService}. The runner needs it
    * to read the workflow header (`brief` / `details`) at dispatch

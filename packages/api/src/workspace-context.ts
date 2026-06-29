@@ -1,12 +1,20 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { type CatalogService, composeCatalogModule } from "@glyphs-ai/catalog";
-import type { RuntimeRegistry } from "@glyphs-ai/runtime";
+import {
+  type AgentFqn,
+  type CatalogModule,
+  composeCatalog,
+  type GetSkillResponse,
+  type McpFqn,
+  type SkillFqn,
+} from "@glyphs-ai/catalog";
+import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
 import { composeScheduleModule, type ScheduleService } from "@glyphs-ai/schedule";
 import { composeSessionModule, type SessionService, type SpawnFn } from "@glyphs-ai/session";
 import { composeTaskModule, type TaskService } from "@glyphs-ai/task";
 import { composeWorkflowModule, type WorkflowService } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
+import type { Result } from "neverthrow";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";
@@ -23,6 +31,7 @@ const silentLogger: Logger = pino({ level: "silent" });
  * have been resolved successfully.
  */
 type Workspace = NonNullable<GetWorkspaceResponse>;
+type Skill = NonNullable<GetSkillResponse>;
 
 /**
  * Thrown by `WorkspaceContextRegistry.reload` when the cached context
@@ -83,7 +92,7 @@ export type WorkspaceContextState = "cached" | "loading" | "unloaded" | "not-reg
  */
 export interface WorkspaceContext {
   readonly workspace: Workspace;
-  readonly catalog: CatalogService;
+  readonly catalog: CatalogModule;
   readonly sessions: SessionService;
   readonly tasks: TaskService;
   /**
@@ -106,6 +115,122 @@ export interface WorkspaceContext {
   readonly workflows: WorkflowService;
   /** Closes all backing connections. Idempotent. */
   close(): Promise<void>;
+}
+
+interface CatalogAgent {
+  readonly dependencies?: { readonly agents?: readonly { readonly fqn: string }[] };
+}
+
+interface CatalogBlockedDep {
+  readonly fqn: string;
+}
+
+interface CatalogBlockedReason {
+  readonly needsPrereqsAck?: true;
+  readonly disabledByUser?: true;
+  readonly orphaned?: true;
+  readonly missingDeps?: readonly unknown[];
+  readonly blockedDeps?: readonly CatalogBlockedDep[];
+}
+
+interface CatalogAgentEntry {
+  readonly status: "ready" | "blocked";
+  readonly blockedReason?: CatalogBlockedReason;
+}
+
+interface CatalogAgentLookup {
+  getAgent(fqn: string): Promise<CatalogAgent | null>;
+}
+
+interface CatalogRuntimePorts extends AgentContentSource, CatalogAgentLookup {
+  getAgentEntry(fqn: string): Promise<CatalogAgentEntry | null>;
+}
+
+function makeCatalogRuntimePorts(catalog: CatalogModule): CatalogRuntimePorts {
+  const unwrap = async <T, E extends { readonly type: string }>(
+    result: Promise<Result<T, E>>,
+  ): Promise<T> => {
+    const settled = await result;
+    if (settled.isErr()) throw new Error(settled.error.type);
+    return settled.value;
+  };
+
+  const getAgent = async (fqn: string): Promise<CatalogAgent | null> => {
+    const res = await catalog.getAgent.execute({ id: fqn as AgentFqn });
+    if (res.isErr()) {
+      if (res.error.type === "AgentNotFound") return null;
+      throw new Error(res.error.type);
+    }
+    const agents = res.value.dependencies?.agents;
+    return agents !== undefined ? { dependencies: { agents } } : {};
+  };
+  const getSkill = async (fqn: string): Promise<Skill | null> => {
+    const res = await catalog.getSkill.execute({ id: fqn as SkillFqn });
+    if (res.isErr()) {
+      if (res.error.type === "SkillNotFound") return null;
+      throw new Error(res.error.type);
+    }
+    return res.value;
+  };
+
+  return {
+    getAgent,
+    async getAgentEntry(fqn) {
+      const entry = await unwrap(catalog.getAgentEntry.execute({ id: fqn as AgentFqn }));
+      if (entry === null) return null;
+      if (entry.blockedReason === undefined) return { status: entry.status };
+      const blockedReason: CatalogBlockedReason = {
+        ...(entry.blockedReason.needsPrereqsAck === true ? { needsPrereqsAck: true } : {}),
+        ...(entry.blockedReason.disabledByUser === true ? { disabledByUser: true } : {}),
+        ...(entry.blockedReason.orphaned === true ? { orphaned: true } : {}),
+        ...(entry.blockedReason.missingDeps !== undefined
+          ? { missingDeps: entry.blockedReason.missingDeps }
+          : {}),
+        ...(entry.blockedReason.blockedDeps !== undefined
+          ? { blockedDeps: entry.blockedReason.blockedDeps }
+          : {}),
+      };
+      return { status: entry.status, blockedReason };
+    },
+    resolveAgent(fqn) {
+      return unwrap(catalog.resolveAgent.execute({ id: fqn as AgentFqn }));
+    },
+    async *agentEntries(fqn) {
+      const entry = await unwrap(catalog.getAgentEntry.execute({ id: fqn as AgentFqn }));
+      if (entry === null) throw new Error("AgentNotFound");
+      const files = await unwrap(catalog.listAgentFiles.execute({ id: fqn as AgentFqn }));
+      for (const file of files) {
+        const content = await unwrap(
+          catalog.getAgentFile.execute({ id: fqn as AgentFqn, relPath: file.relPath }),
+        );
+        if (content !== null) yield { relPath: file.relPath, content };
+      }
+    },
+    async *skillEntries(fqn) {
+      const skill = await getSkill(fqn);
+      if (skill === null) throw new Error("SkillNotFound");
+      const files = await unwrap(catalog.listSkillFiles.execute({ id: fqn as SkillFqn }));
+      for (const file of files) {
+        const content = await unwrap(
+          catalog.getSkillFile.execute({ id: fqn as SkillFqn, relPath: file.relPath }),
+        );
+        if (content !== null) yield { relPath: file.relPath, content };
+      }
+    },
+    async getMcpRuntimeConfig(fqn) {
+      const result = await unwrap(catalog.getMcpContent.execute({ id: fqn as McpFqn }));
+      return stripMcpMeta(result.spec, fqn);
+    },
+  };
+}
+
+function stripMcpMeta(content: string, fqn: string): Record<string, unknown> {
+  const parsed = JSON.parse(content) as unknown;
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`MCP file must be a JSON object: ${fqn}`);
+  }
+  const { _meta: _drop, ...rest } = parsed as Record<string, unknown>;
+  return rest;
 }
 
 /**
@@ -311,7 +436,7 @@ export class WorkspaceContextRegistry {
       }
     };
 
-    let catalogModule: Awaited<ReturnType<typeof composeCatalogModule>>;
+    let catalogModule: CatalogModule;
     let sessionModule: Awaited<ReturnType<typeof composeSessionModule>>;
     let taskModule: Awaited<ReturnType<typeof composeTaskModule>>;
     let scheduleModule: Awaited<ReturnType<typeof composeScheduleModule>>;
@@ -333,15 +458,13 @@ export class WorkspaceContextRegistry {
       return workflowSvc;
     };
     try {
-      catalogModule = await composeCatalogModule({
-        dbFile,
-        logger: this.logger,
-      });
+      catalogModule = composeCatalog({ dbFile });
       cleanup.push(() => catalogModule.close());
+      const catalogPorts = makeCatalogRuntimePorts(catalogModule);
       sessionModule = await composeSessionModule({
         dbFile,
-        agentResolver: catalogModule.service,
-        contentSource: catalogModule.service,
+        agentResolver: catalogPorts,
+        contentSource: catalogPorts,
         runtimeRegistry: this.runtimeRegistry,
         workspaceDir: workspace.workspaceDir,
         workspaceId,
@@ -351,8 +474,8 @@ export class WorkspaceContextRegistry {
       cleanup.push(() => sessionModule.close());
       taskModule = await composeTaskModule({
         dbFile,
-        agentResolver: catalogModule.service,
-        contentSource: catalogModule.service,
+        agentResolver: catalogPorts,
+        contentSource: catalogPorts,
         runtimeRegistry: this.runtimeRegistry,
         workspaceDir: workspace.workspaceDir,
         workspaceId,
@@ -384,7 +507,7 @@ export class WorkspaceContextRegistry {
         "task",
         makeTaskKindHandler({
           tasks: taskModule.service,
-          catalog: catalogModule.service,
+          catalog: catalogPorts,
         }),
       );
 
@@ -397,7 +520,7 @@ export class WorkspaceContextRegistry {
       // runner.
       const coordRunner = makeCoordNodeRunner({
         tasks: taskModule.service,
-        catalog: catalogModule.service,
+        catalog: catalogPorts,
         getService: getWorkflowService,
         // The coord runner injects `GLYPH_WORKFLOW_DIR` into the
         // dispatched coord task's subprocess env via
@@ -410,7 +533,7 @@ export class WorkspaceContextRegistry {
       });
       const workerRunner = makeWorkerNodeRunner({
         tasks: taskModule.service,
-        catalog: catalogModule.service,
+        catalog: catalogPorts,
         logger: this.logger,
       });
       const humanRunner = makeHumanNodeRunner({
@@ -434,7 +557,7 @@ export class WorkspaceContextRegistry {
         makeWorkflowKindHandler({
           workflows: workflowModule.service,
           tasks: taskModule.service,
-          catalog: catalogModule.service,
+          catalog: catalogPorts,
         }),
       );
       await scheduleModule.service.recover();
@@ -446,7 +569,7 @@ export class WorkspaceContextRegistry {
     const outerLogger = this.logger;
     const context: WorkspaceContext = {
       workspace,
-      catalog: catalogModule.service,
+      catalog: catalogModule,
       sessions: sessionModule.service,
       tasks: taskModule.service,
       schedules: scheduleModule.service,

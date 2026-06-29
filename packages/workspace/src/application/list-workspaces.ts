@@ -28,11 +28,7 @@ export interface ListWorkspacesDeps {
 
 const silentLogger: Logger = pino({ level: "silent" });
 
-/**
- * Return every registered workspace ordered by `lastOpenedAt DESC`
- * (then `createdAt DESC`, then `id ASC`). Dashboard / CLI / SDK use
- * this ordering directly, so first-opened workspaces float to the top.
- */
+/** Return all registered workspaces in last-opened order. */
 export class ListWorkspacesUseCase
   implements UseCase<ListWorkspacesRequest, ListWorkspacesResponse, ListWorkspacesError>
 {

@@ -15,8 +15,8 @@
  */
 
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
-import { workspacesRoutes } from "@glyphs-ai/api";
-import type { CatalogService } from "@glyphs-ai/catalog";
+import { catalogRoutes, workspacesRoutes } from "@glyphs-ai/api";
+import type { CatalogModule } from "@glyphs-ai/catalog";
 import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
 import type { SessionService } from "@glyphs-ai/session";
@@ -30,7 +30,6 @@ import {
   injectWorkspaceIdParam,
   registerOpenApiDoc,
 } from "../src/routes/_openapi.js";
-import { catalogRoutes } from "../src/routes/catalog/index.js";
 import { configRoutes } from "../src/routes/config.js";
 import { healthRoutes } from "../src/routes/health.js";
 import { runtimesRoutes } from "../src/routes/runtimes.js";
@@ -123,7 +122,7 @@ function buildOpenApiAppForTest(): OpenAPIHono {
   const catalogApp = createApiApp();
   catalogApp.route(
     "/:id/catalog",
-    catalogRoutes(() => stubCatalogFacade()),
+    catalogRoutes(() => stubCatalogModule()),
   );
   app.route("/api/workspaces", catalogApp);
 
@@ -228,10 +227,10 @@ function stubWorkflowService(): WorkflowService {
   });
 }
 
-function stubCatalogFacade(): CatalogService {
-  return new Proxy({} as CatalogService, {
+function stubCatalogModule(): CatalogModule {
+  return new Proxy({} as CatalogModule, {
     get() {
-      throw new Error("stubCatalogFacade: not callable");
+      throw new Error("stubCatalogModule: not callable");
     },
   });
 }

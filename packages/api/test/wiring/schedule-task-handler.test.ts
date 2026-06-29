@@ -18,7 +18,6 @@
  *   - `hasInFlightForSchedule` / `deleteForSchedule` delegation
  */
 
-import type { CatalogService } from "@glyphs-ai/catalog";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -26,10 +25,12 @@ import {
   TaskScheduleTargetError,
 } from "../../src/wiring/schedule-task-handler.js";
 
+type CatalogAgentLookup = Parameters<typeof makeTaskKindHandler>[0]["catalog"];
+
 function stubDeps(
   opts: { agent?: unknown | null; getAgentThrows?: Error; dispatchReturn?: { id: string } } = {},
 ): {
-  catalog: CatalogService;
+  catalog: CatalogAgentLookup;
   tasks: TaskService;
   getAgent: ReturnType<typeof vi.fn>;
   dispatch: ReturnType<typeof vi.fn>;
@@ -43,7 +44,7 @@ function stubDeps(
   const dispatch = vi.fn(async () => opts.dispatchReturn ?? { id: "task-xyz" });
   const hasInFlightByOrigin = vi.fn(async () => false);
   const deleteTerminalByOrigin = vi.fn(async () => ({ deletedCount: 0 }));
-  const catalog = { getAgent } as unknown as CatalogService;
+  const catalog = { getAgent } as unknown as CatalogAgentLookup;
   const tasks = {
     dispatch,
     hasInFlightByOrigin,

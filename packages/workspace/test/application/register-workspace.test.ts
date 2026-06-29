@@ -18,11 +18,8 @@ const ABS_DIR = process.platform === "win32" ? "C:\\workspaces\\project" : "/wor
 const DEFAULT_PARENT = process.platform === "win32" ? "C:\\glyph\\workspaces" : "/glyph/workspaces";
 
 /**
- * Build a typed `RegisterWorkspaceRequest` from raw values. The
- * use-case re-parses through the schema on every call (defense in
- * depth), so the brand cast here is only for TS — it lets each test
- * write `req("Demo", ABS_DIR)` instead of inline-casting `name`
- * every time.
+ * Builds a typed request while keeping each test's raw name and directory
+ * visible at the call site.
  */
 function req(name: string, workspaceDir?: string): RegisterWorkspaceRequest {
   return { name: name as WorkspaceName, ...(workspaceDir !== undefined ? { workspaceDir } : {}) };

@@ -3,27 +3,8 @@ import type { WorkspaceEntity } from "./workspace-entity.js";
 import type { WorkspaceId } from "./workspace-id.js";
 
 /**
- * Errors produced by — or constructed from — the workspace registry
- * port. Co-located with the port because each variant's meaning
- * belongs to "the registry":
- *
- *   - `DatabaseUnavailable`  — driver-level fault (Drizzle / SQLite)
- *   - `WorkspaceIdConflict`  — `insert` UNIQUE / PK violation on `id`
- *   - `WorkspacePathConflict` — `insert` UNIQUE violation on
- *                                `workspaceDir`
- *   - `WorkspaceNotRegistered` — use-cases build this when
- *                                 `findById` resolves `undefined`;
- *                                 the registry is the source of
- *                                 truth for presence.
- *
- * Discriminated-union values, NOT classes. `switch (err.type)`
- * narrows exhaustively. Plain value semantics: these are values
- * flowing through `Result`, never thrown.
- *
- * Distinct from `workspace-entity.ts`, which owns errors the entity
- * raises FROM ITS OWN STATE (e.g. "can't rename an archived
- * workspace"). The registry errors here all need information the
- * entity does not have (the rest of the table; absence of a row).
+ * Registry errors. They are discriminated-union values flowing through
+ * `Result`, not thrown exceptions.
  */
 export type DatabaseUnavailable = {
   readonly type: "DatabaseUnavailable";
@@ -53,38 +34,9 @@ export type WorkspaceNotRegistered = {
 };
 
 /**
- * Error variants {@link WorkspaceRepository.insert} may yield. The
- * two constraint violations (`WorkspaceIdConflict`,
- * `WorkspacePathConflict`) are the racy-write backstop for the
- * application's pre-flight `findByPath` check — the adapter
- * translates SQLite constraint codes to these typed values so the
- * use-case can `match` on them without inspecting SQL state.
- */
-export type InsertWorkspaceError =
-  | DatabaseUnavailable
-  | WorkspaceIdConflict
-  | WorkspacePathConflict;
-
-/**
- * Persistence port for the workspace registry. Domain-owned interface
- * the application depends on; concrete adapters (Drizzle, in-memory
- * for tests) live in `infrastructure/`.
- *
- * Reads return the pkg-owned {@link WorkspaceEntity} (a class
- * instance, rehydrated via `WorkspaceMapper.toDomain`). The Drizzle
- * row shape never crosses this boundary.
- *
- * Write contract:
- *   - `insert(entity)` — for brand-new aggregates; may yield
- *     `WorkspaceIdConflict` / `WorkspacePathConflict` from UNIQUE /
- *     PRIMARY KEY violations.
- *   - `save(entity)` — persist mutations of an existing aggregate
- *     (rename, markOpened). Writes every column from the entity, so
- *     callers don't need to think about "which fields changed". No
- *     constraint variants because no mutable field is unique.
- *
- * Result/error contract: every method returns a `ResultAsync` —
- * adapters never throw. Driver-level failures collapse to
+ * Persistence port for the workspace registry. Reads return
+ * {@link WorkspaceEntity}; row shapes stay inside infrastructure.
+ * Methods return `ResultAsync` and adapters map driver failures to
  * `DatabaseUnavailable`.
  */
 export interface WorkspaceRepository {
@@ -93,7 +45,9 @@ export interface WorkspaceRepository {
   findAllByLastOpened(): ResultAsync<WorkspaceEntity[], DatabaseUnavailable>;
   findLastOpened(): ResultAsync<WorkspaceEntity | undefined, DatabaseUnavailable>;
   findLastOpenedId(): ResultAsync<WorkspaceId | undefined, DatabaseUnavailable>;
-  insert(entity: WorkspaceEntity): ResultAsync<void, InsertWorkspaceError>;
+  insert(
+    entity: WorkspaceEntity,
+  ): ResultAsync<void, DatabaseUnavailable | WorkspaceIdConflict | WorkspacePathConflict>;
   save(entity: WorkspaceEntity): ResultAsync<void, DatabaseUnavailable>;
   delete(id: WorkspaceId): ResultAsync<void, DatabaseUnavailable>;
 }

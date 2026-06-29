@@ -1,37 +1,8 @@
 /**
- * Domain entity for `@glyphs-ai/workspace`.
- *
- * Rich domain: the entity is a class with private mutable state and
- * public mutator methods. Business state transitions (rename,
- * markOpened) live ON the entity; use-cases orchestrate
- * `repo.findById → entity.X() → repo.save(entity)` without peeking
- * inside the entity to compute the new state. Format validation
- * (name shape, id format) is the use-case schema's responsibility —
- * the entity trusts its inputs once the request schema has parsed
- * them.
- *
- * Construction:
- *   - `new WorkspaceEntity({...})` — direct construction (mapper
- *     rehydration, tests); trusts caller-supplied state.
- *   - `WorkspaceEntity.create({...})` — mint a fresh aggregate
- *     (seeds `lastOpenedAt = now`).
- *
- * Persistence ↔ entity translation lives in `WorkspaceMapper` so
- * repository code reads as pure query orchestration.
- *
- * Errors policy: this file holds the entity class only. Domain errors
- * live next to the port / layer that produces them — currently
- * registry concerns (id uniqueness, path uniqueness, registry
- * presence) all live in `workspace-repository.ts`, and infra failures
- * live in their respective adapter ports. When the entity grows a
- * state rule it can enforce alone (e.g. "can't rename an archived
- * workspace"), the corresponding `Result<void, ...>` mutator + its
- * error DU come back here.
- *
- * Distinct from the wire DTO: `lastOpenedAt` is nullable on the
- * entity (a freshly registered workspace may never have been opened
- * again); each use-case coalesces it to `createdAt` when projecting
- * its response.
+ * Workspace aggregate. Use-cases validate inputs, call entity
+ * mutators, and persist the aggregate through the repository.
+ * `lastOpenedAt` is nullable and response projections coalesce it to
+ * `createdAt`.
  */
 
 import type { WorkspaceId } from "./workspace-id.js";
@@ -52,13 +23,7 @@ export class WorkspaceEntity {
   public readonly createdAt: string;
   private _lastOpenedAt: string | null;
 
-  /**
-   * Direct construction. Used by the persistence mapper to rehydrate
-   * a row, and by tests building fixtures inline. The constructor
-   * trusts its inputs — schemas validate at the request boundary,
-   * the mapper trusts persisted state. Any future entity-local
-   * invariants (e.g. "name must be non-empty") get enforced here.
-   */
+  /** Direct construction for trusted rehydration and tests. */
   constructor(args: {
     readonly id: WorkspaceId;
     readonly workspaceDir: string;
@@ -81,13 +46,7 @@ export class WorkspaceEntity {
     return this._lastOpenedAt;
   }
 
-  /**
-   * Mint a brand-new aggregate. `lastOpenedAt` is seeded to `now` so
-   * a freshly registered workspace sorts at the top of "last opened"
-   * lists — this is the business rule that justifies a factory over a
-   * raw constructor call. Use-cases call this AFTER schema-validating
-   * the request.
-   */
+  /** Mint a new aggregate and seed `lastOpenedAt` to `now`. */
   static create(args: CreateWorkspaceArgs): WorkspaceEntity {
     return new WorkspaceEntity({
       id: args.id,
@@ -98,12 +57,7 @@ export class WorkspaceEntity {
     });
   }
 
-  /**
-   * Update the display name. Noop when the new name equals the
-   * current one — the use-case unconditionally calls `repo.save`
-   * afterwards; the redundant write is acceptable and keeps the
-   * caller's surface a single linear step.
-   */
+  /** Update the display name; same-name updates are a no-op. */
   rename(newName: WorkspaceName): void {
     if (this._name === newName) return;
     this._name = newName;

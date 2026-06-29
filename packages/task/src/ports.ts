@@ -4,7 +4,7 @@
  * need to depend on `@glyphs-ai/catalog` directly; any object
  * satisfying these shapes works.
  *
- * Catalog's CatalogService, AgentResolveResult, BlockedReason, etc.
+ * Catalog's CatalogModule, AgentResolveResult, BlockedReason, etc.
  * satisfy these interfaces structurally, so production wiring passes
  * catalog values without any adapter layer.
  *

@@ -21,8 +21,8 @@
  */
 
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
-import { workspacesRoutes } from "@glyphs-ai/api";
-import type { CatalogService } from "@glyphs-ai/catalog";
+import { catalogRoutes, workspacesRoutes } from "@glyphs-ai/api";
+import type { CatalogModule } from "@glyphs-ai/catalog";
 import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
 import type { SessionService } from "@glyphs-ai/session";
@@ -30,7 +30,6 @@ import type { TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { createApiApp, registerOpenApiDoc } from "../../server/src/routes/_openapi.js";
-import { catalogRoutes } from "../../server/src/routes/catalog/index.js";
 import { configRoutes } from "../../server/src/routes/config.js";
 import { healthRoutes } from "../../server/src/routes/health.js";
 import { runtimesRoutes } from "../../server/src/routes/runtimes.js";
@@ -142,7 +141,7 @@ export function buildOpenApiApp(): OpenAPIHono {
   const catalogApp = createApiApp();
   catalogApp.route(
     "/:id/catalog",
-    catalogRoutes(() => stubCatalogFacade()),
+    catalogRoutes(() => stubCatalogModule()),
   );
   app.route("/api/workspaces", catalogApp);
 
@@ -192,6 +191,6 @@ function stubWorkflowService(): WorkflowService {
   return throwingStub("stubWorkflowService");
 }
 
-function stubCatalogFacade(): CatalogService {
-  return throwingStub("stubCatalogFacade");
+function stubCatalogModule(): CatalogModule {
+  return throwingStub("stubCatalogModule");
 }

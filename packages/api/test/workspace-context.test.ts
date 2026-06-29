@@ -22,7 +22,7 @@
  * `node:fs/promises.mkdir` so the registry exercises its lifecycle
  * paths without touching disk or any real BC code.
  */
-import type { CatalogService } from "@glyphs-ai/catalog";
+import type { CatalogModule } from "@glyphs-ai/catalog";
 import { RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
 import type { SessionService, SpawnFn } from "@glyphs-ai/session";
@@ -65,24 +65,26 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 vi.mock("@glyphs-ai/catalog", () => ({
-  composeCatalogModule: vi.fn(async () => {
-    await mocks.catalogGate;
-    return {
-      service: {} as CatalogService,
-      close: vi.fn(async () => {
-        mocks.sequence.push("catalog");
-      }),
-    };
-  }),
+  composeCatalog: vi.fn(
+    () =>
+      ({
+        close: vi.fn(async () => {
+          mocks.sequence.push("catalog");
+        }),
+      }) as unknown as CatalogModule,
+  ),
 }));
 
 vi.mock("@glyphs-ai/session", () => ({
-  composeSessionModule: vi.fn(async () => ({
-    service: {} as SessionService,
-    close: vi.fn(async () => {
-      mocks.sequence.push("session");
-    }),
-  })),
+  composeSessionModule: vi.fn(async () => {
+    await mocks.catalogGate;
+    return {
+      service: {} as SessionService,
+      close: vi.fn(async () => {
+        mocks.sequence.push("session");
+      }),
+    };
+  }),
 }));
 
 vi.mock("@glyphs-ai/task", () => ({
@@ -203,7 +205,7 @@ describe("WorkspaceContextRegistry race semantics", () => {
     const gate = makeGate();
     mocks.catalogGate = gate.promise;
 
-    // Start a get() whose load() is now blocked at composeCatalogModule.
+    // Start a get() whose load() is now blocked at composeCatalog.
     const getP = registry.get("ws-1");
 
     // closeAll runs concurrently — must NOT race past the inflight
@@ -312,7 +314,7 @@ describe("WorkspaceContextRegistry peek", () => {
     const gate = makeGate();
     mocks.catalogGate = gate.promise;
 
-    // Start a get whose load is blocked at composeCatalogModule.
+    // Start a get whose load is blocked at composeCatalog.
     const getP = registry.get("ws-loading");
 
     // While the load is in flight, peek MUST report "loading".

@@ -7,21 +7,14 @@ import * as schema from "./workspace-schema.js";
 export type Db = BetterSQLite3Database<typeof schema>;
 
 /**
- * Open a better-sqlite3 connection in WAL mode, run pending migrations,
- * and return the drizzle handle plus a `close`. Tests pass `":memory:"`;
- * production passes the absolute path to `global.db`.
- *
- * On migration failure the SQLite handle is closed before the error
- * propagates: a leaked handle would hold the WAL lock and break a
- * subsequent retry from the same caller (EBUSY on the lockfile / WAL
- * files until process exit).
+ * Open the workspace SQLite DB in WAL mode, apply migrations, and
+ * return the drizzle handle plus `close`.
  */
 export function openDb(dbFile: string): { db: Db; close(): void } {
   const sqlite: BetterSqliteDatabase = new Database(dbFile);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("synchronous = NORMAL");
-  // No `foreign_keys = ON` — schema has no FK constraints; the pragma
-  // without FKs is a no-op and would mislead readers.
+  // No foreign-key constraints exist in this schema.
   sqlite.pragma("busy_timeout = 5000");
   const db: Db = drizzle(sqlite, { schema });
   try {

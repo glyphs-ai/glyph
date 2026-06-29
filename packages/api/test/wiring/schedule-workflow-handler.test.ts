@@ -23,7 +23,6 @@
  *     untouched
  */
 
-import type { CatalogService } from "@glyphs-ai/catalog";
 import { AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import { describe, expect, it, vi } from "vitest";
@@ -31,6 +30,8 @@ import {
   makeWorkflowKindHandler,
   WorkflowScheduleTargetError,
 } from "../../src/wiring/schedule-workflow-handler.js";
+
+type CatalogAgentLookup = Parameters<typeof makeWorkflowKindHandler>[0]["catalog"];
 
 const COORD_OK = { name: "coord", dependencies: { agents: ["worker"] } };
 
@@ -51,7 +52,7 @@ function stubDeps(
     nodeTasks?: Record<string, { id: string } | null>;
   } = {},
 ): {
-  catalog: CatalogService;
+  catalog: CatalogAgentLookup;
   tasks: TaskService;
   workflows: WorkflowService;
   getAgent: ReturnType<typeof vi.fn>;
@@ -88,7 +89,7 @@ function stubDeps(
   });
   const deleteTask = vi.fn(async () => undefined);
 
-  const catalog = { getAgent } as unknown as CatalogService;
+  const catalog = { getAgent } as unknown as CatalogAgentLookup;
   const tasks = {
     hasInFlightForWorkflowNode,
     findTaskByWorkflowNode,

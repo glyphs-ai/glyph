@@ -34,28 +34,12 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "WorkflowWorkerSpecError",
   "WorkspaceHasLiveTasksError",
   "WorkspaceLoadError",
-  // @glyphs-ai/catalog
-  "FetchError",
-  "AgentFrontmatterError",
-  "SkillFrontmatterError",
-  "CyclicDependencyError",
-  "HasDependentsError",
-  "McpInvalidJsonError",
-  "McpNameInvalidError",
-  "SkillNameInvalidError",
-  "AgentNameInvalidError",
-  "SkillNotFoundError",
-  // `AgentNotFoundError` is shared across catalog / session / schedule
-  // / task — one allow-list entry covers all four. Each owning pkg
-  // audits its own super(...) template for safety per the rules above.
+  // @glyphs-ai/catalog exposes DU errors; catalog route responses are
+  // projected directly from policy code matches rather than class names.
+  // `AgentNotFoundError` is shared across session / schedule / task —
+  // one allow-list entry covers all three. Each owning pkg audits its own
+  // super(...) template for safety per the rules above.
   "AgentNotFoundError",
-  "McpNotFoundError",
-  "SkillOriginConflictError",
-  "AgentOriginConflictError",
-  "McpOriginConflictError",
-  "OriginParseError",
-  "PlanStaleError",
-  "AgentPlanStaleError",
   "RuntimeDoesNotSupportRemoteError",
   // @glyphs-ai/session
   "InvalidSessionIdError",
@@ -160,9 +144,7 @@ export const INTERNAL_ERROR_NAMES = new Set<string>([
   "ApiError",
   // @glyphs-ai/api
   "WorkflowWorkerNotInCoordMenuError",
-  // @glyphs-ai/catalog
-  "CatalogError",
-  "FetcherError",
+  // @glyphs-ai/catalog uses DU errors and has no exported error classes.
   // @glyphs-ai/runtime
   "CopilotSdkUnavailableError",
   "UnknownPlaceholderError",
@@ -291,16 +273,23 @@ type StatusEntry = readonly [
   classStableBody?: (err: Error) => Record<string, unknown>,
 ];
 
+type CodeStatusEntry = readonly [
+  code: string,
+  status: ContentfulStatusCode,
+  codeStableBody?: (err: unknown) => Record<string, unknown>,
+];
+
 /**
- * A per-domain error policy — ordered list of `(class, status, body?)`
- * triples plus an optional default status. Each domain (tasks /
- * schedules / sessions / workspaces / catalog) maintains its own
- * policy so name-equal classes from different packages (e.g. the four
- * different `AgentNotFoundError` classes) map independently.
+ * A per-domain error policy — ordered lists of `(class, status, body?)`
+ * and `(code, status, body?)` triples plus an optional default status.
+ * Each domain (tasks / schedules / sessions / workspaces / catalog)
+ * maintains its own policy so name-equal classes or code-equal tagged
+ * errors from different domains map independently.
  */
 export interface ErrorPolicy {
   readonly name: string;
   readonly statuses: ReadonlyArray<StatusEntry>;
+  readonly codeStatuses?: ReadonlyArray<CodeStatusEntry>;
   /**
    * Status used when no `statuses` entry matches the thrown error.
    * Defaults to 400. Some routes (read-only / server-failure paths)
@@ -352,6 +341,8 @@ export interface RespondErrorOpts {
  * Status resolution:
  *   - First `instanceof` match in `policy.statuses` wins (order is
  *     significant — list subclasses before their bases).
+ *   - If no class matches, first `.code` match in `policy.codeStatuses`
+ *     wins.
  *   - On no match: status falls back to
  *     `opts.defaultStatus ?? policy.defaultStatus ?? 400`, and the
  *     entry is flagged `isUnmapped` so the log path fires.
@@ -359,7 +350,8 @@ export interface RespondErrorOpts {
  * Body precedence:
  *   1. `opts.customBody(err, status)` when defined AND returns non-null
  *   2. The matched entry's `classStableBody(err)` if present
- *   3. {@link errorBody} fallback (collapses unrecognised classes to
+ *   3. The matched entry's `codeStableBody(err)` if present
+ *   4. {@link errorBody} fallback (collapses unrecognised classes to
  *      `{ error: "internal error" }` per `SAFE_ERROR_NAMES`)
  */
 export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): Response {
@@ -384,6 +376,7 @@ export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): 
 
   let status: ContentfulStatusCode | undefined;
   let classStableBody: ((err: Error) => Record<string, unknown>) | undefined;
+  let codeStableBody: ((err: unknown) => Record<string, unknown>) | undefined;
 
   if (err instanceof Error) {
     for (const entry of opts.policy.statuses) {
@@ -391,6 +384,18 @@ export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): 
       if (err instanceof klass) {
         status = entryStatus;
         classStableBody = bodyBuilder;
+        break;
+      }
+    }
+  }
+
+  const errorCode = readErrorCode(err);
+  if (status === undefined && errorCode !== undefined) {
+    for (const entry of opts.policy.codeStatuses ?? []) {
+      const [code, entryStatus, bodyBuilder] = entry;
+      if (errorCode === code) {
+        status = entryStatus;
+        codeStableBody = bodyBuilder;
         break;
       }
     }
@@ -417,9 +422,17 @@ export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): 
     body = fromCustom;
   } else if (classStableBody !== undefined && err instanceof Error) {
     body = classStableBody(err);
+  } else if (codeStableBody !== undefined) {
+    body = codeStableBody(err);
   } else {
     body = errorBody(err);
   }
 
   return c.json(body, finalStatus);
+}
+
+function readErrorCode(err: unknown): string | undefined {
+  if (typeof err !== "object" || err === null || !("code" in err)) return undefined;
+  const code = err.code;
+  return typeof code === "string" ? code : undefined;
 }

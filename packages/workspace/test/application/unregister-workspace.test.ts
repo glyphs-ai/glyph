@@ -112,7 +112,7 @@ describe("UnregisterWorkspaceUseCase — error channel", () => {
     );
     const res = await useCase.execute({ id: VALID_ID, purge: true });
     expect(res._unsafeUnwrapErr().type).toBe("ProvisioningFailed");
-    // delete NOT called: teardown failed first, single linear chain.
+    // Delete is skipped when teardown fails.
     expect(repo.delete).not.toHaveBeenCalled();
   });
 

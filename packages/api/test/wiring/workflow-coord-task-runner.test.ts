@@ -2,7 +2,7 @@
  * Tests for `makeCoordNodeRunner`. Mirrors the structure of the
  * sibling worker runner tests
  * (`workflow-worker-task-runner.test.ts`) — same `vi`-based `TaskService` /
- * `CatalogService` stubs, same `vi.useFakeTimers()` pattern for the
+ * `CatalogAgentLookup` stubs, same `vi.useFakeTimers()` pattern for the
  * poll-tick scenarios, same `fakeTaskRow` helper.
  *
  * The kind-specific concerns the coord runner owns and these tests
@@ -23,7 +23,6 @@
  *   - dispose clears every armed interval (no `setInterval` leaks)
  */
 
-import type { CatalogService } from "@glyphs-ai/catalog";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -34,6 +33,8 @@ import {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "../../src/wiring/workflow-coord-task-runner.js";
+
+type CatalogAgentLookup = Parameters<typeof makeCoordNodeRunner>[0]["catalog"];
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal Task stub for status-mapping tests; full Task type not needed.
 function fakeTaskRow(overrides: Partial<{ id: string; status: string }> = {}): any {
@@ -106,7 +107,7 @@ function stubDeps(
     return opts.listInFlightReturn ?? [];
   });
   const cancel = vi.fn(async (_id: string) => {});
-  const catalog = { getAgent } as unknown as CatalogService;
+  const catalog = { getAgent } as unknown as CatalogAgentLookup;
   const tasks = {
     dispatch,
     get,

@@ -126,15 +126,26 @@ determined mechanically by its source imports. Enforced by
 that resolves to a file under the same package's `src/` tree (resolve
 relative to the test file's directory; exclude type-only imports,
 `vi.mock(...)`, `vi.importActual(...)`, and imports of other workspace
-packages or node builtins).
+packages or node builtins). **Demote `src/domain/` imports**: domain
+entities and value objects are the package's foundational kernel that
+any layer's test legitimately constructs as input data, so they do not
+locate a test unless they are *all* it imports. The locating set is the
+non-`domain/` imports when any exist, else the domain imports.
 
-1. **Zero in-pkg value-imports** → flat at `test/<name>.test.{ts,tsx}`
+1. **Zero locating imports** → flat at `test/<name>.test.{ts,tsx}`
    (cross-cutting / e2e / fs-walk audits).
-2. **All value-imports share a common subdirectory under `src/`
+2. **All locating imports share a common subdirectory under `src/`
    strictly deeper than `src/` itself** → MUST live at
    `test/<that-subdir>/<name>.test.{ts,tsx}`.
-3. **Multiple value-imports with no common subdir below `src/`** →
+3. **Multiple locating imports with no common subdir below `src/`** →
    flat at `test/<name>.test.{ts,tsx}`.
+
+So a use-case test importing its use-case from `application/<group>/`
+plus domain entities lives at `test/application/<group>/` (the domain
+imports are demoted), while a pure domain unit test that imports only
+domain lives at `test/domain/`. The walk over `test/` does not skip a
+`drizzle` directory (that skip targets the generated `drizzle/*.sql`
+migrations under the package root, not `test/infrastructure/drizzle/`).
 
 Type-only imports (`import type { Foo } from "..."` and the `type`
 modifier inside mixed `import { type Foo, bar }` specifiers) compile

@@ -1,7 +1,7 @@
 /**
  * Tests for `makeWorkerNodeRunner`. Mirrors the structure of
  * `schedule-task-handler.test.ts` — uses mocked `TaskService` +
- * `CatalogService` to exercise the runner in isolation, focusing on
+ * `CatalogAgentLookup` to exercise the runner in isolation, focusing on
  * the kind-specific concerns the runner owns:
  *
  *   - validate: shape checks + agent-existence lookup
@@ -33,7 +33,6 @@
  * boot in this layer.
  */
 
-import type { CatalogService } from "@glyphs-ai/catalog";
 import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -43,6 +42,8 @@ import {
   WorkflowWorkerNotInCoordMenuError,
   WorkflowWorkerSpecError,
 } from "../../src/wiring/workflow-worker-task-runner.js";
+
+type CatalogAgentLookup = Parameters<typeof makeWorkerNodeRunner>[0]["catalog"];
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal Task stub for status-mapping tests; full Task type not needed.
 function fakeTaskRow(overrides: Partial<{ id: string; status: string }> = {}): any {
@@ -114,7 +115,7 @@ function stubDeps(
     return opts.listInFlightReturn ?? [];
   });
   const cancel = vi.fn(async (_id: string) => {});
-  const catalog = { getAgent } as unknown as CatalogService;
+  const catalog = { getAgent } as unknown as CatalogAgentLookup;
   const tasks = {
     dispatch,
     get,

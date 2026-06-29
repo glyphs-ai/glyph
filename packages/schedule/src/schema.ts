@@ -24,7 +24,7 @@ import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
  * (see `compose.ts`) owns the existence lookup for whatever entity
  * its kind references (for the `task` kind, that's
  * `packages/api/src/wiring/schedule-task-handler.ts` calling
- * `CatalogService.getAgent` during `validate`).
+ * `CatalogModule.getAgent` during `validate`).
  */
 export const schedules = sqliteTable(
   "schedules",

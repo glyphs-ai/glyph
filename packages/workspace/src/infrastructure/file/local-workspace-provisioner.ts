@@ -7,16 +7,8 @@ import type {
 } from "../../domain/workspace-provisioner.js";
 
 /**
- * `node:fs` adapter for {@link WorkspaceProvisioner}. The workspace
- * skeleton it manages is `sessions/`, `tasks/`, and `workflows/`
- * under `workspaceDir` — the three subdirs the T0/T1 entity packages
- * write into. Workspace owns the layout; consumers `mkdir` per-id
- * leaves (`<dir>/<id>/`) lazily but never own the parent directory.
- *
- * Each operation uses recursive flags so it is idempotent across
- * retries. The adapter is the sole authorized site for filesystem
- * syscalls in this package; the application layer depends only on the
- * port and never imports `node:fs` directly.
+ * Local filesystem adapter for the workspace skeleton: `sessions/`,
+ * `tasks/`, and `workflows/` under `workspaceDir`.
  */
 export class LocalWorkspaceProvisioner implements WorkspaceProvisioner {
   private static skeleton(workspaceDir: string): {

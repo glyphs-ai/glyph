@@ -16,11 +16,7 @@ beforeEach(() => {
   repo = setupRepo();
 });
 
-// Trusted test fixtures: every value is hand-authored to satisfy the
-// branded schemas (UUID format, non-empty name). Casting once here
-// keeps assertions concise — going through `WorkspaceIdSchema.parse`
-// for each constant would add noise without catching anything
-// (developer error in fixture data fails the test anyway).
+// Trusted fixture constants satisfy the branded ID and name schemas.
 const STATE_A = {
   id: "11111111-1111-4111-8111-111111111111" as WorkspaceId,
   name: "Alpha" as WorkspaceName,
@@ -80,7 +76,7 @@ describe("DrizzleWorkspaceRepository", () => {
       await repo.insert(new WorkspaceEntity(STATE_C));
 
       const all = (await repo.findAllByLastOpened())._unsafeUnwrap();
-      // B (2025-02-03) > C (2025-01-15) > A (2025-01-02)
+      // Ordered by lastOpenedAt descending.
       expect(all.map((r) => r.id)).toEqual([STATE_B.id, STATE_C.id, STATE_A.id]);
     });
   });

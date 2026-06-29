@@ -28,11 +28,7 @@ export interface GetLastOpenedWorkspaceDeps {
 
 const silentLogger: Logger = pino({ level: "silent" });
 
-/**
- * Return the most-recently-opened workspace (highest `lastOpenedAt`),
- * or `null` when the registry is empty. Drives the dashboard's
- * default-workspace pick on cold launch.
- */
+/** Return the most recently opened workspace, or `null` when empty. */
 export class GetLastOpenedWorkspaceUseCase
   implements
     UseCase<
