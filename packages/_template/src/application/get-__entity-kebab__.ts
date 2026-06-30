@@ -30,9 +30,7 @@ export class Get__Entity__UseCase
 {
   constructor(private readonly deps: Get__Entity__Deps) {}
 
-  async execute(
-    request: Get__Entity__Request,
-  ): UseCaseResult<Get__Entity__Response, Get__Entity__Error> {
+  execute(request: Get__Entity__Request): UseCaseResult<Get__Entity__Response, Get__Entity__Error> {
     const { id } = Get__Entity__RequestSchema.parse(request);
     return this.deps.repo.get(id).map((entity) => ({
       id: entity.id,

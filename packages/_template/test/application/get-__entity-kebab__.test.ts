@@ -19,7 +19,7 @@ beforeEach(() => {
 
 describe("Get__Entity__UseCase — input validation", () => {
   it("rejects a malformed id with ZodError", async () => {
-    await expect(useCase.execute({ id: "bad" as __Entity__Id })).rejects.toThrow(ZodError);
+    expect(() => useCase.execute({ id: "bad" as __Entity__Id })).toThrow(ZodError);
   });
 });
 

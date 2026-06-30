@@ -1,4 +1,4 @@
-import { err, ok } from "neverthrow";
+import { ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import { SkillFqnSchema } from "../../domain/skill-fqn.js";
@@ -41,44 +41,42 @@ export interface GetSkillDeps {
 export class GetSkillUseCase implements UseCase<GetSkillRequest, GetSkillResponse, GetSkillError> {
   constructor(private readonly deps: GetSkillDeps) {}
 
-  async execute(request: GetSkillRequest): UseCaseResult<GetSkillResponse, GetSkillError> {
-    const skill = await this.deps.skillRepo.get(request.id);
-    if (skill.isErr()) {
-      return err(skill.error);
-    }
-    const agents = await this.deps.agentRepo.list();
-    if (agents.isErr()) return err(agents.error);
-    const skills = await this.deps.skillRepo.list();
-    if (skills.isErr()) return err(skills.error);
-    const referencedSkillFqns = new Set<string>();
-    for (const agent of agents.value) {
-      for (const fqn of agent.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-    }
-    for (const installedSkill of skills.value) {
-      for (const fqn of installedSkill.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-    }
-    const dependencies =
-      skill.value.dependencyRefs.skills.length > 0 || skill.value.dependencyRefs.mcps.length > 0
-        ? {
-            ...(skill.value.dependencyRefs.skills.length > 0
-              ? { skills: skill.value.dependencyRefs.skills.map((fqn) => ({ fqn })) }
-              : {}),
-            ...(skill.value.dependencyRefs.mcps.length > 0
-              ? { mcps: skill.value.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
-              : {}),
-          }
-        : undefined;
-    return ok({
-      fqn: skill.value.fqn,
-      origin: skill.value.origin,
-      description: skill.value.description,
-      version: skill.value.version,
-      ...(skill.value.prereqs !== undefined ? { prereqs: skill.value.prereqs } : {}),
-      prereqsAck: skill.value.prereqsAck,
-      orphaned: !referencedSkillFqns.has(skill.value.fqn),
-      installedAt: skill.value.installedAt,
-      updatedAt: skill.value.updatedAt,
-      ...(dependencies !== undefined ? { dependencies } : {}),
+  execute(request: GetSkillRequest): UseCaseResult<GetSkillResponse, GetSkillError> {
+    const deps = this.deps;
+    return safeTry<GetSkillResponse, GetSkillError>(async function* () {
+      const skill = yield* deps.skillRepo.get(request.id);
+      const agents = yield* deps.agentRepo.list();
+      const skills = yield* deps.skillRepo.list();
+      const referencedSkillFqns = new Set<string>();
+      for (const agent of agents) {
+        for (const fqn of agent.dependencyRefs.skills) referencedSkillFqns.add(fqn);
+      }
+      for (const installedSkill of skills) {
+        for (const fqn of installedSkill.dependencyRefs.skills) referencedSkillFqns.add(fqn);
+      }
+      const dependencies =
+        skill.dependencyRefs.skills.length > 0 || skill.dependencyRefs.mcps.length > 0
+          ? {
+              ...(skill.dependencyRefs.skills.length > 0
+                ? { skills: skill.dependencyRefs.skills.map((fqn) => ({ fqn })) }
+                : {}),
+              ...(skill.dependencyRefs.mcps.length > 0
+                ? { mcps: skill.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
+                : {}),
+            }
+          : undefined;
+      return ok({
+        fqn: skill.fqn,
+        origin: skill.origin,
+        description: skill.description,
+        version: skill.version,
+        ...(skill.prereqs !== undefined ? { prereqs: skill.prereqs } : {}),
+        prereqsAck: skill.prereqsAck,
+        orphaned: !referencedSkillFqns.has(skill.fqn),
+        installedAt: skill.installedAt,
+        updatedAt: skill.updatedAt,
+        ...(dependencies !== undefined ? { dependencies } : {}),
+      });
     });
   }
 }

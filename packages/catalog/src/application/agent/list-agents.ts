@@ -34,7 +34,7 @@ export class ListAgentsUseCase
 {
   constructor(private readonly deps: ListAgentsDeps) {}
 
-  async execute(_request: ListAgentsRequest): UseCaseResult<ListAgentsResponse, ListAgentsError> {
+  execute(_request: ListAgentsRequest): UseCaseResult<ListAgentsResponse, ListAgentsError> {
     return this.deps.agentRepo.list().map((agents) =>
       agents.map((agent) => ({
         id: agent.id,

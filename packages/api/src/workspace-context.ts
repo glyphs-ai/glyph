@@ -148,7 +148,7 @@ interface CatalogRuntimePorts extends AgentContentSource, CatalogAgentLookup {
 
 function makeCatalogRuntimePorts(catalog: CatalogModule): CatalogRuntimePorts {
   const unwrap = async <T, E extends { readonly type: string }>(
-    result: Promise<Result<T, E>>,
+    result: PromiseLike<Result<T, E>>,
   ): Promise<T> => {
     const settled = await result;
     if (settled.isErr()) throw new Error(settled.error.type);

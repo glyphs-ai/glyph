@@ -17,14 +17,14 @@ beforeEach(() => {
 
 describe("Create__Entity__UseCase — input validation", () => {
   it("rejects an empty name with ZodError", async () => {
-    await expect(useCase.execute({ name: "" })).rejects.toThrow(ZodError);
+    expect(() => useCase.execute({ name: "" })).toThrow(ZodError);
     expect(repo.insert).not.toHaveBeenCalled();
   });
 
   it("rejects an unknown key (strict)", async () => {
-    await expect(
+    expect(() =>
       useCase.execute({ name: "x", extra: 1 } as Parameters<typeof useCase.execute>[0]),
-    ).rejects.toThrow(ZodError);
+    ).toThrow(ZodError);
   });
 });
 

@@ -44,10 +44,10 @@ export class GetUpstreamTreeUseCase
 {
   constructor(private readonly sources: UpstreamSources) {}
 
-  async execute(
+  execute(
     request: GetUpstreamTreeRequest,
   ): UseCaseResult<GetUpstreamTreeResponse, GetUpstreamTreeError> {
-    return await ResultAsync.fromSafePromise(this.walk(request));
+    return ResultAsync.fromSafePromise(this.walk(request));
   }
 
   private async walk(root: GetUpstreamTreeRequest): Promise<ResolvedGraph> {

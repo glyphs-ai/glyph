@@ -58,7 +58,7 @@ export class InstallMcpUseCase
 {
   constructor(private readonly deps: InstallMcpDeps) {}
 
-  async execute(request: InstallMcpRequest): UseCaseResult<InstallMcpResponse, InstallMcpError> {
+  execute(request: InstallMcpRequest): UseCaseResult<InstallMcpResponse, InstallMcpError> {
     return this.deps.mcpSource
       .load(request.origin)
       .andThen((manifest) => this.guardOrigin(manifest, request.origin))

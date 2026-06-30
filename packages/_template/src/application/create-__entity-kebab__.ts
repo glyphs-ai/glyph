@@ -32,7 +32,7 @@ export class Create__Entity__UseCase
 {
   constructor(private readonly deps: Create__Entity__Deps) {}
 
-  async execute(
+  execute(
     request: Create__Entity__Request,
   ): UseCaseResult<Create__Entity__Response, Create__Entity__Error> {
     const { name } = Create__Entity__RequestSchema.parse(request);

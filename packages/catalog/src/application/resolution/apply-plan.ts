@@ -86,8 +86,8 @@ export class ApplyPlanUseCase
 {
   constructor(private readonly deps: ApplyPlanDeps) {}
 
-  async execute(request: ApplyPlanRequest): UseCaseResult<ApplyPlanResponse, ApplyPlanError> {
-    return await ResultAsync.fromSafePromise(this.run(request.plan));
+  execute(request: ApplyPlanRequest): UseCaseResult<ApplyPlanResponse, ApplyPlanError> {
+    return ResultAsync.fromSafePromise(this.run(request.plan));
   }
 
   private async run(plan: ResolvePlanResponse): Promise<ApplyPlanResponse> {

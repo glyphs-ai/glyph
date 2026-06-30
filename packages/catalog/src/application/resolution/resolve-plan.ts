@@ -140,8 +140,8 @@ export class ResolvePlanUseCase
 {
   constructor(private readonly deps: ResolvePlanDeps) {}
 
-  async execute(request: ResolvePlanRequest): UseCaseResult<ResolvePlanResponse, ResolvePlanError> {
-    return await this.rootOrigin(request).andThen((origin) =>
+  execute(request: ResolvePlanRequest): UseCaseResult<ResolvePlanResponse, ResolvePlanError> {
+    return this.rootOrigin(request).andThen((origin) =>
       ResultAsync.fromSafePromise(this.build(request.kind, origin)),
     );
   }

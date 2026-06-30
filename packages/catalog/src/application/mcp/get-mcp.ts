@@ -1,4 +1,4 @@
-import { err, ok } from "neverthrow";
+import { ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import { McpFqnSchema } from "../../domain/mcp-fqn.js";
@@ -29,28 +29,26 @@ export interface GetMcpDeps {
 export class GetMcpUseCase implements UseCase<GetMcpRequest, GetMcpResponse, GetMcpError> {
   constructor(private readonly deps: GetMcpDeps) {}
 
-  async execute(request: GetMcpRequest): UseCaseResult<GetMcpResponse, GetMcpError> {
-    const mcp = await this.deps.mcpRepo.get(request.id);
-    if (mcp.isErr()) {
-      return err(mcp.error);
-    }
-    const agents = await this.deps.agentRepo.list();
-    if (agents.isErr()) return err(agents.error);
-    const skills = await this.deps.skillRepo.list();
-    if (skills.isErr()) return err(skills.error);
-    const referencedMcpFqns = new Set<string>();
-    for (const agent of agents.value) {
-      for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-    }
-    for (const skill of skills.value) {
-      for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-    }
-    return ok({
-      fqn: mcp.value.fqn,
-      origin: mcp.value.origin,
-      orphaned: !referencedMcpFqns.has(mcp.value.fqn),
-      installedAt: mcp.value.installedAt,
-      updatedAt: mcp.value.updatedAt,
+  execute(request: GetMcpRequest): UseCaseResult<GetMcpResponse, GetMcpError> {
+    const deps = this.deps;
+    return safeTry<GetMcpResponse, GetMcpError>(async function* () {
+      const mcp = yield* deps.mcpRepo.get(request.id);
+      const agents = yield* deps.agentRepo.list();
+      const skills = yield* deps.skillRepo.list();
+      const referencedMcpFqns = new Set<string>();
+      for (const agent of agents) {
+        for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
+      }
+      for (const skill of skills) {
+        for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
+      }
+      return ok({
+        fqn: mcp.fqn,
+        origin: mcp.origin,
+        orphaned: !referencedMcpFqns.has(mcp.fqn),
+        installedAt: mcp.installedAt,
+        updatedAt: mcp.updatedAt,
+      });
     });
   }
 }

@@ -54,9 +54,7 @@ export class InstallAgentUseCase
 {
   constructor(private readonly deps: InstallAgentDeps) {}
 
-  async execute(
-    request: InstallAgentRequest,
-  ): UseCaseResult<InstallAgentResponse, InstallAgentError> {
+  execute(request: InstallAgentRequest): UseCaseResult<InstallAgentResponse, InstallAgentError> {
     return this.deps.agentSource
       .load(request.origin)
       .andThen((manifest) => this.buildEntity(manifest, request.origin, request.dependencyRefs))

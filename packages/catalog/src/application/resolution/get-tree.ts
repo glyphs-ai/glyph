@@ -4,7 +4,7 @@
  * origin-based so it can be diffed against upstream manifests.
  */
 
-import { err, ok, type Result } from "neverthrow";
+import { err, ok, type Result, safeTry } from "neverthrow";
 import { z } from "zod";
 import type { AgentFqn } from "../../domain/agent-fqn.js";
 import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
@@ -33,32 +33,34 @@ export interface GetTreeDeps {
 export class GetTreeUseCase implements UseCase<GetTreeRequest, GetTreeResponse, GetTreeError> {
   constructor(private readonly repos: GetTreeDeps) {}
 
-  async execute(request: GetTreeRequest): UseCaseResult<GetTreeResponse, GetTreeError> {
-    const nodes = new Map<string, ResolvedNode>();
-    const visited = new Set<string>();
+  execute(request: GetTreeRequest): UseCaseResult<GetTreeResponse, GetTreeError> {
+    const self = this;
+    return safeTry<GetTreeResponse, GetTreeError>(async function* () {
+      const nodes = new Map<string, ResolvedNode>();
+      const visited = new Set<string>();
 
-    const visit = async (origin: string): Promise<Result<void, DatabaseUnavailable>> => {
-      if (visited.has(origin)) return ok(undefined);
-      visited.add(origin);
-      const loaded = await this.load(origin);
-      if (loaded.isErr()) return err(loaded.error);
-      const node = loaded.value;
-      if (node === null) return ok(undefined);
-      nodes.set(origin, node);
-      for (const depOrigin of [
-        ...node.dependencyRefs.mcps,
-        ...node.dependencyRefs.skills,
-        ...node.dependencyRefs.agents,
-      ]) {
-        const r = await visit(depOrigin);
-        if (r.isErr()) return err(r.error);
-      }
-      return ok(undefined);
-    };
+      const visit = async (origin: string): Promise<Result<void, DatabaseUnavailable>> => {
+        if (visited.has(origin)) return ok(undefined);
+        visited.add(origin);
+        const loaded = await self.load(origin);
+        if (loaded.isErr()) return err(loaded.error);
+        const node = loaded.value;
+        if (node === null) return ok(undefined);
+        nodes.set(origin, node);
+        for (const depOrigin of [
+          ...node.dependencyRefs.mcps,
+          ...node.dependencyRefs.skills,
+          ...node.dependencyRefs.agents,
+        ]) {
+          const r = await visit(depOrigin);
+          if (r.isErr()) return err(r.error);
+        }
+        return ok(undefined);
+      };
 
-    const walked = await visit(request.origin);
-    if (walked.isErr()) return err(walked.error);
-    return ok({ nodes: [...nodes.values()], conflicts: [] });
+      yield* await visit(request.origin);
+      return ok({ nodes: [...nodes.values()], conflicts: [] });
+    });
   }
 
   private async load(origin: string): Promise<Result<ResolvedNode | null, DatabaseUnavailable>> {

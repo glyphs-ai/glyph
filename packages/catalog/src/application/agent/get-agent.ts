@@ -1,4 +1,3 @@
-import { err, ok } from "neverthrow";
 import { z } from "zod";
 import { AgentFqnSchema } from "../../domain/agent-fqn.js";
 import type {
@@ -41,39 +40,36 @@ export interface GetAgentDeps {
 export class GetAgentUseCase implements UseCase<GetAgentRequest, GetAgentResponse, GetAgentError> {
   constructor(private readonly deps: GetAgentDeps) {}
 
-  async execute(request: GetAgentRequest): UseCaseResult<GetAgentResponse, GetAgentError> {
-    const found = await this.deps.agentRepo.get(request.id);
-    if (found.isErr()) {
-      return err(found.error);
-    }
-    const agent = found.value;
-    const dependencies =
-      agent.dependencyRefs.skills.length > 0 ||
-      agent.dependencyRefs.mcps.length > 0 ||
-      agent.dependencyRefs.agents.length > 0
-        ? {
-            ...(agent.dependencyRefs.skills.length > 0
-              ? { skills: agent.dependencyRefs.skills.map((fqn) => ({ fqn })) }
-              : {}),
-            ...(agent.dependencyRefs.mcps.length > 0
-              ? { mcps: agent.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
-              : {}),
-            ...(agent.dependencyRefs.agents.length > 0
-              ? { agents: agent.dependencyRefs.agents.map((fqn) => ({ fqn })) }
-              : {}),
-          }
-        : undefined;
-    return ok({
-      fqn: agent.fqn,
-      origin: agent.origin,
-      description: agent.description,
-      version: agent.version,
-      ...(agent.prereqs !== undefined ? { prereqs: agent.prereqs } : {}),
-      prereqsAck: agent.prereqsAck,
-      disabledByUser: agent.disabledByUser,
-      installedAt: agent.installedAt,
-      updatedAt: agent.updatedAt,
-      ...(dependencies !== undefined ? { dependencies } : {}),
+  execute(request: GetAgentRequest): UseCaseResult<GetAgentResponse, GetAgentError> {
+    return this.deps.agentRepo.get(request.id).map((agent) => {
+      const dependencies =
+        agent.dependencyRefs.skills.length > 0 ||
+        agent.dependencyRefs.mcps.length > 0 ||
+        agent.dependencyRefs.agents.length > 0
+          ? {
+              ...(agent.dependencyRefs.skills.length > 0
+                ? { skills: agent.dependencyRefs.skills.map((fqn) => ({ fqn })) }
+                : {}),
+              ...(agent.dependencyRefs.mcps.length > 0
+                ? { mcps: agent.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
+                : {}),
+              ...(agent.dependencyRefs.agents.length > 0
+                ? { agents: agent.dependencyRefs.agents.map((fqn) => ({ fqn })) }
+                : {}),
+            }
+          : undefined;
+      return {
+        fqn: agent.fqn,
+        origin: agent.origin,
+        description: agent.description,
+        version: agent.version,
+        ...(agent.prereqs !== undefined ? { prereqs: agent.prereqs } : {}),
+        prereqsAck: agent.prereqsAck,
+        disabledByUser: agent.disabledByUser,
+        installedAt: agent.installedAt,
+        updatedAt: agent.updatedAt,
+        ...(dependencies !== undefined ? { dependencies } : {}),
+      };
     });
   }
 }

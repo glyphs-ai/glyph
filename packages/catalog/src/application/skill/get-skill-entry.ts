@@ -1,4 +1,4 @@
-import { err, ok } from "neverthrow";
+import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import { z } from "zod";
 import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import type { McpRepository } from "../../domain/mcp-repository.js";
@@ -75,110 +75,115 @@ export class GetSkillEntryUseCase
 {
   constructor(private readonly deps: GetSkillEntryDeps) {}
 
-  async execute(
-    request: GetSkillEntryRequest,
-  ): UseCaseResult<GetSkillEntryResponse, GetSkillEntryError> {
-    const skill = await this.deps.skillRepo.get(request.id);
-    if (skill.isErr()) {
-      if (skill.error.type === "SkillNotFound") return ok(null);
-      return err(skill.error);
-    }
-    const skills = await this.deps.skillRepo.list();
-    if (skills.isErr()) return err(skills.error);
-    const agents = await this.deps.agentRepo.list();
-    if (agents.isErr()) return err(agents.error);
-    const mcps = await this.deps.mcpRepo.list();
-    if (mcps.isErr()) return err(mcps.error);
-    const referencedSkillFqns = new Set<string>();
-    const referencedMcpFqns = new Set<string>();
-    for (const agent of agents.value) {
-      for (const fqn of agent.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-      for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-    }
-    for (const skill of skills.value) {
-      for (const fqn of skill.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-      for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-    }
-    const skillByFqn = new Map<string, SkillEntity>(
-      skills.value.map((skill) => [skill.fqn, skill] as const),
-    );
-    const mcpByFqn = new Map<string, (typeof mcps.value)[number]>(
-      mcps.value.map((mcp) => [mcp.fqn, mcp] as const),
-    );
-    const skillCache = new Map<string, ComputedStatus>();
-    const inFlight = new Set<string>();
-    const computeSkillStatus = (skillEntity: SkillEntity): ComputedStatus => {
-      const cached = skillCache.get(skillEntity.fqn);
-      if (cached !== undefined) return cached;
-      if (inFlight.has(skillEntity.fqn)) return { status: "ready" as const };
-      inFlight.add(skillEntity.fqn);
-      const reason: BlockedReason = {};
-      if (!skillEntity.prereqsAck && (skillEntity.prereqs ?? "").trim().length > 0) {
-        reason.needsPrereqsAck = true;
-      }
-      if (!referencedSkillFqns.has(skillEntity.fqn)) reason.orphaned = true;
-      const missing: MissingDep[] = [];
-      const blockedDeps: BlockedDep[] = [];
-      for (const fqn of skillEntity.dependencyRefs.skills) {
-        const child = skillByFqn.get(fqn);
-        if (child === undefined) {
-          missing.push({ kind: "skill", name: fqn });
-          continue;
-        }
-        const childStatus = computeSkillStatus(child);
-        if (childStatus.status === "blocked") blockedDeps.push({ kind: "skill", fqn: child.fqn });
-      }
-      for (const fqn of skillEntity.dependencyRefs.mcps) {
-        const child = mcpByFqn.get(fqn);
-        if (child === undefined) missing.push({ kind: "mcp", name: fqn });
-      }
-      if (missing.length > 0) reason.missingDeps = missing;
-      if (blockedDeps.length > 0) reason.blockedDeps = blockedDeps;
-      const result: ComputedStatus =
-        Object.keys(reason).length === 0
-          ? { status: "ready" as const }
-          : { status: "blocked" as const, reason };
-      inFlight.delete(skillEntity.fqn);
-      skillCache.set(skillEntity.fqn, result);
-      return result;
-    };
-    const skillEntities = [skill.value];
-    const entries = skillEntities.map((skillEntity) => {
-      const dependencies =
-        skillEntity.dependencyRefs.skills.length > 0 || skillEntity.dependencyRefs.mcps.length > 0
-          ? {
-              ...(skillEntity.dependencyRefs.skills.length > 0
-                ? { skills: skillEntity.dependencyRefs.skills.map((fqn) => ({ fqn })) }
-                : {}),
-              ...(skillEntity.dependencyRefs.mcps.length > 0
-                ? { mcps: skillEntity.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
-                : {}),
+  execute(request: GetSkillEntryRequest): UseCaseResult<GetSkillEntryResponse, GetSkillEntryError> {
+    return this.deps.skillRepo
+      .get(request.id)
+      .orElse((error) =>
+        error.type === "SkillNotFound"
+          ? okAsync<SkillEntity | null, DatabaseUnavailable>(null)
+          : errAsync<SkillEntity | null, DatabaseUnavailable>(error),
+      )
+      .andThen((skill) => {
+        if (skill === null) return okAsync<GetSkillEntryResponse, GetSkillEntryError>(null);
+        return ResultAsync.combine([
+          this.deps.skillRepo.list(),
+          this.deps.agentRepo.list(),
+          this.deps.mcpRepo.list(),
+        ]).map(([skills, agents, mcps]) => {
+          const referencedSkillFqns = new Set<string>();
+          const referencedMcpFqns = new Set<string>();
+          for (const agent of agents) {
+            for (const fqn of agent.dependencyRefs.skills) referencedSkillFqns.add(fqn);
+            for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
+          }
+          for (const skill of skills) {
+            for (const fqn of skill.dependencyRefs.skills) referencedSkillFqns.add(fqn);
+            for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
+          }
+          const skillByFqn = new Map<string, SkillEntity>(
+            skills.map((skill) => [skill.fqn, skill] as const),
+          );
+          const mcpByFqn = new Map<string, (typeof mcps)[number]>(
+            mcps.map((mcp) => [mcp.fqn, mcp] as const),
+          );
+          const skillCache = new Map<string, ComputedStatus>();
+          const inFlight = new Set<string>();
+          const computeSkillStatus = (skillEntity: SkillEntity): ComputedStatus => {
+            const cached = skillCache.get(skillEntity.fqn);
+            if (cached !== undefined) return cached;
+            if (inFlight.has(skillEntity.fqn)) return { status: "ready" as const };
+            inFlight.add(skillEntity.fqn);
+            const reason: BlockedReason = {};
+            if (!skillEntity.prereqsAck && (skillEntity.prereqs ?? "").trim().length > 0) {
+              reason.needsPrereqsAck = true;
             }
-          : undefined;
-      const skill = {
-        fqn: skillEntity.fqn,
-        origin: skillEntity.origin,
-        description: skillEntity.description,
-        version: skillEntity.version,
-        ...(skillEntity.prereqs !== undefined ? { prereqs: skillEntity.prereqs } : {}),
-        prereqsAck: skillEntity.prereqsAck,
-        orphaned: !referencedSkillFqns.has(skillEntity.fqn),
-        installedAt: skillEntity.installedAt,
-        updatedAt: skillEntity.updatedAt,
-        ...(dependencies !== undefined ? { dependencies } : {}),
-      };
-      const computed = computeSkillStatus(skillEntity);
-      if (computed.status === "ready") return { skill, status: "ready" as const };
-      const out = {
-        skill,
-        status: "blocked" as const,
-        ...(computed.reason !== undefined ? { blockedReason: computed.reason } : {}),
-      };
-      return computed.reason?.missingDeps !== undefined
-        ? { ...out, missingDeps: computed.reason.missingDeps }
-        : out;
-    });
+            if (!referencedSkillFqns.has(skillEntity.fqn)) reason.orphaned = true;
+            const missing: MissingDep[] = [];
+            const blockedDeps: BlockedDep[] = [];
+            for (const fqn of skillEntity.dependencyRefs.skills) {
+              const child = skillByFqn.get(fqn);
+              if (child === undefined) {
+                missing.push({ kind: "skill", name: fqn });
+                continue;
+              }
+              const childStatus = computeSkillStatus(child);
+              if (childStatus.status === "blocked")
+                blockedDeps.push({ kind: "skill", fqn: child.fqn });
+            }
+            for (const fqn of skillEntity.dependencyRefs.mcps) {
+              const child = mcpByFqn.get(fqn);
+              if (child === undefined) missing.push({ kind: "mcp", name: fqn });
+            }
+            if (missing.length > 0) reason.missingDeps = missing;
+            if (blockedDeps.length > 0) reason.blockedDeps = blockedDeps;
+            const result: ComputedStatus =
+              Object.keys(reason).length === 0
+                ? { status: "ready" as const }
+                : { status: "blocked" as const, reason };
+            inFlight.delete(skillEntity.fqn);
+            skillCache.set(skillEntity.fqn, result);
+            return result;
+          };
+          const skillEntities = [skill];
+          const entries = skillEntities.map((skillEntity) => {
+            const dependencies =
+              skillEntity.dependencyRefs.skills.length > 0 ||
+              skillEntity.dependencyRefs.mcps.length > 0
+                ? {
+                    ...(skillEntity.dependencyRefs.skills.length > 0
+                      ? { skills: skillEntity.dependencyRefs.skills.map((fqn) => ({ fqn })) }
+                      : {}),
+                    ...(skillEntity.dependencyRefs.mcps.length > 0
+                      ? { mcps: skillEntity.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
+                      : {}),
+                  }
+                : undefined;
+            const skill = {
+              fqn: skillEntity.fqn,
+              origin: skillEntity.origin,
+              description: skillEntity.description,
+              version: skillEntity.version,
+              ...(skillEntity.prereqs !== undefined ? { prereqs: skillEntity.prereqs } : {}),
+              prereqsAck: skillEntity.prereqsAck,
+              orphaned: !referencedSkillFqns.has(skillEntity.fqn),
+              installedAt: skillEntity.installedAt,
+              updatedAt: skillEntity.updatedAt,
+              ...(dependencies !== undefined ? { dependencies } : {}),
+            };
+            const computed = computeSkillStatus(skillEntity);
+            if (computed.status === "ready") return { skill, status: "ready" as const };
+            const out = {
+              skill,
+              status: "blocked" as const,
+              ...(computed.reason !== undefined ? { blockedReason: computed.reason } : {}),
+            };
+            return computed.reason?.missingDeps !== undefined
+              ? { ...out, missingDeps: computed.reason.missingDeps }
+              : out;
+          });
 
-    return ok(entries[0] ?? null);
+          return entries[0] ?? null;
+        });
+      });
   }
 }

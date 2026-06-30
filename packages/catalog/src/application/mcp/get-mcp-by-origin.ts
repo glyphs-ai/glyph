@@ -36,7 +36,7 @@ export class GetMcpByOriginUseCase
 {
   constructor(private readonly deps: GetMcpByOriginDeps) {}
 
-  async execute(
+  execute(
     request: GetMcpByOriginRequest,
   ): UseCaseResult<GetMcpByOriginResponse, GetMcpByOriginError> {
     return this.deps.mcpRepo

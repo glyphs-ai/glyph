@@ -7,7 +7,7 @@
  * doesn't resolve; `HasDependents` when something still references it.
  */
 
-import { err } from "neverthrow";
+import { err, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import { McpFqnSchema } from "../../domain/mcp-fqn.js";
@@ -43,19 +43,18 @@ export class UninstallMcpUseCase
 {
   constructor(private readonly deps: UninstallMcpDeps) {}
 
-  async execute(
-    request: UninstallMcpRequest,
-  ): UseCaseResult<UninstallMcpResponse, UninstallMcpError> {
+  execute(request: UninstallMcpRequest): UseCaseResult<UninstallMcpResponse, UninstallMcpError> {
     const fqn = request.id;
-    const found = await this.deps.mcpRepo.get(fqn);
-    if (found.isErr()) return err(found.error);
-
-    const byAgent = await this.deps.agentRepo.existsUsingMcp(fqn);
-    if (byAgent.isErr()) return err(byAgent.error);
-    const bySkill = await this.deps.skillRepo.existsUsingMcp(fqn);
-    if (bySkill.isErr()) return err(bySkill.error);
-    if (byAgent.value || bySkill.value) return err({ type: "HasDependents", fqn });
-
-    return this.deps.mcpRepo.delete(fqn).map(() => ({ id: fqn }));
+    const deps = this.deps;
+    return safeTry<UninstallMcpResponse, UninstallMcpError>(async function* () {
+      yield* deps.mcpRepo.get(fqn);
+      const byAgent = yield* deps.agentRepo.existsUsingMcp(fqn);
+      const bySkill = yield* deps.skillRepo.existsUsingMcp(fqn);
+      if (byAgent || bySkill) {
+        return err<UninstallMcpResponse, UninstallMcpError>({ type: "HasDependents", fqn });
+      }
+      yield* deps.mcpRepo.delete(fqn);
+      return ok<UninstallMcpResponse, UninstallMcpError>({ id: fqn });
+    });
   }
 }

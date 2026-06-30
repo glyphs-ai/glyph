@@ -37,11 +37,14 @@ export function catalogRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono
     }),
     async (c) => {
       const queries = getCatalog(c);
-      const [skills, agents, mcps] = await Promise.all([
-        queries.listSkillEntries.execute({}).then((result) => result._unsafeUnwrap()),
-        queries.listAgentEntries.execute({}).then((result) => result._unsafeUnwrap()),
-        queries.listMcps.execute({}).then((result) => result._unsafeUnwrap()),
+      const [skillsRes, agentsRes, mcpsRes] = await Promise.all([
+        queries.listSkillEntries.execute({}),
+        queries.listAgentEntries.execute({}),
+        queries.listMcps.execute({}),
       ]);
+      const skills = skillsRes._unsafeUnwrap();
+      const agents = agentsRes._unsafeUnwrap();
+      const mcps = mcpsRes._unsafeUnwrap();
       return c.json({
         counts: {
           skills: skills.length,

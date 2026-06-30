@@ -22,7 +22,7 @@ export class GetAgentContentUseCase
 {
   constructor(private readonly deps: GetAgentContentDeps) {}
 
-  async execute(
+  execute(
     request: GetAgentContentRequest,
   ): UseCaseResult<GetAgentContentResponse, GetAgentContentError> {
     return this.deps.agentRepo

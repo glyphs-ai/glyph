@@ -49,9 +49,7 @@ export class InstallSkillUseCase
 {
   constructor(private readonly deps: InstallSkillDeps) {}
 
-  async execute(
-    request: InstallSkillRequest,
-  ): UseCaseResult<InstallSkillResponse, InstallSkillError> {
+  execute(request: InstallSkillRequest): UseCaseResult<InstallSkillResponse, InstallSkillError> {
     return this.deps.skillSource
       .load(request.origin)
       .andThen((manifest) => this.buildEntity(manifest, request.origin, request.dependencyRefs))

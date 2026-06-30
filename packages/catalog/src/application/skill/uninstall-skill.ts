@@ -8,7 +8,7 @@
  * resolve; `HasDependents` when something still references it.
  */
 
-import { err } from "neverthrow";
+import { err, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import { SkillFqnSchema } from "../../domain/skill-fqn.js";
@@ -42,19 +42,22 @@ export class UninstallSkillUseCase
 {
   constructor(private readonly deps: UninstallSkillDeps) {}
 
-  async execute(
+  execute(
     request: UninstallSkillRequest,
   ): UseCaseResult<UninstallSkillResponse, UninstallSkillError> {
     const fqn = request.id;
-    const found = await this.deps.skillRepo.get(fqn);
-    if (found.isErr()) return err(found.error);
+    const deps = this.deps;
+    return safeTry<UninstallSkillResponse, UninstallSkillError>(async function* () {
+      yield* deps.skillRepo.get(fqn);
 
-    const byAgent = await this.deps.agentRepo.existsUsingSkill(fqn);
-    if (byAgent.isErr()) return err(byAgent.error);
-    const bySkill = await this.deps.skillRepo.existsUsingSkill(fqn);
-    if (bySkill.isErr()) return err(bySkill.error);
-    if (byAgent.value || bySkill.value) return err({ type: "HasDependents", fqn });
+      const byAgent = yield* deps.agentRepo.existsUsingSkill(fqn);
+      const bySkill = yield* deps.skillRepo.existsUsingSkill(fqn);
+      if (byAgent || bySkill) {
+        return err<UninstallSkillResponse, UninstallSkillError>({ type: "HasDependents", fqn });
+      }
 
-    return this.deps.skillRepo.delete(fqn).map(() => ({ id: fqn }));
+      yield* deps.skillRepo.delete(fqn);
+      return ok<UninstallSkillResponse, UninstallSkillError>({ id: fqn });
+    });
   }
 }

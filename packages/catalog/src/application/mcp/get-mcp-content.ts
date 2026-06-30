@@ -35,9 +35,7 @@ export class GetMcpContentUseCase
 {
   constructor(private readonly deps: GetMcpContentDeps) {}
 
-  async execute(
-    request: GetMcpContentRequest,
-  ): UseCaseResult<GetMcpContentResponse, GetMcpContentError> {
+  execute(request: GetMcpContentRequest): UseCaseResult<GetMcpContentResponse, GetMcpContentError> {
     return this.deps.mcpRepo.get(request.id).map((mcp) => ({ id: mcp.id, spec: mcp.spec }));
   }
 }

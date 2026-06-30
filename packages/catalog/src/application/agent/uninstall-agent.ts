@@ -10,7 +10,7 @@
  * Response is `void` (HTTP semantics: 204 No Content).
  */
 
-import { err } from "neverthrow";
+import { errAsync } from "neverthrow";
 import { z } from "zod";
 import { AgentFqnSchema } from "../../domain/agent-fqn.js";
 import type {
@@ -44,17 +44,17 @@ export class UninstallAgentUseCase
 {
   constructor(private readonly deps: UninstallAgentDeps) {}
 
-  async execute(
+  execute(
     request: UninstallAgentRequest,
   ): UseCaseResult<UninstallAgentResponse, UninstallAgentError> {
     const id = request.id;
-    const found = await this.deps.agentRepo.get(id);
-    if (found.isErr()) return err(found.error);
-
-    const usedByAgent = await this.deps.agentRepo.existsUsingAgent(id);
-    if (usedByAgent.isErr()) return err(usedByAgent.error);
-    if (usedByAgent.value) return err({ type: "HasDependents", fqn: id });
-
-    return this.deps.agentRepo.delete(id);
+    return this.deps.agentRepo
+      .get(id)
+      .andThen(() => this.deps.agentRepo.existsUsingAgent(id))
+      .andThen((usedByAgent) =>
+        usedByAgent
+          ? errAsync<UninstallAgentResponse, HasDependents>({ type: "HasDependents", fqn: id })
+          : this.deps.agentRepo.delete(id),
+      );
   }
 }

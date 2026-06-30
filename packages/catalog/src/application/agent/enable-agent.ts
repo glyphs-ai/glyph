@@ -42,7 +42,7 @@ export class EnableAgentUseCase
 {
   constructor(private readonly deps: EnableAgentDeps) {}
 
-  async execute(request: EnableAgentRequest): UseCaseResult<EnableAgentResponse, EnableAgentError> {
+  execute(request: EnableAgentRequest): UseCaseResult<EnableAgentResponse, EnableAgentError> {
     return this.deps.agentRepo
       .get(request.id)
       .map((agent) => {

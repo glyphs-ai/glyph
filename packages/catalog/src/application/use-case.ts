@@ -11,19 +11,18 @@
  * `Error` builtin inside implementation files. The runtime error type is
  * typically a discriminated union of `{ type: "..." }` variants.
  *
- * `UseCaseResult<T, E>` is the strict outer contract: a
- * `Promise<Result<T, E>>`. Use-cases may use `ResultAsync<T, E>` internally;
- * `async execute()` collapses the chain into the outer shape via `await`.
+ * `UseCaseResult<T, E>` is `ResultAsync<T, E>`: `execute` is synchronous and
+ * returns the `ResultAsync` chain directly, so callers can keep chaining
+ * (`.andThen`, `.map`) without awaiting.
  *
  * Validation policy: each use-case file exports a Zod `RequestSchema`
- * and `ResponseSchema` as the public contract. Runtime validation
- * happens at the outer boundary before `execute`. The schemas define both
+ * and `ResponseSchema` as the public contract. The schemas define both
  * the TS type (`z.infer`) and the wire format.
  */
 
-import type { Result } from "neverthrow";
+import type { ResultAsync } from "neverthrow";
 
-export type UseCaseResult<T, E> = Promise<Result<T, E>>;
+export type UseCaseResult<T, E> = ResultAsync<T, E>;
 
 export interface UseCase<Req, Res, Err> {
   execute(request: Req): UseCaseResult<Res, Err>;

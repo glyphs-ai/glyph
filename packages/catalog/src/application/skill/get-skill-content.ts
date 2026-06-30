@@ -32,7 +32,7 @@ export class GetSkillContentUseCase
 {
   constructor(private readonly deps: GetSkillContentDeps) {}
 
-  async execute(
+  execute(
     request: GetSkillContentRequest,
   ): UseCaseResult<GetSkillContentResponse, GetSkillContentError> {
     return this.deps.skillRepo

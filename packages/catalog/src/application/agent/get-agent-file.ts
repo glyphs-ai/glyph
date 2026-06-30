@@ -18,9 +18,7 @@ export class GetAgentFileUseCase
 {
   constructor(private readonly deps: GetAgentFileDeps) {}
 
-  async execute(
-    request: GetAgentFileRequest,
-  ): UseCaseResult<GetAgentFileResponse, GetAgentFileError> {
+  execute(request: GetAgentFileRequest): UseCaseResult<GetAgentFileResponse, GetAgentFileError> {
     return this.deps.agentRepo.getFile(request.id, request.relPath);
   }
 }

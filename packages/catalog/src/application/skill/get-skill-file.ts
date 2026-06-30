@@ -19,9 +19,7 @@ export class GetSkillFileUseCase
 {
   constructor(private readonly deps: GetSkillFileDeps) {}
 
-  async execute(
-    request: GetSkillFileRequest,
-  ): UseCaseResult<GetSkillFileResponse, GetSkillFileError> {
+  execute(request: GetSkillFileRequest): UseCaseResult<GetSkillFileResponse, GetSkillFileError> {
     return this.deps.skillRepo.getFile(request.id, request.relPath);
   }
 }

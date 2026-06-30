@@ -24,7 +24,7 @@ export class ListAgentFilesUseCase
 {
   constructor(private readonly deps: ListAgentFilesDeps) {}
 
-  async execute(
+  execute(
     request: ListAgentFilesRequest,
   ): UseCaseResult<ListAgentFilesResponse, ListAgentFilesError> {
     return this.deps.agentRepo.listFilePaths(request.id);

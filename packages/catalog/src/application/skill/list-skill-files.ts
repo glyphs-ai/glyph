@@ -21,7 +21,7 @@ export class ListSkillFilesUseCase
 {
   constructor(private readonly deps: ListSkillFilesDeps) {}
 
-  async execute(
+  execute(
     request: ListSkillFilesRequest,
   ): UseCaseResult<ListSkillFilesResponse, ListSkillFilesError> {
     return this.deps.skillRepo.listFilePaths(request.id);

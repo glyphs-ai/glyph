@@ -47,7 +47,7 @@ export class AcknowledgeAgentPrereqsUseCase
 {
   constructor(private readonly deps: AcknowledgeAgentPrereqsDeps) {}
 
-  async execute(
+  execute(
     request: AcknowledgeAgentPrereqsRequest,
   ): UseCaseResult<AcknowledgeAgentPrereqsResponse, AcknowledgeAgentPrereqsError> {
     return this.deps.agentRepo

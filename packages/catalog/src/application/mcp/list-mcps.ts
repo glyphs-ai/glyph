@@ -1,4 +1,4 @@
-import { err, ok } from "neverthrow";
+import { ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import type { McpRepository } from "../../domain/mcp-repository.js";
@@ -27,28 +27,28 @@ export interface ListMcpsDeps {
 export class ListMcpsUseCase implements UseCase<ListMcpsRequest, ListMcpsResponse, ListMcpsError> {
   constructor(private readonly deps: ListMcpsDeps) {}
 
-  async execute(_request: ListMcpsRequest): UseCaseResult<ListMcpsResponse, ListMcpsError> {
-    const mcps = await this.deps.mcpRepo.list();
-    if (mcps.isErr()) return err(mcps.error);
-    const agents = await this.deps.agentRepo.list();
-    if (agents.isErr()) return err(agents.error);
-    const skills = await this.deps.skillRepo.list();
-    if (skills.isErr()) return err(skills.error);
-    const referencedMcpFqns = new Set<string>();
-    for (const agent of agents.value) {
-      for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-    }
-    for (const skill of skills.value) {
-      for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-    }
-    return ok(
-      mcps.value.map((mcp) => ({
-        fqn: mcp.fqn,
-        origin: mcp.origin,
-        orphaned: !referencedMcpFqns.has(mcp.fqn),
-        installedAt: mcp.installedAt,
-        updatedAt: mcp.updatedAt,
-      })),
-    );
+  execute(_request: ListMcpsRequest): UseCaseResult<ListMcpsResponse, ListMcpsError> {
+    const deps = this.deps;
+    return safeTry<ListMcpsResponse, ListMcpsError>(async function* () {
+      const mcps = yield* deps.mcpRepo.list();
+      const agents = yield* deps.agentRepo.list();
+      const skills = yield* deps.skillRepo.list();
+      const referencedMcpFqns = new Set<string>();
+      for (const agent of agents) {
+        for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
+      }
+      for (const skill of skills) {
+        for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
+      }
+      return ok(
+        mcps.map((mcp) => ({
+          fqn: mcp.fqn,
+          origin: mcp.origin,
+          orphaned: !referencedMcpFqns.has(mcp.fqn),
+          installedAt: mcp.installedAt,
+          updatedAt: mcp.updatedAt,
+        })),
+      );
+    });
   }
 }

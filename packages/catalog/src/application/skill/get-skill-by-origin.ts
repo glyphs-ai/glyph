@@ -33,7 +33,7 @@ export class GetSkillByOriginUseCase
 {
   constructor(private readonly deps: GetSkillByOriginDeps) {}
 
-  async execute(
+  execute(
     request: GetSkillByOriginRequest,
   ): UseCaseResult<GetSkillByOriginResponse, GetSkillByOriginError> {
     return this.deps.skillRepo

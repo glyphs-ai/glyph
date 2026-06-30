@@ -40,7 +40,7 @@ export interface CatalogRouteError {
 }
 
 export async function unwrapCatalog<T, E extends CatalogErrorLike>(
-  result: Promise<Result<T, E>>,
+  result: PromiseLike<Result<T, E>>,
   kind: CatalogRouteKind,
 ): Promise<T> {
   const settled = await result;

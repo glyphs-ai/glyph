@@ -42,9 +42,7 @@ export class DisableAgentUseCase
 {
   constructor(private readonly deps: DisableAgentDeps) {}
 
-  async execute(
-    request: DisableAgentRequest,
-  ): UseCaseResult<DisableAgentResponse, DisableAgentError> {
+  execute(request: DisableAgentRequest): UseCaseResult<DisableAgentResponse, DisableAgentError> {
     return this.deps.agentRepo
       .get(request.id)
       .map((agent) => {

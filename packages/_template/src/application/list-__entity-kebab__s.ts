@@ -31,7 +31,7 @@ export class List__Entity__sUseCase
 {
   constructor(private readonly deps: List__Entity__sDeps) {}
 
-  async execute(
+  execute(
     request: List__Entity__sRequest,
   ): UseCaseResult<List__Entity__sResponse, List__Entity__sError> {
     List__Entity__sRequestSchema.parse(request);

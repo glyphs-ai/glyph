@@ -38,7 +38,7 @@ export class Archive__Entity__UseCase
 {
   constructor(private readonly deps: Archive__Entity__Deps) {}
 
-  async execute(
+  execute(
     request: Archive__Entity__Request,
   ): UseCaseResult<Archive__Entity__Response, Archive__Entity__Error> {
     const { id } = Archive__Entity__RequestSchema.parse(request);
