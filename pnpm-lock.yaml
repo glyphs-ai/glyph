@@ -110,9 +110,6 @@ importers:
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
-      js-yaml:
-        specifier: ^4.1.0
-        version: 4.1.1
       neverthrow:
         specifier: ^8.2.0
         version: 8.2.0
@@ -129,9 +126,6 @@ importers:
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
-      '@types/js-yaml':
-        specifier: ^4.0.9
-        version: 4.0.9
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
