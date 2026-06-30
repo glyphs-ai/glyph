@@ -1,8 +1,8 @@
 /**
  * Aggregate re-export of package-private helpers. Downstream modules
- * (`dispatch.ts`, platform files, tests) can import from `_shared.ts`
- * for convenience; the actual implementations live in focused peer
- * modules split by concern:
+ * (`local-spawner.ts`, platform files, tests) can import from
+ * `_shared.ts` for convenience; the actual implementations live in
+ * focused peer modules split by concern:
  *
  *   _validate.ts — input validation (validateLaunchCommand, assertPortableEnvName)
  *   _quoting.ts  — quoting dialects, env-prefix builders, hasUsableEnv

@@ -1,71 +1,33 @@
 /**
- * Cross-platform helper that opens a new terminal window in the requested
- * working directory and runs a launch command there. The dashboard uses it
- * for one-click interactive launch: instead of asking the user to copy a
- * `cd ... && <runtime-cli>` command, the server opens the user's terminal
- * with the command already running.
- *
- * Designed to be testable: the real `spawnTerminal` is a thin wrapper around
- * `spawnTerminalWith(cmd, deps)`, where the dependencies abstract platform
- * detection and spawn so unit tests can drive every code path without
- * touching the host.
+ * Data types for the terminal contract: the launch command a
+ * {@link Spawner} consumes and the result it yields. `LaunchCommand` is
+ * intentionally identical in shape to `@glyphs-ai/runtime-v2`'s, so a
+ * runtime's built launch satisfies `Spawner.spawn` by structural typing
+ * — terminal never imports from runtime-v2 (a terminal must not
+ * depend on a runtime).
  */
 
-/**
- * Shell-runnable launch command, as the terminal package needs it.
- *
- * **Consumer port.** Terminal defines the shape it needs to spawn a
- * process into a platform terminal emulator. Producers — currently
- * `@glyphs-ai/runtime`'s `Runtime.buildInteractiveLaunch` — own their
- * own definition; the wiring relies on TypeScript's structural
- * typing to confirm compatibility at the call sites. Keeping this
- * type local removes terminal's workspace dependency on any specific
- * producer package and makes terminal a pure infrastructure leaf
- * consumable by anything that can produce a command of this shape.
- *
- * The primary consumer is
- * `SessionService.spawnInteractive` (in `@glyphs-ai/session`), which
- * receives `spawnTerminal` via a `SpawnFn` port injected by
- * `@glyphs-ai/api`'s `composeApplication`. `@glyphs-ai/session` deliberately
- * does not import `@glyphs-ai/terminal` at all (neither as a value nor
- * as a type); `SpawnFn`'s structural shape
- * (`(cmd: LaunchCommand) => Promise<{ launcher: string }>`) is what
- * holds the two together, with `spawnTerminal`'s return type
- * (`SpawnTerminalResult = { launcher: Launcher }`) satisfying it
- * via covariance (`Launcher` is a `string` subtype). The "consumable
- * by anything" framing is therefore accurate rather than aspirational.
- *
- * The `cmd`/`args`/`cwd` triple is suitable for `child_process.spawn`;
- * `display` is a single-line string suitable for showing to the user
- * or copying to the clipboard.
- */
+/** A shell-runnable launch command handed to {@link Spawner.spawn}. */
 export interface LaunchCommand {
   readonly cmd: string;
   readonly args: readonly string[];
   readonly cwd: string;
   readonly display: string;
-  /**
-   * Optional environment variables for the spawned terminal session.
-   *
-   * Most platform terminal emulators (Windows Terminal, Terminal.app,
-   * gnome-terminal, …) run as long-lived daemons that do not see the
-   * env handed to the launcher process. Reliably propagating env to
-   * the shell that executes this command therefore requires inlining
-   * the env into the shell command itself (`export K='v' &&
-   * exec foo args` on POSIX, `$env:K='v'; & foo args` for pwsh).
-   * This package does that work; see the per-platform implementations
-   * in `src/platforms/`.
-   *
-   * Environment names must be portable shell identifiers
-   * (`[A-Za-z_][A-Za-z0-9_]*`). Among valid names, keys are preserved in
-   * insertion order and only string-valued entries survive. Producers
-   * should filter `undefined` / `null` before assembling this map;
-   * terminal also drops non-string entries defensively before quoting so
-   * a bad cast over `NodeJS.ProcessEnv` cannot crash the launch path.
-   */
+  /** Optional env vars the spawned terminal session should inherit. */
   readonly env?: Readonly<Record<string, string>>;
 }
 
+/** Outcome of a successful {@link Spawner.spawn}. */
+export interface SpawnResult {
+  /** Identifier of the terminal emulator that was launched. */
+  readonly launcher: string;
+}
+
+// ─── internal implementation types (not part of the public contract) ───
+// Consumed by the package-private platform launchers + dispatch; never
+// re-exported from `index.ts`.
+
+/** Concrete terminal-emulator launchers the platform code may pick. */
 export type Launcher =
   | "wt"
   | "cmd"
@@ -83,6 +45,7 @@ export type Launcher =
   | "xterm"
   | "x-terminal-emulator";
 
+/** Internal launch outcome carrying the concrete {@link Launcher}. */
 export interface SpawnTerminalResult {
   launcher: Launcher;
 }

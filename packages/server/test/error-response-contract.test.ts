@@ -5,13 +5,12 @@
  * These tests pin the cross-cutting behavior the refactor introduced:
  *
  *   1. Catalog `AgentNotFound` DU errors map to 404 on catalog routes,
- *      while task / session `AgentNotFoundError` classes remain 400 on
- *      their own routes. The schedule pkg no longer owns its own class;
- *      its routes reuse the task-pkg class via the kind handler.
- *   2. `routes/sessions.ts` and `routes/workspaces.ts` now emit the
- *      structured "unmapped error fell through" log line for
- *      unrecognised errors, closing the observability gap for these
- *      two files.
+ *      while the task `AgentNotFoundError` class remains 400 on its own
+ *      route. The schedule pkg no longer owns its own class; its routes
+ *      reuse the task-pkg class via the kind handler.
+ *   2. `routes/workspaces.ts` emits the structured "unmapped error fell
+ *      through" log line for unrecognised errors, closing the
+ *      observability gap for that file.
  *   3. `InvalidTransition` carries the route-context `transition`
  *      verb ("cancel" vs "delete") in its 409 body, proving that the
  *      per-call `customBody` parameter forwards route state through
@@ -30,10 +29,6 @@
 
 import { catalogRoutes, workspacesRoutes } from "@glyphs-ai/api";
 import {
-  AgentNotFoundError as SessionAgentNotFoundError,
-  AgentResolutionFailedError as SessionAgentResolutionFailedError,
-} from "@glyphs-ai/session";
-import {
   EntryNotReadyError,
   InvalidTransition,
   type Task,
@@ -50,7 +45,6 @@ import { requestId } from "../src/middleware/request-id.js";
 import { requestLogger } from "../src/middleware/request-logger.js";
 import { scheduledTasksRoutes } from "../src/routes/scheduled-tasks.js";
 import { schedulesRoutes } from "../src/routes/schedules.js";
-import { sessionsRoutes } from "../src/routes/sessions.js";
 import { tasksRoutes } from "../src/routes/tasks.js";
 import { captureLogger } from "./_capture-logger.js";
 
@@ -110,34 +104,6 @@ describe("respondError contract — cross-domain status preservation", () => {
     expect(body.code).toBe("AgentNotFoundError");
   });
 
-  it("session route's AgentNotFoundError (session package) → 400", async () => {
-    // Sessions also map their AgentNotFoundError to 400, but the
-    // class is a SessionError subclass (not TaskError). Routing via
-    // sessionsErrorPolicy proves the instanceof match picks the
-    // session-package class, not the task one — same outcome (400),
-    // different code path.
-    const create = vi.fn(async () => {
-      throw new SessionAgentNotFoundError("ghost");
-    });
-    const sessionsCtx = {
-      sessions: {
-        list: vi.fn(async () => []),
-        create,
-        get: vi.fn(),
-        delete: vi.fn(),
-        spawnInteractive: vi.fn(),
-      },
-    };
-    const res = await sessionsRoutes(() => sessionsCtx as never).request("/", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: "ghost" }),
-    });
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.code).toBe("AgentNotFoundError");
-  });
-
   it("schedule route's AgentNotFoundError (task pkg, via kind handler) → 400", async () => {
     // The schedule pkg is kind-agnostic and does not own an
     // AgentNotFoundError class. The task-kind handler (in
@@ -181,70 +147,6 @@ describe("respondError contract — unmapped-fault observability gap-closes", ()
   // line when an unrecognised error class falls through to the default
   // status. These cases ensure sessions.ts and workspaces.ts use the
   // same seam as tasks.ts and scheduled-tasks.ts.
-
-  it("sessions route unmapped error → 400 + structured log line", async () => {
-    const create = vi.fn(async () => {
-      throw new Error("ERR_MODULE_NOT_FOUND: cannot resolve @github/copilot-sdk");
-    });
-    const sessionsCtx = {
-      sessions: {
-        list: vi.fn(async () => []),
-        create,
-        get: vi.fn(),
-        delete: vi.fn(),
-        spawnInteractive: vi.fn(),
-      },
-    };
-    const { app, cap } = await buildAppWithLogger((a) => {
-      a.route(
-        "/",
-        sessionsRoutes(() => sessionsCtx as never),
-      );
-    });
-    const res = await app.request("/", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: "demo" }),
-    });
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toBe("internal error");
-
-    const fault = cap.entries.find((e) => e.msg?.includes("unmapped"));
-    expect(fault).toBeDefined();
-    expect(fault?.level).toBe(50);
-    expect(fault?.msg).toBe("sessions: unmapped error fell through to 400");
-    expect(fault?.name).toBe("Error");
-    expect(fault?.message).toContain("ERR_MODULE_NOT_FOUND");
-  });
-
-  it("sessions: GET / unmapped error → 400 + log line (read path also covered)", async () => {
-    // Read paths also plumb through respondError so unmapped failures
-    // (e.g. sqlite corrupt) are surfaced to the operator.
-    const list = vi.fn(async () => {
-      throw new Error("metadata.jsonl read failed");
-    });
-    const sessionsCtx = {
-      sessions: {
-        list,
-        create: vi.fn(),
-        get: vi.fn(),
-        delete: vi.fn(),
-        spawnInteractive: vi.fn(),
-      },
-    };
-    const { app, cap } = await buildAppWithLogger((a) => {
-      a.route(
-        "/",
-        sessionsRoutes(() => sessionsCtx as never),
-      );
-    });
-    const res = await app.request("/");
-    expect(res.status).toBe(400);
-    const fault = cap.entries.find((e) => e.msg?.includes("unmapped"));
-    expect(fault).toBeDefined();
-    expect(fault?.msg).toBe("sessions.list: unmapped error fell through to 400");
-  });
 
   it("workspaces route ProvisioningFailed → 500 + 5xx fault log line", async () => {
     // After the Result/DU refactor, a workspace tech failure surfaces
@@ -397,9 +299,9 @@ describe("respondError contract — 5xx fault log separation", () => {
 });
 
 describe("respondError contract — AgentResolutionFailedError 500 path", () => {
-  // The four AgentResolutionFailedError flows (task / session /
-  // schedule's-own / schedule-run-delegated-to-task) all collapse to
-  // the SAME opaque wire envelope: `{ error: "internal error", code:
+  // The three AgentResolutionFailedError flows (task / schedule's-own /
+  // schedule-run-delegated-to-task) all collapse to the SAME opaque
+  // wire envelope: `{ error: "internal error", code:
   // "AgentResolutionFailedError" }`. The shape is the contract.
   // Each test pins:
   //   - response status === 500
@@ -409,14 +311,13 @@ describe("respondError contract — AgentResolutionFailedError 500 path", () => 
   //     diagnostic channel still has the cause)
   //
   // Destructive validation:
-  //   - tasks/sessions/schedules-create: removing the
+  //   - tasks/schedules-create: removing the
   //     `[AgentResolutionFailedError, 500, opaqueAgentResolutionBody]`
   //     row from the corresponding policy makes the assertion fall
   //     through to AgentResolutionFailedError's base-class default
-  //     (TaskError → not in policy → 400 unmapped; SessionError → not
-  //     in policy → 400 unmapped; ScheduleError → 400 base). The body
-  //     code field also disappears (errorBody fallback collapses it
-  //     to `{ error: "internal error" }` with no `code`).
+  //     (TaskError → not in policy → 400 unmapped; ScheduleError → 400
+  //     base). The body code field also disappears (errorBody fallback
+  //     collapses it to `{ error: "internal error" }` with no `code`).
   //   - schedules-run: removing the
   //     `[TaskAgentResolutionFailedError, 500, opaqueAgentResolutionBody]`
   //     row from schedules.ts policy causes the task-side
@@ -452,41 +353,6 @@ describe("respondError contract — AgentResolutionFailedError 500 path", () => 
     expect(body).toEqual(OPAQUE_BODY);
 
     const fivexx = cap.entries.find((e) => e.msg === "tasks: 5xx fault");
-    expect(fivexx).toBeDefined();
-    expect(fivexx?.level).toBe(50);
-    const unmapped = cap.entries.find((e) => e.msg?.includes("unmapped"));
-    expect(unmapped).toBeUndefined();
-  });
-
-  it("sessions route AgentResolutionFailedError → 500 + opaque body + 5xx fault log", async () => {
-    const create = vi.fn(async () => {
-      throw new SessionAgentResolutionFailedError("public/demo", new Error("DB exploded"));
-    });
-    const sessionsCtx = {
-      sessions: {
-        list: vi.fn(async () => []),
-        create,
-        get: vi.fn(),
-        delete: vi.fn(),
-        spawnInteractive: vi.fn(),
-      },
-    };
-    const { app, cap } = await buildAppWithLogger((a) => {
-      a.route(
-        "/",
-        sessionsRoutes(() => sessionsCtx as never),
-      );
-    });
-    const res = await app.request("/", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: "public/demo" }),
-    });
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toEqual(OPAQUE_BODY);
-
-    const fivexx = cap.entries.find((e) => e.msg === "sessions: 5xx fault");
     expect(fivexx).toBeDefined();
     expect(fivexx?.level).toBe(50);
     const unmapped = cap.entries.find((e) => e.msg?.includes("unmapped"));

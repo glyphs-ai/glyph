@@ -8550,7 +8550,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Deleted (no content)",
           },
           "409": {
-            "description": "Runtime state deletion failed",
+            "description": "Runtime state / workdir removal failed",
           },
           "500": {
             "description": "Internal error",
@@ -8759,9 +8759,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           },
           "400": {
             "description": "Malformed request body",
-          },
-          "404": {
-            "description": "Session not found",
           },
           "500": {
             "description": "Internal error",

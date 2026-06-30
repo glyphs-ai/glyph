@@ -22,7 +22,7 @@ in a follow-up doc**.
 
 | Tier      | Name        | Packages                                            | Conceptual role                                                                         |
 | --------- | ----------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **T0**    | Foundations | `catalog`, `runtime`, `schedule`, `terminal`, `workspace` | Who / Where / When / Scope + leaf infrastructure — irreducible primitives                |
+| **T0**    | Foundations | `catalog`, `runtime`, `runtime-v2`, `schedule`, `terminal`, `workspace` | Who / Where / When / Scope + leaf infrastructure — irreducible primitives                |
 | **T1**    | Modes       | `session`, `task`, `workflow`                       | How work runs — Interactive (`session`) / Headless single-shot (`task`) / Multi-task DAG (`workflow`) |
 | **T2**    | Application | `api` (orchestration + wire contracts), `sdk` (generated client) | Two siblings: T0/T1 composed into business capabilities, with the cross-pkg wire contracts living under api's wire/ surface, plus a generated typed HTTP client |
 | **T3**    | Host        | `server`                                            | HTTP transport that exposes T2 capabilities over the wire                               |
@@ -170,15 +170,14 @@ single specifier (`@glyphs-ai/api`). Dashboard and CLI MUST go through
 
 `@glyphs-ai/terminal` is consumed **only by `@glyphs-ai/api`** at
 runtime — specifically by `composeApplication`, which value-imports
-`spawnTerminal` and threads it as an injected `SpawnFn` through
-`composeSessionModule` into `SessionService`. The actual
-"build the `LaunchCommand` and hand it to the spawner" step lives
-inside `SessionService.spawnInteractive(sid, opts)`.
-`api`'s job is wiring, not invocation. Entity packages don't see
-`@glyphs-ai/terminal` — `@glyphs-ai/session` consumes the spawner via
-the structurally-typed `SpawnFn` port (`(cmd: LaunchCommand) =>
-Promise<{ launcher: string }>`) without importing terminal at all,
-so the cross-domain architecture fence
+`spawnTerminal`, wraps it as a `SpawnPort`, and threads it through
+`composeSessionModule`. The actual "build the `LaunchCommand` and hand
+it to the spawner" step lives inside the session package's
+`spawnInteractive` use-case. `api`'s job is wiring, not invocation.
+Entity packages don't see `@glyphs-ai/terminal` — `@glyphs-ai/session`
+consumes the spawner via the structurally-typed `SpawnPort` port
+(`spawn(launch) => ResultAsync<{ launcher }, SpawnFailed>`) without
+importing terminal at all, so the cross-domain architecture fence
 (`packages/e2e/test/architecture/inter-service-imports.test.ts`)
 stays intact. `@glyphs-ai/runtime` produces `LaunchCommand` values
 but does not spawn terminals. The dep direction is asymmetric and

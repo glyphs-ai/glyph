@@ -66,7 +66,7 @@ const PACKAGES_DIR = path.join(REPO_ROOT, "packages");
  * other `@glyphs-ai/*` specifier (api, server, cli, dashboard, etc.)
  * is out of scope.
  */
-const T0_PKGS = ["workspace", "runtime", "schedule", "terminal", "catalog"] as const;
+const T0_PKGS = ["workspace", "runtime", "runtime-v2", "schedule", "terminal", "catalog"] as const;
 const T1_PKGS = ["session", "task", "workflow"] as const;
 const DOMAIN_PKGS: readonly string[] = [...T0_PKGS, ...T1_PKGS];
 const DOMAIN_PKG_SET = new Set(DOMAIN_PKGS);

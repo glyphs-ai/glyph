@@ -3,13 +3,13 @@
 > **Tier:** T1 (Modes). See the [tier model](../../docs/architecture.md#tier-model).
 
 T1 interactive-session registry. Each session is a runtime-provisioned
-workdir for one agent (see [`@glyphs-ai/runtime`](../runtime)). This
-package **organizes** those workdirs and, when the composition root
-injects a `SpawnFn`, **invokes** that spawner via
-`SessionService.spawnInteractive(id, opts)`. The actual spawning
-work lives in `@glyphs-ai/terminal`, which this package does not
-import; the `SpawnFn` type is structurally compatible with
-`spawnTerminal`, and `@glyphs-ai/api` wires it in through
+sandbox — by default an on-disk workdir — for one agent (the runtime
+contract is [`@glyphs-ai/runtime-v2`](../runtime-v2)). This package
+**organizes** those sandboxes and exposes the `spawnInteractive`
+use-case that hands a session's launch command to an injected
+`Spawner`. The concrete spawner is `@glyphs-ai/terminal`'s
+`localSpawner`; this package depends only on the `Spawner` interface
+(type-only) and `@glyphs-ai/api` injects the implementation through
 `composeApplication`.
 
 ## Why
@@ -22,44 +22,49 @@ is the chat UI. glyph's job is to:
 - remember which workdirs exist, what agent each was baked from, and
   the opaque `runtimeSessionId` the runtime returned (this package)
 - give callers the exact incantation to launch / resume the runtime
-  in a workdir
-- when a `SpawnFn` is injected at compose time, hand the incantation
-  to that spawner via `SessionService.spawnInteractive(id, opts)`
-  and return the `SpawnSessionResult` discriminated union the
-  dashboard / CLI consume on `POST /sessions/:id/spawn`
+  in a workdir (`buildInteractiveLaunch`)
+- hand the incantation to the injected `Spawner` (`spawnInteractive`)
+  and return the discriminated-union outcome the dashboard / CLI
+  consume on `POST /sessions/:id/spawn`
 - surface runtime-side display metadata (title / lastActiveAt) in
-  `list()` by calling the runtime's optional `readMetadata` hook
+  `listSessions` / `getSession` by calling the runtime's optional
+  `readMetadata` hook
 
-If no `SpawnFn` is wired in, `spawnInteractive` throws a
-documented misconfiguration error and you launch the CLI yourself
-from the `LaunchCommand` returned by `buildInteractiveLaunch`.
+`spawnInteractive` never rejects: any build- or spawn-side failure is
+folded into an `{ ok: false, error, code, display }` result so callers
+always have a copy-paste `display` fallback.
 
 ## Layout
 
+Schema-first, Result-based, discriminated-union errors. Domain →
+application → infrastructure; imports flow one way and `index.ts` only
+re-exports the use-case wire contracts plus `composeSessionModule`.
+
 ```
 packages/session/src/
-  schema.ts                Drizzle table def (private)
-  errors.ts                Domain error classes (exported)
-  types.ts                 Public DTOs (Session, LaunchCommand,
-                           SpawnSessionResult, opts shapes)
-  ports.ts                 Structural ports (AgentResolverPort, SpawnFn)
-  validate.ts              id regex + assertValidSessionId + generators
-  session-repository.ts    Drizzle CRUD (internal)
-  session-entity.ts        SessionEntity (private; service projects to DTO)
-  session-service.ts       SessionService facade (delegates to subdir)
-  session-service/         SPLIT subdir (implementation detail)
-    _helpers.ts            SessionServiceCtx, safeRm, assembleLaunchEnv,
-                           sessionsRoot, safeJoinUnderRoot
-    create.ts              Rollback-heavy provisioning path
-    refresh.ts             Projection/refresh internals (list/get)
-    spawn.ts               Launch-command assembly + terminal spawn
-  migrations.ts            applySessionMigrations (drizzle migration applier)
-  compose.ts               composeSessionModule({ dbFile, agentResolver,
-                           contentSource, runtimeRegistry, spawnFn?, … })
-  testing.ts               openTestSessionDb helper (via /testing subpath)
-  index.ts                 public barrel
-drizzle/                   generated SQL migrations (committed)
-drizzle.config.ts          drizzle-kit config
+  domain/                    pure: no imports outside neverthrow / zod
+    session-id.ts            branded SessionId + format schema
+    session-entity.ts        SessionEntity (two-door: rehydrate / create)
+    session-repository.ts    persistence port + its error atoms
+    session-sandbox.ts       sandbox port + its error atoms (resolve/create/remove)
+  application/
+    ports/
+      agent-resolver.ts      catalog-agent resolution port + atoms
+    use-case.ts              UseCase<I,O,E> + UseCaseResult = ResultAsync
+    create-session.ts        mint id + provision + persist (rollback on failure)
+    list-sessions.ts         project + refresh + filter + sort
+    get-session.ts           read one (live activity refresh)
+    delete-session.ts        archive (row only) / purge (state + sandbox)
+    build-interactive-launch.ts  assemble LaunchCommand + work-context env
+    spawn-interactive.ts     build + spawn, folded into one result
+    index.ts                 curated domain surface (SessionId + error atoms)
+  infrastructure/
+    drizzle/                 session-db / schema / migrations / mapper / repository
+    file/local-session-sandbox.ts  LocalSessionSandbox (node:fs)
+  session-module.ts          composeSessionModule → SessionModule (DI container)
+  index.ts                   public barrel
+drizzle/                     generated SQL migrations (committed)
+drizzle.config.ts            drizzle-kit config
 ```
 
 ## On-disk
@@ -74,7 +79,7 @@ an on-disk workdir for the agent's actual product.
      <id>/                 # workdir for session <id>
          AGENTS.md         # baked by the runtime provisioner
          .github/skills/   # and whatever else the provisioner wrote
-                          # plus anything the agent itself produces
+                           # plus anything the agent itself produces
 ```
 
 `<id>` is a short date-prefixed identifier:
@@ -94,75 +99,69 @@ session id**.
 
 > Why SQLite for session metadata (and FS for the workdir)? The
 > project-wide rule: queryable structured data → SQLite; opaque
-> blobs / agent product → FS. Session metadata uses the hybrid
-> pattern. (Full rationale in [docs/architecture.md](../../docs/architecture.md#backend-selection-when-sqlite).)
+> blobs / agent product → FS. (Full rationale in
+> [docs/architecture.md](../../docs/architecture.md#backend-selection-when-sqlite).)
 
 ## Public API
 
+`composeSessionModule` is the DI container a host builds once and
+dispatches through. Each use-case is a `<useCase>.execute(request)`
+returning a `ResultAsync<Response, Error>`.
+
 ```ts
 import { composeSessionModule } from "@glyphs-ai/session";
-// `spawnTerminal` is wired in by `@glyphs-ai/api`'s `composeApplication`;
-// pass-throughs receive it via DI. Standalone session callers can
-// inject their own SpawnFn-compatible spawner here, or omit it (in
-// which case `service.spawnInteractive` throws on call).
-const { service, close } = await composeSessionModule({
+
+const session = await composeSessionModule({
   dbFile: "/abs/path/to/workspace.db",
-  agentResolver: catalog,                   // CatalogService
-  contentSource: catalog,                   // CatalogService
-  runtimeRegistry,                          // RuntimeRegistry from @glyphs-ai/runtime
+  agentResolver,            // AgentResolver — adapter over @glyphs-ai/catalog
+  contentSource,            // AgentContentSource — catalog bytes for provision
+  runtimeRegistry,          // RuntimeRegistry from @glyphs-ai/runtime-v2
+  spawner,                  // Spawner from @glyphs-ai/terminal (localSpawner)
   workspaceDir: "/abs/workspace-dir",
   workspaceId: "<uuid>",
-  spawnFn,                                  // optional SpawnFn
 });
 
-const session = await service.create({ agent: "demo-agent" });
-console.log(session.workdir);
+const created = (await session.createSession.execute({ agent: "demo-agent" }))._unsafeUnwrap();
 
-const cmd = await service.buildInteractiveLaunch(session.id);
+// Build the launch command without spawning a process.
+const cmd = (await session.buildInteractiveLaunch.execute({ id: created.id }))._unsafeUnwrap();
 console.log(cmd.display);
 //  cd "/.../sessions/20260508-9dfbdf05" && copilot --session-id=<id> --yolo
 
-// One-shot: build the launch command AND hand it to the injected spawner.
-// Returns a SpawnSessionResult discriminated union; `display` is always
-// populated so callers can show a copy-paste fallback on failure.
-const result = await service.spawnInteractive(session.id, { remote: false });
-if (result.ok) {
-  console.log("launched in", result.launcher, "—", result.display);
-} else {
-  console.error(result.code, result.error, result.display);
-}
+// One-shot: build the launch AND hand it to the injected Spawner.
+// Never rejects; `display` is always populated for a copy-paste fallback.
+const result = (await session.spawnInteractive.execute({ id: created.id }))._unsafeUnwrap();
+if (result.ok) console.log("launched in", result.launcher);
+else console.error(result.code, result.error, result.display);
 
-await service.list();                       // Session[]
-await service.get(session.id);              // Session | null
-await service.delete(session.id, { purge: false });
+await session.listSessions.execute({});                 // SessionView[]
+await session.getSession.execute({ id: created.id });   // SessionView | null
+await session.deleteSession.execute({ id: created.id, purge: false });
 
-await close();
+await session.close();
 ```
 
-Resume is the same call as launch — once a `runtimeSessionId`
-exists, `buildInteractiveLaunch` emits `--session-id=<id>`; for a
-fresh session it emits `--yolo` with no id.
-
-`buildInteractiveLaunch(id, { remote: true })` produces a
-remote-friendly variant when the runtime supports it (otherwise
-throws `RuntimeDoesNotSupportRemoteError`).
+Resume is the same call as launch — once a `runtimeSessionId` exists,
+`buildInteractiveLaunch` emits `--session-id=<id>`; for a fresh session
+it emits `--yolo` with no id. `{ remote: true }` produces a
+remote-friendly variant when the runtime supports it.
 
 ## Env layering
 
-`SessionService` does NOT own the cross-cutting subprocess env
-(`GLYPH_SERVER`, `GLYPH_SHARED_DIR`, …). The runtime adapter
-owns it via `CopilotRuntimeConfig.subprocessEnvBase`; the session
-service layers per-session work-context env (`GLYPH_WORKSPACE`,
-`GLYPH_WORKSPACE_DIR`, `GLYPH_WORK_KIND=session`,
-`GLYPH_WORK_ID=<id>`, `GLYPH_WORK_DIR=<workdir>`) on top of
-whatever the runtime returned.
+The session package does NOT own the cross-cutting subprocess env
+(`GLYPH_SERVER`, `GLYPH_SHARED_DIR`, …); the runtime adapter owns it
+via `CopilotRuntimeConfig.subprocessEnvBase`. The
+`buildInteractiveLaunch` use-case layers per-session work-context env
+(`GLYPH_WORKSPACE`, `GLYPH_WORKSPACE_DIR`, `GLYPH_WORK_KIND=session`,
+`GLYPH_WORK_ID=<id>`, `GLYPH_WORK_DIR=<workdir>`) on top of whatever
+the runtime returned.
 
 ## What this package does NOT do
 
-- Implement terminal launching. `spawnInteractive` calls an
-  *injected* `SpawnFn`; the impl lives in `@glyphs-ai/terminal`
-  (production) or any structurally-compatible test fake. Session
-  itself does not import `@glyphs-ai/terminal`.
+- Implement terminal launching. `spawnInteractive` calls an *injected*
+  `Spawner`; the impl is `@glyphs-ai/terminal`'s `localSpawner`
+  (production) or any test fake. Session depends only on the `Spawner`
+  interface (type-only), never the concrete launcher.
 - Track headless task execution or workflow orchestration. Those are
   separate T1 packages: [`@glyphs-ai/task`](../task) and
   [`@glyphs-ai/workflow`](../workflow).
@@ -175,12 +174,10 @@ whatever the runtime returned.
   a `runtimeSessionId` and threads it through `--session-id=<id>` on
   every launch — first launch creates the Copilot session, subsequent
   launches resume the same one.
-- **Path matching**: session ids are validated before path construction;
-  the path guard compares resolved strings exactly as a defense-in-depth
-  check.
-- **`delete(id, { purge: true })`** may fail with `EBUSY` on Windows
-  if Copilot currently has the session open. The error is surfaced;
-  the metadata row is left intact.
+- **`deleteSession({ purge: true })`** may fail with `EBUSY` on Windows
+  if Copilot currently has the session open. The error is surfaced as
+  `SandboxRemovalFailed` / `RuntimeStateDeletionFailed`; the metadata
+  row is left intact.
 
 ## Testing
 

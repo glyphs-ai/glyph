@@ -84,11 +84,11 @@ await app.reloadWorkspace(workspaceId);
 const ctx = await app.getContext(workspaceId);   // WorkspaceContext | null
 ctx.workspace;                                   // Workspace
 ctx.catalog;                                     // CatalogService
-ctx.sessions;                                    // SessionService
+ctx.sessions;                                    // SessionModule (use-cases)
 ctx.tasks;                                       // TaskService
 ctx.schedules;                                   // ScheduleService
 ctx.workflows;                                   // WorkflowService
-await ctx.sessions.spawnInteractive(sid, { remote? }); // SpawnSessionResult
+await ctx.sessions.spawnInteractive.execute({ id, remote? }); // ResultAsync<SpawnInteractiveResponse>
 
 app.loadedContexts();                            // snapshot of currently-loaded contexts
 
@@ -110,20 +110,20 @@ list-like operations:
 | ----------- | --------------------- | ---------------------------------------------------------- |
 | `workspace` | `Workspace`           | one workspace                                              |
 | `catalog`   | `CatalogService`      | one catalog (the registry)                                 |
-| `sessions`  | `SessionService`      | many sessions per workspace; service is the collection     |
+| `sessions`  | `SessionModule`       | many sessions per workspace; DI container of use-cases     |
 | `tasks`     | `TaskService`         | many tasks per workspace                                   |
 | `schedules` | `ScheduleService`     | many schedules per workspace; cron-driven task dispatch substrate |
 | `workflows` | `WorkflowService`     | many workflows per workspace; DAG orchestration substrate  |
 | `close()`   | `() => Promise<void>` | closes the five service handles in reverse-of-compose order; idempotent |
 
-`sessions.spawnInteractive(sid, { remote? })` (a method on
-`SessionService` from `@glyphs-ai/session`) builds the session's
-interactive launch command via `SessionService.buildInteractiveLaunch`
-and immediately hands it to `@glyphs-ai/terminal`'s `spawnTerminal`.
-The returned `display`
-field is always populated so callers can show a copy-paste command
-even on spawn failure. The result type `SpawnSessionResult` is
-canonical in `@glyphs-ai/session` — import it from there directly.
+`sessions.spawnInteractive.execute({ id, remote? })` (a use-case on the
+`SessionModule` from `@glyphs-ai/session`) builds the session's
+interactive launch command and immediately hands it to the injected
+`SpawnPort` (in production, `@glyphs-ai/terminal`'s `spawnTerminal`
+wrapped by `composeApplication`). The returned `display` field is
+always populated so callers can show a copy-paste command even on spawn
+failure. The outcome is a discriminated union (`ok: true` with a
+launcher, or `ok: false` with `error` / `code`).
 
 `ctx.schedules.registerKind("task", ...)` is wired automatically by
 `composeApplication` (via `makeTaskKindHandler`); callers don't need

@@ -30,10 +30,11 @@
   "dependencies": {
     "@glyphs-ai/catalog": "workspace:*",
     "@glyphs-ai/runtime": "workspace:*",
+    "@glyphs-ai/runtime-v2": "workspace:*",
+    "@glyphs-ai/terminal": "workspace:*",
     "@glyphs-ai/schedule": "workspace:*",
     "@glyphs-ai/session": "workspace:*",
     "@glyphs-ai/task": "workspace:*",
-    "@glyphs-ai/terminal": "workspace:*",
     "@glyphs-ai/workflow": "workspace:*",
     "@glyphs-ai/workspace": "workspace:*",
     "@hono/zod-openapi": "^1.4.0",

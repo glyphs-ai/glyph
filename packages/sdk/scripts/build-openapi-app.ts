@@ -21,11 +21,10 @@
  */
 
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
-import { catalogRoutes, workspacesRoutes } from "@glyphs-ai/api";
+import { catalogRoutes, sessionsRoutes, workspacesRoutes } from "@glyphs-ai/api";
 import type { CatalogModule } from "@glyphs-ai/catalog";
 import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
-import type { SessionService } from "@glyphs-ai/session";
 import type { TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import type { OpenAPIHono } from "@hono/zod-openapi";
@@ -36,7 +35,6 @@ import { runtimesRoutes } from "../../server/src/routes/runtimes.js";
 import { scheduledTasksRoutes } from "../../server/src/routes/scheduled-tasks.js";
 import { scheduledWorkflowsRoutes } from "../../server/src/routes/scheduled-workflows.js";
 import { schedulesRoutes } from "../../server/src/routes/schedules.js";
-import { sessionsRoutes } from "../../server/src/routes/sessions.js";
 import { tasksRoutes } from "../../server/src/routes/tasks.js";
 import { workflowsRoutes } from "../../server/src/routes/workflows.js";
 
@@ -175,7 +173,7 @@ function stubApplication(): Application {
   });
 }
 
-function stubSessionManager(): SessionService {
+function stubSessionManager(): WorkspaceContext["sessions"] {
   return throwingStub("stubSessionManager");
 }
 

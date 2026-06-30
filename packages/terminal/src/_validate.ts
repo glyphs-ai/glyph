@@ -1,5 +1,5 @@
 import { PORTABLE_ENV_NAME_RE } from "./_constants.js";
-import { InvalidLaunchCommandError } from "./errors.js";
+import { InvalidLaunchCommandError } from "./_errors.js";
 import type { LaunchCommand } from "./types.js";
 
 /** Reject command fields with control characters that could break shell/AppleScript quoting. */

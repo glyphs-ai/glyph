@@ -1,5 +1,5 @@
 import type { RuntimeRegistry } from "@glyphs-ai/runtime";
-import { spawnTerminal } from "@glyphs-ai/terminal";
+import { localSpawner } from "@glyphs-ai/terminal";
 import {
   composeWorkspaceModule,
   type DatabaseUnavailable,
@@ -110,7 +110,7 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
   const registry = new WorkspaceContextRegistry({
     getWorkspace: workspace.getWorkspace,
     runtimeRegistry: opts.runtimeRegistry,
-    spawnFn: spawnTerminal,
+    spawner: localSpawner,
     ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
   });
 

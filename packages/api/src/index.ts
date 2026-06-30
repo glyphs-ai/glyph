@@ -22,6 +22,11 @@
 
 export { catalogErrorPolicy } from "./_error-policies/catalog.js";
 export {
+  type RespondSessionErrorOpts,
+  respondSessionError,
+  type SessionRouteError,
+} from "./_error-policies/sessions.js";
+export {
   type ErrorPolicy,
   errorBody,
   INTERNAL_ERROR_NAMES,
@@ -44,6 +49,7 @@ export {
 // Route factories — each returns an OpenAPIHono sub-app mountable by
 // the server's transport layer.
 export { type CatalogResolver, catalogRoutes } from "./routes/catalog/index.js";
+export { sessionsRoutes } from "./routes/sessions.js";
 export { workspacesRoutes } from "./routes/workspaces.js";
 // Transport-agnostic zod schemas mirroring every wire contract. The
 // OpenAPI projection in `@glyphs-ai/server` consumes these; other

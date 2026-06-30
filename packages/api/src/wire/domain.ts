@@ -19,7 +19,6 @@ export type {
 } from "@glyphs-ai/catalog";
 export type { ActivityItem, TruncationInfo } from "@glyphs-ai/runtime";
 export type { PreviewScheduleResult, Schedule } from "@glyphs-ai/schedule";
-export type { Session } from "@glyphs-ai/session";
 export type { Task } from "@glyphs-ai/task";
 export type {
   WorkflowCancellation,

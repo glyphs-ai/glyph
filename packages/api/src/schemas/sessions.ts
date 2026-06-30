@@ -57,6 +57,7 @@ export const SessionPathParamsSchema = z.object({
 });
 
 // Inferred wire types — single source of truth is the schemas above.
+export type Session = z.infer<typeof SessionSchema>;
 export type SessionListQuery = z.infer<typeof SessionListQuerySchema>;
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 export type SessionDeleteQuery = z.infer<typeof SessionDeleteQuerySchema>;

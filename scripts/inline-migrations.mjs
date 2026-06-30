@@ -29,7 +29,7 @@ const PKGS = [
     tableSuffix: "workspace",
     migrationsFile: "src/infrastructure/drizzle/workspace-migrations.ts",
   },
-  { dir: "session", entity: "Session", tableSuffix: "session" },
+  { dir: "session", entity: "Session", tableSuffix: "session", migrationsFile: "src/infrastructure/drizzle/session-migrations.ts" },
   { dir: "task", entity: "Task", tableSuffix: "task" },
   {
     dir: "catalog",

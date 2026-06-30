@@ -25,7 +25,6 @@
 import type { CatalogModule } from "@glyphs-ai/catalog";
 import { RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
-import type { SessionService, SpawnFn } from "@glyphs-ai/session";
 import type { TaskService } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceModule } from "@glyphs-ai/workspace";
@@ -79,7 +78,6 @@ vi.mock("@glyphs-ai/session", () => ({
   composeSessionModule: vi.fn(async () => {
     await mocks.catalogGate;
     return {
-      service: {} as SessionService,
       close: vi.fn(async () => {
         mocks.sequence.push("session");
       }),
@@ -187,7 +185,7 @@ function makeRegistry(opts: { workspaceExists?: boolean } = {}): WorkspaceContex
   return new WorkspaceContextRegistry({
     getWorkspace,
     runtimeRegistry: new RuntimeRegistry(),
-    spawnFn: vi.fn() as unknown as SpawnFn,
+    spawner: { spawn: () => okAsync({ launcher: "wt" }) },
   });
 }
 

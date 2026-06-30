@@ -9,13 +9,23 @@ import {
   type SkillFqn,
 } from "@glyphs-ai/catalog";
 import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
+import type { RuntimeRegistry as RuntimeRegistryV2 } from "@glyphs-ai/runtime-v2";
 import { composeScheduleModule, type ScheduleService } from "@glyphs-ai/schedule";
-import { composeSessionModule, type SessionService, type SpawnFn } from "@glyphs-ai/session";
+import {
+  type AgentNotFound,
+  type AgentResolutionFailed,
+  type AgentResolver,
+  composeSessionModule,
+  type ResolvedAgent,
+  type SessionModule,
+} from "@glyphs-ai/session";
 import { composeTaskModule, type TaskService } from "@glyphs-ai/task";
+import type { Spawner } from "@glyphs-ai/terminal";
 import { composeWorkflowModule, type WorkflowService } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
 import type { Result } from "neverthrow";
 import pino, { type Logger } from "pino";
+import { bridgeRuntimeRegistryToV2 } from "./wiring/runtime-v2-bridge.js";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";
 import { makeCoordNodeRunner } from "./wiring/workflow-coord-task-runner.js";
@@ -87,13 +97,13 @@ export type WorkspaceContextState = "cached" | "loading" | "unloaded" | "not-reg
  * for this workspace.
  *
  * "Start an interactive session" semantics live on
- * `sessions.spawnInteractive(sid, opts)` — callers reach the spawner
- * via `ctx.sessions.spawnInteractive(...)`.
+ * `sessions.spawnInteractive.execute({ id, remote? })` — callers reach
+ * the spawner via `ctx.sessions.spawnInteractive.execute(...)`.
  */
 export interface WorkspaceContext {
   readonly workspace: Workspace;
   readonly catalog: CatalogModule;
-  readonly sessions: SessionService;
+  readonly sessions: SessionModule;
   readonly tasks: TaskService;
   /**
    * Per-workspace cron-driven task dispatch substrate. The timer is
@@ -251,7 +261,10 @@ function stripMcpMeta(content: string, fqn: string): Record<string, unknown> {
 export class WorkspaceContextRegistry {
   private readonly getWorkspace: WorkspaceModule["getWorkspace"];
   private readonly runtimeRegistry: RuntimeRegistry;
-  private readonly spawnFn: SpawnFn;
+  /** v1 registry bridged into the Result-based runtime-v2 contract session consumes. */
+  private readonly runtimeRegistryV2: RuntimeRegistryV2;
+  /** Native Result-based terminal spawner (`@glyphs-ai/terminal`). */
+  private readonly spawner: Spawner;
   private readonly logger: Logger;
   private readonly entries = new Map<string, WorkspaceContext>();
   private readonly inflight = new Map<string, Promise<WorkspaceContext | null>>();
@@ -259,12 +272,13 @@ export class WorkspaceContextRegistry {
   constructor(opts: {
     getWorkspace: WorkspaceModule["getWorkspace"];
     runtimeRegistry: RuntimeRegistry;
-    spawnFn: SpawnFn;
+    spawner: Spawner;
     logger?: Logger;
   }) {
     this.getWorkspace = opts.getWorkspace;
     this.runtimeRegistry = opts.runtimeRegistry;
-    this.spawnFn = opts.spawnFn;
+    this.runtimeRegistryV2 = bridgeRuntimeRegistryToV2(opts.runtimeRegistry);
+    this.spawner = opts.spawner;
     this.logger = opts.logger ?? silentLogger;
   }
 
@@ -461,15 +475,25 @@ export class WorkspaceContextRegistry {
       catalogModule = composeCatalog({ dbFile });
       cleanup.push(() => catalogModule.close());
       const catalogPorts = makeCatalogRuntimePorts(catalogModule);
+      const agentResolver: AgentResolver = {
+        resolve: (agent) =>
+          catalogModule.resolveAgent
+            .execute({ id: agent as AgentFqn })
+            .map((resolved): ResolvedAgent => resolved)
+            .mapErr((e): AgentNotFound | AgentResolutionFailed =>
+              e.type === "AgentNotFound"
+                ? { type: "AgentNotFound", agent }
+                : { type: "AgentResolutionFailed", agent, cause: e },
+            ),
+      };
       sessionModule = await composeSessionModule({
         dbFile,
-        agentResolver: catalogPorts,
+        agentResolver,
         contentSource: catalogPorts,
-        runtimeRegistry: this.runtimeRegistry,
+        runtimeRegistry: this.runtimeRegistryV2,
         workspaceDir: workspace.workspaceDir,
         workspaceId,
-        logger: this.logger,
-        spawnFn: this.spawnFn,
+        spawner: this.spawner,
       });
       cleanup.push(() => sessionModule.close());
       taskModule = await composeTaskModule({
@@ -570,7 +594,7 @@ export class WorkspaceContextRegistry {
     const context: WorkspaceContext = {
       workspace,
       catalog: catalogModule,
-      sessions: sessionModule.service,
+      sessions: sessionModule,
       tasks: taskModule.service,
       schedules: scheduleModule.service,
       workflows: workflowModule.service,

@@ -8,7 +8,12 @@ process.env.UV_THREADPOOL_SIZE ??= "16";
 import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import path, { sep as pathSep } from "node:path";
-import { catalogRoutes, composeApplication, workspacesRoutes } from "@glyphs-ai/api";
+import {
+  catalogRoutes,
+  composeApplication,
+  sessionsRoutes,
+  workspacesRoutes,
+} from "@glyphs-ai/api";
 import {
   assertCopilotSdkResolvable,
   CopilotRuntime,
@@ -33,7 +38,6 @@ import { runtimesRoutes } from "./routes/runtimes.js";
 import { scheduledTasksRoutes } from "./routes/scheduled-tasks.js";
 import { scheduledWorkflowsRoutes } from "./routes/scheduled-workflows.js";
 import { schedulesRoutes } from "./routes/schedules.js";
-import { sessionsRoutes } from "./routes/sessions.js";
 import { tasksRoutes } from "./routes/tasks.js";
 import { workflowsRoutes } from "./routes/workflows.js";
 import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-env.js";
