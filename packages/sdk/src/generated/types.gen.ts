@@ -115,8 +115,8 @@ export type GetApiWorkspacesResponses = {
     200: Array<{
         id: string;
         name: string;
-        createdAt: string;
         workspaceDir: string;
+        createdAt: string;
         lastOpenedAt: string;
     }>;
 };
@@ -155,8 +155,8 @@ export type PostApiWorkspacesResponses = {
     201: {
         id: string;
         name: string;
-        createdAt: string;
         workspaceDir: string;
+        createdAt: string;
         lastOpenedAt: string;
     };
 };
@@ -277,8 +277,8 @@ export type GetApiWorkspacesByIdResponses = {
     200: {
         id: string;
         name: string;
-        createdAt: string;
         workspaceDir: string;
+        createdAt: string;
         lastOpenedAt: string;
     };
 };
@@ -318,8 +318,8 @@ export type PatchApiWorkspacesByIdResponses = {
     200: {
         id: string;
         name: string;
-        createdAt: string;
         workspaceDir: string;
+        createdAt: string;
         lastOpenedAt: string;
     };
 };
@@ -3182,6 +3182,10 @@ export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameData = {
 
 export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
     /**
+     * Skill still has dependents
+     */
+    409: unknown;
+    /**
      * Internal error
      */
     500: unknown;
@@ -3787,6 +3791,10 @@ export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameData = {
 
 export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
     /**
+     * Agent still has dependents
+     */
+    409: unknown;
+    /**
      * Internal error
      */
     500: unknown;
@@ -4298,6 +4306,10 @@ export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameData = {
 };
 
 export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
+    /**
+     * MCP still has dependents
+     */
+    409: unknown;
     /**
      * Internal error
      */
