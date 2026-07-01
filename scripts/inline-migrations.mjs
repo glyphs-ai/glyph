@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Codegen each entity pkg's `src/migrations.ts` from the SQL files
+ * Codegen each entity pkg's configured migrations module from the SQL files
  * in `drizzle/`. The generated file imports nothing at module scope —
  * just literal strings + `MigrationMeta[]` + `applyXxxMigrations()` —
  * so it works uniformly in every JS execution path glyph uses:
@@ -8,11 +8,14 @@
  * integration test seams.
  *
  * Source of truth: `packages/<pkg>/drizzle/*.sql`.
- * Generated:       `packages/<pkg>/src/migrations.ts` (committed).
+ * Generated:       `PKGS[].migrationsFile`, for example
+ *                  `packages/task/src/infrastructure/drizzle/task-migrations.ts`.
+ *                  Packages without `migrationsFile` default to
+ *                  `packages/<pkg>/src/migrations.ts` (committed).
  *
  * Hooked into `pnpm bundle` (prebuild) and each pkg's `db:generate`
  * (postgenerate) so it never goes stale. CI also runs it and fails
- * if `migrations.ts` doesn't match.
+ * if the configured migrations module doesn't match.
  */
 
 import { createHash } from "node:crypto";
@@ -30,7 +33,12 @@ const PKGS = [
     migrationsFile: "src/infrastructure/drizzle/workspace-migrations.ts",
   },
   { dir: "session", entity: "Session", tableSuffix: "session", migrationsFile: "src/infrastructure/drizzle/session-migrations.ts" },
-  { dir: "task", entity: "Task", tableSuffix: "task" },
+  {
+    dir: "task",
+    entity: "Task",
+    tableSuffix: "task",
+    migrationsFile: "src/infrastructure/drizzle/task-migrations.ts",
+  },
   {
     dir: "catalog",
     entity: "Catalog",
@@ -56,10 +64,11 @@ function escapeForTemplateLiteral(s) {
   return s.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
-for (const { dir, entity, tableSuffix, migrationsFile } of PKGS) {
+for (const { dir, entity, tableSuffix, migrationsFile, journalNote } of PKGS) {
   const drizzleDir = join(repoRoot, "packages", dir, "drizzle");
-  // Four-layer packages keep the generated migrations under
-  // `src/persistence/`; flat packages default to `src/migrations.ts`.
+  // Packages may place generated migrations under their current
+  // infrastructure layout; packages without `migrationsFile` default to
+  // `src/migrations.ts`.
   const outFile = join(repoRoot, "packages", dir, ...(migrationsFile ?? "src/migrations.ts").split("/"));
 
   let files = [];
@@ -99,6 +108,11 @@ import type { MigrationMeta } from "drizzle-orm/migrator";
   }
   body += `];\n\n`;
 
+  // Optional per-package exception rationale appended to the migrationsTable
+  // paragraph — used when a package's journal suffix intentionally differs
+  // from its directory name (kept out of other packages' output when absent).
+  const journalNoteBlock = journalNote ? `\n *\n * ${journalNote}` : "";
+
   body += `/**
  * Run drizzle's official migration applier against \`db\`. Thin typed
  * shim over drizzle's \`@internal\` \`dialect\` + \`session\` props (same
@@ -111,7 +125,7 @@ import type { MigrationMeta } from "drizzle-orm/migrator";
  * check — drizzle's own bookkeeping is namespaced by table, so per-pkg
  * tables let migrations apply independently. Every glyph pkg follows
  * the \`__drizzle_migrations_<pkg>\` convention; deviating from it would
- * silently re-apply migrations or skip them.
+ * silently re-apply migrations or skip them.${journalNoteBlock}
  */
 export function apply${entity}Migrations<T extends Record<string, unknown>>(
   db: BetterSQLite3Database<T>,

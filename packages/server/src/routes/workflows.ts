@@ -93,12 +93,15 @@ import {
   FinishWorkflowRequestSchema,
   ReplaceNodeSpecRequestSchema,
   RespondHumanNodeRequestSchema,
+  TaskOperationError,
+  type TaskRouteError,
+  taskErrorWireBody,
   WorkflowArtifactsResponseSchema,
   WorkflowDagSchema,
   WorkflowHeaderSchema,
   WorkflowNodeSchema,
 } from "@glyphs-ai/api";
-import { InvalidTransition, type TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import {
   WorkflowDeleteRequiresTerminalError,
   WorkflowError,
@@ -121,7 +124,7 @@ import { handleListArtifacts, handleStreamArtifact } from "./workflows/_artifact
 import { resolveNodeRef, validateCreatedSinceQuery } from "./workflows/_validators.js";
 
 type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
-type WorkflowTasksResolver = (c: import("hono").Context) => TaskService;
+type WorkflowTasksResolver = (c: import("hono").Context) => TaskModule;
 type WorkflowWorkspaceDirResolver = (c: import("hono").Context) => string;
 
 export function workflowsRoutes(
@@ -746,7 +749,7 @@ export function workflowsRoutes(
   //
   // Cross-substrate composition order:
   //   1. Pre-scan every node for in-flight (non-terminal) tasks via
-  //      the `hasInFlightForWorkflowNode` reverse-lookup. If any are
+  //      the `hasInFlightByOrigin` reverse-lookup. If any are
   //      non-terminal, reject the whole operation with a 409 BEFORE
   //      any destructive write — the cascade is all-or-nothing.
   //      Without this gate, a workflow that has just transitioned to
@@ -798,12 +801,19 @@ export function workflowsRoutes(
         }
         // All-or-nothing pre-scan for in-flight node tasks (see method
         // doc above for the post-finishWorkflow coord-task race this
-        // closes). `hasInFlightForWorkflowNode` is a cheap index-eligible
+        // closes). `hasInFlightByOrigin` is a cheap index-eligible
         // probe; doing N of them is acceptable for typical workflow
         // sizes (< 20 nodes).
         const holdoutNodeIds: string[] = [];
         for (const node of snapshot.nodes) {
-          if (await tasks.hasInFlightForWorkflowNode(node.id)) {
+          const inFlight = await tasks.hasInFlightByOrigin.execute({
+            origin: "workflow",
+            originId: node.id,
+          });
+          if (inFlight.isErr()) {
+            throw new TaskOperationError(inFlight.error);
+          }
+          if (inFlight.value) {
             holdoutNodeIds.push(node.id);
           }
         }
@@ -824,9 +834,19 @@ export function workflowsRoutes(
           );
         }
         for (const node of snapshot.nodes) {
-          const linked = await tasks.findTaskByWorkflowNode(node.id);
+          const found = await tasks.findLatestByOrigin.execute({
+            origin: "workflow",
+            originId: node.id,
+          });
+          if (found.isErr()) {
+            throw new TaskOperationError(found.error);
+          }
+          const linked = found.value;
           if (linked === null) continue;
-          await tasks.delete(linked.id, { purge });
+          const deleted = await tasks.deleteTask.execute({ id: linked.id, purge });
+          if (deleted.isErr()) {
+            throw new TaskOperationError(deleted.error);
+          }
         }
         await wf.deleteWorkflow(wfid, { purgeDir: purge });
         logEvent(c, "workflow deleted", { workflowId: wfid, purge });
@@ -845,13 +865,8 @@ export function workflowsRoutes(
                 transition: "delete",
               };
             }
-            if (e instanceof InvalidTransition) {
-              return {
-                error: e.message,
-                code: "InvalidTransition",
-                status: e.from,
-                transition: "delete",
-              };
+            if (e instanceof TaskOperationError && e.code === "InvalidTransition") {
+              return taskErrorWireBody(e.detail as TaskRouteError, "delete");
             }
             return null;
           },

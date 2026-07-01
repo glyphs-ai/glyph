@@ -32,7 +32,8 @@ export function runtimesRoutes(registry: RuntimeRegistry): OpenAPIHono {
     }),
     (c) => {
       const out: RuntimeInfo[] = registry.kinds().map((kind) => {
-        const rt = registry.get(kind);
+        // `kind` came from `kinds()`, so the lookup is always present.
+        const rt = registry.get(kind)._unsafeUnwrap();
         return {
           kind,
           capabilities: { ...(rt.capabilities ?? {}) },

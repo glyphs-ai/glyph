@@ -183,7 +183,7 @@ available for operator-driven reload (e.g. recovering after the
 persisted state on disk has been edited externally). Reload is
 refused with HTTP 409 + `code=WorkspaceHasLiveTasksError` when the
 workspace still has live task subprocesses, since dropping the
-cached `TaskService` would orphan the in-flight subprocesses.
+cached `TaskModule` would orphan the in-flight subprocesses.
 
 ## Subprocess env contract
 
@@ -200,7 +200,7 @@ The first two are passed to the `CopilotRuntime` constructor at bootstrap.
 The interactive path (`buildInteractiveLaunch` — terminal spawner)
 inherits the parent env wholesale and cannot unset, so scrub keys
 only take effect on headless launches. The per-task layer is added
-inside `TaskService.dispatch` / `SessionService.assembleLaunchEnv` --
+inside `dispatchTask.execute(...)` / the session launch assembly --
 see those modules for the exact field list.
 
 ## Loopback binding

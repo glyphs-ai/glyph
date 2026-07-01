@@ -1,5 +1,6 @@
-import { RuntimeRegistry } from "@glyphs-ai/runtime";
+import { InMemoryRuntimeRegistry, type Runtime, type RuntimeRegistry } from "@glyphs-ai/runtime";
 import { Hono } from "hono";
+import { okAsync } from "neverthrow";
 import { describe, expect, it } from "vitest";
 import { runtimesRoutes } from "../../src/routes/runtimes.js";
 
@@ -15,27 +16,27 @@ function buildApp(registry: RuntimeRegistry): Hono {
  * here — `RuntimeRegistry.kinds()` returns the registered keys and the
  * route reads `runtime.capabilities` to project the response.
  */
-function stubRuntime(kind: string, capabilities?: { remoteSession?: boolean }) {
+function stubRuntime(kind: string, capabilities?: { remoteSession?: boolean }): Runtime {
   return {
     kind,
     ...(capabilities !== undefined ? { capabilities } : {}),
-    provision: async () => ({ runtimeSessionId: "x" }),
-    refresh: async () => null,
-    buildInteractiveLaunch: async () => ({ cmd: "x", args: [], cwd: "/", display: "x" }),
-    deleteState: async () => undefined,
+    provision: () => okAsync({ runtimeSessionId: "x" }),
+    buildInteractiveLaunch: () => okAsync({ cmd: "x", args: [], cwd: "/", display: "x" }),
+    readMetadata: () => okAsync(null),
+    deleteState: () => okAsync(undefined),
   };
 }
 
 describe("GET /api/runtimes", () => {
   it("returns an empty array when no runtimes are registered", async () => {
-    const registry = new RuntimeRegistry();
+    const registry = new InMemoryRuntimeRegistry();
     const res = await buildApp(registry).request("/api/runtimes");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
   });
 
   it("returns the registered runtime kinds with empty capabilities by default", async () => {
-    const registry = new RuntimeRegistry();
+    const registry = new InMemoryRuntimeRegistry();
     registry.register(stubRuntime("copilot"));
     registry.register(stubRuntime("gemini"));
     const res = await buildApp(registry).request("/api/runtimes");
@@ -50,7 +51,7 @@ describe("GET /api/runtimes", () => {
     // The route should pass capabilities through without filtering or
     // adding fields, so the dashboard / future CLI can switch on the
     // raw flags. `remoteSession: true` is the canonical example.
-    const registry = new RuntimeRegistry();
+    const registry = new InMemoryRuntimeRegistry();
     registry.register(stubRuntime("copilot", { remoteSession: true }));
     registry.register(stubRuntime("gemini", {}));
     const res = await buildApp(registry).request("/api/runtimes");

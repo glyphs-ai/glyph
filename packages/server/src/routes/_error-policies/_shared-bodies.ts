@@ -1,5 +1,5 @@
 /**
- * Shared body builders for `_error-policies/*` entries — class-stable
+ * Shared body builders for `_error-policies/*` entries — stable
  * response shapes that multiple policies need to return verbatim.
  *
  * Kept here, in the consumer directory, rather than inlined into
@@ -11,23 +11,16 @@
  */
 
 /**
- * `AgentResolutionFailedError` carries a deliberately opaque
- * class-stable body — its `cause` may contain DB host paths, stack
- * frames, or other internals. The real diagnostics land in the
- * server log via `logFault()`; the wire response is collapsed to
- * `{ error: "internal error", code: "AgentResolutionFailedError" }`
- * so dashboards can differentiate it from a generic 500 without
- * depending on the message.
- *
- * Used by the tasks / sessions / schedules policies (schedules wires
- * it for both the schedule-package and task-package classes). The
- * `_err` parameter is intentionally unused — the body is class-stable
- * and independent of the error instance — but kept in the signature
- * to satisfy the policy body-builder contract.
+ * Opaque 500 body for operator-configuration faults (e.g. schedule-kind
+ * registry mistakes) whose `.message` may name internal wiring the wire
+ * shouldn't leak. Collapses the message to `"internal error"` but keeps the
+ * error class `name` as `code` so a dashboard can still branch on the
+ * specific fault without depending on the message. The real diagnostics land
+ * in the server log via `logFault()`.
  */
-export const opaqueAgentResolutionBody = (_err: Error) => ({
+export const opaqueInternalErrorBody = (err: Error) => ({
   error: "internal error",
-  code: "AgentResolutionFailedError",
+  code: err.name,
 });
 
 /**
@@ -37,9 +30,8 @@ export const opaqueAgentResolutionBody = (_err: Error) => ({
  * — internal workflow topology that stays off the wire. The body is
  * collapsed to `{ error: "internal error", code:
  * "WorkflowWorkerNotInCoordMenuError" }` so the dashboard can still
- * branch on the class without the menu leaking. Mirrors
- * {@link opaqueAgentResolutionBody}; the `_err` parameter is unused
- * because the envelope is class-stable.
+ * branch on the code without the menu leaking. The `_err` parameter
+ * is unused because the envelope is stable.
  */
 export const opaqueWorkerNotInCoordMenuBody = (_err: Error) => ({
   error: "internal error",

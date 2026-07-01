@@ -1,4 +1,4 @@
-import type { ResolvedAgent } from "@glyphs-ai/runtime-v2";
+import type { ResolvedAgent } from "@glyphs-ai/runtime";
 import type { ResultAsync } from "neverthrow";
 
 /** `create`: the agent name does not resolve to a catalog entry. */

@@ -1,4 +1,4 @@
-import type { LaunchCommand } from "@glyphs-ai/runtime-v2";
+import type { LaunchCommand } from "@glyphs-ai/runtime";
 import type { Spawner } from "@glyphs-ai/terminal";
 import { errAsync, okAsync } from "neverthrow";
 import { beforeEach, describe, expect, it } from "vitest";

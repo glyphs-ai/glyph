@@ -1,4 +1,4 @@
-import type { LaunchCommand, Runtime, RuntimeRegistry } from "@glyphs-ai/runtime-v2";
+import type { LaunchCommand, Runtime, RuntimeRegistry } from "@glyphs-ai/runtime";
 import { errAsync, ok, okAsync } from "neverthrow";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type MockProxy, mock } from "vitest-mock-extended";

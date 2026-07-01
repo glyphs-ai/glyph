@@ -55,9 +55,6 @@ importers:
       '@glyphs-ai/runtime':
         specifier: workspace:*
         version: link:../runtime
-      '@glyphs-ai/runtime-v2':
-        specifier: workspace:*
-        version: link:../runtime-v2
       '@glyphs-ai/schedule':
         specifier: workspace:*
         version: link:../schedule
@@ -275,6 +272,9 @@ importers:
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.1
+      neverthrow:
+        specifier: ^8.2.0
+        version: 8.2.0
       proper-lockfile:
         specifier: ^4.1.2
         version: 4.1.2
@@ -294,22 +294,6 @@ importers:
       '@types/write-file-atomic':
         specifier: ^4.0.3
         version: 4.0.3
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-      vitest:
-        specifier: ^4.1.5
-        version: 4.1.5(@types/node@22.19.17)(happy-dom@15.11.7)(msw@2.14.6(@types/node@22.19.17)(typescript@5.9.3))(vite@8.0.11(@types/node@22.19.17)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.9.0))
-
-  packages/runtime-v2:
-    dependencies:
-      neverthrow:
-        specifier: ^8.2.0
-        version: 8.2.0
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.17
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -459,9 +443,6 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@glyphs-ai/runtime-v2':
-        specifier: workspace:*
-        version: link:../runtime-v2
       '@glyphs-ai/terminal':
         specifier: workspace:*
         version: link:../terminal
@@ -483,9 +464,9 @@ importers:
 
   packages/session:
     dependencies:
-      '@glyphs-ai/runtime-v2':
+      '@glyphs-ai/runtime':
         specifier: workspace:*
-        version: link:../runtime-v2
+        version: link:../runtime
       '@glyphs-ai/terminal':
         specifier: workspace:*
         version: link:../terminal
@@ -529,9 +510,15 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(knex@3.2.10(better-sqlite3@12.10.0))
+      neverthrow:
+        specifier: ^8.2.0
+        version: 8.2.0
       pino:
         specifier: ^9.5.0
         version: 9.14.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -3146,11 +3133,6 @@ packages:
   secure-json-parse@2.7.0:
     resolution: {integrity: sha512-6aU+Rwsezw7VR8/nyvKTx8QpWH9FrcYiXXlqC4z5d5XQBDRqtbfsRjnwGyqbi3gddNtWHuEk9OANUotL26qKUw==}
 
-  semver@7.8.0:
-    resolution: {integrity: sha512-AcM7dV/5ul4EekoQ29Agm5vri8JNqRyj39o0qpX6vDF2GZrtutZl5RwgD1XnZjiTAfncsJhMI48QQH3sN87YNA==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.8.4:
     resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
@@ -5627,7 +5609,7 @@ snapshots:
 
   node-abi@3.92.0:
     dependencies:
-      semver: 7.8.0
+      semver: 7.8.4
 
   obug@2.1.1: {}
 
@@ -5993,8 +5975,6 @@ snapshots:
       kind-of: 6.0.3
 
   secure-json-parse@2.7.0: {}
-
-  semver@7.8.0: {}
 
   semver@7.8.4: {}
 

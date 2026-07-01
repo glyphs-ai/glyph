@@ -17,7 +17,7 @@
  */
 
 import type { CatalogModule } from "@glyphs-ai/catalog";
-import { type AgentContentSource, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime-v2";
+import { type AgentContentSource, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import {
   type AgentResolver,
   composeSessionModule,
@@ -25,7 +25,7 @@ import {
   type ResolvedAgent,
   type SessionModule,
 } from "@glyphs-ai/session";
-import type { TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { Spawner, SpawnFailed } from "@glyphs-ai/terminal";
 import { errAsync, okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
@@ -76,7 +76,7 @@ function buildContext(sessions: SessionModule): WorkspaceContext {
   const ctx: Partial<WorkspaceContext> = {
     sessions,
     catalog: {} as CatalogModule,
-    tasks: {} as TaskService,
+    tasks: {} as TaskModule,
   };
   return ctx as WorkspaceContext;
 }

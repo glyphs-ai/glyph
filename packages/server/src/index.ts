@@ -11,13 +11,15 @@ import path, { sep as pathSep } from "node:path";
 import {
   catalogRoutes,
   composeApplication,
+  scheduledTasksRoutes,
   sessionsRoutes,
+  tasksRoutes,
   workspacesRoutes,
 } from "@glyphs-ai/api";
 import {
   assertCopilotSdkResolvable,
   CopilotRuntime,
-  RuntimeRegistry,
+  InMemoryRuntimeRegistry,
   sharedDir,
 } from "@glyphs-ai/runtime";
 import { serve } from "@hono/node-server";
@@ -35,10 +37,8 @@ import { createApiApp, registerOpenApiDoc } from "./routes/_openapi.js";
 import { configRoutes } from "./routes/config.js";
 import { healthRoutes } from "./routes/health.js";
 import { runtimesRoutes } from "./routes/runtimes.js";
-import { scheduledTasksRoutes } from "./routes/scheduled-tasks.js";
 import { scheduledWorkflowsRoutes } from "./routes/scheduled-workflows.js";
 import { schedulesRoutes } from "./routes/schedules.js";
-import { tasksRoutes } from "./routes/tasks.js";
 import { workflowsRoutes } from "./routes/workflows.js";
 import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-env.js";
 
@@ -153,7 +153,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
     format: opts.logFormat ?? (env.GLYPH_LOG_FORMAT === "json" ? "json" : "pretty"),
   });
 
-  const runtimeRegistry = new RuntimeRegistry();
+  const runtimeRegistry = new InMemoryRuntimeRegistry();
   // Fail-fast preflight: confirm `@github/copilot-sdk` (and its
   // transitive `@github/copilot` CLI dep) are resolvable from this
   // process's module graph BEFORE we register the copilot runtime.
@@ -286,7 +286,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", tasksApp);
 
   // `/scheduled-tasks` is the schedule-origin sibling of `/tasks`. It
-  // shares the same workspace-scoped TaskService (via the same
+  // shares the same workspace-scoped TaskModule (via the same
   // `workspaceContext.tasks` resolver) so storage / cancellation /
   // dispatch all observe one in-memory state — splitting at the route
   // layer, not the service layer, keeps the seam at the URL where it
@@ -471,7 +471,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   //      (a) a `POST /tasks` arriving mid-shutdown spawning a new
   //      subprocess after we've already taken the snapshot, and (b) the
   //      first request to a workspace whose context wasn't loaded yet
-  //      lazy-instantiating a fresh TaskService that wasn't in
+  //      lazy-instantiating a fresh TaskModule that wasn't in
   //      `application.loadedContexts()` and would never get drained.
   //   2. `tasks.shutdown()` second — by now no new dispatches can land,
   //      so the snapshot of cached contexts is authoritative.

@@ -264,8 +264,8 @@ export async function catalogAgentEnable(
 export type CatalogAgentDisableOpts = WorkspaceFlagOpts;
 
 /**
- * Disable an agent. Pending tasks still drain; new dispatches fail
- * with `EntryNotReadyError` (`disabledByUser`). Re-enable via
+ * Disable an agent. Pending tasks still drain; new dispatches return
+ * `EntryNotReady` (`disabledByUser`). Re-enable via
  * {@link catalogAgentEnable}.
  */
 export async function catalogAgentDisable(

@@ -30,10 +30,10 @@ import {
   type MCPStdioServerConfig,
   type SessionEvent,
 } from "@github/copilot-sdk";
-import { RuntimeHeadlessLaunchFailed, RuntimeProvisionFailed } from "../errors.js";
+import { err, ok, type Result } from "neverthrow";
+import type { RuntimeHeadlessLaunchFailed } from "../errors.js";
 import type { PlaceholderContext } from "../placeholders.js";
 import type { AgentContentSource, ResolvedAgent, RuntimeExit, RuntimeHandle } from "../types.js";
-import { InvalidMcpJson } from "./errors.js";
 import { COPILOT_MCP_CONFIG, provisionCopilotWorkdir } from "./provision.js";
 
 export { COPILOT_MCP_CONFIG };
@@ -138,94 +138,87 @@ export interface LaunchCopilotHeadlessDeps {
 export async function launchCopilotHeadless(
   opts: LaunchCopilotHeadlessOpts,
   deps: LaunchCopilotHeadlessDeps,
-): Promise<RuntimeHandle> {
-  // Step 1: provision. Distinguishable from spawn failures via error type.
-  const placeholders: PlaceholderContext = {
-    workspaceDir: opts.workspaceDir,
-    sharedDir: deps.sharedDir,
-  };
+): Promise<Result<RuntimeHandle, RuntimeHeadlessLaunchFailed>> {
+  // One boundary catch covers the whole acquire sequence. Any step
+  // below may throw — third-party SDK / fs faults, or our own MCP
+  // shape validation in `readMcpServersFromWorkdir` — and the catch
+  // tears down whatever was acquired (`session`, then `client`) before
+  // folding the cause into the public error atom. `safeDisconnect` /
+  // `safeStop` are no-ops on a half-acquired resource, so unconditional
+  // cleanup stays safe even when a launch fails before the client starts.
+  let client: CopilotClient | undefined;
+  let session: CopilotSession | undefined;
   try {
+    // Step 1: provision the run's workdir.
+    const placeholders: PlaceholderContext = {
+      workspaceDir: opts.workspaceDir,
+      sharedDir: deps.sharedDir,
+    };
     await provisionCopilotWorkdir(opts.workdir, opts.agent, opts.catalog, placeholders);
-  } catch (cause) {
-    throw new RuntimeProvisionFailed("copilot", opts.workdir, cause as Error);
-  }
 
-  // Step 2: start the SDK client.
-  //
-  // Auth model: glyph assumes the operator (the human running the
-  // glyph server) is already logged in via `copilot --login`. That
-  // login state lives in `~/.copilot/` (config.json + OS keychain
-  // tokens). We do NOT pass `copilotHome` so the SDK defaults to
-  // `~/.copilot` and inherits the operator's auth.
-  //
-  // `useLoggedInUser: true` is the SDK default, set explicitly so
-  // setting per-session `gitHubToken` (BYOK) does not accidentally
-  // also switch this default — the SDK documented
-  // behavior is that providing `gitHubToken` implicitly flips this
-  // to false.
-  const createClient = deps.createClient ?? ((opts) => new CopilotClient(opts));
-  const client = createClient({
-    useLoggedInUser: true,
-    env: mergeEnv(process.env, opts.subprocessEnv),
-  });
-
-  try {
+    // Step 2: start the SDK client.
+    //
+    // Auth model: glyph assumes the operator (the human running the
+    // glyph server) is already logged in via `copilot --login`. That
+    // login state lives in `~/.copilot/` (config.json + OS keychain
+    // tokens). We do NOT pass `copilotHome` so the SDK defaults to
+    // `~/.copilot` and inherits the operator's auth.
+    //
+    // `useLoggedInUser: true` is the SDK default, set explicitly so
+    // setting per-session `gitHubToken` (BYOK) does not accidentally
+    // also switch this default — the SDK documented
+    // behavior is that providing `gitHubToken` implicitly flips this
+    // to false.
+    const createClient = deps.createClient ?? ((opts) => new CopilotClient(opts));
+    client = createClient({
+      useLoggedInUser: true,
+      env: mergeEnv(process.env, opts.subprocessEnv),
+    });
     await client.start();
-  } catch (cause) {
-    throw new RuntimeHeadlessLaunchFailed("copilot", opts.workdir, cause as Error);
-  }
 
-  // Step 3: per-session event buffer + idle latch.
-  const buffer: EventBuffer = {
-    events: [],
-    finished: false,
-    subscribers: new Set(),
-  };
+    // Step 3: per-session event buffer + idle latch.
+    const buffer: EventBuffer = {
+      events: [],
+      finished: false,
+      subscribers: new Set(),
+    };
 
-  let idleResolve: ((info: RuntimeExit) => void) | undefined;
-  const idlePromise = new Promise<RuntimeExit>((resolve) => {
-    idleResolve = resolve;
-  });
+    let idleResolve: ((info: RuntimeExit) => void) | undefined;
+    const idlePromise = new Promise<RuntimeExit>((resolve) => {
+      idleResolve = resolve;
+    });
 
-  const onEvent = (event: SessionEvent) => {
-    buffer.events.push(event);
-    for (const sub of buffer.subscribers) {
-      try {
-        sub(event);
-      } catch {
-        // A subscriber throwing must not break the event pipeline.
-        // The streamActivity contract on the runtime side already
-        // handles abort signals; surface anything else via its own
-        // error channel, not ours.
+    const onEvent = (event: SessionEvent) => {
+      buffer.events.push(event);
+      for (const sub of buffer.subscribers) {
+        try {
+          sub(event);
+        } catch {
+          // A subscriber throwing must not break the event pipeline.
+          // The streamActivity contract on the runtime side already
+          // handles abort signals; surface anything else via its own
+          // error channel, not ours.
+        }
       }
-    }
-    // `session.idle` signals the model has no more work — terminal
-    // event for one-shot dispatches.
-    if (event.type === "session.idle") {
-      buffer.finished = true;
-      idleResolve?.({ code: 0, signal: null });
-    }
-  };
+      // `session.idle` signals the model has no more work — terminal
+      // event for one-shot dispatches.
+      if (event.type === "session.idle") {
+        buffer.finished = true;
+        idleResolve?.({ code: 0, signal: null });
+      }
+    };
 
-  // Step 4: load MCP servers from `<workdir>/.mcp.json` and pass them
-  // inline to createSession. The SDK's `enableConfigDiscovery: true`
-  // is documented to pick up `.mcp.json` from `workingDirectory`,
-  // but the bundled CLI's `_doInitializeMcp` only consumes
-  // `SessionConfig.mcpServers` (verified against
-  // @github/copilot-sdk@1.0.0-beta.4). This call polyfills the
-  // missing discovery; `.mcp.json` remains the source of truth on
-  // disk for debuggability and inspection.
-  let mcpServers: Record<string, MCPServerConfig> | undefined;
-  try {
-    mcpServers = await readMcpServersFromWorkdir(opts.workdir);
-  } catch (cause) {
-    await safeStop(client);
-    throw new RuntimeHeadlessLaunchFailed("copilot", opts.workdir, cause as Error);
-  }
+    // Step 4: load MCP servers from `<workdir>/.mcp.json` and pass them
+    // inline to createSession. The SDK's `enableConfigDiscovery: true`
+    // is documented to pick up `.mcp.json` from `workingDirectory`,
+    // but the bundled CLI's `_doInitializeMcp` only consumes
+    // `SessionConfig.mcpServers` (verified against
+    // @github/copilot-sdk@1.0.0-beta.4). This call polyfills the
+    // missing discovery; `.mcp.json` remains the source of truth on
+    // disk for debuggability and inspection.
+    const mcpServers = await readMcpServersFromWorkdir(opts.workdir);
 
-  // Step 5: create the session.
-  let session: CopilotSession;
-  try {
+    // Step 5: create the session.
     session = await client.createSession({
       onPermissionRequest: approveAll,
       workingDirectory: opts.workdir,
@@ -238,49 +231,52 @@ export async function launchCopilotHeadless(
       // the very early `session.start` event is delivered to us.
       onEvent,
     });
-  } catch (cause) {
-    // Best-effort: shut the client down so we don't leak a copilot
-    // CLI subprocess behind the rejected launch.
-    await safeStop(client);
-    throw new RuntimeHeadlessLaunchFailed("copilot", opts.workdir, cause as Error);
-  }
 
-  // Step 6: send the prompt. `send` returns once the message is
-  // queued; the SDK fires events asynchronously as the agent works.
-  try {
+    // Step 6: send the prompt. `send` returns once the message is
+    // queued; the SDK fires events asynchronously as the agent works.
     await session.send({ prompt: opts.prompt });
+
+    // Step 7: register the buffer only after a successful prompt send.
+    deps.registerSession(session.sessionId, buffer);
+
+    // Capture the now-live resources as `const` so the exit / kill
+    // closures below keep their non-nullable type — the outer `let`
+    // bindings exist only so the boundary catch can tear down a
+    // partially-acquired launch.
+    const liveClient = client;
+    const liveSession = session;
+
+    // Step 8: build the exit promise. Resolves on session.idle (handled
+    // in onEvent above) OR if we detect the client dropping (rare —
+    // SDK CLI subprocess crash). Closes the SDK client and session
+    // when settling so resources don't leak.
+    const exit = idlePromise.finally(async () => {
+      await safeDisconnect(liveSession);
+      await safeStop(liveClient);
+    });
+
+    return ok({
+      runtimeSessionId: liveSession.sessionId,
+      sessionDir: Promise.resolve(path.join(deps.copilotStateDir, liveSession.sessionId)),
+      exit,
+      kill: () => {
+        // `session.abort()` is graceful: the model is told to stop,
+        // and `session.idle` fires shortly after. We don't await it
+        // — the exit watcher will see the idle event and clean up.
+        liveSession.abort().catch(() => {
+          // Already aborted or session is in a state that can't be
+          // aborted. Cleanup remains owned by the exit watcher.
+        });
+      },
+    });
   } catch (cause) {
-    await safeDisconnect(session);
-    await safeStop(client);
-    throw new RuntimeHeadlessLaunchFailed("copilot", opts.workdir, cause as Error);
+    // Tear down in reverse acquisition order. Both helpers swallow
+    // "never fully started / already stopped", so calling them on a
+    // resource that failed mid-acquire is harmless.
+    if (session) await safeDisconnect(session);
+    if (client) await safeStop(client);
+    return err({ type: "RuntimeHeadlessLaunchFailed", cause });
   }
-
-  // Step 7: register the buffer only after a successful prompt send.
-  deps.registerSession(session.sessionId, buffer);
-
-  // Step 8: build the exit promise. Resolves on session.idle (handled
-  // in onEvent above) OR if we detect the client dropping (rare —
-  // SDK CLI subprocess crash). Closes the SDK client and session
-  // when settling so resources don't leak.
-  const exit = idlePromise.finally(async () => {
-    await safeDisconnect(session);
-    await safeStop(client);
-  });
-
-  return {
-    runtimeSessionId: session.sessionId,
-    sessionDir: Promise.resolve(path.join(deps.copilotStateDir, session.sessionId)),
-    exit,
-    kill: () => {
-      // `session.abort()` is graceful: the model is told to stop,
-      // and `session.idle` fires shortly after. We don't await it
-      // — the exit watcher will see the idle event and clean up.
-      session.abort().catch(() => {
-        // Already aborted or session is in a state that can't be
-        // aborted. Cleanup remains owned by the exit watcher.
-      });
-    },
-  };
 }
 
 async function safeDisconnect(session: CopilotSession): Promise<void> {
@@ -332,6 +328,19 @@ function mergeEnv(
 }
 
 /**
+ * Build the `Error` thrown when `<workdir>/.mcp.json` is malformed.
+ * `launchCopilotHeadless`'s boundary catch folds the message into the
+ * `RuntimeHeadlessLaunchFailed` atom's `cause`. `name` is the offending
+ * server's FQN, or `.mcp.json` for whole-file faults.
+ */
+function invalidMcpConfig(name: string, reason: string, cause?: unknown): Error {
+  return new Error(
+    `MCP "${name}" config is invalid: ${reason}`,
+    cause === undefined ? undefined : { cause },
+  );
+}
+
+/**
  * Read `<workdir>/.mcp.json` written by {@link provisionCopilotWorkdir}
  * and return its `mcpServers` map shaped for `SessionConfig.mcpServers`.
  *
@@ -343,12 +352,12 @@ function mergeEnv(
  * the server advertises). An explicit empty array on disk is preserved
  * as "no tools" so authors can narrow exposure when needed.
  *
- * Throws {@link InvalidMcpJson} on malformed JSON or unexpected shape so
- * the caller can wrap it as `RuntimeHeadlessLaunchFailed` while preserving
- * the typed cause (consumers pattern-matching on `instanceof InvalidMcpJson`
- * via `.cause` still get the per-MCP attribution). The "name" slot carries
- * `.mcp.json` for whole-file failures and the offending server name for
- * per-server shape failures. ENOENT is not an error.
+ * Throws a plain `Error` (via {@link invalidMcpConfig}) on malformed
+ * JSON or unexpected shape; `launchCopilotHeadless` catches it and folds
+ * the message into the `RuntimeHeadlessLaunchFailed` atom's `cause`. The
+ * message names the offending server, or `.mcp.json` for whole-file
+ * faults. ENOENT is not an error — a missing file means the agent
+ * declared no MCP dependencies.
  */
 async function readMcpServersFromWorkdir(
   workdir: string,
@@ -366,11 +375,9 @@ async function readMcpServersFromWorkdir(
   try {
     parsed = JSON.parse(raw);
   } catch (cause) {
-    // Use the file name as the "name" slot — top-level parse failure
-    // has no per-server attribution, but typing the failure as
-    // InvalidMcpJson keeps the consumer's `instanceof` check working
-    // (the outer RuntimeHeadlessLaunchFailed.cause carries it intact).
-    throw new InvalidMcpJson(COPILOT_MCP_CONFIG, cause as Error);
+    // Whole-file parse failure has no per-server attribution, so the
+    // message carries the file name instead.
+    throw invalidMcpConfig(COPILOT_MCP_CONFIG, (cause as Error).message, cause);
   }
 
   if (
@@ -381,10 +388,7 @@ async function readMcpServersFromWorkdir(
     (parsed as { mcpServers: unknown }).mcpServers === null ||
     Array.isArray((parsed as { mcpServers: unknown }).mcpServers)
   ) {
-    throw new InvalidMcpJson(
-      COPILOT_MCP_CONFIG,
-      new Error(`expected { mcpServers: { ... } } at top level`),
-    );
+    throw invalidMcpConfig(COPILOT_MCP_CONFIG, "expected { mcpServers: { ... } } at top level");
   }
 
   const sourceMap = (parsed as { mcpServers: Record<string, unknown> }).mcpServers;
@@ -393,7 +397,7 @@ async function readMcpServersFromWorkdir(
   const out: Record<string, MCPServerConfig> = {};
   for (const [name, body] of Object.entries(sourceMap)) {
     if (body === null || typeof body !== "object" || Array.isArray(body)) {
-      throw new InvalidMcpJson(name, new Error(`server config must be an object`));
+      throw invalidMcpConfig(name, "server config must be an object");
     }
     out[name] = coerceMcpServerConfig(name, body as Record<string, unknown>);
   }
@@ -403,22 +407,22 @@ async function readMcpServersFromWorkdir(
 function coerceMcpServerConfig(name: string, body: Record<string, unknown>): MCPServerConfig {
   const tools = "tools" in body ? readStringArray(body.tools) : ["*"];
   if (tools === null) {
-    throw new InvalidMcpJson(name, new Error(`server config tools must be a string array`));
+    throw invalidMcpConfig(name, "server config tools must be a string array");
   }
 
   const timeout = readOptionalNumber(body.timeout);
   if (body.timeout !== undefined && timeout === undefined) {
-    throw new InvalidMcpJson(name, new Error(`server config timeout must be a finite number`));
+    throw invalidMcpConfig(name, "server config timeout must be a finite number");
   }
 
   if (body.type === "http" || body.type === "sse") {
     const url = readString(body.url);
     if (url === undefined) {
-      throw new InvalidMcpJson(name, new Error(`server config url must be a string`));
+      throw invalidMcpConfig(name, "server config url must be a string");
     }
     const headers = readOptionalStringRecord(body.headers);
     if (body.headers !== undefined && headers === undefined) {
-      throw new InvalidMcpJson(name, new Error(`server config headers must be a string map`));
+      throw invalidMcpConfig(name, "server config headers must be a string map");
     }
     const config: MCPHTTPServerConfig = {
       type: body.type,
@@ -431,27 +435,24 @@ function coerceMcpServerConfig(name: string, body: Record<string, unknown>): MCP
   }
 
   if (body.type !== undefined && body.type !== "local" && body.type !== "stdio") {
-    throw new InvalidMcpJson(
-      name,
-      new Error(`server config type must be "stdio", "local", "http", or "sse"`),
-    );
+    throw invalidMcpConfig(name, `server config type must be "stdio", "local", "http", or "sse"`);
   }
 
   const command = readString(body.command);
   if (command === undefined) {
-    throw new InvalidMcpJson(name, new Error(`server config command must be a string`));
+    throw invalidMcpConfig(name, "server config command must be a string");
   }
   const args = readStringArray(body.args);
   if (args === null) {
-    throw new InvalidMcpJson(name, new Error(`server config args must be a string array`));
+    throw invalidMcpConfig(name, "server config args must be a string array");
   }
   const env = readOptionalStringRecord(body.env);
   if (body.env !== undefined && env === undefined) {
-    throw new InvalidMcpJson(name, new Error(`server config env must be a string map`));
+    throw invalidMcpConfig(name, "server config env must be a string map");
   }
   const cwd = readString(body.cwd);
   if (body.cwd !== undefined && cwd === undefined) {
-    throw new InvalidMcpJson(name, new Error(`server config cwd must be a string`));
+    throw invalidMcpConfig(name, "server config cwd must be a string");
   }
   const config: MCPStdioServerConfig = {
     ...(body.type !== undefined ? { type: body.type } : {}),

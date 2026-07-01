@@ -1,6 +1,6 @@
 import path from "node:path";
 import { type Application, composeApplication } from "@glyphs-ai/api";
-import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
+import { CopilotRuntime, InMemoryRuntimeRegistry, type RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { WorkspaceModule, WorkspaceName } from "@glyphs-ai/workspace";
 import type { Logger } from "pino";
 
@@ -21,7 +21,7 @@ export async function setupTestSubsystem(opts: {
   readonly scratch: string;
   readonly logger?: Logger;
 }): Promise<ServerTestSubsystem> {
-  const runtimeRegistry = new RuntimeRegistry();
+  const runtimeRegistry = new InMemoryRuntimeRegistry();
   runtimeRegistry.register(
     new CopilotRuntime({ copilotConfigPath: path.join(opts.scratch, "copilot-config.json") }),
   );

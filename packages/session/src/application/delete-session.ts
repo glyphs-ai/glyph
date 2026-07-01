@@ -2,7 +2,7 @@ import type {
   RuntimeRegistry,
   RuntimeStateDeletionFailed,
   UnknownRuntime,
-} from "@glyphs-ai/runtime-v2";
+} from "@glyphs-ai/runtime";
 import { okAsync } from "neverthrow";
 import { z } from "zod";
 import { SessionIdSchema } from "../domain/session-id.js";

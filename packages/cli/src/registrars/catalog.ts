@@ -2,9 +2,8 @@
  * `catalog` subtree registrar. Three resource families — skills,
  * agents, and MCPs — share the same shape of `list / show / install /
  * rm / sync-resolve / sync` commands, with kind-specific optional
- * verbs layered on top. The flat wiring it replaces was 250+ lines of
- * near-identical Commander chains in `index.ts`; here we declare one
- * spec per kind and iterate.
+ * verbs layered on top. Each kind is declared as a spec and registered
+ * through the shared loop.
  *
  * Cross-kind asymmetries:
  *   - MCP has no resolve / ack-prereqs.
@@ -181,7 +180,7 @@ const KIND_SPECS: readonly KindSpec[] = [
       rm: "Remove an agent",
       ackPrereqs: "Acknowledge an agent's prereqs (lifts the prereqs-ack block)",
       enable: "Re-enable a disabled agent",
-      disable: "Disable an agent (new dispatches fail with EntryNotReadyError)",
+      disable: "Disable an agent (new dispatches fail with EntryNotReady)",
     },
     impls: {
       list: (opts) => catalogAgentList(opts),

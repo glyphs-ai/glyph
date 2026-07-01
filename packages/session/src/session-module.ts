@@ -1,5 +1,5 @@
 import { randomBytes as cryptoRandomBytes } from "node:crypto";
-import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime-v2";
+import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { Spawner } from "@glyphs-ai/terminal";
 import { BuildInteractiveLaunchUseCase } from "./application/build-interactive-launch.js";
 import { CreateSessionUseCase } from "./application/create-session.js";
@@ -35,7 +35,7 @@ export interface SessionModuleOptions {
   readonly agentResolver: AgentResolver;
   /** Supplies agent/skill/mcp bytes to `runtime.provision` (catalog satisfies it). */
   readonly contentSource: AgentContentSource;
-  /** Result-based runtime registry (`@glyphs-ai/runtime-v2`); must contain at least the default runtime. */
+  /** Result-based runtime registry (`@glyphs-ai/runtime`); must contain at least the default runtime. */
   readonly runtimeRegistry: RuntimeRegistry;
   /** Hosts a launch command (`@glyphs-ai/terminal`'s `localSpawner`, wired by the host). */
   readonly spawner: Spawner;

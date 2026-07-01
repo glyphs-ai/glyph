@@ -1,4 +1,4 @@
-import type { Runtime, RuntimeRegistry, RuntimeSessionMetadata } from "@glyphs-ai/runtime-v2";
+import type { Runtime, RuntimeRegistry, RuntimeSessionMetadata } from "@glyphs-ai/runtime";
 import { err, errAsync, ok, okAsync } from "neverthrow";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type MockProxy, mock } from "vitest-mock-extended";

@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
  *
  * If the two literals drift, dev `/api/*` requests silently ECONNREFUSED
  * with no useful error. The `_devPortNote` field in package.json points
- * here; this test is the enforcement the note used to only describe.
+ * here; this test enforces the note directly.
  *
  * Both files are read as text rather than imported: the dashboard config
  * is in another package and pulling it in as a module would create a

@@ -8,9 +8,8 @@
  *   - `validate(data, { changedKeys })` SKIPs catalog lookup when
  *     `agent` is not in `changedKeys` (the patch-when-catalog-down
  *     property the service preserves)
- *   - `validate` throws task-pkg's `AgentNotFoundError` on null
- *     catalog hit, and `AgentResolutionFailedError` on any other
- *     catalog throw
+ *   - `validate` wraps null catalog hits as task `AgentNotFound`
+ *     unions, and catalog throws as `AgentResolutionFailed` unions
  *   - `mergePatch` RFC 7396 semantics + `changedKeys` accuracy
  *   - `dispatch` synthesises `origin: "schedule"` +
  *     `originId: scheduleId` + `metadata: { firedAt }`, conditional-spreads
@@ -18,8 +17,10 @@
  *   - `hasInFlightForSchedule` / `deleteForSchedule` delegation
  */
 
-import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
+import { okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
+import { TaskOperationError } from "../../src/wiring/_task-operation-error.js";
 import {
   makeTaskKindHandler,
   TaskScheduleTargetError,
@@ -31,7 +32,7 @@ function stubDeps(
   opts: { agent?: unknown | null; getAgentThrows?: Error; dispatchReturn?: { id: string } } = {},
 ): {
   catalog: CatalogAgentLookup;
-  tasks: TaskService;
+  tasks: TaskModule;
   getAgent: ReturnType<typeof vi.fn>;
   dispatch: ReturnType<typeof vi.fn>;
   hasInFlightByOrigin: ReturnType<typeof vi.fn>;
@@ -41,15 +42,15 @@ function stubDeps(
     if (opts.getAgentThrows !== undefined) throw opts.getAgentThrows;
     return opts.agent === undefined ? { name: "default-agent" } : opts.agent;
   });
-  const dispatch = vi.fn(async () => opts.dispatchReturn ?? { id: "task-xyz" });
-  const hasInFlightByOrigin = vi.fn(async () => false);
-  const deleteTerminalByOrigin = vi.fn(async () => ({ deletedCount: 0 }));
+  const dispatch = vi.fn(() => okAsync(opts.dispatchReturn ?? { id: "task-xyz" }));
+  const hasInFlightByOrigin = vi.fn(() => okAsync(false));
+  const deleteTerminalByOrigin = vi.fn(() => okAsync({ deletedCount: 0 }));
   const catalog = { getAgent } as unknown as CatalogAgentLookup;
   const tasks = {
-    dispatch,
-    hasInFlightByOrigin,
-    deleteTerminalByOrigin,
-  } as unknown as TaskService;
+    dispatchTask: { execute: dispatch },
+    hasInFlightByOrigin: { execute: hasInFlightByOrigin },
+    deleteTerminalByOrigin: { execute: deleteTerminalByOrigin },
+  } as unknown as TaskModule;
   return {
     catalog,
     tasks,
@@ -178,9 +179,9 @@ describe("makeTaskKindHandler.validate — catalog cross-check", () => {
   it("throws task-pkg's AgentNotFoundError when catalog returns null", async () => {
     const deps = stubDeps({ agent: null });
     const h = makeTaskKindHandler({ catalog: deps.catalog, tasks: deps.tasks });
-    await expect(h.validate({ agent: "ghost", brief: "x" })).rejects.toBeInstanceOf(
-      AgentNotFoundError,
-    );
+    await expect(h.validate({ agent: "ghost", brief: "x" })).rejects.toMatchObject({
+      code: "AgentNotFound",
+    });
   });
 
   it("throws task-pkg's AgentResolutionFailedError on any other catalog throw", async () => {
@@ -190,9 +191,9 @@ describe("makeTaskKindHandler.validate — catalog cross-check", () => {
       () => null,
       (e) => e,
     );
-    expect(err).toBeInstanceOf(AgentResolutionFailedError);
-    expect(err).not.toBeInstanceOf(AgentNotFoundError);
-    expect((err as AgentResolutionFailedError).agent).toBe("writer");
+    expect(err).toBeInstanceOf(TaskOperationError);
+    expect((err as TaskOperationError).code).toBe("AgentResolutionFailed");
+    expect((err as TaskOperationError).detail).toMatchObject({ agent: "writer" });
   });
 });
 
@@ -302,7 +303,7 @@ describe("makeTaskKindHandler.dispatch", () => {
 describe("makeTaskKindHandler.hasInFlightForSchedule + deleteForSchedule", () => {
   it("hasInFlightForSchedule delegates to hasInFlightByOrigin", async () => {
     const deps = stubDeps();
-    deps.hasInFlightByOrigin.mockResolvedValueOnce(true);
+    deps.hasInFlightByOrigin.mockReturnValueOnce(okAsync(true));
     const h = makeTaskKindHandler({ catalog: deps.catalog, tasks: deps.tasks });
     expect(await h.hasInFlightForSchedule("sched-abc")).toBe(true);
     expect(deps.hasInFlightByOrigin).toHaveBeenCalledWith({
@@ -313,7 +314,7 @@ describe("makeTaskKindHandler.hasInFlightForSchedule + deleteForSchedule", () =>
 
   it("deleteForSchedule delegates to deleteTerminalByOrigin", async () => {
     const deps = stubDeps();
-    deps.deleteTerminalByOrigin.mockResolvedValueOnce({ deletedCount: 17 });
+    deps.deleteTerminalByOrigin.mockReturnValueOnce(okAsync({ deletedCount: 17 }));
     const h = makeTaskKindHandler({ catalog: deps.catalog, tasks: deps.tasks });
     expect(await h.deleteForSchedule("sched-abc")).toEqual({ deletedCount: 17 });
     expect(deps.deleteTerminalByOrigin).toHaveBeenCalledWith({

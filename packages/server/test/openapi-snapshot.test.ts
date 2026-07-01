@@ -15,11 +15,17 @@
  */
 
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
-import { catalogRoutes, sessionsRoutes, workspacesRoutes } from "@glyphs-ai/api";
+import {
+  catalogRoutes,
+  scheduledTasksRoutes,
+  sessionsRoutes,
+  tasksRoutes,
+  workspacesRoutes,
+} from "@glyphs-ai/api";
 import type { CatalogModule } from "@glyphs-ai/catalog";
-import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
+import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
-import type { TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -32,10 +38,8 @@ import {
 import { configRoutes } from "../src/routes/config.js";
 import { healthRoutes } from "../src/routes/health.js";
 import { runtimesRoutes } from "../src/routes/runtimes.js";
-import { scheduledTasksRoutes } from "../src/routes/scheduled-tasks.js";
 import { scheduledWorkflowsRoutes } from "../src/routes/scheduled-workflows.js";
 import { schedulesRoutes } from "../src/routes/schedules.js";
-import { tasksRoutes } from "../src/routes/tasks.js";
 import { workflowsRoutes } from "../src/routes/workflows.js";
 
 /**
@@ -62,7 +66,7 @@ function buildOpenApiAppForTest(): OpenAPIHono {
     }),
   );
 
-  const runtimeRegistry = new RuntimeRegistry();
+  const runtimeRegistry = new InMemoryRuntimeRegistry();
   runtimeRegistry.register(new CopilotRuntime({ sharedDir: "/tmp/shared" }));
   app.route("/api/runtimes", runtimesRoutes(runtimeRegistry));
 
@@ -201,8 +205,8 @@ function stubSessionManager(): WorkspaceContext["sessions"] {
   });
 }
 
-function stubTaskManager(): TaskService {
-  return new Proxy({} as TaskService, {
+function stubTaskManager(): TaskModule {
+  return new Proxy({} as TaskModule, {
     get() {
       throw new Error("stubTaskManager: not callable");
     },

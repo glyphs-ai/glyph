@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import writeFileAtomic from "write-file-atomic";
-import { TrustRegistrationFailed } from "../../src/copilot/errors.js";
 import { ensureDirTrusted } from "../../src/copilot/trust.js";
 
 // Deterministic coverage for the bounded-retry wrapper around
@@ -88,7 +87,7 @@ describe("ensureDirTrusted retry behaviour", () => {
     expect(String(debugSpy.mock.calls[0]?.[0])).toMatch(/retried-write/);
   });
 
-  it("propagates persistent EPERM as TrustRegistrationFailed after the bounded budget, emitting a give-up log", async () => {
+  it("propagates persistent EPERM after the bounded budget, emitting a give-up log", async () => {
     const dir = path.join(scratch, "workspace");
     await mkdir(dir, { recursive: true });
     const configPath = path.join(scratch, "copilot-config.json");
@@ -99,7 +98,7 @@ describe("ensureDirTrusted retry behaviour", () => {
       (e: unknown) => e,
     );
 
-    expect(err).toBeInstanceOf(TrustRegistrationFailed);
+    expect((err as NodeJS.ErrnoException).code).toBe("EPERM");
     // 8 attempts on the first call site (touch). It never reaches
     // the second call site because the touch failure bubbles up.
     expect(mockedWriteFileAtomic).toHaveBeenCalledTimes(8);
@@ -120,7 +119,7 @@ describe("ensureDirTrusted retry behaviour", () => {
       () => null,
       (e: unknown) => e,
     );
-    expect(err).toBeInstanceOf(TrustRegistrationFailed);
+    expect((err as NodeJS.ErrnoException).code).toBe("ENOSPC");
     expect(mockedWriteFileAtomic).toHaveBeenCalledTimes(1);
     expect(debugSpy).not.toHaveBeenCalled();
   });

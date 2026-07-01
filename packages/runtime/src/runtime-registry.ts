@@ -1,21 +1,38 @@
-import { UnknownRuntimeError } from "./errors.js";
+import { err, ok, type Result } from "neverthrow";
+import type { UnknownRuntime } from "./errors.js";
 import type { Runtime } from "./types.js";
 
 /**
- * In-memory registry of `Runtime` implementations, keyed by their `kind`.
- * Mutable: implementations register themselves at server bootstrap. Lookup
- * is the only operation used at request time.
+ * Lookup port over registered {@link Runtime} adapters. Result-based:
+ * `get` returns `err(UnknownRuntime)` instead of throwing, so consumers
+ * stay on the Result rail. Consumed by `@glyphs-ai/session` and
+ * `@glyphs-ai/task`; satisfied at the composition root by
+ * {@link InMemoryRuntimeRegistry} (production) or any fake (tests).
+ */
+export interface RuntimeRegistry {
+  /** True iff `kind` resolves to a registered adapter. */
+  has(kind: string): boolean;
+  /** Resolve `kind` to its adapter, or `err(UnknownRuntime)` when absent. */
+  get(kind: string): Result<Runtime, UnknownRuntime>;
+  /** All registered kinds, in registration order. */
+  kinds(): string[];
+}
+
+/**
+ * In-memory {@link RuntimeRegistry}. Implementations register themselves at
+ * server bootstrap; lookup is the only operation used at request time.
  *
  * Not concurrent-safe in the strict sense, but registration only happens at
  * startup and lookup is `Map.get`, so practical concurrency is not a concern.
  */
-export class RuntimeRegistry {
+export class InMemoryRuntimeRegistry implements RuntimeRegistry {
   private readonly runtimes = new Map<string, Runtime>();
 
   /**
    * Add `runtime` to the registry. If a runtime with the same `kind` is
    * already registered, throws — duplicate registration is always a bug
    * (rather than silently overwriting and losing the previous instance).
+   * This is a bootstrap-time fault, not a Result-flow error.
    */
   register(runtime: Runtime): void {
     if (this.runtimes.has(runtime.kind)) {
@@ -24,27 +41,15 @@ export class RuntimeRegistry {
     this.runtimes.set(runtime.kind, runtime);
   }
 
-  /**
-   * Look up the runtime with the given `kind`. Throws `UnknownRuntimeError`
-   * if no such runtime is registered — callers typically map this onto a
-   * 4xx response since it indicates the on-disk session was created with
-   * a runtime that the running server does not know about.
-   */
-  get(kind: string): Runtime {
+  get(kind: string): Result<Runtime, UnknownRuntime> {
     const r = this.runtimes.get(kind);
-    if (!r) throw new UnknownRuntimeError(kind);
-    return r;
+    return r ? ok(r) : err({ type: "UnknownRuntime", runtime: kind });
   }
 
-  /** Returns true if `kind` is registered. Cheap; intended for validation. */
   has(kind: string): boolean {
     return this.runtimes.has(kind);
   }
 
-  /**
-   * List all registered runtime kinds. Iteration order matches registration
-   * order. Useful for diagnostics ("server knows about: copilot, gemini").
-   */
   kinds(): string[] {
     return [...this.runtimes.keys()];
   }

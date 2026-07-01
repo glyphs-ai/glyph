@@ -369,11 +369,14 @@ location kinds should host it.
 
 2. **Single domain's entity / DTO / error → that domain's pkg, never the api `wire/` surface.**
    If `Task` only makes sense as part of the task BC, it lives in
-   `packages/task/src/contract/task.types.ts`. The api `wire/` surface
-   re-exports the subset of domain types that actually appear on the HTTP
-   wire (api depends on the domain pkgs for the type-only re-export). The
-   server imports through `@glyphs-ai/api` and the surfaces import through
-   `@glyphs-ai/sdk`, while the domain pkg owns the definition.
+   `@glyphs-ai/task` domain/use-case modules, for example
+   `packages/task/src/domain/task-entity.ts` or
+   `packages/task/src/application/list-tasks.ts`. The api `wire/`
+   surface re-exports the subset of domain types that actually appear on
+   the HTTP wire (api depends on the domain pkgs for the type-only
+   re-export). The server imports through `@glyphs-ai/api` and the
+   surfaces import through `@glyphs-ai/sdk`, while the domain pkg owns
+   the definition.
    `@glyphs-ai/api`'s composition layer owns *cross-BC composition* types
    only — never single-domain DTOs.
 
@@ -383,12 +386,12 @@ location kinds should host it.
    to `api` only when a second transport (CLI direct-mode, MCP, gRPC)
    actually arrives and needs the same abstraction generically.
 
-4. **Inter-domain-pkg dependencies must be `import type` ONLY.**
-   `task` may `import type` from `catalog` (e.g. `AgentResolveResult`)
-   because it talks to catalog *through a service-instance threaded by
-   `@glyphs-ai/api`*. It must NOT value-import from `catalog` — that
-   would couple two BCs at runtime and violate the "api is the only
-   composer" invariant. Enforced mechanically by
+4. **Inter-domain-pkg dependencies must be mediated by ports.**
+   `task` owns an `AgentResolver` port and does not import `catalog`;
+   `api` adapts catalog to that port. Domain packages must NOT
+   value-import from each other — that would couple two BCs at runtime
+   and violate the "api is the only composer" invariant. Enforced
+   mechanically by
    `packages/e2e/test/architecture/inter-service-imports.test.ts`.
 
 5. **Surface (`dashboard`, `cli`) imports go through `@glyphs-ai/sdk`.**
@@ -953,13 +956,13 @@ It demonstrates `__entity-kebab__.service.ts` next to
 
 ### Hard rules
 
-> **Scope.** These 7 rules apply ONLY when a subdir has a sibling `.ts` / `.tsx` file at the parent level (the SPLIT pattern — e.g. `task.service.ts` next to `task.service/`). Subdirs without a sibling file (CATEGORY dirs — e.g. `packages/catalog/src/agent/`, `packages/catalog/src/facade/`, `packages/server/src/routes/`) are a separate, pre-existing organisational pattern and are unaffected by these rules; they MAY contain an `index.ts` barrel and follow the multi-entity / per-route conventions documented elsewhere on this page.
+> **Scope.** These 7 rules apply ONLY when a subdir has a sibling `.ts` / `.tsx` file at the parent level (the SPLIT pattern — e.g. `example.service.ts` next to `example.service/`). Subdirs without a sibling file (CATEGORY dirs — e.g. `packages/catalog/src/agent/`, `packages/catalog/src/facade/`, `packages/server/src/routes/`) are a separate, pre-existing organisational pattern and are unaffected by these rules; they MAY contain an `index.ts` barrel and follow the multi-entity / per-route conventions documented elsewhere on this page.
 
-1. **Subdir basename equals facade basename AND is a direct sibling.** `task.service.ts` ↔ `task.service/` in the same directory. Enforced mechanically — see the structural test in `packages/e2e/test/architecture/split-convention.test.ts`. The subdir MUST sit next to its facade; a subdir at any other path (e.g. `src/internal/<role>/`) is not a recognised SPLIT and forfeits the no-barrel and package-private guarantees this convention provides.
-2. **No barrel re-export** inside the subdir (no `<entity>.<role>/index.ts`). The facade composes via direct relative imports (`./task.service/queries.js` etc.). Enforced by the same structural test.
+1. **Subdir basename equals facade basename AND is a direct sibling.** `example.service.ts` ↔ `example.service/` in the same directory. Enforced mechanically — see the structural test in `packages/e2e/test/architecture/split-convention.test.ts`. The subdir MUST sit next to its facade; a subdir at any other path (e.g. `src/internal/<role>/`) is not a recognised SPLIT and forfeits the no-barrel and package-private guarantees this convention provides.
+2. **No barrel re-export** inside the subdir (no `<entity>.<role>/index.ts`). The facade composes via direct relative imports (`./example.service/queries.js` etc.). Enforced by the same structural test.
 3. **Subdir files are package-private.** They MUST NOT appear in the package's top-level `src/index.ts` barrel. The facade is the only public surface.
-4. **Concern files use bare names** (`queries.ts`, `mutations.ts`, `shutdown.ts`) — the subdir name already supplies the entity context. Do NOT prefix (`task.queries.ts` inside `task.service/` is wrong).
-5. **Each concern file ≤ ~450 LOC.** If a single concern grows beyond that, that concern itself needs further decomposition — but always keep at one level of nesting (do NOT nest `task.service/queries/by-id.ts`).
+4. **Concern files use bare names** (`queries.ts`, `mutations.ts`, `shutdown.ts`) — the subdir name already supplies the entity context. Do NOT prefix (`example.queries.ts` inside `example.service/` is wrong).
+5. **Each concern file ≤ ~450 LOC.** If a single concern grows beyond that, that concern itself needs further decomposition — but always keep at one level of nesting (do NOT nest `example.service/queries/by-id.ts`).
 6. **Facade stays ≤ ~250 LOC** and contains only: constructor, ctx-object construction, and 1-line delegates to internals.
 7. **Shared context.** The facade builds a `<Entity>ServiceCtx` (or similar) once and passes it to every internal — no `this`-casting, no widening of class field visibility. Each internal exports plain functions taking `(ctx, …args)` OR a small object that consumes ctx.
 

@@ -28,7 +28,7 @@
  */
 
 // ─── runtime data types re-exported for adapter authors ────────────
-export type { LaunchCommand, ResolvedAgent } from "@glyphs-ai/runtime-v2";
+export type { LaunchCommand, ResolvedAgent } from "@glyphs-ai/runtime";
 // ─── use-case wire contracts ───────────────────────────────────────
 export {
   type BuildInteractiveLaunchError,

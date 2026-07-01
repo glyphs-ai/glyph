@@ -28,9 +28,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { CopilotClient, CopilotSession } from "@github/copilot-sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { InvalidMcpJson } from "../../src/copilot/errors.js";
 import { launchCopilotHeadless } from "../../src/copilot/launch-headless.js";
-import { RuntimeHeadlessLaunchFailed } from "../../src/errors.js";
 import type { AgentContentSource, ResolvedAgent } from "../../src/types.js";
 import { makeFakeContentSource } from "../fixtures/fake-content-source.js";
 
@@ -101,27 +99,27 @@ describe("launchCopilotHeadless env merge", () => {
     const { agent, source } = await buildAgent();
     const { capture, factory } = capturingClientFactory();
 
-    await expect(
-      launchCopilotHeadless(
-        {
-          workdir,
-          agent,
-          catalog: source,
-          prompt: FRAMING,
-          workspaceDir: scratch,
-          subprocessEnv: {
-            GLYPH_WORKSPACE: "ws-fixture-123",
-            GLYPH_WORK_ID: "task-fixture-456",
-          },
+    const result = await launchCopilotHeadless(
+      {
+        workdir,
+        agent,
+        catalog: source,
+        prompt: FRAMING,
+        workspaceDir: scratch,
+        subprocessEnv: {
+          GLYPH_WORKSPACE: "ws-fixture-123",
+          GLYPH_WORK_ID: "task-fixture-456",
         },
-        {
-          copilotStateDir: stateDir,
-          sharedDir: path.join(scratch, "shared"),
-          createClient: factory,
-          registerSession: () => {},
-        },
-      ),
-    ).rejects.toBeInstanceOf(RuntimeHeadlessLaunchFailed);
+      },
+      {
+        copilotStateDir: stateDir,
+        sharedDir: path.join(scratch, "shared"),
+        createClient: factory,
+        registerSession: () => {},
+      },
+    );
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().type).toBe("RuntimeHeadlessLaunchFailed");
 
     expect(capture.env).toBeDefined();
     const env = capture.env as NodeJS.ProcessEnv;
@@ -148,26 +146,26 @@ describe("launchCopilotHeadless env merge", () => {
     try {
       const { capture, factory } = capturingClientFactory();
 
-      await expect(
-        launchCopilotHeadless(
-          {
-            workdir,
-            agent,
-            catalog: source,
-            prompt: FRAMING,
-            workspaceDir: scratch,
-            subprocessEnv: {
-              [sentinelKey]: undefined,
-            },
+      const result = await launchCopilotHeadless(
+        {
+          workdir,
+          agent,
+          catalog: source,
+          prompt: FRAMING,
+          workspaceDir: scratch,
+          subprocessEnv: {
+            [sentinelKey]: undefined,
           },
-          {
-            copilotStateDir: stateDir,
-            sharedDir: path.join(scratch, "shared"),
-            createClient: factory,
-            registerSession: () => {},
-          },
-        ),
-      ).rejects.toBeInstanceOf(RuntimeHeadlessLaunchFailed);
+        },
+        {
+          copilotStateDir: stateDir,
+          sharedDir: path.join(scratch, "shared"),
+          createClient: factory,
+          registerSession: () => {},
+        },
+      );
+      expect(result.isErr()).toBe(true);
+      expect(result._unsafeUnwrapErr().type).toBe("RuntimeHeadlessLaunchFailed");
 
       const env = capture.env as NodeJS.ProcessEnv;
       // Sentinel key was in process.env when we made the call. The
@@ -185,23 +183,23 @@ describe("launchCopilotHeadless env merge", () => {
     const { agent, source } = await buildAgent();
     const { capture, factory } = capturingClientFactory();
 
-    await expect(
-      launchCopilotHeadless(
-        {
-          workdir,
-          agent,
-          catalog: source,
-          prompt: FRAMING,
-          workspaceDir: scratch,
-        },
-        {
-          copilotStateDir: stateDir,
-          sharedDir: path.join(scratch, "shared"),
-          createClient: factory,
-          registerSession: () => {},
-        },
-      ),
-    ).rejects.toBeInstanceOf(RuntimeHeadlessLaunchFailed);
+    const result = await launchCopilotHeadless(
+      {
+        workdir,
+        agent,
+        catalog: source,
+        prompt: FRAMING,
+        workspaceDir: scratch,
+      },
+      {
+        copilotStateDir: stateDir,
+        sharedDir: path.join(scratch, "shared"),
+        createClient: factory,
+        registerSession: () => {},
+      },
+    );
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().type).toBe("RuntimeHeadlessLaunchFailed");
 
     expect(capture.env).toBeDefined();
     const env = capture.env as NodeJS.ProcessEnv;
@@ -223,30 +221,30 @@ describe("launchCopilotHeadless failure handling", () => {
       abort: () => Promise.resolve(),
     });
 
-    await expect(
-      launchCopilotHeadless(
-        {
-          workdir,
-          agent,
-          catalog: source,
-          prompt: FRAMING,
-          workspaceDir: scratch,
+    const result = await launchCopilotHeadless(
+      {
+        workdir,
+        agent,
+        catalog: source,
+        prompt: FRAMING,
+        workspaceDir: scratch,
+      },
+      {
+        copilotStateDir: stateDir,
+        sharedDir: path.join(scratch, "shared"),
+        createClient: () =>
+          fakeCopilotClient({
+            start: () => Promise.resolve(),
+            stop: () => Promise.resolve([]),
+            createSession: () => Promise.resolve(session),
+          }),
+        registerSession: () => {
+          registered += 1;
         },
-        {
-          copilotStateDir: stateDir,
-          sharedDir: path.join(scratch, "shared"),
-          createClient: () =>
-            fakeCopilotClient({
-              start: () => Promise.resolve(),
-              stop: () => Promise.resolve([]),
-              createSession: () => Promise.resolve(session),
-            }),
-          registerSession: () => {
-            registered += 1;
-          },
-        },
-      ),
-    ).rejects.toBeInstanceOf(RuntimeHeadlessLaunchFailed);
+      },
+    );
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().type).toBe("RuntimeHeadlessLaunchFailed");
 
     expect(registered).toBe(0);
   });
@@ -254,44 +252,43 @@ describe("launchCopilotHeadless failure handling", () => {
   it("rejects non-object mcpServers entries before creating the SDK session", async () => {
     const { agent, source } = await buildAgent();
     let createSessionCalled = false;
-    let caught: unknown;
 
-    try {
-      await launchCopilotHeadless(
-        {
-          workdir,
-          agent,
-          catalog: source,
-          prompt: FRAMING,
-          workspaceDir: scratch,
-        },
-        {
-          copilotStateDir: stateDir,
-          sharedDir: path.join(scratch, "shared"),
-          createClient: () =>
-            fakeCopilotClient({
-              start: async () => {
-                await writeFile(
-                  path.join(workdir, ".mcp.json"),
-                  JSON.stringify({ mcpServers: { bad: [] } }),
-                  "utf8",
-                );
-              },
-              stop: () => Promise.resolve([]),
-              createSession: () => {
-                createSessionCalled = true;
-                return Promise.reject(new Error("should not create session"));
-              },
-            }),
-          registerSession: () => {},
-        },
-      );
-    } catch (err) {
-      caught = err;
-    }
+    const result = await launchCopilotHeadless(
+      {
+        workdir,
+        agent,
+        catalog: source,
+        prompt: FRAMING,
+        workspaceDir: scratch,
+      },
+      {
+        copilotStateDir: stateDir,
+        sharedDir: path.join(scratch, "shared"),
+        createClient: () =>
+          fakeCopilotClient({
+            start: async () => {
+              await writeFile(
+                path.join(workdir, ".mcp.json"),
+                JSON.stringify({ mcpServers: { bad: [] } }),
+                "utf8",
+              );
+            },
+            stop: () => Promise.resolve([]),
+            createSession: () => {
+              createSessionCalled = true;
+              return Promise.reject(new Error("should not create session"));
+            },
+          }),
+        registerSession: () => {},
+      },
+    );
 
-    expect(caught).toBeInstanceOf(RuntimeHeadlessLaunchFailed);
-    expect((caught as Error).cause).toBeInstanceOf(InvalidMcpJson);
+    expect(result.isErr()).toBe(true);
+    const e = result._unsafeUnwrapErr();
+    expect(e.type).toBe("RuntimeHeadlessLaunchFailed");
+    // The MCP shape validation throws a plain Error caught at the launch
+    // boundary; its message (folded into the atom's cause) names the fault.
+    expect((e.cause as Error).message).toMatch(/config is invalid/);
     expect(createSessionCalled).toBe(false);
   });
 });

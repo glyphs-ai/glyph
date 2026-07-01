@@ -1,7 +1,7 @@
 /**
  * Tests for `makeCoordNodeRunner`. Mirrors the structure of the
  * sibling worker runner tests
- * (`workflow-worker-task-runner.test.ts`) — same `vi`-based `TaskService` /
+ * (`workflow-worker-task-runner.test.ts`) — same `vi`-based `TaskModule` /
  * `CatalogAgentLookup` stubs, same `vi.useFakeTimers()` pattern for the
  * poll-tick scenarios, same `fakeTaskRow` helper.
  *
@@ -9,7 +9,7 @@
  * exercise:
  *
  *   - validate: strict coord spec shape + agent-existence lookup
- *     (`AgentNotFoundError` / `AgentResolutionFailedError`)
+ *     (`AgentNotFound` / `AgentResolutionFailed` task unions)
  *   - dispatch: reads the workflow header via `getService` thunk;
  *     synthesises `origin: 'workflow'` + canonical
  *     node id in the typed `origin_id` column (reverse-lookup); conditional
@@ -17,22 +17,35 @@
  *   - poll loop status→terminal mapping (`succeeded` / `failed` /
  *     `cancelled` / `null` task), runner-local error budget exhaustion
  *   - hasInFlightForNode delegation to
- *     `tasks.hasInFlightForWorkflowNode`
- *   - cancel reverse-lookup + per-task `tasks.cancel(...)`,
+ *     `tasks.hasInFlightByOrigin.execute`
+ *   - cancel reverse-lookup + per-task `tasks.cancelTask.execute(...)`,
  *     best-effort behaviour when a per-task cancel throws
  *   - dispose clears every armed interval (no `setInterval` leaks)
  */
 
-import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
+import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TaskOperationError } from "../../src/wiring/_task-operation-error.js";
 import {
+  COORD_FRAMING_PROMPT_COPILOT,
   DEFAULT_COORD_MAX_POLL_ERRORS,
   DEFAULT_COORD_POLL_INTERVAL_MS,
   makeCoordNodeRunner,
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "../../src/wiring/workflow-coord-task-runner.js";
+
+describe("COORD_FRAMING_PROMPT_COPILOT", () => {
+  it("is single-line printable ASCII (safe as a cmd.exe /c argv element)", () => {
+    // cmd.exe treats an LF inside a `/c` payload as a statement separator, so
+    // the shipped coord framing prompt must stay single-line printable ASCII.
+    // task re-validates the forwarded prompt on every dispatch; this pins
+    // the invariant on the shipped default at test time.
+    expect(COORD_FRAMING_PROMPT_COPILOT).toMatch(/^[\x20-\x7e]+$/);
+  });
+});
 
 type CatalogAgentLookup = Parameters<typeof makeCoordNodeRunner>[0]["catalog"];
 
@@ -96,25 +109,29 @@ function stubDeps(
       ? { name: "default-agent", dependencies: { agents: [{ fqn: "w" }] } }
       : opts.agent;
   });
-  const dispatch = vi.fn(async () => opts.dispatchReturn ?? fakeTaskRow({ id: "task-id-1" }));
-  const get = vi.fn(async (_id: string) => {
-    if (opts.getThrows !== undefined) throw opts.getThrows;
-    return opts.getReturn !== undefined ? opts.getReturn : fakeTaskRow();
+  const dispatch = vi.fn(() => okAsync(opts.dispatchReturn ?? fakeTaskRow({ id: "task-id-1" })));
+  const get = vi.fn((_req: { id: string }) => {
+    if (opts.getThrows !== undefined) {
+      return errAsync({ type: "DatabaseUnavailable" as const, cause: opts.getThrows });
+    }
+    return okAsync(opts.getReturn !== undefined ? opts.getReturn : fakeTaskRow());
   });
-  const hasInFlightForWorkflowNode = vi.fn(async () => opts.hasInFlightReturn ?? false);
-  const listInFlightForWorkflowNode = vi.fn(async () => {
-    if (opts.listInFlightThrows !== undefined) throw opts.listInFlightThrows;
-    return opts.listInFlightReturn ?? [];
+  const hasInFlightForWorkflowNode = vi.fn(() => okAsync(opts.hasInFlightReturn ?? false));
+  const listInFlightForWorkflowNode = vi.fn(() => {
+    if (opts.listInFlightThrows !== undefined) {
+      return errAsync({ type: "DatabaseUnavailable" as const, cause: opts.listInFlightThrows });
+    }
+    return okAsync(opts.listInFlightReturn ?? []);
   });
-  const cancel = vi.fn(async (_id: string) => {});
+  const cancel = vi.fn((_req: { id: string }) => okAsync(fakeTaskRow()));
   const catalog = { getAgent } as unknown as CatalogAgentLookup;
   const tasks = {
-    dispatch,
-    get,
-    hasInFlightForWorkflowNode,
-    listInFlightForWorkflowNode,
-    cancel,
-  } as unknown as TaskService;
+    dispatchTask: { execute: dispatch },
+    getTask: { execute: get },
+    hasInFlightByOrigin: { execute: hasInFlightForWorkflowNode },
+    listInFlightByOrigin: { execute: listInFlightForWorkflowNode },
+    cancelTask: { execute: cancel },
+  } as unknown as TaskModule;
 
   const getWorkflow = vi.fn(async (_id: string) => {
     if (opts.getWorkflowThrows !== undefined) throw opts.getWorkflowThrows;
@@ -283,9 +300,9 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "missing" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
-      AgentNotFoundError,
-    );
+    await expect(r.validate({ agent: "missing" }, NODE_VALIDATE_CTX)).rejects.toMatchObject({
+      code: "AgentNotFound",
+    });
     await r.dispose();
   });
 
@@ -304,13 +321,11 @@ describe("makeCoordNodeRunner — validate", () => {
     } catch (err) {
       captured = err;
     }
-    expect(captured).toBeInstanceOf(AgentResolutionFailedError);
-    // AgentResolutionFailedError exposes the original error; assert
-    // the wrapping carried the cause.
-    const wrapped = captured as AgentResolutionFailedError & { cause?: unknown };
-    expect(wrapped.cause === cause || (wrapped as unknown as { err?: unknown }).err === cause).toBe(
-      true,
-    );
+    expect(captured).toBeInstanceOf(TaskOperationError);
+    expect((captured as TaskOperationError).code).toBe("AgentResolutionFailed");
+    // The AgentResolutionFailed atom carries the original error as `cause`.
+    const detail = (captured as TaskOperationError).detail as { cause?: unknown };
+    expect(detail.cause).toBe(cause);
     await r.dispose();
   });
 
@@ -386,7 +401,7 @@ describe("makeCoordNodeRunner — validate", () => {
 });
 
 describe("makeCoordNodeRunner — dispatch", () => {
-  it("U11: reads workflow header via getService and calls tasks.dispatch with brief+details from header", async () => {
+  it("U11: reads workflow header via getService and calls tasks.dispatchTask.execute with brief+details from header", async () => {
     const deps = stubDeps({
       getWorkflowReturn: fakeWorkflowRow({ brief: "wf brief", details: "wf details" }),
       // biome-ignore lint/suspicious/noExplicitAny: stub return shape mirrors fakeTaskRow.
@@ -685,7 +700,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
     await r.dispose();
   });
 
-  it("U18: maps tasks.get → null → onTerminal({status:'failed', reason:'task not found'})", async () => {
+  it("U18: maps tasks.getTask.execute → null → onTerminal({status:'failed', reason:'task not found'})", async () => {
     const deps = stubDeps({ getReturn: null });
     const onTerminal = vi.fn();
     const r = makeCoordNodeRunner({
@@ -707,7 +722,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
 });
 
 describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => {
-  it("U19: hasInFlightForNode delegates to tasks.hasInFlightForWorkflowNode", async () => {
+  it("U19: hasInFlightForNode delegates to tasks.hasInFlightByOrigin.execute", async () => {
     const deps = stubDeps({ hasInFlightReturn: true });
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
@@ -717,13 +732,14 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
     });
     const result = await r.hasInFlightForNode("deadbeef-cafe-4bab-89ab-cafebabe1234");
     expect(result).toBe(true);
-    expect(deps.hasInFlightForWorkflowNode).toHaveBeenCalledWith(
-      "deadbeef-cafe-4bab-89ab-cafebabe1234",
-    );
+    expect(deps.hasInFlightForWorkflowNode).toHaveBeenCalledWith({
+      origin: "workflow",
+      originId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
+    });
     await r.dispose();
   });
 
-  it("U20: cancel reverse-looks-up via tasks.listInFlightForWorkflowNode and calls tasks.cancel for each + clears any local interval", async () => {
+  it("U20: cancel reverse-looks-up via tasks.listInFlightByOrigin.execute and calls tasks.cancelTask.execute for each + clears any local interval", async () => {
     vi.useFakeTimers();
     try {
       const deps = stubDeps({
@@ -744,12 +760,13 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
       const pollsBeforeCancel = deps.get.mock.calls.length;
       expect(pollsBeforeCancel).toBeGreaterThanOrEqual(1);
       await r.cancel("deadbeef-cafe-4bab-89ab-cafebabe1234");
-      expect(deps.listInFlightForWorkflowNode).toHaveBeenCalledWith(
-        "deadbeef-cafe-4bab-89ab-cafebabe1234",
-      );
+      expect(deps.listInFlightForWorkflowNode).toHaveBeenCalledWith({
+        origin: "workflow",
+        originId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
+      });
       expect(deps.cancel).toHaveBeenCalledTimes(2);
-      expect(deps.cancel).toHaveBeenCalledWith("t-a");
-      expect(deps.cancel).toHaveBeenCalledWith("t-b");
+      expect(deps.cancel).toHaveBeenCalledWith({ id: "t-a" });
+      expect(deps.cancel).toHaveBeenCalledWith({ id: "t-b" });
       // Interval cleared by cancel — further timer advance must not
       // produce additional polls.
       await vi.advanceTimersByTimeAsync(500);
@@ -760,14 +777,17 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
     }
   });
 
-  it("U21: cancel survives tasks.cancel throwing on one task (best-effort, continues)", async () => {
+  it("U21: cancel survives tasks.cancelTask.execute throwing on one task (best-effort, continues)", async () => {
     const deps = stubDeps({
       listInFlightReturn: [fakeTaskRow({ id: "t-a" }), fakeTaskRow({ id: "t-b" })],
     });
-    // biome-ignore lint/suspicious/noExplicitAny: test-only override of the stubbed facade.
-    (deps.tasks as any).cancel = vi.fn(async (id: string) => {
-      if (id === "t-a") throw new Error("cancel boom");
+    const cancel = vi.fn((req: { id: string }) => {
+      if (req.id === "t-a") {
+        return errAsync({ type: "DatabaseUnavailable" as const, cause: new Error("cancel boom") });
+      }
+      return okAsync(fakeTaskRow({ id: req.id }));
     });
+    (deps.tasks.cancelTask as unknown as { execute: typeof cancel }).execute = cancel;
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
@@ -776,8 +796,7 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
     });
     // Should NOT throw; the runner logs and continues.
     await r.cancel("deadbeef-cafe-4bab-89ab-cafebabe1234");
-    // biome-ignore lint/suspicious/noExplicitAny: test-only access to the overridden mock.
-    expect((deps.tasks as any).cancel).toHaveBeenCalledTimes(2);
+    expect(cancel).toHaveBeenCalledTimes(2);
     await r.dispose();
   });
 

@@ -92,17 +92,17 @@ describe("glyph task cancel", () => {
     expect(res.stderr).toMatch(/HTTP 409/);
   });
 
-  it("surfaces a 503 ManagerShuttingDownError as exit 4 with the typed code", async () => {
+  it("surfaces a 503 ManagerShuttingDown as exit 4 with the typed code", async () => {
     stubFetch({
       status: 503,
       body: JSON.stringify({
         error: "task manager is shutting down",
-        code: "ManagerShuttingDownError",
+        code: "ManagerShuttingDown",
       }),
     });
     const res = await taskCancel(TID, OPTS);
     expect(res.exitCode).toBe(4);
-    expect(res.stderr).toMatch(/ManagerShuttingDownError/);
+    expect(res.stderr).toMatch(/ManagerShuttingDown/);
     expect(res.stderr).toMatch(/HTTP 503/);
   });
 });

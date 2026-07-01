@@ -1,11 +1,14 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
-import type { WorkflowArtifact, WorkflowArtifactsResponse } from "@glyphs-ai/api";
+import {
+  TaskOperationError,
+  type WorkflowArtifact,
+  type WorkflowArtifactsResponse,
+} from "@glyphs-ai/api";
 import {
   tasksRoot as resolveTasksRoot,
-  safeJoinUnderRoot as safeJoinTaskRoot,
   TASK_ARTIFACT_SUBDIR,
-  type TaskService,
+  type TaskModule,
 } from "@glyphs-ai/task";
 import { workflowDir as resolveWorkflowDir, type WorkflowService } from "@glyphs-ai/workflow";
 import type { Context } from "hono";
@@ -17,7 +20,7 @@ import { respondError } from "../_respond-error.js";
 
 export interface ArtifactRouteDeps {
   readonly resolve: (c: Context) => WorkflowService;
-  readonly resolveTasks: (c: Context) => TaskService;
+  readonly resolveTasks: (c: Context) => TaskModule;
   readonly resolveWorkspaceDir: (c: Context) => string;
 }
 
@@ -70,11 +73,26 @@ export async function handleListArtifacts(
   const tasksRoot = resolveTasksRoot(workspaceDir);
   const nodeEntries: WorkflowArtifact[] = [];
   for (const node of nodes) {
-    const task = await tasksSvc.findTaskByWorkflowNode(node.id);
-    if (task === null) continue;
+    const found = await tasksSvc.findLatestByOrigin.execute({
+      origin: "workflow",
+      originId: node.id,
+    });
+    if (found.isErr()) {
+      // A real lookup fault (e.g. the task DB is unavailable) must surface as
+      // a 5xx, not be silently folded into "this node has no task" — otherwise
+      // the listing would 200 with entries missing. `found.value === null`
+      // below is the legitimate "no task dispatched yet" skip.
+      return respondError(c, new TaskOperationError(found.error), {
+        route: "workflows.artifacts.list",
+        policy: workflowsErrorPolicy,
+        meta: { workflowId: wfid, nodeId: node.id },
+      });
+    }
+    if (found.value === null) continue;
+    const task = found.value;
     let taskDir: string;
     try {
-      taskDir = safeJoinTaskRoot(tasksRoot, task.id);
+      taskDir = safeJoinNested(tasksRoot, task.id);
     } catch {
       continue;
     }
@@ -119,7 +137,7 @@ export async function handleStreamArtifact(
   encoded: string,
   deps: ArtifactRouteDeps,
 ): Promise<Response> {
-  const { resolveTasks, resolveWorkspaceDir } = deps;
+  const { resolve, resolveTasks, resolveWorkspaceDir } = deps;
 
   let decoded: string;
   try {
@@ -161,13 +179,37 @@ export async function handleStreamArtifact(
     }
     const nodeId = tail.slice(0, sep);
     const rest = tail.slice(sep + 1);
-    const task = await resolveTasks(c).findTaskByWorkflowNode(nodeId);
+    // Scope the node to the addressed workflow: `nodeId` must belong to
+    // `wfid`'s DAG before its task artifact is served, so the `wfid` path
+    // segment can't be bypassed to read another (or a deleted) workflow's
+    // node bytes. Mirrors the list route, which only walks `wfid`'s own nodes.
+    let snapshot: Awaited<ReturnType<WorkflowService["getDag"]>>;
+    try {
+      snapshot = await resolve(c).getDag(wfid);
+    } catch (err) {
+      return respondError(c, err, {
+        route: "workflows.artifacts.stream",
+        policy: workflowsErrorPolicy,
+        meta: { workflowId: wfid, nodeId },
+      });
+    }
+    if (!snapshot.nodes.some((n) => n.id === nodeId)) {
+      return c.json({ error: "no such node in workflow" }, 404);
+    }
+    const found = await resolveTasks(c).findLatestByOrigin.execute({
+      origin: "workflow",
+      originId: nodeId,
+    });
+    if (found.isErr()) {
+      return c.json({ error: "internal error" }, 500);
+    }
+    const task = found.value;
     if (task === null) {
       return c.json({ error: "no task dispatched for node" }, 404);
     }
     try {
       const tasksRoot = resolveTasksRoot(workspaceDir);
-      const taskDir = safeJoinTaskRoot(tasksRoot, task.id);
+      const taskDir = safeJoinNested(tasksRoot, task.id);
       const artifactRoot = path.join(taskDir, TASK_ARTIFACT_SUBDIR);
       absPath = safeJoinNested(artifactRoot, rest);
     } catch {

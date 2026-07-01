@@ -3,7 +3,7 @@ import type {
   RuntimeProvisionFailed,
   RuntimeRegistry,
   UnknownRuntime,
-} from "@glyphs-ai/runtime-v2";
+} from "@glyphs-ai/runtime";
 import { err, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import { SessionEntity } from "../domain/session-entity.js";
@@ -103,7 +103,7 @@ export class CreateSessionUseCase
       const provisioned = await rt.provision({
         workdir,
         agent: resolved,
-        contentSource: deps.contentSource,
+        catalog: deps.contentSource,
         workspaceDir: deps.workspaceDir,
       });
       if (provisioned.isErr()) {

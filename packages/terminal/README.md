@@ -18,7 +18,7 @@ boundary.
 
 `LaunchCommand` is defined in this package and matched structurally
 against whatever the producer hands to `localSpawner.spawn`. The current
-producer is `@glyphs-ai/runtime-v2`'s `Runtime.buildInteractiveLaunch`,
+producer is `@glyphs-ai/runtime`'s `Runtime.buildInteractiveLaunch`,
 but any structurally compatible object works. The wiring relies on
 TypeScript's structural typing at the call site rather than a workspace
 dependency on a specific producer package. Keeping the type local makes

@@ -155,11 +155,6 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
       "grouped by runtime kind (copilot/); imports span copilot/ + sibling top-level src/ files — rule says flat. Runtime adapter coverage stays grouped by adapter.",
   },
   {
-    file: "packages/runtime/test/copilot/launch-headless-env.test.ts",
-    rationale:
-      "grouped by runtime kind (copilot/); imports span copilot/ + sibling top-level src/ files — rule says flat. Runtime adapter coverage stays grouped by adapter.",
-  },
-  {
     file: "packages/runtime/test/copilot/preflight.test.ts",
     rationale:
       "grouped by runtime kind (copilot/); imports span copilot/ + sibling top-level src/ files — rule says flat. Runtime adapter coverage stays grouped by adapter.",
@@ -189,6 +184,12 @@ const ALLOWED_FLAT_EXCEPTIONS: readonly FlatException[] = [
     file: "packages/server/test/workspaces.test.ts",
     rationale:
       "workspace route integration test; route factory migrated to @glyphs-ai/api so remaining in-pkg imports are middleware-only — rule says middleware/. Kept flat: subject is the workspace API surface, not the middleware.",
+  },
+  // task
+  {
+    file: "packages/task/test/application/task-supervisor.test.ts",
+    rationale:
+      "grouped by area (application/); exercises application/supervision/task-supervisor.ts through the shared task-fixture, so its only direct src value-import is the domain TaskIdSchema — rule says domain. Kept beside the application use-case tests it belongs with.",
   },
   // terminal
   {

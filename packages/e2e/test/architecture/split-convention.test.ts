@@ -65,7 +65,6 @@ const SKIP_DIR_NAMES = new Set(["node_modules", "__tests__", "drizzle", "migrati
  * into the facade.
  */
 const REQUIRED_SPLITS = new Set<string>([
-  "packages/task/src/task-service",
   "packages/dashboard/src/App",
   "packages/dashboard/src/components/tasks/TaskDetail",
 

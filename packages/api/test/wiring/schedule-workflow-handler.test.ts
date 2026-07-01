@@ -10,8 +10,8 @@
  *   - `validate(data, { changedKeys })` SKIPs the catalog lookup when
  *     `coordinatorAgent` is not in `changedKeys` (patch-when-catalog-down)
  *   - `validate` throws `WorkflowScheduleTargetError` on unknown /
- *     not-coord-eligible agent, but `AgentResolutionFailedError` (→ 500
- *     opaque) when the catalog itself throws (infra, not bad input)
+ *     not-coord-eligible agent, but wraps catalog throws as task
+ *     `AgentResolutionFailed` unions (→ 500 opaque)
  *   - `mergePatch` RFC 7396 semantics + `changedKeys` accuracy
  *   - `dispatch` synthesises `originId: scheduleId` + `metadata: { firedAt }`,
  *     conditional-spreads `details`, returns `{ id }`
@@ -23,9 +23,11 @@
  *     untouched
  */
 
-import { AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
+import { okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
+import { TaskOperationError } from "../../src/wiring/_task-operation-error.js";
 import {
   makeWorkflowKindHandler,
   WorkflowScheduleTargetError,
@@ -53,7 +55,7 @@ function stubDeps(
   } = {},
 ): {
   catalog: CatalogAgentLookup;
-  tasks: TaskService;
+  tasks: TaskModule;
   workflows: WorkflowService;
   getAgent: ReturnType<typeof vi.fn>;
   createWorkflow: ReturnType<typeof vi.fn>;
@@ -80,21 +82,22 @@ function stubDeps(
     nodes: opts.dagNodes?.[id] ?? [],
   }));
   const deleteWorkflow = vi.fn(async () => undefined);
-  const hasInFlightForWorkflowNode = vi.fn(
-    async (nodeId: string) => opts.inFlightNodes?.has(nodeId) ?? false,
+  const hasInFlightForWorkflowNode = vi.fn((req: { originId: string }) =>
+    okAsync(opts.inFlightNodes?.has(req.originId) ?? false),
   );
-  const findTaskByWorkflowNode = vi.fn(async (nodeId: string) => {
-    if (opts.nodeTasks !== undefined) return opts.nodeTasks[nodeId] ?? null;
-    return { id: `task-for-${nodeId}` };
+  const findTaskByWorkflowNode = vi.fn((req: { originId: string }) => {
+    const nodeId = req.originId;
+    if (opts.nodeTasks !== undefined) return okAsync(opts.nodeTasks[nodeId] ?? null);
+    return okAsync({ id: `task-for-${nodeId}` });
   });
-  const deleteTask = vi.fn(async () => undefined);
+  const deleteTask = vi.fn(() => okAsync(undefined));
 
   const catalog = { getAgent } as unknown as CatalogAgentLookup;
   const tasks = {
-    hasInFlightForWorkflowNode,
-    findTaskByWorkflowNode,
-    delete: deleteTask,
-  } as unknown as TaskService;
+    hasInFlightByOrigin: { execute: hasInFlightForWorkflowNode },
+    findLatestByOrigin: { execute: findTaskByWorkflowNode },
+    deleteTask: { execute: deleteTask },
+  } as unknown as TaskModule;
   const workflows = {
     createWorkflow,
     list: listWorkflows,
@@ -255,9 +258,10 @@ describe("makeWorkflowKindHandler.validate — catalog cross-check + coord-eligi
       () => null,
       (e) => e,
     );
-    expect(err).toBeInstanceOf(AgentResolutionFailedError);
+    expect(err).toBeInstanceOf(TaskOperationError);
     expect(err).not.toBeInstanceOf(WorkflowScheduleTargetError);
-    expect((err as AgentResolutionFailedError).agent).toBe("coord");
+    expect((err as TaskOperationError).code).toBe("AgentResolutionFailed");
+    expect((err as TaskOperationError).detail).toMatchObject({ agent: "coord" });
     // Must NOT echo the raw catalog error string back to the caller.
     expect((err as Error).message).not.toMatch(/catalog DB down/);
   });
@@ -402,8 +406,8 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
 
     // Both node-backing tasks purged.
     expect(deps.deleteTask).toHaveBeenCalledTimes(2);
-    expect(deps.deleteTask).toHaveBeenCalledWith("task-1", { purge: true });
-    expect(deps.deleteTask).toHaveBeenCalledWith("task-2", { purge: true });
+    expect(deps.deleteTask).toHaveBeenCalledWith({ id: "task-1", purge: true });
+    expect(deps.deleteTask).toHaveBeenCalledWith({ id: "task-2", purge: true });
 
     // Workflow dir purged, and ONLY the terminal same-schedule run is dropped.
     expect(deps.deleteWorkflow).toHaveBeenCalledTimes(1);
@@ -421,7 +425,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
     const out = await h.deleteForSchedule("sched-abc");
     expect(out).toEqual({ deletedCount: 1 });
     expect(deps.deleteTask).toHaveBeenCalledTimes(1);
-    expect(deps.deleteTask).toHaveBeenCalledWith("task-1", { purge: true });
+    expect(deps.deleteTask).toHaveBeenCalledWith({ id: "task-1", purge: true });
     expect(deps.deleteWorkflow).toHaveBeenCalledWith("wf-done", { purgeDir: true });
   });
 

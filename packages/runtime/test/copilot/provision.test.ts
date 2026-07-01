@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { provisionCopilotWorkdir } from "../../src/copilot/provision.js";
-import { flattenSkillName, InvalidMcpJson } from "../../src/index.js";
+import { flattenSkillName } from "../../src/index.js";
 import type { AgentContentSource } from "../../src/types.js";
 import { type FakeFixtures, makeFakeContentSource } from "../fixtures/fake-content-source.js";
 
@@ -106,8 +106,8 @@ async function setup(opts: {
  * Build a fake whose only mcp ("broken") is registered with a
  * `setMcpConfigOverride(_, new Error(...))` so the runtime's
  * `getMcpRuntimeConfig` call rejects - exercising provision's wrap
- * path that turns an upstream source failure into `InvalidMcpJson`
- * with the per-MCP fqn attached.
+ * path that turns an upstream source failure into a plain `Error`
+ * whose message names the per-MCP fqn.
  */
 async function makeFakeWithBrokenMcp(specName: string): Promise<{
   source: AgentContentSource;
@@ -130,7 +130,7 @@ async function makeFakeWithBrokenMcp(specName: string): Promise<{
         // CRITICAL: declare the MCP dep here. The fake does NOT parse
         // AGENTS.md frontmatter; if deps.mcps is omitted, resolveAgent
         // returns mcps: [] and getMcpRuntimeConfig is never called -
-        // the InvalidMcpJson path would NOT fire and the test would
+        // the invalid-config path would NOT fire and the test would
         // pass for the wrong reason.
         deps: { mcps: [specName] },
       },
@@ -324,7 +324,7 @@ describe("provisionCopilotWorkdir - MCP config", () => {
     expect(await exists(path.join(t, ".mcp.json"))).toBe(false);
   });
 
-  it("throws InvalidMcpJson when an MCP is corrupted between scan and provision", async () => {
+  it("throws an invalid-config Error when an MCP is corrupted between scan and provision", async () => {
     const t = targetDir();
     const dirty = await makeFakeWithBrokenMcp("broken/mcp");
     await expect(
@@ -334,10 +334,10 @@ describe("provisionCopilotWorkdir - MCP config", () => {
         dirty.source,
         TEST_PLACEHOLDERS,
       ),
-    ).rejects.toBeInstanceOf(InvalidMcpJson);
+    ).rejects.toThrow(/config is invalid/);
   });
 
-  it("InvalidMcpJson exposes mcpName and cause", async () => {
+  it("names the offending MCP and chains the cause in the thrown Error", async () => {
     const t = targetDir();
     const dirty = await makeFakeWithBrokenMcp("broken/mcp");
     try {
@@ -349,9 +349,10 @@ describe("provisionCopilotWorkdir - MCP config", () => {
       );
       expect.fail("should have thrown");
     } catch (e) {
-      expect(e).toBeInstanceOf(InvalidMcpJson);
-      const err = e as InvalidMcpJson;
-      expect(err.mcpName).toBe("broken/mcp");
+      expect(e).toBeInstanceOf(Error);
+      const err = e as Error;
+      expect(err.message).toContain("broken/mcp");
+      expect(err.message).toMatch(/config is invalid/);
       expect(err.cause).toBeInstanceOf(Error);
     }
   });

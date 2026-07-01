@@ -4,7 +4,7 @@
 
 T1 interactive-session registry. Each session is a runtime-provisioned
 sandbox — by default an on-disk workdir — for one agent (the runtime
-contract is [`@glyphs-ai/runtime-v2`](../runtime-v2)). This package
+contract is [`@glyphs-ai/runtime`](../runtime)). This package
 **organizes** those sandboxes and exposes the `spawnInteractive`
 use-case that hands a session's launch command to an injected
 `Spawner`. The concrete spawner is `@glyphs-ai/terminal`'s
@@ -115,7 +115,7 @@ const session = await composeSessionModule({
   dbFile: "/abs/path/to/workspace.db",
   agentResolver,            // AgentResolver — adapter over @glyphs-ai/catalog
   contentSource,            // AgentContentSource — catalog bytes for provision
-  runtimeRegistry,          // RuntimeRegistry from @glyphs-ai/runtime-v2
+  runtimeRegistry,          // RuntimeRegistry from @glyphs-ai/runtime
   spawner,                  // Spawner from @glyphs-ai/terminal (localSpawner)
   workspaceDir: "/abs/workspace-dir",
   workspaceId: "<uuid>",

@@ -58,6 +58,15 @@ export const TaskSchema = z.object({
   cancellation: TaskCancellationSchema.optional(),
 });
 
+/**
+ * The wire-shape task DTO — this schema IS the source of truth for the
+ * `Task` shape that crosses the HTTP boundary (dashboard / CLI / SDK).
+ * The task package's per-use-case response schemas are structurally
+ * identical; this local definition keeps the wire contract owned by the
+ * api layer, independent of any single task use-case's response type.
+ */
+export type Task = z.infer<typeof TaskSchema>;
+
 // ─── ActivityItem (runtime-neutral timeline) ──────────────────────
 
 const TokenUsageSchema = z.object({

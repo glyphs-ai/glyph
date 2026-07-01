@@ -25,10 +25,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Runtime, RuntimeCapabilities } from "@glyphs-ai/runtime";
-import { RuntimeRegistry } from "@glyphs-ai/runtime";
+import { InMemoryRuntimeRegistry, type RuntimeRegistry } from "@glyphs-ai/runtime";
 import type { WorkspaceName } from "@glyphs-ai/workspace";
 import type { Result, ResultAsync } from "neverthrow";
-import { errAsync } from "neverthrow";
+import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type Application,
@@ -59,35 +59,45 @@ async function ok<T, E>(r: ResultAsync<T, E> | Promise<Result<T, E>>): Promise<T
 class StubRuntime implements Runtime {
   readonly kind = "copilot";
   readonly capabilities: RuntimeCapabilities = { remoteSession: true };
-  // Every method exists but is never called by the tests; throw if
-  // something unexpectedly tries to. Explicit `Promise<never>` return
-  // types satisfy the `Runtime` interface (covariant `Promise<T>`)
-  // without forcing the stubs to fabricate a real response shape.
-  async provision(): Promise<never> {
-    throw new Error("StubRuntime.provision: not implemented for tests");
+  // Every method exists but is never called by the tests; the
+  // dispatch/launch paths they would drive are never reached. The
+  // behavioural methods return an `err` atom so an unexpected call
+  // surfaces loudly on the Result rail; the best-effort readers return
+  // empty.
+  provision() {
+    return errAsync({
+      type: "RuntimeProvisionFailed" as const,
+      cause: new Error("StubRuntime.provision: not implemented for tests"),
+    });
   }
-  async buildInteractiveLaunch(): Promise<never> {
-    throw new Error("StubRuntime.buildInteractiveLaunch: not implemented");
+  buildInteractiveLaunch() {
+    return errAsync({
+      type: "RuntimeLaunchFailed" as const,
+      cause: new Error("StubRuntime.buildInteractiveLaunch: not implemented"),
+    });
   }
-  async launchHeadless(): Promise<never> {
-    throw new Error("StubRuntime.launchHeadless: not implemented");
+  launchHeadless() {
+    return errAsync({
+      type: "RuntimeHeadlessLaunchFailed" as const,
+      cause: new Error("StubRuntime.launchHeadless: not implemented"),
+    });
   }
-  async readMetadata() {
-    return null;
+  readMetadata() {
+    return okAsync(null);
   }
-  async readActivity() {
-    return null;
+  readActivity() {
+    return okAsync(null);
   }
   async *streamActivity() {
     // empty
   }
-  async deleteState() {
-    // no-op
+  deleteState() {
+    return okAsync(undefined);
   }
 }
 
 function makeRegistry(): RuntimeRegistry {
-  const reg = new RuntimeRegistry();
+  const reg = new InMemoryRuntimeRegistry();
   reg.register(new StubRuntime());
   return reg;
 }

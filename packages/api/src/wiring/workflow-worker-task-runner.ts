@@ -15,20 +15,21 @@
  *
  *   - worker spec-shape validation
  *   - agent existence lookup (mirroring `schedule-task-handler.ts`)
- *   - origin/originId synthesis for `TaskService.dispatch`
+ *   - origin/originId synthesis for `tasks.dispatchTask.execute`
  *   - polling `tasks.get(...)` to discover terminal status
  *   - mapping `TaskStatus` → `WorkflowNodeTerminalResult`
  *   - bookkeeping the per-node `setInterval` handle so `dispose()`
  *     and `cancel(nodeId)` can clear it without leaking timers
  *
  * `validate(spec, _)` checks the inbound payload shape and verifies
- * the named agent exists in the catalog using the canonical task-pkg
- * error classes (`AgentNotFoundError` / `AgentResolutionFailedError`)
+ * the named agent exists in the catalog, surfacing a missing / failed
+ * lookup as task's `AgentNotFound` / `AgentResolutionFailed` union
  * — matching `schedule-task-handler.ts`'s precedent.
  *
- * Agent errors are RAISED USING TASK-PKG'S CLASSES directly so
- * downstream error policies for schedule dispatch and workflow routes
- * can share the same canonical matches.
+ * Agent errors are carried by `TaskOperationError` (the union `type`
+ * exposed as `.code`) so the schedule / workflow error policies resolve
+ * their HTTP status from the same `codeStatuses` table as the task
+ * routes.
  *
  * # Why `setInterval` lives here, not in `@glyphs-ai/workflow/_engine.ts`
  *
@@ -48,7 +49,7 @@
  *   (`origin: "workflow"`, `originId: nodeId`). This module never
  *   asks the substrate to persist the task id; reverse-lookup goes
  *   through that column via
- *   `TaskService.hasInFlightForWorkflowNode` / `listInFlightForWorkflowNode`.
+ *   `hasInFlightByOrigin` / `listInFlightByOrigin`.
  * - `onTerminal` is fired exactly once per dispatched node by this
  *   runner (the interval is cleared the moment a terminal status is
  *   observed, and the per-node Map entry is dropped at the same time).
@@ -63,7 +64,12 @@
  *   `onTerminal({status: 'failed', reason: 'tasks.get exhausted: ...'})`.
  */
 
-import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import type {
+  GetTaskResponse,
+  ListInFlightByOriginResponse,
+  TaskId,
+  TaskModule,
+} from "@glyphs-ai/task";
 import type {
   WorkflowNodeRunner,
   WorkflowNodeTerminalResult,
@@ -71,6 +77,11 @@ import type {
 } from "@glyphs-ai/workflow";
 import pino, { type Logger } from "pino";
 import type { WorkflowWorkerNodeSpec } from "../wire/index.js";
+import {
+  TaskOperationError,
+  taskAgentNotFound,
+  taskAgentResolutionFailed,
+} from "./_task-operation-error.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
@@ -124,7 +135,7 @@ export class WorkflowWorkerNotInCoordMenuError extends Error {
 }
 
 export interface MakeWorkerNodeRunnerOpts {
-  readonly tasks: TaskService;
+  readonly tasks: TaskModule;
   readonly catalog: CatalogAgentLookup;
   readonly logger?: Logger;
   /**
@@ -239,9 +250,9 @@ export function makeWorkerNodeRunner(
       try {
         found = await catalog.getAgent(obj.agent);
       } catch (err) {
-        throw new AgentResolutionFailedError(obj.agent, err);
+        throw taskAgentResolutionFailed(obj.agent, err);
       }
-      if (found === null) throw new AgentNotFoundError(obj.agent);
+      if (found === null) throw taskAgentNotFound(obj.agent);
 
       // Workflow worker menu-membership discipline: a worker's
       // spec.agent MUST be a member of the workflow coordinator's
@@ -255,14 +266,14 @@ export function makeWorkerNodeRunner(
       try {
         coordAgent = await catalog.getAgent(ctx.coordinatorAgent);
       } catch (err) {
-        throw new AgentResolutionFailedError(ctx.coordinatorAgent, err);
+        throw taskAgentResolutionFailed(ctx.coordinatorAgent, err);
       }
       if (coordAgent === null) {
         // Defensive: the substrate denorm should have kept this in
         // sync, but if the coord was uninstalled mid-workflow we
         // surface as not-found rather than mis-attribute as a
         // menu-membership failure.
-        throw new AgentNotFoundError(ctx.coordinatorAgent);
+        throw taskAgentNotFound(ctx.coordinatorAgent);
       }
       const menu = (coordAgent.dependencies?.agents ?? []).map((d) => d.fqn);
       if (!menu.includes(obj.agent)) {
@@ -280,7 +291,7 @@ export function makeWorkerNodeRunner(
 
     async dispatch(opts): Promise<void> {
       const spec = opts.spec as WorkflowWorkerNodeSpec;
-      const task = await tasks.dispatch({
+      const dispatchResult = await tasks.dispatchTask.execute({
         agent: spec.agent,
         brief: spec.brief,
         ...(spec.details !== undefined ? { details: spec.details } : {}),
@@ -289,7 +300,7 @@ export function makeWorkerNodeRunner(
         originId: opts.nodeId,
         // `workflowId` stays in metadata for log correlation only; the
         // node reverse-lookup id lives in the typed `origin_id` column
-        // (`originId`), consumed by `tasks.hasInFlightForWorkflowNode`.
+        // (`originId`), consumed by `hasInFlightByOrigin`.
         metadata: {
           workflowId: opts.workflowId,
         },
@@ -313,6 +324,8 @@ export function makeWorkerNodeRunner(
           GLYPH_NODE_ID: opts.nodeId,
         },
       });
+      if (dispatchResult.isErr()) throw new TaskOperationError(dispatchResult.error);
+      const task = dispatchResult.value;
       const taskId = task.id;
       const nodeId = opts.nodeId;
       const onTerminal = opts.onTerminal;
@@ -333,9 +346,11 @@ export function makeWorkerNodeRunner(
         // Fire-and-forget: setInterval callbacks can't be async,
         // and any error we don't catch here would crash the process.
         void (async () => {
-          let task: Awaited<ReturnType<typeof tasks.get>>;
+          let task: GetTaskResponse;
           try {
-            task = await tasks.get(taskId);
+            const getResult = await tasks.getTask.execute({ id: taskId as TaskId });
+            if (getResult.isErr()) throw taskUseCaseError(getResult.error);
+            task = getResult.value;
           } catch (err) {
             consecutivePollErrors += 1;
             logger.warn(
@@ -433,20 +448,30 @@ export function makeWorkerNodeRunner(
     },
 
     async hasInFlightForNode(nodeId: string): Promise<boolean> {
-      return tasks.hasInFlightForWorkflowNode(nodeId);
+      const result = await tasks.hasInFlightByOrigin.execute({
+        origin: "workflow",
+        originId: nodeId,
+      });
+      if (result.isErr()) throw taskUseCaseError(result.error);
+      return result.value;
     },
 
     async cancel(nodeId: string): Promise<void> {
       // Tear down the local interval FIRST so a poll-tick can't race
       // ahead and observe the cancellation as a generic terminal.
       clearForNode(nodeId);
-      let inFlight: Awaited<ReturnType<typeof tasks.listInFlightForWorkflowNode>>;
+      let inFlight: ListInFlightByOriginResponse;
       try {
-        inFlight = await tasks.listInFlightForWorkflowNode(nodeId);
+        const result = await tasks.listInFlightByOrigin.execute({
+          origin: "workflow",
+          originId: nodeId,
+        });
+        if (result.isErr()) throw taskUseCaseError(result.error);
+        inFlight = result.value;
       } catch (err) {
         logger.warn(
           { nodeId, err },
-          "workflow-worker-task-runner: listInFlightForWorkflowNode threw during cancel",
+          "workflow-worker-task-runner: listInFlightByOrigin threw during cancel",
         );
         return;
       }
@@ -455,7 +480,8 @@ export function makeWorkerNodeRunner(
       // continue.
       for (const t of inFlight) {
         try {
-          await tasks.cancel(t.id);
+          const result = await tasks.cancelTask.execute({ id: t.id });
+          if (result.isErr()) throw taskUseCaseError(result.error);
         } catch (err) {
           logger.warn(
             { nodeId, taskId: t.id, err },
@@ -472,4 +498,8 @@ export function makeWorkerNodeRunner(
       intervals.clear();
     },
   };
+}
+
+function taskUseCaseError(err: { readonly type: string; readonly cause?: unknown }): Error {
+  return err.cause instanceof Error ? err.cause : new Error(err.type);
 }

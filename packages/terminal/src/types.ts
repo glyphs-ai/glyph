@@ -1,9 +1,9 @@
 /**
  * Data types for the terminal contract: the launch command a
  * {@link Spawner} consumes and the result it yields. `LaunchCommand` is
- * intentionally identical in shape to `@glyphs-ai/runtime-v2`'s, so a
+ * intentionally identical in shape to `@glyphs-ai/runtime`'s, so a
  * runtime's built launch satisfies `Spawner.spawn` by structural typing
- * — terminal never imports from runtime-v2 (a terminal must not
+ * — terminal never imports from runtime (a terminal must not
  * depend on a runtime).
  */
 

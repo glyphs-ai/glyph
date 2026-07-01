@@ -47,7 +47,7 @@ describe("@glyphs-ai/terminal public API guard", () => {
 
   it("preserves the public DTO shapes", () => {
     // LaunchCommand — the SHARED structural seam with @glyphs-ai/session
-    // (consumed via the `Spawner` port) and @glyphs-ai/runtime-v2
+    // (consumed via the `Spawner` port) and @glyphs-ai/runtime
     // (produced by `Runtime.buildInteractiveLaunch`). Field renames here
     // break both producers and consumers simultaneously.
     expectTypeOf<LaunchCommand>().toHaveProperty("cmd");

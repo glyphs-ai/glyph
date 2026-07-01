@@ -6,7 +6,7 @@
 import type { TaskRecord, TaskStatus } from "../../api";
 import { serverNow } from "../../server-clock";
 
-// `cancelled` is a first-class task status: TaskService.cancel(id),
+// `cancelled` is a first-class task status: cancelTask,
 // POST /tasks/:id/cancel, and `glyph task cancel` all produce it.
 export const STATUS_LABEL: Record<TaskStatus, string> = {
   running: "Running",

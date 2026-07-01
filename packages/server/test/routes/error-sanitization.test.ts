@@ -1,10 +1,4 @@
 import { catalogErrorPolicy } from "@glyphs-ai/api";
-import {
-  RuntimeHeadlessLaunchFailed,
-  RuntimeProvisionFailed,
-  RuntimeReadMetadataFailed,
-  RuntimeStateDeletionFailed,
-} from "@glyphs-ai/runtime";
 import { describe, expect, it } from "vitest";
 import { errorBody, INTERNAL_ERROR_NAMES } from "../../src/routes/_shared.js";
 
@@ -62,7 +56,7 @@ describe("errorBody", () => {
     expect(errorBody(undefined)).toEqual({ error: "internal error" });
   });
 
-  it("handles all session/runtime/terminal known names", () => {
+  it("handles all known safe error names across packages", () => {
     const safeNames = [
       // session
       "AgentNotFoundError",
@@ -70,30 +64,10 @@ describe("errorBody", () => {
       "SessionIdAllocationFailedError",
       "SessionNotFoundError",
       "SessionError",
-      // runtime
-      "InvalidMcpJson",
-      "RuntimeHeadlessLaunchFailed",
-      "RuntimeProvisionFailed",
-      "RuntimeReadActivityInvalidArgs",
-      "RuntimeReadMetadataFailed",
-      "RuntimeStateDeletionFailed",
-      "UnknownRuntimeError",
-      "TrustRegistrationFailed",
       // terminal
       "NoTerminalFoundError",
       "TerminalSpawnFailedError",
       "UnsupportedPlatformError",
-      // task
-      "CorruptedTaskError",
-      "DispatchKernelEnvCollisionError",
-      "EntryNotReadyError",
-      "InvalidTaskIdError",
-      "InvalidTransition",
-      "ManagerShuttingDownError",
-      "RuntimeDoesNotSupportTasksError",
-      "TaskError",
-      "TaskIdAllocationFailedError",
-      "TaskNotFoundError",
       // schedule
       "InvalidCronExprError",
       "InvalidJsonPathError",
@@ -201,103 +175,5 @@ describe("catalogErrorPolicy mapping", () => {
     ]) {
       expect(catalogPolicyStatus(catalogRouteError(name))).toBeNull();
     }
-  });
-});
-
-// Pin the runtime error contract: every Runtime*Failed `.message` (the
-// piece that lands in the JSON `error` field) must contain the runtime
-// kind ONLY — no on-disk paths, no caller-controlled identifiers
-// (sessionId / workdir), no underlying `cause.message` (which is
-// typically a Node `fs` error like `EACCES: permission denied,
-// open '/etc/...'`). The full diagnostic stays accessible via instance
-// fields + `cause` for server-side `console.error` logging.
-describe("RuntimeXxxFailed message sanitization", () => {
-  const fsCause = Object.assign(new Error("EACCES: permission denied, open '/etc/shadow'"), {
-    code: "EACCES",
-  });
-
-  const cases: Array<{ name: string; err: Error; forbidden: string[] }> = [
-    {
-      name: "RuntimeReadMetadataFailed",
-      err: new RuntimeReadMetadataFailed(
-        "copilot",
-        "20260509-deadbeef-cafef00d-aaaa-bbbb",
-        fsCause,
-      ),
-      forbidden: [
-        "20260509-deadbeef-cafef00d-aaaa-bbbb",
-        "EACCES",
-        "/etc/shadow",
-        "permission denied",
-      ],
-    },
-    {
-      name: "RuntimeStateDeletionFailed",
-      err: new RuntimeStateDeletionFailed(
-        "copilot",
-        "20260509-deadbeef-cafef00d-aaaa-bbbb",
-        fsCause,
-      ),
-      forbidden: [
-        "20260509-deadbeef-cafef00d-aaaa-bbbb",
-        "EACCES",
-        "/etc/shadow",
-        "permission denied",
-      ],
-    },
-    {
-      name: "RuntimeProvisionFailed",
-      err: new RuntimeProvisionFailed(
-        "copilot",
-        "C:\\Users\\langcheng\\.glyph\\workspaces\\foo",
-        fsCause,
-      ),
-      forbidden: [
-        "C:\\Users\\langcheng",
-        ".glyph\\workspaces",
-        "EACCES",
-        "/etc/shadow",
-        "permission denied",
-      ],
-    },
-    {
-      name: "RuntimeHeadlessLaunchFailed",
-      err: new RuntimeHeadlessLaunchFailed(
-        "copilot",
-        "C:\\Users\\langcheng\\.glyph\\workspaces\\foo\\tasks\\20260509-cafef00d",
-        fsCause,
-      ),
-      forbidden: [
-        "C:\\Users\\langcheng",
-        "20260509-cafef00d",
-        "EACCES",
-        "/etc/shadow",
-        "permission denied",
-      ],
-    },
-  ];
-
-  it.each(cases)("$name body contains kind only", ({ name, err, forbidden }) => {
-    const body = errorBody(err);
-    expect(body.code).toBe(name);
-    expect(body.error).toContain("copilot");
-    for (const banned of forbidden) {
-      expect(body.error).not.toContain(banned);
-    }
-    // Sanity: the typed instance still preserves the full diagnostic so
-    // the server-side log path can recover it.
-    expect(err.cause).toBe(fsCause);
-  });
-
-  it("preserves public diagnostic fields on the instance", () => {
-    const r = new RuntimeReadMetadataFailed("copilot", "sid-123", fsCause);
-    expect(r.kind).toBe("copilot");
-    expect(r.sessionId).toBe("sid-123");
-
-    const p = new RuntimeProvisionFailed("copilot", "/abs/wd", fsCause);
-    expect(p.workdir).toBe("/abs/wd");
-
-    const d = new RuntimeHeadlessLaunchFailed("copilot", "/abs/td", fsCause);
-    expect(d.workdir).toBe("/abs/td");
   });
 });

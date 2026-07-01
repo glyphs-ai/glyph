@@ -79,9 +79,9 @@ export function formatRecord(record: Record<string, unknown>): string {
  * For an {@link ApiError} the message includes:
  *  - the server's `error` field
  *  - the optional `code` field (so users can tell `WorkspaceNotFoundError`
- *    apart from `BadRequest` apart from `EntryNotReadyError` without
+ *    apart from `BadRequest` apart from `EntryNotReady` without
  *    parsing the prose)
- *  - `EntryNotReadyError`-specific structured hints (the agent FQN and
+ *  - `EntryNotReady`-specific structured hints (the agent FQN and
  *    the {@link BlockedReason} bullet list, plus a CTA pointing at the
  *    matching `glyph catalog ...` subcommand)
  *
@@ -97,7 +97,7 @@ export function formatError(err: unknown): CommandResult {
       ? `${err.message} (HTTP ${err.status}, ${code})`
       : `${err.message} (HTTP ${err.status})`;
     lines.push(headline);
-    if (code === "EntryNotReadyError") {
+    if (code === "EntryNotReady") {
       lines.push(...formatEntryNotReadyHint(err.body));
     }
     return { exitCode: 4, stderr: `${lines.join("\n")}\n` };
@@ -126,9 +126,9 @@ function pickStringField(body: unknown, key: string): string | undefined {
 }
 
 /**
- * Render the `EntryNotReadyError` envelope extension shipped by
+ * Render the `EntryNotReady` envelope extension shipped by
  * `POST /api/workspaces/:id/tasks` (see
- * `packages/server/src/routes/tasks.ts`). Mirrors the dashboard's
+ * `packages/api/src/routes/tasks.ts`). Mirrors the dashboard's
  * structured CTA — every actionable cause gets a one-liner pointing
  * the user at the matching CLI subcommand so the terminal experience
  * matches the web UI.

@@ -21,21 +21,25 @@
  */
 
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
-import { catalogRoutes, sessionsRoutes, workspacesRoutes } from "@glyphs-ai/api";
+import {
+  catalogRoutes,
+  scheduledTasksRoutes,
+  sessionsRoutes,
+  tasksRoutes,
+  workspacesRoutes,
+} from "@glyphs-ai/api";
 import type { CatalogModule } from "@glyphs-ai/catalog";
-import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
+import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
-import type { TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { createApiApp, registerOpenApiDoc } from "../../server/src/routes/_openapi.js";
 import { configRoutes } from "../../server/src/routes/config.js";
 import { healthRoutes } from "../../server/src/routes/health.js";
 import { runtimesRoutes } from "../../server/src/routes/runtimes.js";
-import { scheduledTasksRoutes } from "../../server/src/routes/scheduled-tasks.js";
 import { scheduledWorkflowsRoutes } from "../../server/src/routes/scheduled-workflows.js";
 import { schedulesRoutes } from "../../server/src/routes/schedules.js";
-import { tasksRoutes } from "../../server/src/routes/tasks.js";
 import { workflowsRoutes } from "../../server/src/routes/workflows.js";
 
 /**
@@ -81,7 +85,7 @@ export function buildOpenApiApp(): OpenAPIHono {
     }),
   );
 
-  const runtimeRegistry = new RuntimeRegistry();
+  const runtimeRegistry = new InMemoryRuntimeRegistry();
   runtimeRegistry.register(new CopilotRuntime({ sharedDir: "/tmp/shared" }));
   app.route("/api/runtimes", runtimesRoutes(runtimeRegistry));
 
@@ -177,7 +181,7 @@ function stubSessionManager(): WorkspaceContext["sessions"] {
   return throwingStub("stubSessionManager");
 }
 
-function stubTaskManager(): TaskService {
+function stubTaskManager(): TaskModule {
   return throwingStub("stubTaskManager");
 }
 

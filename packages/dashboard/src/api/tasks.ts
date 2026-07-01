@@ -30,7 +30,7 @@ export type TaskOrigin = "standalone" | "workflow" | "schedule";
  *
  *   - exited   → subprocess exited non-zero (carries `exit_code`)
  *   - signal   → terminated by OS signal (carries `signal`)
- *   - shutdown → TaskService.shutdown() killed it
+ *   - shutdown → task-module shutdown killed it
  *   - orphan   → recoverOrphaned marked a row whose owner crashed
  *   - internal → kernel-side fault
  *
@@ -47,7 +47,7 @@ export type TaskFailure =
 /**
  * Why a task ended in `cancelled`.
  *
- *   - user    → TaskService.cancel(id) (operator request)
+ *   - user    → cancelTask (operator request)
  *   - cascade -> reconciliation / parent-side cancellation, including
  *               rows orphaned by parent shutdown
  */

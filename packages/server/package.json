@@ -60,7 +60,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@glyphs-ai/runtime-v2": "workspace:*",
     "@glyphs-ai/terminal": "workspace:*",
     "@types/node": "^22.19.17",
     "cross-env": "^7.0.3",

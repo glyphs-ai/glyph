@@ -9,7 +9,6 @@ import {
   type SkillFqn,
 } from "@glyphs-ai/catalog";
 import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
-import type { RuntimeRegistry as RuntimeRegistryV2 } from "@glyphs-ai/runtime-v2";
 import { composeScheduleModule, type ScheduleService } from "@glyphs-ai/schedule";
 import {
   type AgentNotFound,
@@ -19,13 +18,16 @@ import {
   type ResolvedAgent,
   type SessionModule,
 } from "@glyphs-ai/session";
-import { composeTaskModule, type TaskService } from "@glyphs-ai/task";
+import {
+  composeTaskModule,
+  type AgentResolver as TaskAgentResolver,
+  type TaskModule,
+} from "@glyphs-ai/task";
 import type { Spawner } from "@glyphs-ai/terminal";
 import { composeWorkflowModule, type WorkflowService } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
-import type { Result } from "neverthrow";
+import { type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
-import { bridgeRuntimeRegistryToV2 } from "./wiring/runtime-v2-bridge.js";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";
 import { makeCoordNodeRunner } from "./wiring/workflow-coord-task-runner.js";
@@ -45,8 +47,8 @@ type Skill = NonNullable<GetSkillResponse>;
 
 /**
  * Thrown by `WorkspaceContextRegistry.reload` when the cached context
- * still has live task subprocesses being supervised by its
- * `TaskService`. Reload would orphan them.
+ * still has live task subprocesses being supervised by its task module.
+ * Reload would orphan them.
  */
 export class WorkspaceHasLiveTasksError extends Error {
   override readonly name = "WorkspaceHasLiveTasksError";
@@ -104,23 +106,23 @@ export interface WorkspaceContext {
   readonly workspace: Workspace;
   readonly catalog: CatalogModule;
   readonly sessions: SessionModule;
-  readonly tasks: TaskService;
+  readonly tasks: TaskModule;
   /**
    * Per-workspace cron-driven task dispatch substrate. The timer is
    * armed in `load()` via `service.recover()` (catchup-once on boot)
    * and torn down before tasks in `close()` so a fire in flight
-   * doesn't race a closed `TaskService`.
+   * doesn't race a closed task module.
    */
   readonly schedules: ScheduleService;
   /**
    * Per-workspace DAG-orchestration substrate. Hands the
-   * coordinator-kind dispatch path a `TaskService`-backed runner via
+   * coordinator-kind dispatch path a task-module-backed runner via
    * a two-phase `getService` thunk (the runner needs a ref to the
    * `WorkflowService` it sits inside), and the worker-kind
-   * dispatch path a sibling runner over the same `TaskService`.
+   * dispatch path a sibling runner over the same task module.
    * Closed FIRST in `close()` so the engine's drain step (which
-   * calls into `tasks.cancel` for any live nodes) still has a live
-   * `TaskService` to talk to.
+   * calls into `tasks.cancelTask.execute` for any live nodes) still has
+   * a live task module to talk to.
    */
   readonly workflows: WorkflowService;
   /** Closes all backing connections. Idempotent. */
@@ -261,8 +263,6 @@ function stripMcpMeta(content: string, fqn: string): Record<string, unknown> {
 export class WorkspaceContextRegistry {
   private readonly getWorkspace: WorkspaceModule["getWorkspace"];
   private readonly runtimeRegistry: RuntimeRegistry;
-  /** v1 registry bridged into the Result-based runtime-v2 contract session consumes. */
-  private readonly runtimeRegistryV2: RuntimeRegistryV2;
   /** Native Result-based terminal spawner (`@glyphs-ai/terminal`). */
   private readonly spawner: Spawner;
   private readonly logger: Logger;
@@ -277,7 +277,6 @@ export class WorkspaceContextRegistry {
   }) {
     this.getWorkspace = opts.getWorkspace;
     this.runtimeRegistry = opts.runtimeRegistry;
-    this.runtimeRegistryV2 = bridgeRuntimeRegistryToV2(opts.runtimeRegistry);
     this.spawner = opts.spawner;
     this.logger = opts.logger ?? silentLogger;
   }
@@ -312,8 +311,8 @@ export class WorkspaceContextRegistry {
     if (this.inflight.has(workspaceId)) return "loading";
     // DatabaseUnavailable from the registry surfaces here as a thrown
     // error — re-throw the underlying driver cause so callers (e.g.
-    // middleware, Application.getContext) see the same shape they'd
-    // have seen before the Result refactor.
+    // middleware, Application.getContext) receive the driver-level
+    // failure shape.
     //
     // `workspaceId` is a raw `string` from a URL parameter; the
     // use-case re-parses through `WorkspaceIdSchema` on entry, so
@@ -422,7 +421,7 @@ export class WorkspaceContextRegistry {
     if (result.isErr()) {
       // Re-throw the driver cause so `Application.getContext` wraps
       // it as `WorkspaceLoadError(workspaceId, cause)` and every host
-      // sees the same shape they did before the Result refactor.
+      // sees a stable `WorkspaceLoadError(workspaceId, cause)` shape.
       throw result.error.cause;
     }
     const workspace = result.value;
@@ -486,11 +485,25 @@ export class WorkspaceContextRegistry {
                 : { type: "AgentResolutionFailed", agent, cause: e },
             ),
       };
+      // task's AgentResolver port needs `resolve` (shared with the
+      // session resolver above) + `getEntry` (dispatch-time readiness).
+      // `catalogPorts.getAgentEntry` already returns task's AgentEntry
+      // shape; wrap its promise on the Result rail and surface any throw
+      // as `AgentResolutionFailed`.
+      const taskAgentResolver: TaskAgentResolver = {
+        resolve: agentResolver.resolve,
+        getEntry: (agent) =>
+          ResultAsync.fromPromise(catalogPorts.getAgentEntry(agent), (cause) => ({
+            type: "AgentResolutionFailed" as const,
+            agent,
+            cause,
+          })),
+      };
       sessionModule = await composeSessionModule({
         dbFile,
         agentResolver,
         contentSource: catalogPorts,
-        runtimeRegistry: this.runtimeRegistryV2,
+        runtimeRegistry: this.runtimeRegistry,
         workspaceDir: workspace.workspaceDir,
         workspaceId,
         spawner: this.spawner,
@@ -498,7 +511,7 @@ export class WorkspaceContextRegistry {
       cleanup.push(() => sessionModule.close());
       taskModule = await composeTaskModule({
         dbFile,
-        agentResolver: catalogPorts,
+        agentResolver: taskAgentResolver,
         contentSource: catalogPorts,
         runtimeRegistry: this.runtimeRegistry,
         workspaceDir: workspace.workspaceDir,
@@ -508,8 +521,8 @@ export class WorkspaceContextRegistry {
       cleanup.push(() => taskModule.close());
 
       // Schedules are composed AFTER tasks so the kind handler's
-      // `dispatch` / `hasInFlightByOrigin` / `deleteTerminalByOrigin`
-      // can bridge to a live `TaskService`. The same workspace.db
+      // `dispatchTask` / `hasInFlightByOrigin` / `deleteTerminalByOrigin`
+      // use-cases have a live task module. The same workspace.db
       // file is reused (WAL-mode shared connection); migrations are
       // idempotent.
       scheduleModule = await composeScheduleModule({
@@ -518,7 +531,8 @@ export class WorkspaceContextRegistry {
       });
       cleanup.push(() => scheduleModule.close());
 
-      await taskModule.service.recoverOrphaned();
+      const recoverTasks = await taskModule.recoverOrphanedTasks.execute({});
+      if (recoverTasks.isErr()) throw new Error(recoverTasks.error.type);
       // Register every kind BEFORE recover(). recover() freezes the
       // registry and preflights every persisted row's target_kind
       // against it — any row with an unregistered kind throws
@@ -530,7 +544,7 @@ export class WorkspaceContextRegistry {
       scheduleModule.service.registerKind(
         "task",
         makeTaskKindHandler({
-          tasks: taskModule.service,
+          tasks: taskModule,
           catalog: catalogPorts,
         }),
       );
@@ -543,7 +557,7 @@ export class WorkspaceContextRegistry {
       // service ref via the `getWorkflowService` thunk for the coord
       // runner.
       const coordRunner = makeCoordNodeRunner({
-        tasks: taskModule.service,
+        tasks: taskModule,
         catalog: catalogPorts,
         getService: getWorkflowService,
         // The coord runner injects `GLYPH_WORKFLOW_DIR` into the
@@ -556,7 +570,7 @@ export class WorkspaceContextRegistry {
         logger: this.logger,
       });
       const workerRunner = makeWorkerNodeRunner({
-        tasks: taskModule.service,
+        tasks: taskModule,
         catalog: catalogPorts,
         logger: this.logger,
       });
@@ -580,7 +594,7 @@ export class WorkspaceContextRegistry {
         "workflow",
         makeWorkflowKindHandler({
           workflows: workflowModule.service,
-          tasks: taskModule.service,
+          tasks: taskModule,
           catalog: catalogPorts,
         }),
       );
@@ -595,7 +609,7 @@ export class WorkspaceContextRegistry {
       workspace,
       catalog: catalogModule,
       sessions: sessionModule,
-      tasks: taskModule.service,
+      tasks: taskModule,
       schedules: scheduleModule.service,
       workflows: workflowModule.service,
       async close() {
@@ -608,12 +622,12 @@ export class WorkspaceContextRegistry {
         // Ordering: workflow FIRST, then schedule, then task /
         // session / catalog (reverse of compose). workflow's
         // close() awaits `engine.drain()` which awaits in-flight
-        // ticks; those ticks dispatch through `TaskService`, so
+        // ticks; those ticks dispatch through the task module, so
         // tasks must still be alive while workflow drains.
         // schedule's close() likewise awaits `service.shutdown()`
         // which clears the in-flight setTimeout queue; closing it
-        // before tasks means no new fires can land on a torn-down
-        // TaskService.
+        // before tasks means no new fires can land on a closed task
+        // module.
         //
         // Multi-error handling: the FIRST error is re-thrown so the
         // caller sees something; LATER errors are logged via the

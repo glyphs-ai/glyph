@@ -40,32 +40,11 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   // one allow-list entry covers all three. Each owning pkg audits its own
   // super(...) template for safety per the rules above.
   "AgentNotFoundError",
-  "RuntimeDoesNotSupportRemoteError",
   // @glyphs-ai/session
   "InvalidSessionIdError",
   "SessionIdAllocationFailedError",
   "SessionNotFoundError",
   "SessionError",
-  // @glyphs-ai/runtime
-  "InvalidMcpJson",
-  "RuntimeHeadlessLaunchFailed",
-  "RuntimeProvisionFailed",
-  "RuntimeReadMetadataFailed",
-  "RuntimeStateDeletionFailed",
-  "UnknownRuntimeError",
-  "TrustRegistrationFailed",
-  "RuntimeReadActivityInvalidArgs",
-  // @glyphs-ai/task
-  "CorruptedTaskError",
-  "InvalidTaskIdError",
-  "TaskNotFoundError",
-  "TaskIdAllocationFailedError",
-  "RuntimeDoesNotSupportTasksError",
-  "EntryNotReadyError",
-  "DispatchKernelEnvCollisionError",
-  "TaskError",
-  "InvalidTransition",
-  "ManagerShuttingDownError",
   // @glyphs-ai/schedule
   "ScheduleError",
   "ScheduleNotFoundError",
@@ -258,7 +237,7 @@ export function unmappedFaultMeta(
  * it maps to, and an optional class-stable body builder.
  *
  * Use the third slot ONLY for envelopes whose shape depends on the
- * error instance alone — not on the route. Example: `EntryNotReadyError`
+ * error value alone — not on the route. Example: `EntryNotReady`
  * always returns `{ error, code, agent, reason }` regardless of which
  * route caught it, so its body builder lives on the policy entry.
  *
@@ -273,7 +252,7 @@ type StatusEntry = readonly [
   classStableBody?: (err: Error) => Record<string, unknown>,
 ];
 
-type CodeStatusEntry = readonly [
+export type CodeStatusEntry = readonly [
   code: string,
   status: ContentfulStatusCode,
   codeStableBody?: (err: unknown) => Record<string, unknown>,

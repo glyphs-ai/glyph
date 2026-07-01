@@ -1,4 +1,4 @@
-import type { RuntimeRegistry } from "@glyphs-ai/runtime-v2";
+import type { RuntimeRegistry } from "@glyphs-ai/runtime";
 import { okAsync } from "neverthrow";
 import { z } from "zod";
 import { SessionIdSchema } from "../domain/session-id.js";

@@ -1,3 +1,12 @@
+import type { ResultAsync } from "neverthrow";
+import type {
+  RuntimeActivityReadFailed,
+  RuntimeHeadlessLaunchFailed,
+  RuntimeLaunchFailed,
+  RuntimeProvisionFailed,
+  RuntimeStateDeletionFailed,
+} from "./errors.js";
+
 /**
  * Minimal resolved-agent shape consumed by runtime adapters during
  * {@link Runtime.provision}. Defined here (not imported from
@@ -106,9 +115,9 @@ export interface Runtime {
    * required to be idempotent; the caller arranges atomicity (rolling
    * back the workdir on failure).
    */
-  provision(opts: ProvisionOpts): Promise<{
-    runtimeSessionId: string | null;
-  }>;
+  provision(
+    opts: ProvisionOpts,
+  ): ResultAsync<{ runtimeSessionId: string | null }, RuntimeProvisionFailed>;
 
   /**
    * Build the shell incantation that drops the user into an interactive
@@ -133,14 +142,14 @@ export interface Runtime {
    * that precondition here, lazily, only when the user actually launches.
    *
    * `opts` carries per-launch inputs and flags. Runtimes that don't
-   * implement a flag MUST throw a typed error when asked for it (see
-   * {@link RuntimeCapabilities}); they MUST NOT silently ignore an
-   * unsupported flag.
+   * implement a flag MUST return a typed error (`RuntimeLaunchFailed`)
+   * when asked for it (see {@link RuntimeCapabilities}); they MUST NOT
+   * silently ignore an unsupported flag.
    */
   buildInteractiveLaunch(
     runtimeSessionId: string | null,
     opts: BuildInteractiveLaunchOpts,
-  ): Promise<LaunchCommand>;
+  ): ResultAsync<LaunchCommand, RuntimeLaunchFailed>;
 
   // ─── Non-interactive mode (-p) ─────────────────────────────────────
 
@@ -159,12 +168,14 @@ export interface Runtime {
    * caller can observe completion without holding the spawn machinery
    * itself.
    */
-  launchHeadless?(opts: LaunchHeadlessOpts): Promise<RuntimeHandle>;
+  launchHeadless?(
+    opts: LaunchHeadlessOpts,
+  ): ResultAsync<RuntimeHandle, RuntimeHeadlessLaunchFailed>;
 
   // ─── Observability ─────────────────────────────────────────────────
 
   /**
-   * Optional. Read runtime-managed display metadata for one
+   * Read runtime-managed display metadata for one
    * `runtimeSessionId` — principally a `title` field that the CLI
    * generates from the first user prompt (Copilot's
    * `workspace.yaml.name`). Works for either execution mode.
@@ -173,9 +184,11 @@ export interface Runtime {
    * hasn't launched yet, state was deleted out of band, runtime
    * doesn't expose display metadata at all).
    *
-   * Implementations should be idempotent and side-effect-free.
+   * Best-effort and side-effect-free: a read fault is indistinguishable
+   * from "no metadata" to the caller, so both resolve to `null` (error
+   * channel `never`).
    */
-  readMetadata?(runtimeSessionId: string): Promise<RuntimeSessionMetadata | null>;
+  readMetadata(runtimeSessionId: string): ResultAsync<RuntimeSessionMetadata | null, never>;
 
   /**
    * Optional. Fetch the runtime-neutral activity timeline for one
@@ -186,9 +199,9 @@ export interface Runtime {
    *   3. Translate to the shared {@link ActivityItem} vocabulary
    *   4. Pick the agent's "final answer" string for the headline
    *
-   * Returns `null` when the runtime has no log for this id yet.
-   * Throws on real I/O / parse errors so the route layer can surface
-   * 5xx for genuine faults.
+   * Returns `null` when the runtime has no log for this id yet. A real
+   * I/O / parse fault yields `err(RuntimeActivityReadFailed)` so the
+   * route layer can surface 5xx for genuine faults.
    *
    * Tail-first pagination via `opts.before` / `opts.after` (mutually
    * exclusive) + `opts.limit`; omit both for the latest `limit` items
@@ -199,7 +212,10 @@ export interface Runtime {
    * surface it so the user doesn't render a partial timeline as if
    * it were complete.
    */
-  readActivity?(runtimeSessionId: string, opts?: ReadActivityOpts): Promise<ActivityResult | null>;
+  readActivity?(
+    runtimeSessionId: string,
+    opts?: ReadActivityOpts,
+  ): ResultAsync<ActivityResult | null, RuntimeActivityReadFailed>;
 
   /**
    * Optional. The most recent activity event produced by the agent
@@ -218,7 +234,7 @@ export interface Runtime {
    * "workflow failed"; those states are owned by the T1 managers. This
    * method just reports the latest agent utterance.
    */
-  getLastAgentActivity?(runtimeSessionId: string): Promise<AgentActivity | null>;
+  getLastAgentActivity?(runtimeSessionId: string): ResultAsync<AgentActivity | null, never>;
 
   /**
    * Optional. Live-tail variant of {@link readActivity}. Returns an
@@ -239,13 +255,13 @@ export interface Runtime {
    * Remove the runtime's recorded state for one `runtimeSessionId`.
    * No-op when no state exists.
    *
-   * Throws on partial failure (e.g. permission denied removing some
-   * files); the caller is responsible for surfacing this to the user.
-   * Domain managers call this before removing their own local records on
-   * hard purge. Runtime cleanup runs first, so a runtime failure aborts
-   * before local removal.
+   * A partial failure (e.g. permission denied removing some files)
+   * yields `err(RuntimeStateDeletionFailed)`; the caller is responsible
+   * for surfacing this to the user. Domain managers call this before
+   * removing their own local records on hard purge. Runtime cleanup runs
+   * first, so a runtime failure aborts before local removal.
    */
-  deleteState(runtimeSessionId: string): Promise<void>;
+  deleteState(runtimeSessionId: string): ResultAsync<void, RuntimeStateDeletionFailed>;
 }
 
 /**

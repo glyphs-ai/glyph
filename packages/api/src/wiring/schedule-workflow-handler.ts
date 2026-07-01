@@ -1,7 +1,8 @@
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
-import { AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import type { TaskId, TaskModule } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import type { WorkflowTargetData, WorkflowTargetPatch } from "../wire/index.js";
+import { taskAgentResolutionFailed } from "./_task-operation-error.js";
 
 interface CatalogAgent {
   readonly dependencies?: { readonly agents?: readonly { readonly fqn: string }[] };
@@ -39,15 +40,15 @@ interface CatalogAgentLookup {
  *
  * Error policy mirrors the task handler and the `/workflows` create
  * path: catalog *resolution / infra* failure surfaces as the task
- * pkg's `AgentResolutionFailedError` (→ 500, opaque body) so a
- * transient catalog outage never masquerades as a 400 bad-request that
- * leaks the underlying error string. Genuine validation failures
- * (unknown coordinatorAgent, not coord-eligible, malformed brief) stay
+ * `AgentResolutionFailed` union (→ 500, opaque body) so a transient
+ * catalog outage never masquerades as a 400 bad-request that leaks the
+ * underlying error string. Genuine validation failures (unknown
+ * coordinatorAgent, not coord-eligible, malformed brief) stay
  * `WorkflowScheduleTargetError` (→ 400 with message).
  */
 export function makeWorkflowKindHandler(opts: {
   readonly workflows: WorkflowService;
-  readonly tasks: TaskService;
+  readonly tasks: TaskModule;
   readonly catalog: CatalogAgentLookup;
 }): ScheduleKindHandler {
   const workflows = opts.workflows;
@@ -100,7 +101,7 @@ export function makeWorkflowKindHandler(opts: {
           // bad caller input. Surface as the task pkg's resolution
           // error (→ 500 opaque) rather than a 400 that would falsely
           // blame the caller and echo the raw error message.
-          throw new AgentResolutionFailedError(obj.coordinatorAgent as string, err);
+          throw taskAgentResolutionFailed(obj.coordinatorAgent as string, err);
         }
         if (found === null) {
           throw new WorkflowScheduleTargetError(
@@ -191,7 +192,7 @@ export function makeWorkflowKindHandler(opts: {
       for (const wf of terminal) {
         // The workflow substrate's `deleteWorkflow` drops only its own
         // workflow/node/edge rows — each node's backing task row + its
-        // workdir live in the TaskService and must be cascaded here, or
+        // workdir live in the task module and must be cascaded here, or
         // they outlive the schedule (orphaned rows + disk). This mirrors
         // the canonical `DELETE /workflows/:wfid` route's cascade and
         // matches the task kind's purge-on-schedule-delete semantics.
@@ -204,16 +205,30 @@ export function makeWorkflowKindHandler(opts: {
         // schedule cascade promises.
         let hasInFlightNode = false;
         for (const node of snapshot.nodes) {
-          if (await tasks.hasInFlightForWorkflowNode(node.id)) {
+          const inFlight = await tasks.hasInFlightByOrigin.execute({
+            origin: "workflow",
+            originId: node.id,
+          });
+          if (inFlight.isErr()) throw new Error(inFlight.error.type);
+          if (inFlight.value) {
             hasInFlightNode = true;
             break;
           }
         }
         if (hasInFlightNode) continue;
         for (const node of snapshot.nodes) {
-          const linked = await tasks.findTaskByWorkflowNode(node.id);
+          const linkedResult = await tasks.findLatestByOrigin.execute({
+            origin: "workflow",
+            originId: node.id,
+          });
+          if (linkedResult.isErr()) throw new Error(linkedResult.error.type);
+          const linked = linkedResult.value;
           if (linked === null) continue;
-          await tasks.delete(linked.id, { purge: true });
+          const deleteResult = await tasks.deleteTask.execute({
+            id: linked.id as TaskId,
+            purge: true,
+          });
+          if (deleteResult.isErr()) throw new Error(deleteResult.error.type);
         }
         await workflows.deleteWorkflow(wf.id, { purgeDir: true });
         deletedCount++;

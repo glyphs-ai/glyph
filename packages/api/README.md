@@ -36,11 +36,11 @@ packages/api/src/
 ├── schemas/                  ← zod wire schemas, one module per domain; transport-agnostic single source of truth for the server's OpenAPI spec and the inferred wire types (z.infer)
 │   └── index.ts              ← schemas barrel (re-exported from the package root)
 ├── wiring/                   ← per-kind handler wiring (cross-package glue)
-│   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskService
+│   ├── schedule-task-handler.ts         ← schedule "task" kind → TaskModule use-cases
 │   ├── schedule-workflow-handler.ts     ← schedule "workflow" kind → WorkflowService
-│   ├── workflow-coord-task-runner.ts    ← workflow coordinator node → TaskService
+│   ├── workflow-coord-task-runner.ts    ← workflow coordinator node → TaskModule use-cases
 │   ├── workflow-human-node-runner.ts    ← workflow human node → gate awaiting the respond API
-│   └── workflow-worker-task-runner.ts   ← workflow worker node → TaskService
+│   └── workflow-worker-task-runner.ts   ← workflow worker node → TaskModule use-cases
 └── index.ts                  ← public barrel (orchestration + the
                                 wire/ surface)
 ```
@@ -85,7 +85,7 @@ const ctx = await app.getContext(workspaceId);   // WorkspaceContext | null
 ctx.workspace;                                   // Workspace
 ctx.catalog;                                     // CatalogService
 ctx.sessions;                                    // SessionModule (use-cases)
-ctx.tasks;                                       // TaskService
+ctx.tasks;                                       // TaskModule
 ctx.schedules;                                   // ScheduleService
 ctx.workflows;                                   // WorkflowService
 await ctx.sessions.spawnInteractive.execute({ id, remote? }); // ResultAsync<SpawnInteractiveResponse>
@@ -111,7 +111,7 @@ list-like operations:
 | `workspace` | `Workspace`           | one workspace                                              |
 | `catalog`   | `CatalogService`      | one catalog (the registry)                                 |
 | `sessions`  | `SessionModule`       | many sessions per workspace; DI container of use-cases     |
-| `tasks`     | `TaskService`         | many tasks per workspace                                   |
+| `tasks`     | `TaskModule`          | many tasks per workspace; DI container of use-cases        |
 | `schedules` | `ScheduleService`     | many schedules per workspace; cron-driven task dispatch substrate |
 | `workflows` | `WorkflowService`     | many workflows per workspace; DAG orchestration substrate  |
 | `close()`   | `() => Promise<void>` | closes the five service handles in reverse-of-compose order; idempotent |
@@ -131,7 +131,7 @@ to re-register the task kind on a freshly-loaded context.
 
 `ctx.workflows` is composed after the task and schedule services and is
 wired with coordinator and worker node runners that dispatch through the
-same `TaskService`. Callers use `WorkflowService` for DAG lifecycle
+same `TaskModule` use-cases. Callers use `WorkflowService` for DAG lifecycle
 operations; they do not register runners manually.
 
 ## Concurrency invariants

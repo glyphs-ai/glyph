@@ -1,7 +1,7 @@
 /**
  * Application barrel: shared value objects + error atoms referenced by
  * use-case error unions. Repository / sandbox / resolver atoms come from
- * their port files; the runtime atoms come from `@glyphs-ai/runtime-v2`.
+ * their port files; the runtime atoms come from `@glyphs-ai/runtime`.
  * Entity, schema, mapper, and row types stay package-internal.
  */
 
@@ -10,7 +10,7 @@ export type {
   RuntimeProvisionFailed,
   RuntimeStateDeletionFailed,
   UnknownRuntime,
-} from "@glyphs-ai/runtime-v2";
+} from "@glyphs-ai/runtime";
 export { type SessionId, SessionIdSchema } from "../domain/session-id.js";
 export type {
   DatabaseUnavailable,

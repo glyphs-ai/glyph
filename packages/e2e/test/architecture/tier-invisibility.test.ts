@@ -75,7 +75,7 @@ const ARCHITECTURE_DOC = path.join(REPO_ROOT, "docs", "architecture.md");
 // template, this cross-cutting e2e harness, and the catalogv2 reference
 // skeleton (used as a migration target template, not shipped).
 const NON_TIERED_PKGS = new Set(["_template", "e2e", "catalogv2"]);
-const T0_PKGS = ["workspace", "runtime", "runtime-v2", "schedule", "terminal", "catalog"] as const;
+const T0_PKGS = ["workspace", "runtime", "schedule", "terminal", "catalog"] as const;
 const T1_PKGS = ["session", "task", "workflow"] as const;
 const T2_PKGS = ["api", "sdk"] as const;
 const T3_PKGS = ["server"] as const;

@@ -25,38 +25,26 @@
  *           the caller observed a stale state.
  *
  * Agent-resolution failures from the coord-kind runner's `validate`
- * (`AgentNotFoundError` / `AgentResolutionFailedError` from the task
- * pkg) are listed below — reachable via `POST /workflows` at create
- * time AND via the DAG-mutation routes (`addNode`, `addSubgraph`,
- * `replaceNodeSpec`) when the runner re-validates an agent FQN.
+ * surface through task union values (`AgentNotFound` /
+ * `AgentResolutionFailed`) and are covered by `codeStatuses` below.
+ * They are reachable via `POST /workflows` at create time AND via the
+ * DAG-mutation routes (`addNode`, `addSubgraph`, `replaceNodeSpec`)
+ * when the runner re-validates an agent FQN.
  *
  * Coord-runner validate-time capability rejection
- * (`WorkflowCoordAgentNotCapableError`) is listed below with a
- * class-stable body builder that pins the rejection to the
- * `coordinatorAgent` form field — same envelope precedent as
- * `EntryNotReadyError`.
+ * (`WorkflowCoordAgentNotCapableError`) is listed below with a stable
+ * body builder that pins the rejection to the `coordinatorAgent` form
+ * field, matching the task `EntryNotReady` union envelope shape.
  */
 
 import {
+  taskUnionCodeStatuses,
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
   WorkflowHumanSpecError,
   WorkflowWorkerNotInCoordMenuError,
   WorkflowWorkerSpecError,
 } from "@glyphs-ai/api";
-import {
-  AgentNotFoundError,
-  AgentResolutionFailedError,
-  CorruptedTaskError,
-  DispatchKernelEnvCollisionError,
-  EntryNotReadyError,
-  InvalidTaskIdError,
-  InvalidTransition,
-  ManagerShuttingDownError,
-  RuntimeDoesNotSupportTasksError,
-  TaskIdAllocationFailedError,
-  TaskNotFoundError,
-} from "@glyphs-ai/task";
 import {
   EmptyParentsError,
   InvalidWorkflowIdError,
@@ -87,7 +75,7 @@ import {
   WorkflowSubgraphTempParentlessError,
 } from "@glyphs-ai/workflow";
 import type { ErrorPolicy } from "../_respond-error.js";
-import { opaqueAgentResolutionBody, opaqueWorkerNotInCoordMenuBody } from "./_shared-bodies.js";
+import { opaqueWorkerNotInCoordMenuBody } from "./_shared-bodies.js";
 
 export const workflowsErrorPolicy: ErrorPolicy = {
   name: "workflows",
@@ -114,8 +102,8 @@ export const workflowsErrorPolicy: ErrorPolicy = {
     // agent's catalog frontmatter declares no `dependencies.agents`
     // dispatch menu. Caller-fixable: pick a different agent (or add
     // the menu to the existing one). Body pins the error to the
-    // form field so the dashboard can render it inline. Mirrors
-    // `EntryNotReadyError`'s class-stable body precedent below.
+    // form field so the dashboard can render it inline. Matches the
+    // task `EntryNotReady` union envelope shape.
     [
       WorkflowCoordAgentNotCapableError,
       400,
@@ -188,37 +176,14 @@ export const workflowsErrorPolicy: ErrorPolicy = {
     // the substrate's well-formedness rules.
     [WorkflowDagInvariantError, 409],
 
-    // Task-package surface — reachable from worker-kind handler
-    // dispatch paths surfaced via the DAG-mutation routes. Listed
-    // here proactively so policy is consistent with the schedules
-    // policy's same fallthrough block.
-    [InvalidTaskIdError, 400],
-    [TaskNotFoundError, 404],
-    [AgentNotFoundError, 400],
-    [AgentResolutionFailedError, 500, opaqueAgentResolutionBody],
-    [RuntimeDoesNotSupportTasksError, 400],
-    [
-      EntryNotReadyError,
-      409,
-      (err) => {
-        const e = err as EntryNotReadyError;
-        return {
-          error: e.message,
-          code: e.name,
-          agent: e.agent,
-          ...(e.reason !== undefined ? { reason: e.reason } : {}),
-        };
-      },
-    ],
-    [InvalidTransition, 409],
-    [ManagerShuttingDownError, 503],
-    [DispatchKernelEnvCollisionError, 400],
-    [TaskIdAllocationFailedError, 500],
-    [CorruptedTaskError, 500],
-
     // `WorkflowError` is the abstract base — listed LAST so concrete
     // subclasses match first. Defaults to 400 (most workflow-base
     // throws are caller validation flavors).
     [WorkflowError, 400],
   ],
+  // Task-dispatch failures inside worker / coord node runs surface as a
+  // `TaskOperationError` carrying the task union `type` as `.code`;
+  // resolve their status + body from the shared task-error table so the
+  // wire `code` matches the task routes.
+  codeStatuses: [...taskUnionCodeStatuses],
 };

@@ -30,7 +30,6 @@
   "dependencies": {
     "@glyphs-ai/catalog": "workspace:*",
     "@glyphs-ai/runtime": "workspace:*",
-    "@glyphs-ai/runtime-v2": "workspace:*",
     "@glyphs-ai/terminal": "workspace:*",
     "@glyphs-ai/schedule": "workspace:*",
     "@glyphs-ai/session": "workspace:*",

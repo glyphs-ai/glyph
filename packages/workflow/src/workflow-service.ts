@@ -295,7 +295,7 @@ export class WorkflowService {
    *     a `%` typed into the search box doesn't widen the match.
    *
    * Per-workspace volume is small enough to use the same unbounded
-   * shape as `ScheduleService.list` / `TaskService.list`.
+   * shape as `ScheduleService.list` / `TaskModule.listTasks.execute`.
    */
   async list(opts: ListWorkflowOpts = {}): Promise<readonly WorkflowEntity[]> {
     return this.repo.listWorkflows(opts);

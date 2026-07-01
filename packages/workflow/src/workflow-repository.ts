@@ -63,7 +63,7 @@ export class WorkflowRepository {
    *     fragment from a search box doesn't accidentally widen.
    *
    * Per-workspace volume is small enough to mirror
-   * `ScheduleService.list` / `TaskService.list`, which are also
+   * `ScheduleService.list` / `TaskModule.listTasks.execute`, which are also
    * unbounded on the same per-workspace scope.
    */
   async listWorkflows(opts?: {

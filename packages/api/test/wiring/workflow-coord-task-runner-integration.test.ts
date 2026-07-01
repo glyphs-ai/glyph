@@ -1,11 +1,11 @@
 /**
  * Integration tests for `makeCoordNodeRunner` wired into a real
- * `composeWorkflowModule`. Uses a fake `TaskService` whose
+ * `composeWorkflowModule`. Uses a fake `TaskModule` whose
  * `dispatch` records calls and `get` returns scripted statuses, so
- * the substrate ↔ runner ↔ task-service bridge runs end-to-end
+ * the substrate, runner, and task module run end-to-end
  * without standing up a real `@glyphs-ai/task` host (which would pull
  * in a runtime registry, an agent resolver, and a real workspace
- * dir for no extra coverage of THIS runner's bridging behaviour).
+ * dir for no extra coverage of THIS runner's behavior).
  *
  * Two-phase init demonstration: the coord runner is built with a
  * `getService` thunk that closes over a mutable holder; after
@@ -21,13 +21,14 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import {
   composeWorkflowModule,
   type WorkflowModule,
   type WorkflowNodeRunner,
 } from "@glyphs-ai/workflow";
 import { openTestWorkflowDb } from "@glyphs-ai/workflow/testing";
+import { okAsync } from "neverthrow";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeCoordNodeRunner } from "../../src/wiring/workflow-coord-task-runner.js";
@@ -52,7 +53,7 @@ function fakeTaskRow(overrides: Partial<{ id: string; status: string }> = {}): a
 
 interface Harness {
   readonly module: WorkflowModule;
-  readonly tasks: TaskService;
+  readonly tasks: TaskModule;
   readonly dispatch: ReturnType<typeof vi.fn>;
   readonly get: ReturnType<typeof vi.fn>;
   readonly workspaceDir: string;
@@ -66,18 +67,20 @@ interface MakeHarnessOpts {
 async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
   const initialStatus = opts.initialTaskStatus ?? "succeeded";
 
-  const dispatch = vi.fn(async () => fakeTaskRow({ id: "tid-1", status: initialStatus }));
-  const get = vi.fn(async (_id: string) => fakeTaskRow({ id: "tid-1", status: initialStatus }));
-  const hasInFlightForWorkflowNode = vi.fn(async () => false);
-  const listInFlightForWorkflowNode = vi.fn(async () => []);
-  const cancel = vi.fn(async (_id: string) => {});
+  const dispatch = vi.fn(() => okAsync(fakeTaskRow({ id: "tid-1", status: initialStatus })));
+  const get = vi.fn((_req: { id: string }) =>
+    okAsync(fakeTaskRow({ id: "tid-1", status: initialStatus })),
+  );
+  const hasInFlightForWorkflowNode = vi.fn(() => okAsync(false));
+  const listInFlightForWorkflowNode = vi.fn(() => okAsync([]));
+  const cancel = vi.fn(() => okAsync(fakeTaskRow()));
   const tasks = {
-    dispatch,
-    get,
-    hasInFlightForWorkflowNode,
-    listInFlightForWorkflowNode,
-    cancel,
-  } as unknown as TaskService;
+    dispatchTask: { execute: dispatch },
+    getTask: { execute: get },
+    hasInFlightByOrigin: { execute: hasInFlightForWorkflowNode },
+    listInFlightByOrigin: { execute: listInFlightForWorkflowNode },
+    cancelTask: { execute: cancel },
+  } as unknown as TaskModule;
 
   const getAgent = vi.fn(async (_fqn: string) => ({
     name: "coord-agent",
@@ -198,14 +201,18 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
     await h.cleanup();
   });
 
-  it("I1: createWorkflow → coord task auto-dispatches via tasks.dispatch with brief+details from workflow header", async () => {
+  it("I1: createWorkflow → coord task auto-dispatches via tasks.dispatchTask.execute with brief+details from workflow header", async () => {
     const { workflowId, initialCoordNodeId } = await h.module.service.createWorkflow({
       brief: "my brief",
       details: "my long details",
       coordinatorAgent: "coord-agent",
     });
 
-    await waitUntil(() => h.dispatch.mock.calls.length >= 1, 2000, "tasks.dispatch called");
+    await waitUntil(
+      () => h.dispatch.mock.calls.length >= 1,
+      2000,
+      "tasks.dispatchTask.execute called",
+    );
 
     const calls = h.dispatch.mock.calls as unknown as ReadonlyArray<
       readonly [Record<string, unknown>]
@@ -224,13 +231,17 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
     }
   });
 
-  it("I2: createWorkflow without details → coord tasks.dispatch called without 'details' key", async () => {
+  it("I2: createWorkflow without details → coord tasks.dispatchTask.execute called without 'details' key", async () => {
     await h.module.service.createWorkflow({
       brief: "brief only",
       coordinatorAgent: "coord-agent",
     });
 
-    await waitUntil(() => h.dispatch.mock.calls.length >= 1, 2000, "tasks.dispatch called");
+    await waitUntil(
+      () => h.dispatch.mock.calls.length >= 1,
+      2000,
+      "tasks.dispatchTask.execute called",
+    );
 
     const calls = h.dispatch.mock.calls as unknown as ReadonlyArray<
       readonly [Record<string, unknown>]
@@ -243,7 +254,7 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
     }
   });
 
-  it("I3: coord task succeeds via fake tasks.get → substrate marks coord node succeeded", async () => {
+  it("I3: coord task succeeds via fake tasks.getTask.execute → substrate marks coord node succeeded", async () => {
     const { initialCoordNodeId } = await h.module.service.createWorkflow({
       brief: "succeed-test",
       coordinatorAgent: "coord-agent",
@@ -255,7 +266,7 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
         return node.status === "succeeded";
       },
       2000,
-      "coord node observed succeeded after fake tasks.get returns succeeded",
+      "coord node observed succeeded after fake tasks.getTask.execute returns succeeded",
     );
 
     const node = await h.module.service.getNode(initialCoordNodeId);
@@ -263,7 +274,7 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
     // The initial coord succeeded without any children; the
     // substrate's stuck-coord detector fires
     // and inserts a retry coord which the engine immediately
-    // dispatches via the same fake tasks.dispatch. Total calls = 2.
+    // dispatches via the same fake tasks.dispatchTask.execute. Total calls = 2.
     expect(h.dispatch).toHaveBeenCalledTimes(2);
     expect(h.get.mock.calls.length).toBeGreaterThanOrEqual(1);
   });

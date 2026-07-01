@@ -23,9 +23,9 @@
  * paths without touching disk or any real BC code.
  */
 import type { CatalogModule } from "@glyphs-ai/catalog";
-import { RuntimeRegistry } from "@glyphs-ai/runtime";
+import { InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
-import type { TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowService } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceModule } from "@glyphs-ai/workspace";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,15 +86,20 @@ vi.mock("@glyphs-ai/session", () => ({
 }));
 
 vi.mock("@glyphs-ai/task", () => ({
-  composeTaskModule: vi.fn(async () => ({
-    service: {
-      recoverOrphaned: vi.fn(async () => undefined),
-      liveCount: vi.fn(() => 0),
-    } as unknown as TaskService,
-    close: vi.fn(async () => {
-      mocks.sequence.push("task");
-    }),
-  })),
+  composeTaskModule: vi.fn(
+    async () =>
+      ({
+        recoverOrphanedTasks: {
+          execute: vi.fn(() => okAsync(undefined)),
+        },
+        liveCount: vi.fn(() => 0),
+        shutdown: vi.fn(async () => undefined),
+        drainPurges: vi.fn(async () => undefined),
+        close: vi.fn(async () => {
+          mocks.sequence.push("task");
+        }),
+      }) as unknown as TaskModule,
+  ),
 }));
 
 vi.mock("@glyphs-ai/schedule", () => ({
@@ -184,7 +189,7 @@ function makeRegistry(opts: { workspaceExists?: boolean } = {}): WorkspaceContex
   } as unknown as WorkspaceModule["getWorkspace"];
   return new WorkspaceContextRegistry({
     getWorkspace,
-    runtimeRegistry: new RuntimeRegistry(),
+    runtimeRegistry: new InMemoryRuntimeRegistry(),
     spawner: { spawn: () => okAsync({ launcher: "wt" }) },
   });
 }

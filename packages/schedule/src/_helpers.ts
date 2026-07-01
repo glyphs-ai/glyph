@@ -33,7 +33,7 @@ export function assertValidKindName(kind: unknown): asserts kind is string {
 
 /**
  * JSON-path grammar accepted by `ListScheduleOpts.dataEquals.path`.
- * Used to defend the `json_extract(target_json, <path>) = ?` SQL
+ * Defends the `json_extract(target_json, <path>) = ?` SQL
  * fragment from injection — the path is string-concatenated into the
  * Drizzle `sql` template because Drizzle parameterises only the
  * `?`-placeholder values, not the `json_extract` first argument.

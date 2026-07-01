@@ -4,13 +4,11 @@
  * within the same realm; cross-realm callers (HTTP routes, CLI)
  * should branch on the stable `name` string literal.
  *
- * Agent-related errors live in `@glyphs-ai/task` (`AgentNotFoundError`,
- * `AgentResolutionFailedError`). The schedule pkg deliberately knows
- * nothing about agents — they are a concept owned by the task kind's
- * handler (see `packages/api/src/wiring/schedule-task-handler.ts`).
- * Catalog misses surface those task-pkg classes directly through the
- * schedule service; the server's schedules-error-policy table has a
- * single row for each.
+ * Agent existence is validated by the api task-kind handler (see
+ * `packages/api/src/wiring/schedule-task-handler.ts`), which surfaces
+ * missing or failed lookups as the task `AgentNotFound` /
+ * `AgentResolutionFailed` union values. The schedule pkg stays
+ * agent-agnostic.
  */
 
 export class ScheduleError extends Error {

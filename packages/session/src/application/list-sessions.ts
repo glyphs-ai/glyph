@@ -1,4 +1,4 @@
-import type { RuntimeRegistry } from "@glyphs-ai/runtime-v2";
+import type { RuntimeRegistry } from "@glyphs-ai/runtime";
 import { ResultAsync } from "neverthrow";
 import { z } from "zod";
 import type { SessionEntity } from "../domain/session-entity.js";

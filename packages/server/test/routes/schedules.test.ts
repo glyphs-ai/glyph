@@ -16,6 +16,7 @@
  *   - wire-shape projection (envelope → flat task target)
  */
 
+import { TaskOperationError } from "@glyphs-ai/api";
 import {
   InvalidCronExprError,
   InvalidScheduleIdError,
@@ -28,7 +29,7 @@ import {
   ScheduleNotFoundError,
   type ScheduleService,
 } from "@glyphs-ai/schedule";
-import { AgentNotFoundError, EntryNotReadyError, ManagerShuttingDownError } from "@glyphs-ai/task";
+import type { AgentNotFound, EntryNotReady, ManagerShuttingDown } from "@glyphs-ai/task";
 import { describe, expect, it, vi } from "vitest";
 import { schedulesRoutes } from "../../src/routes/schedules.js";
 
@@ -458,14 +459,16 @@ describe("schedulesRoutes — create", () => {
     expect((await res.json()).code).toBe("InvalidTimezoneError");
   });
 
-  it("POST /task maps task-pkg's AgentNotFoundError → 400 with typed code", async () => {
-    // The task kind handler throws task-pkg's AgentNotFoundError
-    // directly on catalog miss; the schedule pkg owns no agent-related
-    // classes. The schedules-error-policy table has a single row for
-    // this class covering both the create/patch validation path AND
-    // the /:sid/run dispatch path.
+  it("POST /task maps task AgentNotFound → 400 with typed code", async () => {
+    // The task kind handler raises TaskOperationError with an
+    // AgentNotFound detail on catalog miss. The schedules-error-policy
+    // table covers both the create/patch validation path AND the
+    // /:sid/run dispatch path.
     const create = vi.fn(async () => {
-      throw new AgentNotFoundError("ghost-agent");
+      throw new TaskOperationError({
+        type: "AgentNotFound",
+        agent: "ghost-agent",
+      } as AgentNotFound);
     });
     const svc = stubService({ create });
     const res = await schedulesRoutes(() => svc).request("/task", {
@@ -478,7 +481,7 @@ describe("schedulesRoutes — create", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).code).toBe("AgentNotFoundError");
+    expect((await res.json()).code).toBe("AgentNotFound");
   });
 });
 
@@ -590,15 +593,15 @@ describe("schedulesRoutes — patch", () => {
     expect((await res.json()).code).toBe("InvalidCronExprError");
   });
 
-  it("PATCH /task/:sid maps task.AgentNotFoundError → 400 with typed code", async () => {
-    // Mirrors the POST counterpart — task-package
-    // `AgentNotFoundError` is caller-fixable input (the FQN points
-    // at an agent that's not in the catalog), so 400, not 404. The
-    // schedule pkg's own `AgentNotFoundError` was deleted in
-    // ; the task handler now imports and re-throws task's
-    // class.
+  it("PATCH /task/:sid maps task AgentNotFound → 400 with typed code", async () => {
+    // Mirrors the POST counterpart — AgentNotFound is caller-fixable
+    // input (the FQN points at an agent that's not in the catalog), so
+    // 400, not 404.
     const patch = vi.fn(async () => {
-      throw new AgentNotFoundError("ghost-agent");
+      throw new TaskOperationError({
+        type: "AgentNotFound",
+        agent: "ghost-agent",
+      } as AgentNotFound);
     });
     const svc = stubService({ patch });
     const res = await schedulesRoutes(() => svc).request("/task/sched-abc", {
@@ -607,7 +610,7 @@ describe("schedulesRoutes — patch", () => {
       body: JSON.stringify({ target: { agent: "ghost-agent" } }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).code).toBe("AgentNotFoundError");
+    expect((await res.json()).code).toBe("AgentNotFound");
   });
 
   it("PATCH /task/:sid rejects target.kind in body (URL discriminates)", async () => {
@@ -902,49 +905,53 @@ describe("schedulesRoutes — run", () => {
     expect((await res.json()).code).toBe("ScheduleNotFoundError");
   });
 
-  it("POST /:sid/run on task.EntryNotReadyError → 409 with typed code", async () => {
-    // Inner `TaskService.dispatch` (called transitively by
-    // `ScheduleService.run`) throws when the target agent is
-    // `blocked`. The server returns 409 — the dashboard's
+  it("POST /:sid/run on task EntryNotReady → 409 with typed code", async () => {
+    // ScheduleService.run delegates to the task kind handler; an
+    // EntryNotReady task result maps to 409 when the target agent is
+    // `blocked`. The dashboard's
     // `formatEntryNotReadyHint` CTA keys off the 409 body, so a
     // collapse to 400 would silently disable that affordance.
     const run = vi.fn(async () => {
-      throw new EntryNotReadyError("writer", undefined);
+      throw new TaskOperationError({
+        type: "EntryNotReady",
+        agent: "writer",
+        reason: undefined,
+      } as EntryNotReady);
     });
     const svc = stubService({ run });
     const res = await schedulesRoutes(() => svc).request("/sched-abc/run", { method: "POST" });
     expect(res.status).toBe(409);
-    expect((await res.json()).code).toBe("EntryNotReadyError");
+    expect((await res.json()).code).toBe("EntryNotReady");
   });
 
-  it("POST /:sid/run on task.ManagerShuttingDownError → 503 with typed code", async () => {
+  it("POST /:sid/run on task ManagerShuttingDown → 503 with typed code", async () => {
     // Dispatch refuses during graceful shutdown so the caller can
     // show a "server restarting" toast and retry. Before the
     // fall-through to `statusForError` landed, this leaked as a
     // 400 and lied about the cause.
     const run = vi.fn(async () => {
-      throw new ManagerShuttingDownError();
+      throw new TaskOperationError({ type: "ManagerShuttingDown" } as ManagerShuttingDown);
     });
     const svc = stubService({ run });
     const res = await schedulesRoutes(() => svc).request("/sched-abc/run", { method: "POST" });
     expect(res.status).toBe(503);
-    expect((await res.json()).code).toBe("ManagerShuttingDownError");
+    expect((await res.json()).code).toBe("ManagerShuttingDown");
   });
 
-  it("POST /:sid/run on task.AgentNotFoundError → 400 with typed code", async () => {
-    // Task's `AgentNotFoundError` is its own class (lives in
-    // `@glyphs-ai/task`); catalog's `CatalogAgentNotFoundError` is a
-    // separate class. The schedule pkg no longer has its own
-    // `AgentNotFoundError` post-. Pinned separately from the
-    // catalog mapping so a future refactor that confuses the two
-    // cannot silently regress either mapping.
+  it("POST /:sid/run on task AgentNotFound → 400 with typed code", async () => {
+    // Task AgentNotFound is distinct from catalog AgentNotFound.
+    // Pinned separately from the catalog mapping so a future refactor
+    // that confuses the two cannot silently regress either mapping.
     const run = vi.fn(async () => {
-      throw new AgentNotFoundError("ghost-agent");
+      throw new TaskOperationError({
+        type: "AgentNotFound",
+        agent: "ghost-agent",
+      } as AgentNotFound);
     });
     const svc = stubService({ run });
     const res = await schedulesRoutes(() => svc).request("/sched-abc/run", { method: "POST" });
     expect(res.status).toBe(400);
-    expect((await res.json()).code).toBe("AgentNotFoundError");
+    expect((await res.json()).code).toBe("AgentNotFound");
   });
 });
 

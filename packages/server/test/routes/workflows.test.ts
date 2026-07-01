@@ -26,6 +26,7 @@ import {
   WorkflowCoordSpecError,
   WorkflowWorkerSpecError,
 } from "@glyphs-ai/api";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowDagSnapshot, WorkflowStatus } from "@glyphs-ai/workflow";
 import {
   WorkflowAlreadyTerminalError,
@@ -39,6 +40,7 @@ import {
   WorkflowRemoveNodeOrphansChildError,
   type WorkflowService,
 } from "@glyphs-ai/workflow";
+import { okAsync, ResultAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { workflowsRoutes } from "../../src/routes/workflows.js";
 
@@ -133,15 +135,40 @@ function stubTasks(
     findTaskByWorkflowNode: (nodeId: string) => Promise<{ readonly id: string } | null>;
   }> = {},
 ) {
+  const findTaskByWorkflowNode = overrides.findTaskByWorkflowNode ?? (async () => null);
   return {
-    findTaskByWorkflowNode: overrides.findTaskByWorkflowNode ?? (async () => null),
-  } as unknown as import("@glyphs-ai/task").TaskService;
+    findTaskByWorkflowNode,
+    findLatestByOrigin: {
+      execute: vi.fn((req: { readonly origin: string; readonly originId: string }) => {
+        expect(req.origin).toBe("workflow");
+        return ResultAsync.fromPromise(
+          findTaskByWorkflowNode(req.originId).then((task) =>
+            task === null
+              ? null
+              : {
+                  id: task.id,
+                  agent: "writer",
+                  brief: "draft",
+                  origin: "workflow" as const,
+                  originId: req.originId,
+                  status: "succeeded" as const,
+                  metadata: {},
+                  createdAt: "2026-06-07T00:00:00.000Z",
+                  startedAt: "2026-06-07T00:00:00.000Z",
+                },
+          ),
+          (cause) => ({ type: "DatabaseUnavailable" as const, cause }),
+        );
+      }),
+    },
+    hasInFlightByOrigin: { execute: vi.fn(() => okAsync(false)) },
+    deleteTask: { execute: vi.fn(() => okAsync(undefined)) },
+  } as unknown as TaskModule & {
+    findTaskByWorkflowNode: (nodeId: string) => Promise<{ readonly id: string } | null>;
+  };
 }
 
-function mountRoutes(
-  svc: WorkflowService,
-  tasks: import("@glyphs-ai/task").TaskService = stubTasks(),
-) {
+function mountRoutes(svc: WorkflowService, tasks: TaskModule = stubTasks()) {
   return workflowsRoutes(
     () => svc,
     () => tasks,

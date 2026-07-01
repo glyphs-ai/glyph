@@ -47,7 +47,7 @@
  *
  *   - The node's id lives in the task's typed `origin_id` column
  *     (`origin: "workflow"`, `originId: nodeId`). Worker and
- *     coord runners use the SAME column — `tasks.hasInFlightForWorkflowNode`
+ *     coord runners use the SAME column — `hasInFlightByOrigin`
  *     covers both kinds via the `tasks_origin_pair_idx` partial index.
  *   - `onTerminal` is fired exactly once per dispatched node by this
  *     runner (the interval is cleared the moment a terminal status
@@ -64,11 +64,11 @@
  *     `onTerminal({status: 'failed', reason: 'tasks.get exhausted: ...'})`.
  */
 
-import {
-  AgentNotFoundError,
-  AgentResolutionFailedError,
-  assertFramingPromptIsSafe,
-  type TaskService,
+import type {
+  GetTaskResponse,
+  ListInFlightByOriginResponse,
+  TaskId,
+  TaskModule,
 } from "@glyphs-ai/task";
 import {
   type WorkflowNodeRunner,
@@ -79,6 +79,11 @@ import {
 } from "@glyphs-ai/workflow";
 import pino, { type Logger } from "pino";
 import type { WorkflowCoordinatorNodeSpec } from "../wire/index.js";
+import {
+  TaskOperationError,
+  taskAgentNotFound,
+  taskAgentResolutionFailed,
+} from "./_task-operation-error.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
@@ -110,13 +115,13 @@ export const DEFAULT_COORD_MAX_POLL_ERRORS = 3;
  * "what to do this wake-up" decision logic lives in the agent body,
  * not here.
  *
- * Single-line printable ASCII by the same invariant as the default
- * (see `framing.ts` — cmd.exe `/c` argv treats LF as a statement
- * separator on Windows). The assertion below catches any unsafe edit
- * that breaks that invariant at module load; the task pkg also
- * re-runs the same check at dispatch time.
+ * Single-line printable ASCII: cmd.exe `/c` argv treats LF as a
+ * statement separator on Windows, so a multi-line prompt would be
+ * truncated. A unit test asserts this invariant on the shipped
+ * constant, and task re-validates the forwarded prompt on every
+ * dispatch (`UnsafeFramingPrompt`).
  */
-const COORD_FRAMING_PROMPT_COPILOT =
+export const COORD_FRAMING_PROMPT_COPILOT =
   "You are running as a workflow coordinator. " +
   "Identity: " +
   "GLYPH_WORKFLOW_ID -- the workflow you advance; " +
@@ -130,14 +135,6 @@ const COORD_FRAMING_PROMPT_COPILOT =
   "Before calling workflow finish (succeeded, failed, or cancelled), save a single self-contained HTML summary under $GLYPH_WORKFLOW_DIR/artifact/ (choose a descriptive filename; inline all CSS, JS, fonts, images as data URLs; no external links or CDN references; must render correctly when opened directly from disk with no network access). The summary MUST include: (1) the complete workflow brief from TASK.md (not just the title -- the full goal and context), (2) a timeline table showing each node's role, agent, start time, duration, and final status, (3) a collapsible coordinator decisions section summarizing each wake-up's case match and action taken (which case from the strategy was matched, what nodes were dispatched or what finish outcome was chosen, and why), (4) for each completed worker node: a collapsible section with the node's key outputs and findings as determined by the strategy skill and the worker's artifact contents, (5) final outcome metrics (iterations count, deliverable URLs, any remaining open items). Use HTML details/summary elements for collapsible sections so the page is scannable at a glance but full detail is one click away. The goal: a reader seeing this HTML for the first time should understand every decision made and every result produced without needing to open the dashboard or read task activity logs. " +
   "If state is inconsistent or no next step is decidable, " +
   "finish the workflow as failed rather than retrying indefinitely.";
-
-// Build-time safety check. Mirrors the module-load
-// `assertFramingPromptIsSafe(DEFAULT_TASK_FRAMING_PROMPT)` in
-// `@glyphs-ai/task`'s `framing.ts`. The task pkg also re-runs the
-// same invariant on every actual dispatch against the override
-// argument — this is the additional build-time guard on the
-// default value we ship here.
-assertFramingPromptIsSafe(COORD_FRAMING_PROMPT_COPILOT);
 
 /**
  * Wire-shape error for a malformed coord node spec. Lives next to
@@ -174,7 +171,7 @@ export class WorkflowCoordAgentNotCapableError extends Error {
 }
 
 export interface MakeCoordNodeRunnerOpts {
-  readonly tasks: TaskService;
+  readonly tasks: TaskModule;
   readonly catalog: CatalogAgentLookup;
   /**
    * Lazy getter for the {@link WorkflowService}. The runner needs it
@@ -306,9 +303,9 @@ export function makeCoordNodeRunner(
       try {
         found = await catalog.getAgent(obj.agent);
       } catch (err) {
-        throw new AgentResolutionFailedError(obj.agent, err);
+        throw taskAgentResolutionFailed(obj.agent, err);
       }
-      if (found === null) throw new AgentNotFoundError(obj.agent);
+      if (found === null) throw taskAgentNotFound(obj.agent);
 
       // Workflow coordinator capability discipline: a workflow coord
       // MUST declare a non-empty `dependencies.agents` dispatch
@@ -343,7 +340,7 @@ export function makeCoordNodeRunner(
 
       const wf = await service.getWorkflow(opts.workflowId);
       const spec = opts.spec as WorkflowCoordinatorNodeSpec;
-      const task = await tasks.dispatch({
+      const dispatchResult = await tasks.dispatchTask.execute({
         agent: spec.agent,
         brief: wf.brief,
         // Conditional spread: passing `details: undefined` into
@@ -355,19 +352,15 @@ export function makeCoordNodeRunner(
         originId: opts.nodeId,
         // `workflowId` stays in metadata for log correlation only.
         // Worker and coord runners write the node reverse-lookup id to
-        // the SAME typed `origin_id` column — `tasks.hasInFlightForWorkflowNode`
+        // the SAME typed `origin_id` column — `hasInFlightByOrigin`
         // covers both kinds via the `tasks_origin_pair_idx` index.
         metadata: {
           workflowId: opts.workflowId,
         },
-        // Override the default framing prompt so the spawned coord
-        // task receives the coord-kind opener defined at the top of
-        // this file. Replaces `@glyphs-ai/task`'s
-        // `DEFAULT_TASK_FRAMING_PROMPT` for this dispatch only. The
-        // default's safety is invariant-checked by `framing.ts` at
-        // module load; the override is checked at module load above
-        // + re-checked on every dispatch by the task pkg's
-        // `assertFramingPromptIsSafe` wire in `dispatch.ts`.
+        // Override the default framing prompt for this dispatch only.
+        // The constant is asserted safe by a unit test, and
+        // `DispatchTaskUseCase` re-validates the forwarded prompt
+        // before spawn.
         prompt: COORD_FRAMING_PROMPT_COPILOT,
         // Coord tasks see all three workflow env keys
         // (`GLYPH_WORKFLOW_ID`, `GLYPH_NODE_ID`,
@@ -383,6 +376,8 @@ export function makeCoordNodeRunner(
           GLYPH_WORKFLOW_DIR: workflowDir(workspaceDir, opts.workflowId),
         },
       });
+      if (dispatchResult.isErr()) throw new TaskOperationError(dispatchResult.error);
+      const task = dispatchResult.value;
       const taskId = task.id;
       const nodeId = opts.nodeId;
       const onTerminal = opts.onTerminal;
@@ -403,9 +398,11 @@ export function makeCoordNodeRunner(
         // Fire-and-forget: setInterval callbacks can't be async,
         // and any error we don't catch here would crash the process.
         void (async () => {
-          let polled: Awaited<ReturnType<typeof tasks.get>>;
+          let polled: GetTaskResponse;
           try {
-            polled = await tasks.get(taskId);
+            const getResult = await tasks.getTask.execute({ id: taskId as TaskId });
+            if (getResult.isErr()) throw taskUseCaseError(getResult.error);
+            polled = getResult.value;
           } catch (err) {
             consecutivePollErrors += 1;
             logger.warn(
@@ -503,20 +500,30 @@ export function makeCoordNodeRunner(
     },
 
     async hasInFlightForNode(nodeId: string): Promise<boolean> {
-      return tasks.hasInFlightForWorkflowNode(nodeId);
+      const result = await tasks.hasInFlightByOrigin.execute({
+        origin: "workflow",
+        originId: nodeId,
+      });
+      if (result.isErr()) throw taskUseCaseError(result.error);
+      return result.value;
     },
 
     async cancel(nodeId: string): Promise<void> {
       // Tear down the local interval FIRST so a poll-tick can't race
       // ahead and observe the cancellation as a generic terminal.
       clearForNode(nodeId);
-      let inFlight: Awaited<ReturnType<typeof tasks.listInFlightForWorkflowNode>>;
+      let inFlight: ListInFlightByOriginResponse;
       try {
-        inFlight = await tasks.listInFlightForWorkflowNode(nodeId);
+        const result = await tasks.listInFlightByOrigin.execute({
+          origin: "workflow",
+          originId: nodeId,
+        });
+        if (result.isErr()) throw taskUseCaseError(result.error);
+        inFlight = result.value;
       } catch (err) {
         logger.warn(
           { nodeId, err },
-          "workflow-coord-task-runner: listInFlightForWorkflowNode threw during cancel",
+          "workflow-coord-task-runner: listInFlightByOrigin threw during cancel",
         );
         return;
       }
@@ -525,7 +532,8 @@ export function makeCoordNodeRunner(
       // continue.
       for (const t of inFlight) {
         try {
-          await tasks.cancel(t.id);
+          const result = await tasks.cancelTask.execute({ id: t.id });
+          if (result.isErr()) throw taskUseCaseError(result.error);
         } catch (err) {
           logger.warn(
             { nodeId, taskId: t.id, err },
@@ -542,4 +550,8 @@ export function makeCoordNodeRunner(
       intervals.clear();
     },
   };
+}
+
+function taskUseCaseError(err: { readonly type: string; readonly cause?: unknown }): Error {
+  return err.cause instanceof Error ? err.cause : new Error(err.type);
 }

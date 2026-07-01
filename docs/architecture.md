@@ -22,8 +22,8 @@ in a follow-up doc**.
 
 | Tier      | Name        | Packages                                            | Conceptual role                                                                         |
 | --------- | ----------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **T0**    | Foundations | `catalog`, `runtime`, `runtime-v2`, `schedule`, `terminal`, `workspace` | Who / Where / When / Scope + leaf infrastructure — irreducible primitives                |
-| **T1**    | Modes       | `session`, `task`, `workflow`                       | How work runs — Interactive (`session`) / Headless single-shot (`task`) / Multi-task DAG (`workflow`) |
+| **T0**    | Foundations | `catalog`, `runtime`, `schedule`, `terminal`, `workspace` | Who / Where / When / Scope + leaf infrastructure — irreducible primitives                |
+| **T1**    | Modes       | `session`, `task`, `workflow`            | How work runs — Interactive (`session`) / Headless single-shot (`task`) / Multi-task DAG (`workflow`) |
 | **T2**    | Application | `api` (orchestration + wire contracts), `sdk` (generated client) | Two siblings: T0/T1 composed into business capabilities, with the cross-pkg wire contracts living under api's wire/ surface, plus a generated typed HTTP client |
 | **T3**    | Host        | `server`                                            | HTTP transport that exposes T2 capabilities over the wire                               |
 | **T_top** | Surfaces    | `dashboard`, `cli`                                  | Platform-specific UI on top of T3                                                       |
@@ -36,6 +36,12 @@ exposure via `server` routes follow the same pattern as `session` and
 `task` — the workflow-specific task runners live in
 `packages/api/src/wiring/` and the HTTP routes live in
 `packages/server/src/routes/workflows.ts`.
+
+`task` is Result-native (neverthrow `Result` on every boundary,
+discriminated-union errors, a four-layer domain / application /
+infrastructure split with per-use-case
+`UseCase<Request, Response, Error>` classes) and dispatched through the
+`TaskModule` DI container built by `composeTaskModule`.
 
 ### Tier philosophy
 
@@ -200,20 +206,24 @@ spawn agents; `workflow` does not spawn anything itself — its DAG
 nodes are `task` / `session` nodes that the workflow runner dispatches
 through the same T1 execution-mode pipeline.
 
-## Service + repository pattern
+## Module + repository pattern
 
 Every entity package follows the same shape: a **3-layer Row / Entity /
-DTO** split, with `<Entity>Service` orchestrating reads + writes against
-a package-private Drizzle repository. The repository returns `*Entity`;
-the service returns the wire DTO. The full contract (layer table,
-projection-helper rules, when Entity becomes a class) lives in
+DTO** split. A package exposes a compose function that returns its module
+surface; the module owns the use-cases that orchestrate reads + writes
+against package-private Drizzle repositories. `task` exposes
+`TaskModule`, a DI container of per-use-case
+`UseCase<Request, Response, Error>` classes returning `ResultAsync` with
+discriminated-union errors. Repositories return package-owned entities at
+their boundary. The full contract (layer table, projection-helper rules,
+when Entity becomes a class) lives in
 [`docs/pkg-template.md` → Repository contract](./pkg-template.md#repository-contract);
 the rationale for this specific shape is in the same doc under
 [Why this shape](./pkg-template.md#why-this-shape).
 
 In-tree examples: anemic BCs (`workspace`, `session`) use a plain
 `interface` for Entity; rich BCs (`catalog`, `task`) use a class with
-FSM transitions and invariant validation. Tests open the service
+FSM transitions and invariant validation. Tests open the module
 against `dbFile: ":memory:"` via the package's `compose<Entity>Module`
 helper, so the schema goes through the real drizzle-kit migrator on
 every test boot.
@@ -304,7 +314,7 @@ An earlier exploration considered a generic `PersistenceService`
 (`@glyphs-ai/storage`). It was deliberately not built. Each entity's
 repository surface is shaped by its own queries:
 `WorkspaceService.getLastOpened()`,
-`TaskService.list({ statuses, runtime, ... })`,
+`TaskModule.listTasks.execute({ statuses, runtime, ... })`,
 `CatalogService.resolveAgent()` (graph). A unified interface would
 force these into either an `unknown`-typed lowest common denominator
 or a parade of entity-specific extension methods that re-introduce
@@ -315,13 +325,14 @@ The pattern that works: **shared SQLite connection per scope (global
 
 ## Unified verb conventions
 
-- **`delete(id, { purge?: boolean })`** — every Service. Default is
-  metadata-only (the repository row is removed; agent-produced files
-  under `<workdir>/<entity>/<id>/` are preserved for archival).
-  `purge: true` additionally removes the entity's sandbox directory.
-  The workspace's `workdir` itself is **never** removed by glyph;
-  it's user-owned. REST mirrors: `DELETE
-  /api/workspaces/:id/tasks/:tid?purge=1`.
+- **Delete with optional purge** — service-style packages use
+  `delete(id, { purge?: boolean })`; `task` uses
+  `deleteTask.execute({ id, purge })`. Default is metadata-only (the
+  repository row is removed; agent-produced files under
+  `<workdir>/<entity>/<id>/` are preserved for archival). `purge: true`
+  additionally removes the entity's sandbox directory. The workspace's
+  `workdir` itself is **never** removed by glyph; it's user-owned. REST
+  mirrors: `DELETE /api/workspaces/:id/tasks/:tid?purge=1`.
 - **Stripe-style hybrid params** — primary key (id) positional;
   flags / options in a single trailing options bag
   (`service.rename(id, { newName })`,
@@ -383,7 +394,7 @@ Tailscale). A misconfigured non-loopback bind fails fast at startup.
 └── tasks/<id>/                  one-shot autonomous dispatch — workdir for agent artifacts
     ├── AGENTS.md                materialised from catalog at create time (runtime.provision)
     ├── .mcp.json                merged from agent's MCP deps (runtime.provision)
-    ├── TASK.md                  user-supplied brief + optional details (TaskService.dispatch writes `# <brief>\n` or `# <brief>\n\n<details>\n`)
+    ├── TASK.md                  user-supplied brief + optional details (created during `dispatchTask.execute(...)` via the task sandbox)
     ├── temp/                    agent scratch (created empty; not surfaced to the user)
     ├── artifact/                user-visible task output (created empty; agent-managed)
     ├── stderr.log               CLI errors (the runtime owns its event log via readActivity, NOT mirrored here)
@@ -400,12 +411,12 @@ absent). This eliminates a class of silent-degradation bugs on
 Windows where any LF in user-supplied prompt bytes truncated
 `cmd.exe`'s parsing of the spawn argv, silently dropping
 `--output-format json` / `--resume` / etc. The framing constants
-live in `packages/task/src/framing.ts` and are selected per runtime
-kind; today only `copilot` is registered.
+live in `packages/task/src/application/dispatch-task.ts` and are
+selected per runtime kind; today only `copilot` is registered.
 
 `temp/` and `artifact/` are agent-managed after creation; glyph
-does not prune them. Future work could surface `artifact/` in the
-dashboard as the canonical "task output" location.
+does not prune them. `artifact/` is the user-visible task output
+directory; hosts expose its files through task artifact endpoints.
 
 Workspace metadata (`name`, `createdAt`, `defaults`) lives in
 `<GLYPH_HOME>/global.db` keyed by workspace id — there is no

@@ -18,16 +18,19 @@
  *  2. list returns per-node entries with kind/nodeId/taskId/mimeBucket
  *  3. list returns `{ artifacts: [] }` when both namespaces are empty
  *  4. list 404s when getDag rejects with WorkflowNotFoundError
- *  5. GET summary/<name> streams bytes with `Cache-Control: no-store`
- *  6. GET nodes/<nid>/<name> with terminal task → `Cache-Control: max-age=300`
- *  7. GET nodes/<nid>/<name> with running task  → `Cache-Control: no-store`
- *  8. GET nodes/<nid>/<name> 404s when no task is dispatched
- *  9. GET …/..%2F… (traversal) rejects with 400
+ *  5. list 500s when a node task lookup faults (not a silent skip)
+ *  6. GET summary/<name> streams bytes with `Cache-Control: no-store`
+ *  7. GET nodes/<nid>/<name> with terminal task → `Cache-Control: max-age=300`
+ *  8. GET nodes/<nid>/<name> with running task  → `Cache-Control: no-store`
+ *  9. GET nodes/<nid>/<name> 404s when no task is dispatched
+ * 10. GET nodes/<nid>/<name> 404s when the node is not in the addressed workflow
+ * 11. GET …/..%2F… (traversal) rejects with 400
  */
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowDagSnapshot } from "@glyphs-ai/workflow";
 import {
   WorkflowEdgeEntity,
@@ -36,6 +39,7 @@ import {
   WorkflowNotFoundError,
   type WorkflowService,
 } from "@glyphs-ai/workflow";
+import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { workflowsRoutes } from "../../src/routes/workflows.js";
 
@@ -114,10 +118,7 @@ function stubService(overrides: Partial<Record<keyof WorkflowService, unknown>>)
 }
 
 interface TaskStub {
-  findTaskByWorkflowNode: (nodeId: string) => Promise<{
-    readonly id: string;
-    readonly status: "running" | "succeeded" | "failed" | "cancelled";
-  } | null>;
+  findLatestByOrigin: { execute: TaskModule["findLatestByOrigin"]["execute"] };
 }
 
 type TaskStubValue =
@@ -127,16 +128,38 @@ type TaskStubValue =
 
 function stubTasks(map: Record<string, TaskStubValue>): TaskStub {
   return {
-    findTaskByWorkflowNode: async (nodeId: string) => {
-      const v = map[nodeId];
-      if (v === undefined || v === null) return null;
-      if (typeof v === "string") {
-        // Bare task-id form defaults to terminal status; the
-        // byte handler treats terminal tasks as immutable bytes
-        // and caches the response.
-        return { id: v, status: "succeeded" };
-      }
-      return v;
+    findLatestByOrigin: {
+      execute: vi.fn((req: { readonly origin: string; readonly originId: string }) => {
+        expect(req.origin).toBe("workflow");
+        const v = map[req.originId];
+        if (v === undefined || v === null) return okAsync(null);
+        if (typeof v === "string") {
+          // Bare task-id form defaults to terminal status; the
+          // byte handler treats terminal tasks as immutable bytes
+          // and caches the response.
+          return okAsync({
+            id: v,
+            agent: "writer",
+            brief: "draft",
+            origin: "workflow",
+            originId: req.originId,
+            status: "succeeded",
+            metadata: {},
+            createdAt: "2026-06-07T00:00:00.000Z",
+            startedAt: "2026-06-07T00:00:00.000Z",
+          });
+        }
+        return okAsync({
+          agent: "writer",
+          brief: "draft",
+          origin: "workflow",
+          originId: req.originId,
+          metadata: {},
+          createdAt: "2026-06-07T00:00:00.000Z",
+          startedAt: "2026-06-07T00:00:00.000Z",
+          ...v,
+        });
+      }) as unknown as TaskModule["findLatestByOrigin"]["execute"],
     },
   };
 }
@@ -144,7 +167,7 @@ function stubTasks(map: Record<string, TaskStubValue>): TaskStub {
 function mountRoutes(svc: WorkflowService, tasks: TaskStub, workspaceDir: string) {
   return workflowsRoutes(
     () => svc,
-    () => tasks as unknown as import("@glyphs-ai/task").TaskService,
+    () => tasks as unknown as TaskModule,
     () => workspaceDir,
   );
 }
@@ -226,6 +249,22 @@ describe("workflowsRoutes — artifacts list", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("WorkflowNotFoundError");
   });
+
+  it("500s when a node task lookup faults (not a silent skip)", async () => {
+    // A `findLatestByOrigin` fault (e.g. the task DB is unavailable) must
+    // surface as a 5xx, not be folded into "no task" — otherwise the list
+    // would 200 with entries missing and mask the outage.
+    const svc = stubService({});
+    const tasks: TaskStub = {
+      findLatestByOrigin: {
+        execute: vi.fn(() =>
+          errAsync({ type: "DatabaseUnavailable", cause: new Error("db down") }),
+        ) as unknown as TaskModule["findLatestByOrigin"]["execute"],
+      },
+    };
+    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
+    expect(res.status).toBe(500);
+  });
 });
 
 describe("workflowsRoutes — artifacts bytes", () => {
@@ -297,6 +336,19 @@ describe("workflowsRoutes — artifacts bytes", () => {
     const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
     expect(res.status).toBe(404);
+  });
+
+  it("404s when the node is not in the addressed workflow (wfid scoping)", async () => {
+    // A task exists for `unknown-node`, but that node is NOT in `WID`'s DAG
+    // (it belongs to some other workflow). The stream route must refuse to
+    // serve it under this `wfid`, so a node id alone can't reach another
+    // workflow's task artifacts.
+    const svc = stubService({});
+    const tasks = stubTasks({ "unknown-node": { id: WORKER_TID, status: "succeeded" } });
+    const encoded = encodeURIComponent("nodes/unknown-node/out.txt");
+    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { error: string }).error).toBe("no such node in workflow");
   });
 
   it("rejects traversal attempts in the artifact path with 400", async () => {

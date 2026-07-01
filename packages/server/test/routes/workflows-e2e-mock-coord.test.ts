@@ -29,6 +29,7 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { TaskModule } from "@glyphs-ai/task";
 import {
   composeWorkflowModule,
   type WorkflowModule,
@@ -36,6 +37,7 @@ import {
   type WorkflowNodeTerminalResult,
 } from "@glyphs-ai/workflow";
 import { openTestWorkflowDb } from "@glyphs-ai/workflow/testing";
+import { okAsync } from "neverthrow";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { workflowsRoutes } from "../../src/routes/workflows.js";
@@ -135,8 +137,8 @@ async function makeHarness(): Promise<Harness> {
     () => module.service,
     () =>
       ({
-        findTaskByWorkflowNode: async () => null,
-      }) as unknown as import("@glyphs-ai/task").TaskService,
+        findLatestByOrigin: { execute: () => okAsync(null) },
+      }) as unknown as TaskModule,
     () => workspaceDir,
   );
   return {

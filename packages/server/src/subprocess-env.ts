@@ -2,7 +2,7 @@
  * Builds the static portion of the env bag that the server hands to
  * every glyph-spawned subprocess. Per-run additions
  * (`GLYPH_WORKSPACE`, `GLYPH_WORKSPACE_DIR`, `GLYPH_WORK_*`) are
- * layered on top inside `TaskService.dispatch` /
+ * layered on top inside `dispatchTask.execute` /
  * `SessionService.assembleLaunchEnv`; this helper is for fields the
  * server itself owns (where to dial back, where the cross-workspace
  * shared state directory lives).

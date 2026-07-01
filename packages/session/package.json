@@ -30,7 +30,7 @@
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts && node ../../scripts/inline-migrations.mjs"
   },
   "dependencies": {
-    "@glyphs-ai/runtime-v2": "workspace:*",
+    "@glyphs-ai/runtime": "workspace:*",
     "@glyphs-ai/terminal": "workspace:*",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",

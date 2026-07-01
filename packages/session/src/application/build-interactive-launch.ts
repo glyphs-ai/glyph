@@ -3,7 +3,7 @@ import type {
   RuntimeLaunchFailed,
   RuntimeRegistry,
   UnknownRuntime,
-} from "@glyphs-ai/runtime-v2";
+} from "@glyphs-ai/runtime";
 import { okAsync } from "neverthrow";
 import { z } from "zod";
 import { type SessionId, SessionIdSchema } from "../domain/session-id.js";

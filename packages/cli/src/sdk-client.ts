@@ -7,7 +7,7 @@
  *
  *  - {@link ApiError} — the CLI's HTTP error type. `output.ts` pattern-matches
  *    on `err.status` / `err.body` (the parsed error envelope: `code`,
- *    `transition`, the `EntryNotReadyError` reason tree, …), so the throw path
+ *    `transition`, the `EntryNotReady` reason tree, …), so the throw path
  *    must carry the full parsed body.
  *  - {@link unwrap} — turns a result tuple into the success payload or throws,
  *    pinning the exact status → message → body mapping and the

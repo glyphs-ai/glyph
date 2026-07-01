@@ -5,7 +5,7 @@
  * These tests pin the error-formatting contract:
  *  - the server's optional `code` envelope field is surfaced (so
  *    `WorkspaceNotFoundError` looks different from `BadRequest`),
- *  - the `EntryNotReadyError` envelope extension fields (`agent`,
+ *  - the `EntryNotReady` envelope extension fields (`agent`,
  *    `reason`) are unpacked into actionable hints pointing at the
  *    matching `glyph catalog ...` subcommand, mirroring the
  *    dashboard's typed-error UI.
@@ -36,25 +36,25 @@ describe("formatError", () => {
     expect(r.stderr).toBe("not found (HTTP 404, WorkspaceNotFoundError)\n");
   });
 
-  it("EntryNotReadyError surfaces agent + disabledByUser CTA", () => {
+  it("EntryNotReady surfaces agent + disabledByUser CTA", () => {
     const err = new ApiError(409, 'agent "writer" is not ready: disabled by user', {
       error: 'agent "writer" is not ready: disabled by user',
-      code: "EntryNotReadyError",
+      code: "EntryNotReady",
       agent: "acme/writer",
       reason: { disabledByUser: true },
     });
     const r = formatError(err);
     expect(r.exitCode).toBe(4);
-    expect(r.stderr).toContain("EntryNotReadyError");
+    expect(r.stderr).toContain("EntryNotReady");
     expect(r.stderr).toContain("agent: acme/writer");
     expect(r.stderr).toContain("cause: agent is disabled");
     expect(r.stderr).toContain("glyph catalog agent enable acme/writer");
   });
 
-  it("EntryNotReadyError surfaces the prereqs-ack CTA", () => {
+  it("EntryNotReady surfaces the prereqs-ack CTA", () => {
     const err = new ApiError(409, "blocked", {
       error: "blocked",
-      code: "EntryNotReadyError",
+      code: "EntryNotReady",
       agent: "acme/data-pipeline",
       reason: { needsPrereqsAck: true },
     });
@@ -63,10 +63,10 @@ describe("formatError", () => {
     expect(r.stderr).toContain("glyph catalog agent ack-prereqs acme/data-pipeline");
   });
 
-  it("EntryNotReadyError lists missingDeps and suggests installation", () => {
+  it("EntryNotReady lists missingDeps and suggests installation", () => {
     const err = new ApiError(409, "blocked", {
       error: "blocked",
-      code: "EntryNotReadyError",
+      code: "EntryNotReady",
       agent: "acme/foo",
       reason: {
         missingDeps: [
@@ -82,10 +82,10 @@ describe("formatError", () => {
     expect(r.stderr).toContain("install the missing dependencies");
   });
 
-  it("EntryNotReadyError lists blockedDeps", () => {
+  it("EntryNotReady lists blockedDeps", () => {
     const err = new ApiError(409, "blocked", {
       error: "blocked",
-      code: "EntryNotReadyError",
+      code: "EntryNotReady",
       agent: "acme/foo",
       reason: { blockedDeps: [{ kind: "agent", fqn: "acme/bar" }] },
     });
@@ -95,15 +95,15 @@ describe("formatError", () => {
     expect(r.stderr).toContain("resolve the blocked dependencies");
   });
 
-  it("EntryNotReadyError handles missing reason gracefully", () => {
+  it("EntryNotReady handles missing reason gracefully", () => {
     // No `reason` field at all → only the agent line is emitted.
     // The "unknown variant" fallback must NOT fire here because the
     // server didn't send a reason payload at all (this happens when
-    // the manager threw EntryNotReadyError without a structured
+    // the manager threw EntryNotReady without a structured
     // BlockedReason — the route surface still includes agent + code).
     const err = new ApiError(409, "blocked", {
       error: "blocked",
-      code: "EntryNotReadyError",
+      code: "EntryNotReady",
       agent: "acme/foo",
     });
     const r = formatError(err);
@@ -112,13 +112,13 @@ describe("formatError", () => {
     expect(r.stderr).not.toContain("not recognized by this CLI version");
   });
 
-  it("EntryNotReadyError surfaces a generic CTA when reason has no recognized field", () => {
+  it("EntryNotReady surfaces a generic CTA when reason has no recognized field", () => {
     // If the server sends a BlockedReason variant this CLI does not
     // recognize, still emit an actionable line rather than only the
     // agent name and HTTP code.
     const err = new ApiError(409, "blocked", {
       error: "blocked",
-      code: "EntryNotReadyError",
+      code: "EntryNotReady",
       agent: "acme/foo",
       reason: { someFutureBlock: true } as unknown,
     });

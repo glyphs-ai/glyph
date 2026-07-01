@@ -41,11 +41,11 @@ export interface ScheduleTargetEnvelope {
  * its callers.
  *
  * All methods receive `data: unknown` and are responsible for the
- * shape check. Implementations should throw caller-meaningful errors
- * (the task handler throws task-pkg's `AgentNotFoundError` /
- * `AgentResolutionFailedError` directly on catalog miss / failure);
- * those propagate through the schedule pkg untouched, and the
- * server's error-policy table maps them to the right HTTP status.
+ * shape check. Implementations should surface caller-meaningful
+ * failures; the api task-kind handler reports catalog misses and
+ * resolver failures as the task `AgentNotFound` /
+ * `AgentResolutionFailed` union values, while the schedule pkg stays
+ * agent-agnostic.
  *
  * The interface is intentionally non-generic. Per-kind type safety
  * lives at the EDGES: route handlers narrow from `unknown` to the

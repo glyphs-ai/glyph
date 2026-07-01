@@ -1,6 +1,11 @@
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
-import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import type { TaskModule } from "@glyphs-ai/task";
 import type { TaskTargetData, TaskTargetPatch } from "../wire/index.js";
+import {
+  TaskOperationError,
+  taskAgentNotFound,
+  taskAgentResolutionFailed,
+} from "./_task-operation-error.js";
 
 interface CatalogAgentLookup {
   getAgent(fqn: string): Promise<unknown | null>;
@@ -19,7 +24,7 @@ interface CatalogAgentLookup {
  *   - task-target shape validation
  *   - agent existence lookup
  *   - RFC 7396 deep-merge of task target patches
- *   - origin/originId synthesis for `TaskService.dispatch`
+ *   - origin/originId synthesis for `tasks.dispatchTask.execute`
  *   - lifecycle delegation for `hasInFlightForSchedule` /
  *     `deleteForSchedule`
  *
@@ -28,11 +33,12 @@ interface CatalogAgentLookup {
  * catalog-down invariant: a sparse "edit only brief" patch must not
  * fail because the catalog is unhealthy.
  *
- * Agent errors use task-pkg classes directly so downstream error
- * policies share canonical matches with the `/run` task-dispatch path.
+ * Agent-lookup failures are wrapped as task union errors
+ * (`TaskOperationError`) so downstream policies use the same status/body
+ * mapping as the task routes.
  */
 export function makeTaskKindHandler(opts: {
-  readonly tasks: TaskService;
+  readonly tasks: TaskModule;
   readonly catalog: CatalogAgentLookup;
 }): ScheduleKindHandler {
   const tasks = opts.tasks;
@@ -80,9 +86,9 @@ export function makeTaskKindHandler(opts: {
         try {
           found = await catalog.getAgent(obj.agent as string);
         } catch (err) {
-          throw new AgentResolutionFailedError(obj.agent as string, err);
+          throw taskAgentResolutionFailed(obj.agent as string, err);
         }
-        if (found === null) throw new AgentNotFoundError(obj.agent as string);
+        if (found === null) throw taskAgentNotFound(obj.agent as string);
       }
 
       const validated: TaskTargetData = {
@@ -149,7 +155,7 @@ export function makeTaskKindHandler(opts: {
 
     async dispatch({ scheduleId, firedAt, data }) {
       const t = data as TaskTargetData;
-      const result = await tasks.dispatch({
+      const result = await tasks.dispatchTask.execute({
         agent: t.agent,
         brief: t.brief,
         // `{ details: undefined }` is NOT equivalent to omitting the
@@ -160,21 +166,26 @@ export function makeTaskKindHandler(opts: {
         originId: scheduleId,
         metadata: { firedAt },
       });
-      return { id: result.id };
+      if (result.isErr()) throw new TaskOperationError(result.error);
+      return { id: result.value.id };
     },
 
-    hasInFlightForSchedule(scheduleId) {
-      return tasks.hasInFlightByOrigin({
+    async hasInFlightForSchedule(scheduleId) {
+      const result = await tasks.hasInFlightByOrigin.execute({
         origin: "schedule",
         originId: scheduleId,
       });
+      if (result.isErr()) throw new Error(result.error.type);
+      return result.value;
     },
 
-    deleteForSchedule(scheduleId) {
-      return tasks.deleteTerminalByOrigin({
+    async deleteForSchedule(scheduleId) {
+      const result = await tasks.deleteTerminalByOrigin.execute({
         origin: "schedule",
         originId: scheduleId,
       });
+      if (result.isErr()) throw new Error(result.error.type);
+      return result.value;
     },
   };
 }

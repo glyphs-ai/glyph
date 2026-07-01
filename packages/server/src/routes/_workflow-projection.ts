@@ -27,17 +27,23 @@ import {
   type WorkflowEntity,
   type WorkflowNodeEntity,
 } from "@glyphs-ai/workflow";
+import type { ResultAsync } from "neverthrow";
 
 /**
  * Narrow dependency surface for the async, taskId-enriched projector.
- * Only the one `findTaskByWorkflowNode` lookup is needed — the full
- * `TaskService` is intentionally NOT in scope so tests can stub the
- * minimum shape, and the return type is structurally typed
+ * Only the one `findLatestByOrigin` lookup is needed — the full
+ * `TaskModule` is intentionally NOT in scope so tests can stub the
+ * minimum shape, and the response is structurally typed
  * (`{ id: string } | null`) so the projector doesn't depend on the
- * internal `TaskEntity` class.
+ * task package's response type.
  */
 interface ProjectionTasksDep {
-  findTaskByWorkflowNode(nodeId: string): Promise<{ readonly id: string } | null>;
+  readonly findLatestByOrigin: {
+    execute(req: {
+      readonly origin: string;
+      readonly originId: string;
+    }): ResultAsync<{ readonly id: string } | null, unknown>;
+  };
 }
 
 /**
@@ -154,7 +160,11 @@ export async function projectWorkflowNodeWithTaskId(
   deps: { readonly tasks: ProjectionTasksDep },
 ): Promise<WorkflowNode> {
   const sync = projectWorkflowNodeSync(node);
-  const task = await deps.tasks.findTaskByWorkflowNode(node.id);
+  const found = await deps.tasks.findLatestByOrigin.execute({
+    origin: "workflow",
+    originId: node.id,
+  });
+  const task = found.isOk() ? found.value : null;
   if (task === null) return sync;
   return { ...sync, taskId: task.id };
 }
