@@ -30,6 +30,7 @@ import {
   type ScheduleService,
 } from "@glyphs-ai/schedule";
 import type { AgentNotFound, EntryNotReady, ManagerShuttingDown } from "@glyphs-ai/task";
+import { okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { schedulesRoutes } from "../../src/routes/schedules.js";
 
@@ -166,9 +167,11 @@ describe("schedulesRoutes — list", () => {
     const list = vi.fn(async () => [sampleSchedule, workflowSchedule]);
     const svc = stubService({ list });
     const workflowService = {
-      aggregateByOrigin: vi.fn(
-        async () => new Map([["sched-wf", { totalCount: 3, runningCount: 3, awaitingCount: 1 }]]),
-      ),
+      aggregateByOrigin: {
+        execute: vi.fn(() =>
+          okAsync({ "sched-wf": { totalCount: 3, runningCount: 3, awaitingCount: 1 } }),
+        ),
+      },
     };
     const res = await schedulesRoutes(
       () => svc,

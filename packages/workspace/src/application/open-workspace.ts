@@ -13,7 +13,7 @@ export const OpenWorkspaceRequestSchema = z.object({ id: WorkspaceIdSchema }).st
 export type OpenWorkspaceRequest = z.infer<typeof OpenWorkspaceRequestSchema>;
 
 export const OpenWorkspaceResponseSchema = z.void();
-export type OpenWorkspaceResponse = void;
+export type OpenWorkspaceResponse = undefined;
 
 export type OpenWorkspaceError = WorkspaceNotRegistered | DatabaseUnavailable;
 

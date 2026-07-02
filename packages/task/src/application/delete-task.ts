@@ -16,7 +16,7 @@ export const DeleteTaskRequestSchema = z
   .strict();
 export type DeleteTaskRequest = z.infer<typeof DeleteTaskRequestSchema>;
 
-export type DeleteTaskResponse = void;
+export type DeleteTaskResponse = undefined;
 
 export type DeleteTaskError =
   | TaskNotFound
@@ -43,23 +43,26 @@ export class DeleteTaskUseCase
   execute(request: DeleteTaskRequest): UseCaseResult<DeleteTaskResponse, DeleteTaskError> {
     const { id, purge } = DeleteTaskRequestSchema.parse(request);
     const deps = this.deps;
-    return deps.repository.get(id).andThen((existing) => {
-      if (!isTerminal(existing.status)) {
-        return errAsync<void, DeleteTaskError>({
-          type: "InvalidTransition",
-          from: existing.status,
-          eventType: "delete",
+    return deps.repository
+      .get(id)
+      .andThen((existing) => {
+        if (!isTerminal(existing.status)) {
+          return errAsync<void, DeleteTaskError>({
+            type: "InvalidTransition",
+            from: existing.status,
+            eventType: "delete",
+          });
+        }
+        // Row removal IS the "deleted" semantic and resolves synchronously; a
+        // requested purge is enqueued fire-and-forget afterwards. `andThen`
+        // (not `map`) keeps the callback on the Result rail with an explicit
+        // `okAsync` tail.
+        return deps.repository.delete(id).andThen(() => {
+          if (purge === true) deps.supervisor.enqueuePurge(existing);
+          return okAsync<void, DeleteTaskError>(undefined);
         });
-      }
-      // Row removal IS the "deleted" semantic and resolves synchronously; a
-      // requested purge is enqueued fire-and-forget afterwards. `andThen`
-      // (not `map`) keeps the callback on the Result rail with an explicit
-      // `okAsync` tail.
-      return deps.repository.delete(id).andThen(() => {
-        if (purge === true) deps.supervisor.enqueuePurge(existing);
-        return okAsync<void, DeleteTaskError>(undefined);
-      });
-    });
+      })
+      .map(() => undefined);
   }
 }
 

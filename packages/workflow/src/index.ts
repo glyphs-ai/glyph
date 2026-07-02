@@ -1,133 +1,70 @@
 /**
  * Public API of `@glyphs-ai/workflow`.
  *
- * A closed-kind substrate for a workflow DAG with mutation primitives.
- * The pkg owns three tables (`workflows` / `workflow_nodes` /
- * `workflow_edges`), the entity layer that round-trips them, the
- * error catalog, and the `WorkflowNodeRunner` interface that callers
- * implement once per `WorkflowNodeKind` and inject at compose time via the
- * `runners: WorkflowRunners` field on {@link composeWorkflowModule}.
+ * A closed-kind substrate for a workflow DAG. The package owns three tables
+ * (`workflows` / `workflow_nodes` / `workflow_edges`), a Result-native
+ * four-layer stack (domain / infrastructure / application / composition), and
+ * the `WorkflowNodeRunner` port that callers implement once per
+ * `WorkflowNodeKind` and inject at compose time via the `runners` field on
+ * {@link composeWorkflowModule}.
  *
- * Construction goes through `composeWorkflowModule({ dbFile, …,
- * runners })`. Tests use `openTestWorkflowDb()` from `./testing`.
+ * Construction goes through `composeWorkflowModule({ dbFile | db, workspaceDir,
+ * runners })`, which returns a {@link WorkflowModule} — a DI container of
+ * use-case instances plus the stateful engine. There is no service facade;
+ * consumers call `module.<useCase>.execute(request)`.
  *
- * Per-kind wire DTOs (`WorkflowWorkerNodeSpec`,
- * `WorkflowCoordinatorNodeSpec`, `WorkflowNodeSpec`, …) are owned
- * by and imported directly from `@glyphs-ai/api`'s wire surface; the
- * substrate stays kind-agnostic and takes no workspace dep on the wire
- * layer.
+ * Per-kind wire DTOs (e.g. worker/coordinator node specs) are owned by and
+ * imported directly from `@glyphs-ai/api`'s wire surface; the substrate stays
+ * kind-agnostic and takes no dependency on the wire layer.
  */
 
-// ─── Stuck-recovery cap ─────────────────────────────────────────────
-export { STUCK_RETRY_LIMIT, STUCK_RETRY_MAX_ATTEMPTS } from "./_stuck-recovery.js";
-// ─── Composition ────────────────────────────────────────────────────
-export {
-  composeWorkflowModule,
-  type WorkflowModule,
-  type WorkflowModuleOptions,
-} from "./compose.js";
-// ─── Errors ─────────────────────────────────────────────────────────
-export {
-  EmptyParentsError,
-  InvalidWorkflowIdError,
-  InvalidWorkflowNodeIdError,
-  MultipleSuccessorCoordsError,
-  OrphanCoordInsertError,
-  ParentStateError,
-  WorkflowAlreadyTerminalError,
-  WorkflowDagInvariantError,
-  WorkflowDeleteRequiresTerminalError,
-  WorkflowEdgeCycleError,
-  WorkflowEdgeNotFoundError,
-  WorkflowEnumValueCorruptionError,
-  WorkflowError,
-  WorkflowNodeKindCorruptionError,
-  WorkflowNodeKindShapeError,
-  WorkflowNodeNotFoundError,
-  WorkflowNodeNotMutableError,
-  WorkflowNodeSpecError,
-  WorkflowNotFoundError,
-  WorkflowRemoveEdgeOrphansChildError,
-  WorkflowRemoveNodeOrphansChildError,
-  WorkflowSubgraphCyclicError,
-  WorkflowSubgraphEmptyError,
-  WorkflowSubgraphMultipleCoordTempsError,
-  WorkflowSubgraphNodeRefUnresolvedError,
-  WorkflowSubgraphTempIdInvalidError,
-  WorkflowSubgraphTempParentlessError,
-} from "./errors.js";
-// ─── Path helpers ───────────────────────────────────────────────────
-export {
-  WORKFLOW_NODES_SUBDIR,
-  WORKFLOW_SUBDIR,
-  workflowDir,
-  workflowNodeDir,
-  workflowRoot,
-} from "./paths.js";
-// ─── Re-exported types ──────────────────────────────────────────────
+// ─── Application: use-cases, engine, ports, ids ──────────────────────
+export * from "./application/index.js";
+export * from "./domain/edge/workflow-edge-entity.js";
+export * from "./domain/node/workflow-human-node.js";
+export * from "./domain/node/workflow-node-entity.js";
+export * from "./domain/node/workflow-node-kind.js";
+export * from "./domain/node/workflow-node-retry.js";
+export * from "./domain/node/workflow-node-status.js";
+export * from "./domain/workflow/workflow-cancellation.js";
+export * from "./domain/workflow/workflow-corruption.js";
+export * from "./domain/workflow/workflow-dag.js";
+export * from "./domain/workflow/workflow-dispatch-readiness.js";
 export type {
-  AddEdgeOpts,
-  AddEdgeResult,
-  AddNodeOpts,
-  AddNodeResult,
-  AddSubgraphEdgeInput,
-  AddSubgraphInsertedNode,
-  AddSubgraphNodeInput,
-  AddSubgraphOpts,
-  AddSubgraphResult,
-  CancelWorkflowOpts,
-  CreateWorkflowOpts,
-  CreateWorkflowResult,
-  DispatchAtomicOpts,
-  FinishWorkflowOpts,
-  HumanNodeChoice,
-  HumanNodePromptStyle,
-  HumanNodeResponse,
-  HumanNodeSpec,
-  ListWorkflowOpts,
+  IllegalNodeTransition,
   NodeRef,
-  RemoveEdgeOpts,
-  ReplaceSpecOpts,
-  WorkflowCancellation,
-  WorkflowDagSnapshot,
-  WorkflowFailure,
-  WorkflowNodeDispatchOpts,
-  WorkflowNodeKind,
-  WorkflowNodeRetryMetadata,
-  WorkflowNodeRetryReason,
-  WorkflowNodeRunner,
-  WorkflowNodeSpecEnvelope,
-  WorkflowNodeStatus,
-  WorkflowNodeTerminalResult,
-  WorkflowNodeValidateCtx,
-  WorkflowOrigin,
-  WorkflowRunners,
-  WorkflowStatus,
-  WorkflowSuccess,
-} from "./types.js";
+  NormalizedSubgraphInput,
+  SubgraphEdgeShape,
+  SubgraphNodeInput,
+  SubgraphTempNodeShape,
+  WorkflowAlreadyTerminal,
+  WorkflowCreateArgs,
+  WorkflowHeaderSnapshot,
+  WorkflowNodeSnapshot,
+  WorkflowReconstituteArgs,
+  WorkflowSnapshot,
+} from "./domain/workflow/workflow-entity.js";
+// ─── Domain: entities, value objects, error atoms (ids come via the
+//     application barrel) ──
 export {
-  deriveIterationCount,
-  HUMAN_MAX_CHOICES,
-  HUMAN_PROMPT_STYLES,
-  hasLiveCoord,
-} from "./types.js";
-// ─── Validators ─────────────────────────────────────────────────────
-export {
-  assertValidWorkflowId,
-  assertValidWorkflowNodeId,
-  assertValidWorkflowNodeKind,
-  assertValidWorkflowNodeStatusEnum,
-  assertValidWorkflowOriginEnum,
-  assertValidWorkflowStatusEnum,
-  generateWorkflowId,
-  generateWorkflowNodeId,
-} from "./validate.js";
-// ─── Entity classes ─────────────────────────────────────────────────
-export {
-  extractWorkflowNodeRetryMetadata,
-  WorkflowEdgeEntity,
+  normalizeSubgraphInput,
+  validateSubgraphShape,
   WorkflowEntity,
-  WorkflowNodeEntity,
-} from "./workflow-entity.js";
-// ─── Service ────────────────────────────────────────────────────────
-export { WorkflowService, type WorkflowServiceOpts } from "./workflow-service.js";
+} from "./domain/workflow/workflow-entity.js";
+export * from "./domain/workflow/workflow-errors.js";
+export * from "./domain/workflow/workflow-failure.js";
+export * from "./domain/workflow/workflow-origin.js";
+export type {
+  DatabaseUnavailable,
+  WorkflowEdgeNotFound,
+  WorkflowNodeNotFound,
+  WorkflowNotFound,
+  WorkflowRepository,
+} from "./domain/workflow/workflow-repository.js";
+export * from "./domain/workflow/workflow-status.js";
+export * from "./domain/workflow/workflow-stuck-recovery.js";
+export * from "./domain/workflow/workflow-success.js";
+// ─── Path helpers ───────────────────────────────────────────────────
+export * from "./infrastructure/file/workflow-sandbox.js";
+// ─── Composition ────────────────────────────────────────────────────
+export * from "./workflow-module.js";

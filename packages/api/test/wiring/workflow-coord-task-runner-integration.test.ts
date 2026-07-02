@@ -96,7 +96,7 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
 
   // Two-phase init holder. Populated after `composeWorkflowModule`
   // returns, matching the engine ↔ service composition pattern.
-  const serviceHolder: { service: import("@glyphs-ai/workflow").WorkflowService | null } = {
+  const serviceHolder: { service: import("@glyphs-ai/workflow").WorkflowModule | null } = {
     service: null,
   };
 
@@ -155,7 +155,7 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
     },
     logger: silentLogger,
   });
-  serviceHolder.service = module.service;
+  serviceHolder.service = module;
 
   return {
     module,
@@ -202,11 +202,13 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
   });
 
   it("I1: createWorkflow → coord task auto-dispatches via tasks.dispatchTask.execute with brief+details from workflow header", async () => {
-    const { workflowId, initialCoordNodeId } = await h.module.service.createWorkflow({
+    const created1 = await h.module.createWorkflow.execute({
       brief: "my brief",
       details: "my long details",
       coordinatorAgent: "coord-agent",
     });
+    if (created1.isErr()) throw new Error(created1.error.type);
+    const { workflowId, initialCoordNodeId } = created1.value;
 
     await waitUntil(
       () => h.dispatch.mock.calls.length >= 1,
@@ -232,10 +234,11 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
   });
 
   it("I2: createWorkflow without details → coord tasks.dispatchTask.execute called without 'details' key", async () => {
-    await h.module.service.createWorkflow({
+    const created = await h.module.createWorkflow.execute({
       brief: "brief only",
       coordinatorAgent: "coord-agent",
     });
+    if (created.isErr()) throw new Error(created.error.type);
 
     await waitUntil(
       () => h.dispatch.mock.calls.length >= 1,
@@ -255,22 +258,26 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
   });
 
   it("I3: coord task succeeds via fake tasks.getTask.execute → substrate marks coord node succeeded", async () => {
-    const { initialCoordNodeId } = await h.module.service.createWorkflow({
+    const created3 = await h.module.createWorkflow.execute({
       brief: "succeed-test",
       coordinatorAgent: "coord-agent",
     });
+    if (created3.isErr()) throw new Error(created3.error.type);
+    const { initialCoordNodeId } = created3.value;
 
     await waitUntil(
       async () => {
-        const node = await h.module.service.getNode(initialCoordNodeId);
-        return node.status === "succeeded";
+        const node = await h.module.getNode.execute({ nodeId: initialCoordNodeId });
+        if (node.isErr()) throw new Error(node.error.type);
+        return node.value.status === "succeeded";
       },
       2000,
       "coord node observed succeeded after fake tasks.getTask.execute returns succeeded",
     );
 
-    const node = await h.module.service.getNode(initialCoordNodeId);
-    expect(node.status).toBe("succeeded");
+    const node = await h.module.getNode.execute({ nodeId: initialCoordNodeId });
+    if (node.isErr()) throw new Error(node.error.type);
+    expect(node.value.status).toBe("succeeded");
     // The initial coord succeeded without any children; the
     // substrate's stuck-coord detector fires
     // and inserts a retry coord which the engine immediately

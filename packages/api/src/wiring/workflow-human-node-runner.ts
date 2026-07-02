@@ -21,33 +21,29 @@ import {
   HUMAN_PROMPT_STYLES,
   type HumanNodePromptStyle,
   type HumanNodeSpec,
-  WorkflowError,
+  type WorkflowModule,
   type WorkflowNodeDispatchOpts,
+  type WorkflowNodeId,
   type WorkflowNodeRunner,
   type WorkflowNodeValidateCtx,
-  type WorkflowService,
 } from "@glyphs-ai/workflow";
 
 /**
- * Wire-shape error for a malformed human node spec. Subclasses the
- * workflow pkg's {@link WorkflowError} base so the server's workflows
- * error policy routes it to 400 through the same instanceof path the
- * coord / worker spec errors use, while in-process callers can tell a
- * human-spec rejection apart from a bare `WorkflowError` by instanceof
- * instead of string-matching the message. Mirrors
+ * Wire-shape error for a malformed human node spec. Mirrors
  * {@link WorkflowCoordSpecError} / {@link WorkflowWorkerSpecError} so the
  * three node runners stay isomorphic.
  */
-export class WorkflowHumanSpecError extends WorkflowError {
+export class WorkflowHumanSpecError extends Error {
   override readonly name = "WorkflowHumanSpecError";
 }
 
 export interface HumanNodeRunnerOpts {
-  readonly getService: () => WorkflowService;
+  readonly getModule?: () => WorkflowModule;
+  readonly getService?: () => WorkflowModule;
 }
 
 export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunner {
-  const { getService } = opts;
+  const getModule = opts.getModule ?? opts.getService;
 
   return {
     async validate(spec: unknown, _ctx: WorkflowNodeValidateCtx): Promise<unknown> {
@@ -133,7 +129,11 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
     },
 
     async hasInFlightForNode(nodeId: string): Promise<boolean> {
-      const node = await getService().getNode(nodeId);
+      const module = getModule?.();
+      if (module === undefined) throw new Error("workflow-human-node-runner: missing module");
+      const nodeResult = await module.getNode.execute({ nodeId: nodeId as WorkflowNodeId });
+      if (nodeResult.isErr()) throw new Error(nodeResult.error.type);
+      const node = nodeResult.value;
       return node.status === "running";
     },
 

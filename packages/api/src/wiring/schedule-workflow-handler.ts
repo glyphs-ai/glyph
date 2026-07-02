@@ -1,6 +1,6 @@
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import type { TaskId, TaskModule } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import type { WorkflowTargetData, WorkflowTargetPatch } from "../wire/index.js";
 import { taskAgentResolutionFailed } from "./_task-operation-error.js";
 
@@ -47,7 +47,7 @@ interface CatalogAgentLookup {
  * `WorkflowScheduleTargetError` (→ 400 with message).
  */
 export function makeWorkflowKindHandler(opts: {
-  readonly workflows: WorkflowService;
+  readonly workflows: WorkflowModule;
   readonly tasks: TaskModule;
   readonly catalog: CatalogAgentLookup;
 }): ScheduleKindHandler {
@@ -164,7 +164,7 @@ export function makeWorkflowKindHandler(opts: {
 
     async dispatch({ scheduleId, firedAt, data }) {
       const t = data as WorkflowTargetData;
-      const result = await workflows.createWorkflow({
+      const result = await workflows.createWorkflow.execute({
         coordinatorAgent: t.coordinatorAgent,
         brief: t.brief,
         ...(t.details !== undefined ? { details: t.details } : {}),
@@ -172,7 +172,8 @@ export function makeWorkflowKindHandler(opts: {
         originId: scheduleId,
         metadata: { firedAt },
       });
-      return { id: result.workflowId };
+      if (result.isErr()) throw new Error(result.error.type);
+      return { id: result.value.workflowId };
     },
 
     // Both lookups narrow to the schedule's workflows in SQL via the
@@ -181,13 +182,21 @@ export function makeWorkflowKindHandler(opts: {
     // this schedule — no full `origin: "schedule"` scan + client-side
     // `metadata.scheduleId` filter.
     async hasInFlightForSchedule(scheduleId) {
-      const matched = await workflows.list({ origin: "schedule", originId: scheduleId });
-      return matched.some((wf) => wf.status === "running");
+      const matched = await workflows.listWorkflows.execute({
+        origin: "schedule",
+        originId: scheduleId,
+      });
+      if (matched.isErr()) throw new Error(matched.error.type);
+      return matched.value.some((wf) => wf.status === "running");
     },
 
     async deleteForSchedule(scheduleId) {
-      const matched = await workflows.list({ origin: "schedule", originId: scheduleId });
-      const terminal = matched.filter((wf) => wf.status !== "running");
+      const matched = await workflows.listWorkflows.execute({
+        origin: "schedule",
+        originId: scheduleId,
+      });
+      if (matched.isErr()) throw new Error(matched.error.type);
+      const terminal = matched.value.filter((wf) => wf.status !== "running");
       let deletedCount = 0;
       for (const wf of terminal) {
         // The workflow substrate's `deleteWorkflow` drops only its own
@@ -196,7 +205,9 @@ export function makeWorkflowKindHandler(opts: {
         // they outlive the schedule (orphaned rows + disk). This mirrors
         // the canonical `DELETE /workflows/:wfid` route's cascade and
         // matches the task kind's purge-on-schedule-delete semantics.
-        const snapshot = await workflows.getDag(wf.id);
+        const snapshotResult = await workflows.getDag.execute({ workflowId: wf.id });
+        if (snapshotResult.isErr()) throw new Error(snapshotResult.error.type);
+        const snapshot = snapshotResult.value;
         // Defense-in-depth against the post-finishWorkflow coord-task
         // race: a workflow can read terminal while a node task is still
         // wrapping up. Skip the whole workflow (no partial delete) and
@@ -230,7 +241,11 @@ export function makeWorkflowKindHandler(opts: {
           });
           if (deleteResult.isErr()) throw new Error(deleteResult.error.type);
         }
-        await workflows.deleteWorkflow(wf.id, { purgeDir: true });
+        const deleted = await workflows.deleteWorkflow.execute({
+          workflowId: wf.id,
+          purgeDir: true,
+        });
+        if (deleted.isErr()) throw new Error(deleted.error.type);
         deletedCount++;
       }
       return { deletedCount };

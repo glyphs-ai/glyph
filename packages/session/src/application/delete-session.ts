@@ -20,7 +20,7 @@ export const DeleteSessionRequestSchema = z
 export type DeleteSessionRequest = z.infer<typeof DeleteSessionRequestSchema>;
 
 export const DeleteSessionResponseSchema = z.void();
-export type DeleteSessionResponse = void;
+export type DeleteSessionResponse = undefined;
 
 export type DeleteSessionError =
   | SessionNotFound
@@ -47,14 +47,17 @@ export class DeleteSessionUseCase
   execute(request: DeleteSessionRequest): UseCaseResult<DeleteSessionResponse, DeleteSessionError> {
     const { id, purge } = DeleteSessionRequestSchema.parse(request);
     const deps = this.deps;
-    return deps.repo.get(id).andThen((entity) => {
-      if (purge !== true) return deps.repo.delete(id);
-      const rsid = entity.runtimeSessionId;
-      const dropState =
-        rsid !== null
-          ? deps.runtimeRegistry.get(entity.runtime).asyncAndThen((rt) => rt.deleteState(rsid))
-          : okAsync<void, UnknownRuntime | RuntimeStateDeletionFailed>(undefined);
-      return dropState.andThen(() => deps.sandbox.remove(id)).andThen(() => deps.repo.delete(id));
-    });
+    return deps.repo
+      .get(id)
+      .andThen((entity) => {
+        if (purge !== true) return deps.repo.delete(id);
+        const rsid = entity.runtimeSessionId;
+        const dropState =
+          rsid !== null
+            ? deps.runtimeRegistry.get(entity.runtime).asyncAndThen((rt) => rt.deleteState(rsid))
+            : okAsync<void, UnknownRuntime | RuntimeStateDeletionFailed>(undefined);
+        return dropState.andThen(() => deps.sandbox.remove(id)).andThen(() => deps.repo.delete(id));
+      })
+      .map(() => undefined);
   }
 }

@@ -20,12 +20,11 @@ import type {
   WorkflowNode,
   WorkflowNodeSpec,
 } from "@glyphs-ai/api";
-import {
-  deriveIterationCount,
-  type WorkflowDagSnapshot,
-  type WorkflowEdgeEntity,
-  type WorkflowEntity,
-  type WorkflowNodeEntity,
+import type {
+  GetWorkflowNodeResponse,
+  GetWorkflowResponse,
+  WorkflowDagSnapshot,
+  WorkflowEdgeView,
 } from "@glyphs-ai/workflow";
 import type { ResultAsync } from "neverthrow";
 
@@ -47,7 +46,7 @@ interface ProjectionTasksDep {
 }
 
 /**
- * Project a `WorkflowEntity` to the wire-shape header. The caller
+ * Project a workflow view to the wire-shape header. The caller
  * supplies `iterationCount` explicitly — single-workflow routes pass
  * the count computed from a fresh `listNodesByWorkflow` call; list
  * routes pass `undefined` so the field is omitted from the response
@@ -58,7 +57,7 @@ interface ProjectionTasksDep {
  * dag routes) or from a batch query (list route).
  */
 export function projectWorkflowHeader(
-  wf: WorkflowEntity,
+  wf: GetWorkflowResponse,
   iterationCount: number | undefined,
   awaitingHumanCount: number,
 ): WorkflowHeader {
@@ -102,7 +101,7 @@ export function countAwaitingHuman(nodes: readonly { kind: string; status: strin
  * runtime parse error from `WorkflowNodeEntity.fromRow` before
  * reaching this projection.
  */
-function projectNodeSpec(node: WorkflowNodeEntity): WorkflowNodeSpec {
+function projectNodeSpec(node: GetWorkflowNodeResponse): WorkflowNodeSpec {
   if (node.kind === "worker") {
     return { kind: "worker", ...(node.spec as object) } as WorkflowNodeSpec;
   }
@@ -116,7 +115,7 @@ function projectNodeSpec(node: WorkflowNodeEntity): WorkflowNodeSpec {
 }
 
 /**
- * Project a `WorkflowNodeEntity` to the wire-shape node. Synchronous
+ * Project a workflow node view to the wire-shape node. Synchronous
  * variant — `taskId` is omitted. Used internally by code paths that
  * don't need the dispatched-task enrichment (e.g. the cancel route
  * which only projects the header).
@@ -124,7 +123,7 @@ function projectNodeSpec(node: WorkflowNodeEntity): WorkflowNodeSpec {
  * For routes that DO need `taskId` (the `/dag` route), use
  * {@link projectWorkflowNodeWithTaskId}.
  */
-function projectWorkflowNodeSync(node: WorkflowNodeEntity): WorkflowNode {
+function projectWorkflowNodeSync(node: GetWorkflowNodeResponse): WorkflowNode {
   return {
     id: node.id,
     workflowId: node.workflowId,
@@ -156,7 +155,7 @@ function projectWorkflowNodeSync(node: WorkflowNodeEntity): WorkflowNode {
  * dispatch in normal operation).
  */
 export async function projectWorkflowNodeWithTaskId(
-  node: WorkflowNodeEntity,
+  node: GetWorkflowNodeResponse,
   deps: { readonly tasks: ProjectionTasksDep },
 ): Promise<WorkflowNode> {
   const sync = projectWorkflowNodeSync(node);
@@ -169,8 +168,8 @@ export async function projectWorkflowNodeWithTaskId(
   return { ...sync, taskId: task.id };
 }
 
-/** Project a `WorkflowEdgeEntity` to its wire-shape `(from, to)` pair. */
-function projectWorkflowEdge(edge: WorkflowEdgeEntity): WorkflowEdge {
+/** Project a workflow edge to its wire-shape `(from, to)` pair. */
+function projectWorkflowEdge(edge: WorkflowEdgeView): WorkflowEdge {
   return { from: edge.from, to: edge.to };
 }
 
@@ -206,7 +205,16 @@ export async function projectWorkflowDag(
  * node list. Used by the `GET /:wfid` header route. The dag route
  * uses {@link projectWorkflowDag} which derives it inline.
  */
-export function iterationCountForNodes(nodes: readonly WorkflowNodeEntity[]): number {
+export function iterationCountForNodes(nodes: readonly GetWorkflowNodeResponse[]): number {
   const coordCount = nodes.filter((n) => n.kind === "coordinator").length;
   return deriveIterationCount(coordCount);
+}
+
+/**
+ * A workflow's `iterationCount` is its coordinator-node count: each coordinator
+ * generation is one planning iteration (a silent-retry coordinator bumps it).
+ * Read-projection concern, so it lives in the server rather than the substrate.
+ */
+function deriveIterationCount(coordNodeCount: number): number {
+  return coordNodeCount;
 }

@@ -24,7 +24,7 @@
  */
 
 import type { TaskModule } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskOperationError } from "../../src/wiring/_task-operation-error.js";
@@ -95,7 +95,7 @@ function stubDeps(
     // biome-ignore lint/suspicious/noExplicitAny: stub return shape mirrors fakeWorkflowRow.
     getWorkflowReturn?: any;
     getWorkflowThrows?: Error;
-    serviceFromThunk?: WorkflowService | null | undefined;
+    serviceFromThunk?: WorkflowModule | null | undefined;
   } = {},
 ) {
   const getAgent = vi.fn(async (_fqn: string) => {
@@ -133,13 +133,15 @@ function stubDeps(
     cancelTask: { execute: cancel },
   } as unknown as TaskModule;
 
-  const getWorkflow = vi.fn(async (_id: string) => {
+  const getWorkflow = vi.fn((_request: { workflowId: string }) => {
     if (opts.getWorkflowThrows !== undefined) throw opts.getWorkflowThrows;
-    return opts.getWorkflowReturn !== undefined ? opts.getWorkflowReturn : fakeWorkflowRow();
+    return okAsync(
+      opts.getWorkflowReturn !== undefined ? opts.getWorkflowReturn : fakeWorkflowRow(),
+    );
   });
-  const fakeService = { getWorkflow } as unknown as WorkflowService;
+  const fakeService = { getWorkflow: { execute: getWorkflow } } as unknown as WorkflowModule;
   const serviceFromThunk = "serviceFromThunk" in opts ? opts.serviceFromThunk : fakeService;
-  const getService = vi.fn(() => serviceFromThunk as unknown as WorkflowService);
+  const getService = vi.fn(() => serviceFromThunk as unknown as WorkflowModule);
 
   return {
     catalog,
@@ -170,7 +172,6 @@ const DISPATCH_OPTS_BASE = {
   workflowId: "20260101-deadbeef",
   nodeId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
   spec: { agent: "coord-agent" } as unknown,
-  nodeDir: "/tmp/node-dir",
 };
 
 /**
@@ -419,7 +420,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
       onTerminal: () => {},
     });
     expect(deps.getService).toHaveBeenCalledTimes(1);
-    expect(deps.getWorkflow).toHaveBeenCalledWith("20260101-deadbeef");
+    expect(deps.getWorkflow).toHaveBeenCalledWith({ workflowId: "20260101-deadbeef" });
     expect(deps.dispatch).toHaveBeenCalledWith({
       agent: "coord-agent",
       brief: "wf brief",

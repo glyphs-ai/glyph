@@ -8,7 +8,7 @@ import type { UseCase, UseCaseResult } from "./use-case.js";
 export const RecoverOrphanedTasksRequestSchema = z.object({}).strict();
 export type RecoverOrphanedTasksRequest = z.infer<typeof RecoverOrphanedTasksRequestSchema>;
 
-export type RecoverOrphanedTasksResponse = void;
+export type RecoverOrphanedTasksResponse = undefined;
 
 export type RecoverOrphanedTasksError = DatabaseUnavailable;
 

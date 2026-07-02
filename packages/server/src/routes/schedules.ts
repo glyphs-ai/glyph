@@ -81,7 +81,7 @@ import {
   type ScheduleService,
   type ScheduleTrigger,
 } from "@glyphs-ai/schedule";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 // `ScheduleError` is used by both the `/:sid/preview` n-bound check
 // and the new `/preview-cron` n-bound check for a typed
 // envelope on rejection.
@@ -92,7 +92,7 @@ import { respondError } from "./_respond-error.js";
 import { errorBody, logEvent } from "./_shared.js";
 
 type ScheduleServiceResolver = (c: import("hono").Context) => ScheduleService;
-type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
+type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowModule;
 
 /**
  * Project the internal `Schedule` envelope to the flat wire shape
@@ -203,12 +203,13 @@ export function schedulesRoutes(
                 const workflowScheduleIds = list
                   .filter((s) => s.target.kind === "workflow")
                   .map((s) => s.id);
-                const aggregated = await workflowService.aggregateByOrigin({
+                const aggregated = await workflowService.aggregateByOrigin.execute({
                   origin: "schedule",
                   originIds: workflowScheduleIds,
                   statusIn: ["running"],
                 });
-                return collectWorkflowFireStats(aggregated);
+                if (aggregated.isErr()) throw new Error(aggregated.error.type);
+                return collectWorkflowFireStats(new Map(Object.entries(aggregated.value)));
               })()
             : undefined;
         return c.json(list.map((schedule) => projectScheduleHeader(schedule, workflowFireStats)));
@@ -361,12 +362,13 @@ export function schedulesRoutes(
           | undefined;
         if (found.target.kind === "workflow" && resolveWorkflowService !== undefined) {
           const workflowService = resolveWorkflowService(c);
-          const aggregated = await workflowService.aggregateByOrigin({
+          const aggregated = await workflowService.aggregateByOrigin.execute({
             origin: "schedule",
             originIds: [found.id],
             statusIn: ["running"],
           });
-          workflowFireStats = collectWorkflowFireStats(aggregated);
+          if (aggregated.isErr()) throw new Error(aggregated.error.type);
+          workflowFireStats = collectWorkflowFireStats(new Map(Object.entries(aggregated.value)));
         }
         // Enrich with derived cron `describe` so dashboards / CLI `show`
         // can render the human-readable text without a second round-trip.

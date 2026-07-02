@@ -94,25 +94,23 @@ import {
   ReplaceNodeSpecRequestSchema,
   RespondHumanNodeRequestSchema,
   TaskOperationError,
-  type TaskRouteError,
-  taskErrorWireBody,
   WorkflowArtifactsResponseSchema,
   WorkflowDagSchema,
   WorkflowHeaderSchema,
   WorkflowNodeSchema,
 } from "@glyphs-ai/api";
 import type { TaskModule } from "@glyphs-ai/task";
-import {
-  WorkflowDeleteRequiresTerminalError,
-  WorkflowError,
-  WorkflowNodeNotFoundError,
-  type WorkflowService,
-} from "@glyphs-ai/workflow";
+import type { WorkflowId, WorkflowModule, WorkflowNodeId } from "@glyphs-ai/workflow";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
+import type { Result } from "neverthrow";
+import {
+  respondWorkflowError,
+  type WorkflowRouteError,
+  workflowCustomDeleteBody,
+  workflowsErrorPolicy,
+} from "./_error-policies/workflows.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "./_openapi.js";
-import { respondError } from "./_respond-error.js";
-import { errorBody, logEvent } from "./_shared.js";
+import { logEvent } from "./_shared.js";
 import {
   countAwaitingHuman,
   iterationCountForNodes,
@@ -123,9 +121,14 @@ import {
 import { handleListArtifacts, handleStreamArtifact } from "./workflows/_artifacts.js";
 import { resolveNodeRef, validateCreatedSinceQuery } from "./workflows/_validators.js";
 
-type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
+type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowModule;
 type WorkflowTasksResolver = (c: import("hono").Context) => TaskModule;
 type WorkflowWorkspaceDirResolver = (c: import("hono").Context) => string;
+
+function unwrapWorkflow<T, E extends WorkflowRouteError>(result: Result<T, E>): T {
+  if (result.isErr()) throw result.error;
+  return result.value;
+}
 
 export function workflowsRoutes(
   resolve: WorkflowServiceResolver,
@@ -158,7 +161,7 @@ export function workflowsRoutes(
     async (c) => {
       const createdSinceResult = validateCreatedSinceQuery(c.req.query("createdSince"));
       if (!createdSinceResult.ok) {
-        return c.json(errorBody(new WorkflowError(createdSinceResult.error)), 400);
+        return c.json({ error: createdSinceResult.error, code: "WorkflowError" }, 400);
       }
       const q = c.req.query("q");
       const coordinatorAgent = c.req.query("coordinatorAgent");
@@ -174,10 +177,12 @@ export function workflowsRoutes(
       }
       if (createdSinceResult.value !== undefined) opts.createdSince = createdSinceResult.value;
       try {
-        const [list, awaitingMap] = await Promise.all([
-          resolve(c).list(opts),
-          resolve(c).countAwaitingHumanByWorkflow(),
+        const [listResult, awaitingResult] = await Promise.all([
+          resolve(c).listWorkflows.execute(opts),
+          resolve(c).countAwaitingHuman.execute({}),
         ]);
+        const list = unwrapWorkflow(listResult);
+        const awaitingMap = new Map(Object.entries(unwrapWorkflow(awaitingResult)));
         // `iterationCount` is omitted from list rows to keep the
         // endpoint O(workflows): computing it per row would require a
         // DAG snapshot per workflow. Clients that need the accurate
@@ -187,7 +192,7 @@ export function workflowsRoutes(
         );
         return c.json(wire);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.list",
           policy: workflowsErrorPolicy,
         });
@@ -213,23 +218,26 @@ export function workflowsRoutes(
     async (c) => {
       const body = c.req.valid("json");
       try {
-        const { workflowId } = await resolve(c).createWorkflow({
-          brief: body.brief,
-          coordinatorAgent: body.coordinatorAgent,
-          ...(body.details !== undefined ? { details: body.details } : {}),
-        });
+        const created = unwrapWorkflow(
+          await resolve(c).createWorkflow.execute({
+            brief: body.brief,
+            coordinatorAgent: body.coordinatorAgent,
+            ...(body.details !== undefined ? { details: body.details } : {}),
+          }),
+        );
+        const { workflowId } = created;
         // A freshly seeded workflow has exactly one coord node, so
         // `iterationCount` is 1 (silent-retry coords are counted too —
         // a retry IS another iteration). Hard-coded rather than
         // rederived to avoid a second query on the happy path.
-        const wf = await resolve(c).getWorkflow(workflowId);
+        const wf = unwrapWorkflow(await resolve(c).getWorkflow.execute({ workflowId }));
         logEvent(c, "workflow.create", {
           workflowId,
           coordinatorAgent: body.coordinatorAgent,
         });
         return c.json(projectWorkflowHeader(wf, 1, 0), 201);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.create",
           policy: workflowsErrorPolicy,
         });
@@ -254,15 +262,17 @@ export function workflowsRoutes(
     async (c) => {
       const wfid = c.req.param("wfid");
       try {
-        const dag = await resolve(c).getDag(wfid);
+        const dag = unwrapWorkflow(
+          await resolve(c).getDag.execute({ workflowId: wfid as WorkflowId }),
+        );
         const iter = iterationCountForNodes(dag.nodes);
         const awaiting = countAwaitingHuman(dag.nodes);
         return c.json(projectWorkflowHeader(dag.workflow, iter, awaiting));
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.get",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid },
+          meta: { workflowId: wfid as WorkflowId },
         });
       }
     },
@@ -285,16 +295,18 @@ export function workflowsRoutes(
     async (c) => {
       const wfid = c.req.param("wfid");
       try {
-        const snapshot = await resolve(c).getDag(wfid);
+        const snapshot = unwrapWorkflow(
+          await resolve(c).getDag.execute({ workflowId: wfid as WorkflowId }),
+        );
         const wire: WorkflowDag = await projectWorkflowDag(snapshot, {
           tasks: resolveTasks(c),
         });
         return c.json(wire);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.dag",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid },
+          meta: { workflowId: wfid as WorkflowId },
         });
       }
     },
@@ -321,21 +333,27 @@ export function workflowsRoutes(
       const wfid = c.req.param("wfid");
       const nid = c.req.param("nid");
       try {
-        const node = await resolve(c).getNode(nid);
+        const node = unwrapWorkflow(
+          await resolve(c).getNode.execute({ nodeId: nid as WorkflowNodeId }),
+        );
         // The substrate's `getNode(nid)` is workflow-agnostic by id;
         // re-check the path's `wfid` segment here so a typo'd
         // workflow id doesn't silently return the right node from a
         // different workflow.
         if (node.workflowId !== wfid) {
-          throw new WorkflowNodeNotFoundError(wfid, nid);
+          throw {
+            type: "WorkflowNodeNotFound",
+            workflowId: wfid as WorkflowId,
+            nodeId: nid as WorkflowNodeId,
+          };
         }
         const wire = await projectWorkflowNodeWithTaskId(node, { tasks: resolveTasks(c) });
         return c.json(wire);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.getNode",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid, nodeId: nid },
+          meta: { workflowId: wfid as WorkflowId, nodeId: nid as WorkflowNodeId },
         });
       }
     },
@@ -368,18 +386,23 @@ export function workflowsRoutes(
       const body = c.req.valid("json");
       const { cancellation } = body;
       try {
-        await resolve(c).cancelWorkflow(wfid, {
-          cancellation: { kind: cancellation.kind, message: cancellation.message },
-        });
-        const dag = await resolve(c).getDag(wfid);
+        unwrapWorkflow(
+          await resolve(c).cancelWorkflow.execute({
+            workflowId: wfid as WorkflowId,
+            cancellation: { kind: cancellation.kind, message: cancellation.message },
+          }),
+        );
+        const dag = unwrapWorkflow(
+          await resolve(c).getDag.execute({ workflowId: wfid as WorkflowId }),
+        );
         const iter = iterationCountForNodes(dag.nodes);
-        logEvent(c, "workflow.cancel", { workflowId: wfid });
+        logEvent(c, "workflow.cancel", { workflowId: wfid as WorkflowId });
         return c.json(projectWorkflowHeader(dag.workflow, iter, countAwaitingHuman(dag.nodes)));
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.cancel",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid },
+          meta: { workflowId: wfid as WorkflowId },
         });
       }
     },
@@ -450,22 +473,25 @@ export function workflowsRoutes(
       const wfid = c.req.param("wfid");
       const body = c.req.valid("json");
       try {
-        const result = await resolve(c).addNode(wfid, {
-          kind: body.kind,
-          spec: body.spec,
-          parents: body.parents,
-        });
+        const result = unwrapWorkflow(
+          await resolve(c).addNode.execute({
+            workflowId: wfid as WorkflowId,
+            kind: body.kind,
+            spec: body.spec,
+            parents: body.parents as unknown as readonly WorkflowNodeId[],
+          }),
+        );
         logEvent(c, "workflow.addNode", {
-          workflowId: wfid,
+          workflowId: wfid as WorkflowId,
           nodeId: result.nodeId,
           kind: body.kind,
         });
         return c.json(result);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.addNode",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid },
+          meta: { workflowId: wfid as WorkflowId },
         });
       }
     },
@@ -494,30 +520,33 @@ export function workflowsRoutes(
       const wfid = c.req.param("wfid");
       const body = c.req.valid("json");
       try {
-        const result = await resolve(c).addEdge(wfid, {
-          fromNodeId: body.fromNodeId,
-          toNodeId: body.toNodeId,
-        });
+        const result = unwrapWorkflow(
+          await resolve(c).addEdge.execute({
+            workflowId: wfid as WorkflowId,
+            fromNodeId: body.fromNodeId as WorkflowNodeId,
+            toNodeId: body.toNodeId as WorkflowNodeId,
+          }),
+        );
         // The substrate returns `{ toPhase }` because inserting an edge
         // can shift the receiving node's phase. The wire echoes the
         // (from, to) pair plus the post-insert phase so the caller has
         // a self-contained record without re-fetching the DAG.
         logEvent(c, "workflow.addEdge", {
-          workflowId: wfid,
-          fromNodeId: body.fromNodeId,
-          toNodeId: body.toNodeId,
+          workflowId: wfid as WorkflowId,
+          fromNodeId: body.fromNodeId as WorkflowNodeId,
+          toNodeId: body.toNodeId as WorkflowNodeId,
           toPhase: result.toPhase,
         });
         return c.json({
-          fromNodeId: body.fromNodeId,
-          toNodeId: body.toNodeId,
+          fromNodeId: body.fromNodeId as WorkflowNodeId,
+          toNodeId: body.toNodeId as WorkflowNodeId,
           toPhase: result.toPhase,
         });
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.addEdge",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid },
+          meta: { workflowId: wfid as WorkflowId },
         });
       }
     },
@@ -546,28 +575,33 @@ export function workflowsRoutes(
       const wfid = c.req.param("wfid");
       const body = c.req.valid("json");
       try {
-        const result = await resolve(c).addSubgraph(wfid, {
-          nodes: body.nodes.map((n) => ({
-            tempId: n.tempId,
-            kind: n.kind,
-            spec: n.spec,
-            ...(n.existingParents !== undefined ? { existingParents: n.existingParents } : {}),
-          })),
-          edges: body.edges.map((e) => ({
-            from: resolveNodeRef(e.from),
-            to: resolveNodeRef(e.to),
-          })),
-        });
+        const result = unwrapWorkflow(
+          await resolve(c).addSubgraph.execute({
+            workflowId: wfid as WorkflowId,
+            nodes: body.nodes.map((n) => ({
+              tempId: n.tempId,
+              kind: n.kind,
+              spec: n.spec,
+              ...(n.existingParents !== undefined
+                ? { existingParents: n.existingParents as unknown as readonly WorkflowNodeId[] }
+                : {}),
+            })),
+            edges: body.edges.map((e) => ({
+              from: resolveNodeRef(e.from),
+              to: resolveNodeRef(e.to),
+            })),
+          }),
+        );
         logEvent(c, "workflow.addSubgraph", {
-          workflowId: wfid,
+          workflowId: wfid as WorkflowId,
           insertedCount: result.insertedNodes.length,
         });
         return c.json({ insertedNodes: result.insertedNodes });
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.addSubgraph",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid },
+          meta: { workflowId: wfid as WorkflowId },
         });
       }
     },
@@ -592,20 +626,30 @@ export function workflowsRoutes(
       const wfid = c.req.param("wfid");
       const nid = c.req.param("nid");
       try {
-        await resolve(c).cancelNode(wfid, nid);
+        unwrapWorkflow(
+          await resolve(c).cancelNode.execute({
+            workflowId: wfid as WorkflowId,
+            nodeId: nid as WorkflowNodeId,
+          }),
+        );
         // Substrate's `cancelNode` returns void; project the post-cancel
         // node so the caller observes the new `status` / `endedAt`
         // without a second round-trip. Enrich with `taskId` for parity
         // with the `/dag` projection.
-        const node = await resolve(c).getNode(nid);
+        const node = unwrapWorkflow(
+          await resolve(c).getNode.execute({ nodeId: nid as WorkflowNodeId }),
+        );
         const wire = await projectWorkflowNodeWithTaskId(node, { tasks: resolveTasks(c) });
-        logEvent(c, "workflow.cancelNode", { workflowId: wfid, nodeId: nid });
+        logEvent(c, "workflow.cancelNode", {
+          workflowId: wfid as WorkflowId,
+          nodeId: nid as WorkflowNodeId,
+        });
         return c.json(wire);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.cancelNode",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid, nodeId: nid },
+          meta: { workflowId: wfid as WorkflowId, nodeId: nid as WorkflowNodeId },
         });
       }
     },
@@ -635,25 +679,33 @@ export function workflowsRoutes(
       const body = c.req.valid("json");
       try {
         if (body.kind === "succeeded") {
-          await resolve(c).finishWorkflow(wfid, {
-            outcome: "succeeded",
-            success: { output: body.success?.output ?? null },
-          });
+          unwrapWorkflow(
+            await resolve(c).finishWorkflow.execute({
+              workflowId: wfid as WorkflowId,
+              outcome: "succeeded",
+              success: { output: body.success?.output ?? null },
+            }),
+          );
         } else {
-          await resolve(c).finishWorkflow(wfid, {
-            outcome: "failed",
-            failure: { kind: "coordinator", message: body.failure.message },
-          });
+          unwrapWorkflow(
+            await resolve(c).finishWorkflow.execute({
+              workflowId: wfid as WorkflowId,
+              outcome: "failed",
+              failure: { kind: "coordinator", message: body.failure.message },
+            }),
+          );
         }
-        const dag = await resolve(c).getDag(wfid);
+        const dag = unwrapWorkflow(
+          await resolve(c).getDag.execute({ workflowId: wfid as WorkflowId }),
+        );
         const iter = iterationCountForNodes(dag.nodes);
-        logEvent(c, "workflow.finish", { workflowId: wfid, kind: body.kind });
+        logEvent(c, "workflow.finish", { workflowId: wfid as WorkflowId, kind: body.kind });
         return c.json(projectWorkflowHeader(dag.workflow, iter, countAwaitingHuman(dag.nodes)));
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.finish",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid },
+          meta: { workflowId: wfid as WorkflowId },
         });
       }
     },
@@ -678,14 +730,22 @@ export function workflowsRoutes(
       const wfid = c.req.param("wfid");
       const nid = c.req.param("nid");
       try {
-        await resolve(c).removeNode(wfid, nid);
-        logEvent(c, "workflow.removeNode", { workflowId: wfid, nodeId: nid });
+        unwrapWorkflow(
+          await resolve(c).removeNode.execute({
+            workflowId: wfid as WorkflowId,
+            nodeId: nid as WorkflowNodeId,
+          }),
+        );
+        logEvent(c, "workflow.removeNode", {
+          workflowId: wfid as WorkflowId,
+          nodeId: nid as WorkflowNodeId,
+        });
         return c.body(null, 204);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.removeNode",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid, nodeId: nid },
+          meta: { workflowId: wfid as WorkflowId, nodeId: nid as WorkflowNodeId },
         });
       }
     },
@@ -711,21 +771,28 @@ export function workflowsRoutes(
       const from = c.req.param("from");
       const to = c.req.param("to");
       try {
-        await resolve(c).removeEdge(wfid, {
-          fromNodeId: from,
-          toNodeId: to,
-        });
+        unwrapWorkflow(
+          await resolve(c).removeEdge.execute({
+            workflowId: wfid as WorkflowId,
+            fromNodeId: from as WorkflowNodeId,
+            toNodeId: to as WorkflowNodeId,
+          }),
+        );
         logEvent(c, "workflow.removeEdge", {
-          workflowId: wfid,
-          fromNodeId: from,
-          toNodeId: to,
+          workflowId: wfid as WorkflowId,
+          fromNodeId: from as WorkflowNodeId,
+          toNodeId: to as WorkflowNodeId,
         });
         return c.body(null, 204);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.removeEdge",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid, fromNodeId: from, toNodeId: to },
+          meta: {
+            workflowId: wfid as WorkflowId,
+            fromNodeId: from as WorkflowNodeId,
+            toNodeId: to as WorkflowNodeId,
+          },
         });
       }
     },
@@ -795,9 +862,15 @@ export function workflowsRoutes(
         // The substrate's `deleteWorkflow` re-checks status inside its
         // tx as defense-in-depth against a race with concurrent
         // cancel-in-flight.
-        const snapshot = await wf.getDag(wfid);
+        const snapshot = unwrapWorkflow(
+          await wf.getDag.execute({ workflowId: wfid as WorkflowId }),
+        );
         if (snapshot.workflow.status === "running") {
-          throw new WorkflowDeleteRequiresTerminalError(wfid, snapshot.workflow.status);
+          throw {
+            type: "WorkflowDeleteRequiresTerminal",
+            workflowId: wfid as WorkflowId,
+            status: snapshot.workflow.status,
+          };
         }
         // All-or-nothing pre-scan for in-flight node tasks (see method
         // doc above for the post-finishWorkflow coord-task race this
@@ -848,28 +921,17 @@ export function workflowsRoutes(
             throw new TaskOperationError(deleted.error);
           }
         }
-        await wf.deleteWorkflow(wfid, { purgeDir: purge });
-        logEvent(c, "workflow deleted", { workflowId: wfid, purge });
+        unwrapWorkflow(
+          await wf.deleteWorkflow.execute({ workflowId: wfid as WorkflowId, purgeDir: purge }),
+        );
+        logEvent(c, "workflow deleted", { workflowId: wfid as WorkflowId, purge });
         return c.body(null, 204);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.delete",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid, purge },
-          customBody: (e) => {
-            if (e instanceof WorkflowDeleteRequiresTerminalError) {
-              return {
-                error: e.message,
-                code: e.name,
-                status: e.status,
-                transition: "delete",
-              };
-            }
-            if (e instanceof TaskOperationError && e.code === "InvalidTransition") {
-              return taskErrorWireBody(e.detail as TaskRouteError, "delete");
-            }
-            return null;
-          },
+          meta: { workflowId: wfid as WorkflowId, purge },
+          customBody: workflowCustomDeleteBody,
         });
       }
     },
@@ -899,22 +961,31 @@ export function workflowsRoutes(
       const nid = c.req.param("nid");
       const body = c.req.valid("json");
       try {
-        await resolve(c).replaceSpec(wfid, nid, {
-          newSpec: body.newSpec,
-        });
+        unwrapWorkflow(
+          await resolve(c).replaceNodeSpec.execute({
+            workflowId: wfid as WorkflowId,
+            nodeId: nid as WorkflowNodeId,
+            newSpec: body.newSpec,
+          }),
+        );
         // Substrate returns void; project the post-update node so the
         // caller sees the normalized spec (the per-kind runner may have
         // dropped unknown keys or trimmed whitespace at validate time).
         // Enrich with `taskId` for parity with the `/dag` projection.
-        const node = await resolve(c).getNode(nid);
+        const node = unwrapWorkflow(
+          await resolve(c).getNode.execute({ nodeId: nid as WorkflowNodeId }),
+        );
         const wire = await projectWorkflowNodeWithTaskId(node, { tasks: resolveTasks(c) });
-        logEvent(c, "workflow.replaceNodeSpec", { workflowId: wfid, nodeId: nid });
+        logEvent(c, "workflow.replaceNodeSpec", {
+          workflowId: wfid as WorkflowId,
+          nodeId: nid as WorkflowNodeId,
+        });
         return c.json(wire);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.replaceNodeSpec",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid, nodeId: nid },
+          meta: { workflowId: wfid as WorkflowId, nodeId: nid as WorkflowNodeId },
         });
       }
     },
@@ -948,15 +1019,24 @@ export function workflowsRoutes(
         ...(body.input !== undefined ? { input: body.input } : {}),
       };
       try {
-        const node = await resolve(c).respondHumanNode(wfid, nid, response);
+        const node = unwrapWorkflow(
+          await resolve(c).respondHumanNode.execute({
+            workflowId: wfid as WorkflowId,
+            nodeId: nid as WorkflowNodeId,
+            response,
+          }),
+        );
         const wire = await projectWorkflowNodeWithTaskId(node, { tasks: resolveTasks(c) });
-        logEvent(c, "workflow.respondHumanNode", { workflowId: wfid, nodeId: nid });
+        logEvent(c, "workflow.respondHumanNode", {
+          workflowId: wfid as WorkflowId,
+          nodeId: nid as WorkflowNodeId,
+        });
         return c.json(wire);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "workflows.respondHumanNode",
           policy: workflowsErrorPolicy,
-          meta: { workflowId: wfid, nodeId: nid },
+          meta: { workflowId: wfid as WorkflowId, nodeId: nid as WorkflowNodeId },
         });
       }
     },

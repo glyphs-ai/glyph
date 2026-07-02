@@ -26,7 +26,7 @@ import type { CatalogModule } from "@glyphs-ai/catalog";
 import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { describe, expect, it } from "vitest";
@@ -221,8 +221,8 @@ function stubScheduleService(): ScheduleService {
   });
 }
 
-function stubWorkflowService(): WorkflowService {
-  return new Proxy({} as WorkflowService, {
+function stubWorkflowService(): WorkflowModule {
+  return new Proxy({} as WorkflowModule, {
     get() {
       throw new Error("stubWorkflowService: not callable");
     },

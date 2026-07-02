@@ -95,7 +95,6 @@ function RenderContent({ relPath, content, category }: RenderContentProps) {
     case "binary":
       return <BinaryPlaceholder relPath={relPath} size={content.byteLength} content={content} />;
 
-    case "plain":
     default:
       return <pre className="file-viewer__pre">{text}</pre>;
   }

@@ -26,7 +26,7 @@ import type { CatalogModule } from "@glyphs-ai/catalog";
 import { InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceModule } from "@glyphs-ai/workspace";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,11 +52,11 @@ const mocks = vi.hoisted(() => ({
   workflowThrow: null as Error | null,
   // Append-only close() call log to assert ordering.
   sequence: [] as string[],
-  // Captured `getService` thunk handed to the coord runner — the
-  // workspace-context fixes the workflow service ref AFTER
+  // Captured `getModule` thunk handed to the coord runner — the
+  // workspace-context fixes the workflow module ref AFTER
   // composeWorkflowModule returns, so the thunk must resolve to
-  // a non-null service post-compose.
-  capturedGetService: null as (() => WorkflowService) | null,
+  // a non-null module post-compose.
+  capturedGetModule: null as (() => WorkflowModule) | null,
 }));
 
 vi.mock("node:fs/promises", () => ({
@@ -123,31 +123,25 @@ vi.mock("@glyphs-ai/schedule", () => ({
 // via `makeCoordNodeRunner` / `makeWorkerNodeRunner` (the workflow
 // module is built LAST in compose, FIRST in close).
 vi.mock("@glyphs-ai/workflow", () => ({
-  // `workflow-human-node-runner.ts` (loaded unmocked by the registry's
-  // `load()`) subclasses this at module-eval time, so the mock must
-  // provide a real base class, not just `composeWorkflowModule`.
-  WorkflowError: class WorkflowError extends Error {
-    override readonly name = "WorkflowError";
-  },
   composeWorkflowModule: vi.fn(async () => {
     if (mocks.workflowThrow !== null) throw mocks.workflowThrow;
     return {
-      service: { __mock: "workflow" } as unknown as WorkflowService,
+      __mock: "workflow",
       close: vi.fn(async () => {
         mocks.sequence.push("workflow");
       }),
-    };
+    } as unknown as WorkflowModule;
   }),
 }));
 
 // The coord-runner factory dereferences `tasks` / `catalog` only on
 // dispatch, so the test stubs are safe to pass through. We capture
-// `getService` so a separate assertion can verify the two-phase
-// init: the thunk must resolve to a non-null `WorkflowService`
+// `getModule` so a separate assertion can verify the two-phase
+// init: the thunk must resolve to a non-null `WorkflowModule`
 // AFTER `composeWorkflowModule` returns.
 vi.mock("../src/wiring/workflow-coord-task-runner.js", () => ({
-  makeCoordNodeRunner: vi.fn((deps: { getService: () => WorkflowService }) => {
-    mocks.capturedGetService = deps.getService;
+  makeCoordNodeRunner: vi.fn((deps: { getModule: () => WorkflowModule }) => {
+    mocks.capturedGetModule = deps.getModule;
     return {
       validate: vi.fn(),
       dispatch: vi.fn(),
@@ -199,7 +193,7 @@ beforeEach(() => {
   mocks.scheduleThrow = null;
   mocks.workflowThrow = null;
   mocks.catalogGate = Promise.resolve();
-  mocks.capturedGetService = null;
+  mocks.capturedGetModule = null;
 });
 
 describe("WorkspaceContextRegistry race semantics", () => {
@@ -278,17 +272,17 @@ describe("WorkspaceContextRegistry workflow wiring", () => {
     expect(registry.loaded()).toHaveLength(0);
   });
 
-  it("two-phase init: getService() thunk resolves to the workflow service post-compose", async () => {
+  it("two-phase init: getModule() thunk resolves to the workflow module post-compose", async () => {
     const registry = makeRegistry();
     const ctx = await registry.get("ws-6");
     expect(ctx).not.toBeNull();
-    // The coord runner's `getService` thunk was captured at compose
-    // time (before the workflow service ref was assigned). Calling
+    // The coord runner's `getModule` thunk was captured at compose
+    // time (before the workflow module ref was assigned). Calling
     // it AFTER compose returns must yield the same service object
     // the context exposes — proves the two-phase init seam is wired
     // end-to-end.
-    expect(mocks.capturedGetService).not.toBeNull();
-    const resolved = mocks.capturedGetService?.();
+    expect(mocks.capturedGetModule).not.toBeNull();
+    const resolved = mocks.capturedGetModule?.();
     expect(resolved).toBe(ctx?.workflows);
     await registry.closeAll();
   });

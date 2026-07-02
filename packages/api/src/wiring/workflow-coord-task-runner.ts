@@ -71,10 +71,11 @@ import type {
   TaskModule,
 } from "@glyphs-ai/task";
 import {
+  type WorkflowId,
+  type WorkflowModule,
   type WorkflowNodeRunner,
   type WorkflowNodeTerminalResult,
   type WorkflowNodeValidateCtx,
-  type WorkflowService,
   workflowDir,
 } from "@glyphs-ai/workflow";
 import pino, { type Logger } from "pino";
@@ -174,20 +175,21 @@ export interface MakeCoordNodeRunnerOpts {
   readonly tasks: TaskModule;
   readonly catalog: CatalogAgentLookup;
   /**
-   * Lazy getter for the {@link WorkflowService}. The runner needs it
+   * Lazy getter for the {@link WorkflowModule}. The runner needs it
    * to read the workflow header (`brief` / `details`) at dispatch
    * time, because `dispatch` opts hand the runner only the node-
    * level spec; `brief` / `details` live on the workflow row.
    *
-   * Two-phase init: the workflow service is constructed by
+   * Two-phase init: the workflow module is constructed by
    * `composeWorkflowModule`, which itself requires the runners.
-   * Taking an eager `service: WorkflowService` would make it
+   * Taking an eager `module: WorkflowModule` would make it
    * impossible for the caller to construct the runner before compose
    * returns. The thunk lets the caller capture a ref, build the
    * runner, call compose, then assign the ref — mirrors the engine
    * ↔ service two-phase init in `@glyphs-ai/workflow`.
    */
-  readonly getService: () => WorkflowService;
+  readonly getModule?: () => WorkflowModule;
+  readonly getService?: () => WorkflowModule;
   /**
    * Absolute path to the workspace root. The runner needs it so it
    * can resolve the per-workflow shared dir via
@@ -232,7 +234,7 @@ export function makeCoordNodeRunner(
 ): WorkflowNodeRunner & { dispose(): Promise<void> } {
   const tasks = opts.tasks;
   const catalog = opts.catalog;
-  const getService = opts.getService;
+  const getModule = opts.getModule ?? opts.getService;
   const workspaceDir = opts.workspaceDir;
   const logger = opts.logger ?? silentLogger;
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_COORD_POLL_INTERVAL_MS;
@@ -328,17 +330,21 @@ export function makeCoordNodeRunner(
       // but the runner should fail loudly rather than silently
       // dereference if a caller wires the runner without ever
       // calling compose.
-      const service = getService() as WorkflowService | null | undefined;
-      if (service === null || service === undefined) {
+      const module = getModule?.() as WorkflowModule | null | undefined;
+      if (module === null || module === undefined) {
         throw new Error(
-          "workflow-coord-task-runner: getService() returned null/undefined; " +
+          "workflow-coord-task-runner: getModule() returned null/undefined; " +
             "compose-time wiring forgot to set the ref. " +
-            "Build the runner with a thunk that closes over the WorkflowService " +
+            "Build the runner with a thunk that closes over the WorkflowModule " +
             "returned by composeWorkflowModule.",
         );
       }
 
-      const wf = await service.getWorkflow(opts.workflowId);
+      const wfResult = await module.getWorkflow.execute({
+        workflowId: opts.workflowId as WorkflowId,
+      });
+      if (wfResult.isErr()) throw new Error(wfResult.error.type);
+      const wf = wfResult.value;
       const spec = opts.spec as WorkflowCoordinatorNodeSpec;
       const dispatchResult = await tasks.dispatchTask.execute({
         agent: spec.agent,

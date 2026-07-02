@@ -20,8 +20,8 @@ the coord's prerogative.
 
 - **WorkflowStatus** is 4 values: `running | succeeded | failed |
   cancelled`. `running` is the only non-terminal value; "is the
-  coord awake right now" is derived from `workflow_nodes`
-  (`hasLiveCoord(nodes)` helper).
+  coord awake right now" is derived from `workflow_nodes` (a running
+  `kind='coordinator'` node).
 - **Coordinator** is first-class: every coord run is a
   `kind='coordinator'` node, not a row in a separate table. The
   current coord agent FQN is denormalized into

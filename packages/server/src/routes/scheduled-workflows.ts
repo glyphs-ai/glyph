@@ -1,17 +1,16 @@
 import type { WorkflowHeader } from "@glyphs-ai/api";
 import { WorkflowHeaderSchema } from "@glyphs-ai/api";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { workflowsErrorPolicy } from "./_error-policies/workflows.js";
+import { respondWorkflowError, workflowsErrorPolicy } from "./_error-policies/workflows.js";
 import { createApiApp, errorResponse, jsonResponse } from "./_openapi.js";
-import { respondError } from "./_respond-error.js";
 import { projectWorkflowHeader } from "./_workflow-projection.js";
 
 /**
  * Resolver passed in by the mount point so route handlers pull the
  * workspace-scoped WorkflowService out of Hono's per-request context.
  */
-type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowService;
+type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowModule;
 
 /**
  * Routes for `/api/workspaces/:id/scheduled-workflows`.
@@ -50,21 +49,24 @@ export function scheduledWorkflowsRoutes(
         // so the `?scheduleId=` filter is served from
         // `workflows_origin_pair_idx` with no `metadata` JSON probing.
         const [filtered, awaitingMap] = await Promise.all([
-          svc.list({
+          svc.listWorkflows.execute({
             origin: "schedule",
             ...(scheduleId !== undefined ? { originId: scheduleId } : {}),
           }),
-          svc.countAwaitingHumanByWorkflow(),
+          svc.countAwaitingHuman.execute({}),
         ]);
+        if (filtered.isErr()) throw filtered.error;
+        if (awaitingMap.isErr()) throw awaitingMap.error;
+        const awaiting = new Map(Object.entries(awaitingMap.value));
         // Project to wire headers — same entity→wire boundary every other
         // workflow route uses. `iterationCount` is omitted (O(workflows)
         // list semantics); `awaitingHumanCount` comes from the batch query.
-        const wire: readonly WorkflowHeader[] = filtered.map((wf) =>
-          projectWorkflowHeader(wf, undefined, awaitingMap.get(wf.id) ?? 0),
+        const wire: readonly WorkflowHeader[] = filtered.value.map((wf) =>
+          projectWorkflowHeader(wf, undefined, awaiting.get(wf.id) ?? 0),
         );
         return c.json(wire);
       } catch (err) {
-        return respondError(c, err, {
+        return respondWorkflowError(c, err, {
           route: "scheduled-workflows.list",
           policy: workflowsErrorPolicy,
         });

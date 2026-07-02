@@ -155,7 +155,6 @@ const DISPATCH_OPTS_BASE = {
   workflowId: "20260101-deadbeef",
   nodeId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
   spec: { agent: "w", brief: "b" } as unknown,
-  nodeDir: "/tmp/node-dir",
 };
 
 describe("makeWorkerNodeRunner — validate", () => {

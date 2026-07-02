@@ -1,163 +1,58 @@
 /**
  * Compile-time public API guard for `@glyphs-ai/workflow`.
  *
- * WHAT this file does:
- *   Uses Vitest's `expectTypeOf<T>()` to lock the pkg's public surface
- *   at the TYPE level. Every exported error class, every exported
- *   type, every path helper / validator, and every entity class gets
- *   an assertion.
- *
- * WHY it is valuable:
- *   Silent renames (`addNode` → `appendNode`), accidental method
- *   removals, DTO-field drift, and dropping an enum arm all break
- *   downstream pkgs at compile time — but only the downstream pkg's
- *   typecheck sees the failure. This guard pulls the failure forward:
- *   `pnpm --filter @glyphs-ai/workflow typecheck` fails the moment the
- *   public surface drifts, BEFORE the downstream consumer notices.
- *
- * WHEN it runs:
- *   - At `pnpm typecheck` time: every `expectTypeOf` assertion is
- *     evaluated by tsc — that is where the real check happens.
- *   - At `pnpm test` time: the file loads and the `describe(...)` /
- *     `it(...)` bodies execute, but `expectTypeOf` is a no-op at
- *     runtime.
+ * Uses Vitest's `expectTypeOf<T>()` to lock the package's public surface at the
+ * TYPE level: the composition entrypoint, the module's use-case container + the
+ * engine seam, the runner port, the entity classes, the closed enum
+ * vocabularies, the id generators + path helpers, and the retry-metadata
+ * surface. A silent rename / removal / DTO-field drift fails
+ * `pnpm --filter @glyphs-ai/workflow typecheck` before any downstream consumer
+ * notices. `expectTypeOf` is a no-op at runtime; the real check is tsc.
  */
 
 import { describe, expectTypeOf, it } from "vitest";
 import {
-  type AddEdgeOpts,
-  type AddNodeOpts,
-  type AddSubgraphEdgeInput,
-  type AddSubgraphInsertedNode,
-  type AddSubgraphNodeInput,
-  type AddSubgraphOpts,
-  type AddSubgraphResult,
-  assertValidWorkflowId,
-  assertValidWorkflowNodeId,
-  assertValidWorkflowNodeKind,
-  assertValidWorkflowNodeStatusEnum,
-  assertValidWorkflowStatusEnum,
-  type CancelWorkflowOpts,
   composeWorkflowModule,
-  type DispatchAtomicOpts,
-  deriveIterationCount,
-  EmptyParentsError,
   extractWorkflowNodeRetryMetadata,
-  type FinishWorkflowOpts,
   generateWorkflowId,
   generateWorkflowNodeId,
-  hasLiveCoord,
-  InvalidWorkflowIdError,
-  InvalidWorkflowNodeIdError,
-  type ListWorkflowOpts,
-  MultipleSuccessorCoordsError,
   type NodeRef,
-  OrphanCoordInsertError,
-  ParentStateError,
-  type RemoveEdgeOpts,
-  type ReplaceSpecOpts,
-  type STUCK_RETRY_LIMIT,
   STUCK_RETRY_MAX_ATTEMPTS,
-  type WORKFLOW_NODES_SUBDIR,
-  type WORKFLOW_SUBDIR,
-  WorkflowAlreadyTerminalError,
   type WorkflowDagSnapshot,
-  WorkflowEdgeCycleError,
   type WorkflowEdgeEntity,
-  WorkflowEdgeNotFoundError,
   type WorkflowEntity,
-  WorkflowEnumValueCorruptionError,
-  WorkflowError,
   type WorkflowModule,
   type WorkflowModuleOptions,
   type WorkflowNodeDispatchOpts,
   type WorkflowNodeEntity,
   type WorkflowNodeKind,
-  WorkflowNodeKindCorruptionError,
-  WorkflowNodeKindShapeError,
-  WorkflowNodeNotFoundError,
-  WorkflowNodeNotMutableError,
   type WorkflowNodeRetryMetadata,
   type WorkflowNodeRetryReason,
   type WorkflowNodeRunner,
-  type WorkflowNodeSpecEnvelope,
-  WorkflowNodeSpecError,
   type WorkflowNodeStatus,
   type WorkflowNodeTerminalResult,
   type WorkflowNodeValidateCtx,
-  WorkflowNotFoundError,
-  WorkflowRemoveEdgeOrphansChildError,
-  WorkflowRemoveNodeOrphansChildError,
   type WorkflowRunners,
-  type WorkflowService,
   type WorkflowStatus,
-  WorkflowSubgraphCyclicError,
-  WorkflowSubgraphEmptyError,
-  WorkflowSubgraphMultipleCoordTempsError,
-  WorkflowSubgraphNodeRefUnresolvedError,
-  WorkflowSubgraphTempIdInvalidError,
-  WorkflowSubgraphTempParentlessError,
   workflowDir,
-  workflowNodeDir,
   workflowRoot,
 } from "../src/index.js";
 
 describe("@glyphs-ai/workflow public API guard", () => {
-  it("exports the concrete error classes with their canonical constructor signatures", () => {
-    const errs: Error[] = [
-      new WorkflowError("boom"),
-      new WorkflowError("boom", { cause: new Error("upstream") }),
-      new WorkflowNotFoundError("wf-id"),
-      new WorkflowNodeNotFoundError("wf-id", "node-id"),
-      new InvalidWorkflowIdError("bad"),
-      new InvalidWorkflowNodeIdError("bad"),
-      new WorkflowAlreadyTerminalError("wf-id"),
-      new WorkflowNodeNotMutableError("wf-id", "node-id", "running", "removeNode"),
-      new WorkflowEdgeCycleError("wf-id", "node-a", "node-b"),
-      // Defensive guard — fires only when a persisted row carries a
-      // kind value outside `WorkflowNodeKind`, signalling schema corruption.
-      new WorkflowNodeKindCorruptionError("evaluator"),
-      new WorkflowNodeKindShapeError(""),
-      new WorkflowNodeSpecError("worker", "agent missing"),
-      new MultipleSuccessorCoordsError("wf-id", "coord-parent-id"),
-      new OrphanCoordInsertError("wf-id"),
-      new ParentStateError("wf-id", "worker", "parent-id", "failed"),
-      // Zero-arg now: structural precondition (≥1 parent) is workflow-
-      // independent, so the error doesn't take an id.
-      new EmptyParentsError(),
-      new WorkflowEnumValueCorruptionError("status", "archived", ["running", "succeeded"]),
-    ];
-    expectTypeOf(errs[0]!).toExtend<Error>();
-  });
-
   it("preserves the FSM enum vocabularies", () => {
-    // Four-value workflow status: one non-terminal (`running`) and
-    // three terminals. The "actively coordinating right now" view is
-    // intentionally derived, not persisted.
     expectTypeOf<WorkflowStatus>().toEqualTypeOf<
       "running" | "succeeded" | "failed" | "cancelled"
     >();
-    // Six-value node status; applies to both worker-kind and
-    // coordinator-kind nodes.
     expectTypeOf<WorkflowNodeStatus>().toEqualTypeOf<
       "not_started" | "ready" | "running" | "succeeded" | "failed" | "cancelled"
     >();
   });
 
   it("locks the closed WorkflowNodeKind enum to {'coordinator', 'worker', 'human'}", () => {
-    // Closed-enum substrate: adding a new kind requires updating
-    // `WorkflowNodeKind`, adding a `WorkflowRunners` field, and the exhaustive
-    // `switch (kind)` branches inside the service. This assertion
-    // fails on every kind addition/removal — that's the point.
     expectTypeOf<WorkflowNodeKind>().toEqualTypeOf<"coordinator" | "worker" | "human">();
   });
 
-  it("preserves the substrate envelope + runner interface", () => {
-    // The envelope's `kind` is the closed-enum type so any downstream
-    // pattern-match on it is exhaustive.
-    expectTypeOf<WorkflowNodeSpecEnvelope>().toHaveProperty("kind");
-    expectTypeOf<WorkflowNodeSpecEnvelope>().toHaveProperty("spec");
-
+  it("preserves the runner port interface", () => {
     expectTypeOf<WorkflowNodeRunner>().toHaveProperty("validate");
     expectTypeOf<WorkflowNodeRunner>().toHaveProperty("dispatch");
     expectTypeOf<WorkflowNodeRunner>().toHaveProperty("hasInFlightForNode");
@@ -165,21 +60,10 @@ describe("@glyphs-ai/workflow public API guard", () => {
 
     expectTypeOf<WorkflowNodeValidateCtx>().toHaveProperty("workflowId");
     expectTypeOf<WorkflowNodeValidateCtx>().toHaveProperty("workflowStatus");
-    // The validate ctx threads the workflow header's
-    // `coordinatorAgent` FQN through to runners so the worker runner
-    // can do a menu-membership lookup against the coord agent's
-    // `dependencies.agents`. Lock the field here so the substrate
-    // contract that delivers it stays explicit.
     expectTypeOf<WorkflowNodeValidateCtx>().toHaveProperty("coordinatorAgent");
   });
 
-  it("exposes WorkflowNodeTerminalResult discriminated union", () => {
-    // The terminal-result type is the runner's push-back shape. Three
-    // arms (succeeded / failed / cancelled). Failed requires a string
-    // reason; the others do not. `output` is opaque on succeeded /
-    // failed; cancelled has no output. Locking the exact shape here
-    // means a downstream pkg's exhaustive pattern-match stays
-    // exhaustive even after refactors.
+  it("exposes WorkflowNodeTerminalResult as a three-arm discriminated union", () => {
     expectTypeOf<WorkflowNodeTerminalResult>().toEqualTypeOf<
       | { readonly status: "succeeded"; readonly output?: unknown }
       | { readonly status: "failed"; readonly reason: string; readonly output?: unknown }
@@ -187,17 +71,43 @@ describe("@glyphs-ai/workflow public API guard", () => {
     >();
   });
 
-  it("exposes the substrate stuck-retry failure reason + cap as public consts", () => {
-    // The standalone `WorkflowSubstrateFailureReason` alias was folded
-    // into the `WorkflowFailure` substrate arm; the failure-reason
-    // literal is now anchored by the public `STUCK_RETRY_LIMIT` const.
-    // Lock its literal value-type so the reason string stays part of
-    // the public surface, plus the companion attempt-cap const.
-    expectTypeOf<typeof STUCK_RETRY_LIMIT>().toEqualTypeOf<"STUCK_RETRY_LIMIT">();
-    expectTypeOf(STUCK_RETRY_MAX_ATTEMPTS).toBeNumber();
+  it("dispatch opts carry workflowId / nodeId / spec / onTerminal (no nodeDir)", () => {
+    type DispatchParam = Parameters<WorkflowNodeRunner["dispatch"]>[0];
+    expectTypeOf<DispatchParam>().toEqualTypeOf<WorkflowNodeDispatchOpts>();
+    expectTypeOf<DispatchParam>().toHaveProperty("workflowId");
+    expectTypeOf<DispatchParam>().toHaveProperty("nodeId");
+    expectTypeOf<DispatchParam>().toHaveProperty("spec");
+    expectTypeOf<DispatchParam>().toHaveProperty("onTerminal");
+    expectTypeOf<DispatchParam>().not.toHaveProperty("nodeDir");
+    expectTypeOf<DispatchParam["onTerminal"]>().toEqualTypeOf<
+      (result: WorkflowNodeTerminalResult) => void
+    >();
   });
 
-  it("exposes workflow node retry metadata with package-prefixed naming", () => {
+  it("requires a runner per WorkflowNodeKind via WorkflowRunners", () => {
+    expectTypeOf<WorkflowRunners>().toHaveProperty("coordinator");
+    expectTypeOf<WorkflowRunners>().toHaveProperty("worker");
+    expectTypeOf<WorkflowRunners>().toHaveProperty("human");
+    expectTypeOf<WorkflowRunners["coordinator"]>().toEqualTypeOf<WorkflowNodeRunner>();
+    expectTypeOf<WorkflowRunners["worker"]>().toEqualTypeOf<WorkflowNodeRunner>();
+    expectTypeOf<WorkflowRunners["human"]>().toEqualTypeOf<WorkflowNodeRunner>();
+  });
+
+  it("preserves the id generators", () => {
+    expectTypeOf(generateWorkflowId).toBeFunction();
+    expectTypeOf(generateWorkflowNodeId).toBeFunction();
+    expectTypeOf(generateWorkflowId).returns.toBeString();
+    expectTypeOf(generateWorkflowNodeId).returns.toBeString();
+  });
+
+  it("preserves the exported path helpers", () => {
+    expectTypeOf(workflowDir).toBeFunction();
+    expectTypeOf(workflowRoot).toBeFunction();
+    expectTypeOf(workflowDir).returns.toBeString();
+    expectTypeOf(workflowRoot).returns.toBeString();
+  });
+
+  it("exposes the retry-metadata surface + stuck-retry cap", () => {
     expectTypeOf<WorkflowNodeRetryReason>().toEqualTypeOf<
       "coord_exited_without_action" | "workers_finished_without_coord"
     >();
@@ -205,226 +115,70 @@ describe("@glyphs-ai/workflow public API guard", () => {
     expectTypeOf<WorkflowNodeRetryMetadata>().toHaveProperty("reason");
     expectTypeOf<WorkflowNodeRetryMetadata>().toHaveProperty("attempt");
     expectTypeOf(extractWorkflowNodeRetryMetadata).toBeFunction();
+    expectTypeOf(STUCK_RETRY_MAX_ATTEMPTS).toBeNumber();
   });
 
-  it("dispatch opts include the onTerminal callback", () => {
-    // The `onTerminal` field inside `dispatch`'s opts parameter is
-    // the engine ↔ runner completion callback. Lock the parameter
-    // shape here so a future refactor renaming or removing the
-    // callback is a compile-time failure rather than a silent
-    // breakage of the contract.
-    type DispatchParam = Parameters<WorkflowNodeRunner["dispatch"]>[0];
-    expectTypeOf<DispatchParam>().toEqualTypeOf<WorkflowNodeDispatchOpts>();
-    expectTypeOf<DispatchParam>().toHaveProperty("workflowId");
-    expectTypeOf<DispatchParam>().toHaveProperty("nodeId");
-    expectTypeOf<DispatchParam>().toHaveProperty("spec");
-    expectTypeOf<DispatchParam>().toHaveProperty("nodeDir");
-    expectTypeOf<DispatchParam>().toHaveProperty("onTerminal");
-    expectTypeOf<DispatchParam["onTerminal"]>().toEqualTypeOf<
-      (result: WorkflowNodeTerminalResult) => void
-    >();
+  it("preserves the entity classes (create / reconstitute — mapper owns row mapping)", () => {
+    expectTypeOf<typeof WorkflowEntity>().toHaveProperty("create");
+    expectTypeOf<typeof WorkflowEntity>().toHaveProperty("reconstitute");
+    expectTypeOf<typeof WorkflowNodeEntity>().toHaveProperty("create");
+    expectTypeOf<typeof WorkflowNodeEntity>().toHaveProperty("reconstitute");
+    expectTypeOf<typeof WorkflowEdgeEntity>().toHaveProperty("create");
   });
 
-  it("requires a runner per WorkflowNodeKind via WorkflowRunners", () => {
-    // Both fields non-optional: `composeWorkflowModule({ runners: {
-    // coordinator } })` is a TypeScript compile error, not a runtime
-    // throw.
-    expectTypeOf<WorkflowRunners>().toHaveProperty("coordinator");
-    expectTypeOf<WorkflowRunners>().toHaveProperty("worker");
-    expectTypeOf<WorkflowRunners["coordinator"]>().toEqualTypeOf<WorkflowNodeRunner>();
-    expectTypeOf<WorkflowRunners["worker"]>().toEqualTypeOf<WorkflowNodeRunner>();
+  it("NodeRef is a discriminated union over the existing | temp tag", () => {
+    expectTypeOf<NodeRef["kind"]>().toEqualTypeOf<"existing" | "temp">();
+    expectTypeOf<{ readonly kind: "temp"; readonly tempId: string }>().toExtend<NodeRef>();
   });
 
-  it("preserves derived-view helpers (hasLiveCoord, deriveIterationCount)", () => {
-    expectTypeOf(hasLiveCoord).toBeFunction();
-    expectTypeOf(hasLiveCoord).returns.toBeBoolean();
-    expectTypeOf(deriveIterationCount).toBeFunction();
-    expectTypeOf(deriveIterationCount).returns.toBeNumber();
-  });
-
-  it("preserves the validators + id generators", () => {
-    expectTypeOf(assertValidWorkflowId).toBeFunction();
-    expectTypeOf(assertValidWorkflowNodeId).toBeFunction();
-    expectTypeOf(assertValidWorkflowStatusEnum).toBeFunction();
-    expectTypeOf(assertValidWorkflowNodeStatusEnum).toBeFunction();
-    expectTypeOf(assertValidWorkflowNodeKind).toBeFunction();
-    expectTypeOf(generateWorkflowId).toBeFunction();
-    expectTypeOf(generateWorkflowNodeId).toBeFunction();
-    expectTypeOf(generateWorkflowId).returns.toBeString();
-    expectTypeOf(generateWorkflowNodeId).returns.toBeString();
-  });
-
-  it("preserves the exported path helpers + subdir constants", () => {
-    expectTypeOf(workflowDir).toBeFunction();
-    expectTypeOf(workflowNodeDir).toBeFunction();
-    expectTypeOf(workflowRoot).toBeFunction();
-    // String-literal subtypes; assert assignability to `string` rather
-    // than exact equality so renaming the literal value remains an
-    // internal change while the public type stays string-shaped.
-    expectTypeOf<typeof WORKFLOW_SUBDIR>().toExtend<string>();
-    expectTypeOf<typeof WORKFLOW_NODES_SUBDIR>().toExtend<string>();
-  });
-
-  it("preserves the entity classes with fromRow / toRow round-trip", () => {
-    expectTypeOf<typeof WorkflowEntity>().toHaveProperty("fromRow");
-    expectTypeOf<WorkflowEntity>().toHaveProperty("toRow");
-    expectTypeOf<typeof WorkflowNodeEntity>().toHaveProperty("fromRow");
-    expectTypeOf<WorkflowNodeEntity>().toHaveProperty("toRow");
-    expectTypeOf<WorkflowNodeEntity>().toHaveProperty("toEnvelope");
-    expectTypeOf<typeof WorkflowEdgeEntity>().toHaveProperty("fromRow");
-    expectTypeOf<WorkflowEdgeEntity>().toHaveProperty("toRow");
-  });
-
-  it("preserves the composition surface", () => {
-    expectTypeOf(composeWorkflowModule).parameters.toEqualTypeOf<[WorkflowModuleOptions]>();
-    expectTypeOf(composeWorkflowModule).returns.resolves.toEqualTypeOf<WorkflowModule>();
-    expectTypeOf<WorkflowModule>().toHaveProperty("service");
-    expectTypeOf<WorkflowModule>().toHaveProperty("close");
-    // `runners` is part of the composition surface — every caller
-    // must supply both arms of `WorkflowRunners`.
-    expectTypeOf<WorkflowModuleOptions>().toHaveProperty("runners");
-  });
-
-  it("WorkflowModule exposes the engine alongside service + close", () => {
-    // The engine field is the structural seam composition callers
-    // use to drive `drain()` (awaits in-flight per-workflow tick
-    // chains and gates further triggers). The type is left
-    // opaque-ish (no static reference to the class) — downstream
-    // consumers should not import the engine directly; they
-    // interact through the module.
-    expectTypeOf<WorkflowModule>().toHaveProperty("engine");
-  });
-
-  it("preserves the service class", () => {
-    expectTypeOf<WorkflowService>().toHaveProperty("getWorkflow");
-    expectTypeOf<WorkflowService>().toHaveProperty("list");
-    expectTypeOf<WorkflowService>().toHaveProperty("getDag");
-    expectTypeOf<WorkflowService>().toHaveProperty("getNode");
-    expectTypeOf<WorkflowService>().toHaveProperty("getNodeDir");
-    expectTypeOf<WorkflowService>().toHaveProperty("createWorkflow");
-    expectTypeOf<WorkflowService>().toHaveProperty("addNode");
-    expectTypeOf<WorkflowService>().toHaveProperty("addEdge");
-    expectTypeOf<WorkflowService>().toHaveProperty("cancelNode");
-    expectTypeOf<WorkflowService>().toHaveProperty("finishWorkflow");
-    expectTypeOf<WorkflowService>().toHaveProperty("cancelWorkflow");
-    expectTypeOf<WorkflowService>().toHaveProperty("dispatchAtomic");
-    // Per-workflow shared dir lifecycle. The `purge` method is the
-    // operator cleanup seam wired into the `glyph workflow purge`
-    // subcommand (separate PR); the assertion here locks the method
-    // on the service so a future refactor renaming it surfaces as a
-    // compile failure.
-    expectTypeOf<WorkflowService>().toHaveProperty("purge");
-    // Structural mutation primitives.
-    expectTypeOf<WorkflowService>().toHaveProperty("removeNode");
-    expectTypeOf<WorkflowService>().toHaveProperty("removeEdge");
-    expectTypeOf<WorkflowService>().toHaveProperty("replaceSpec");
-    expectTypeOf<WorkflowService>().toHaveProperty("addSubgraph");
-    // Engine-facing terminal writer + engine wire-up.
-    expectTypeOf<WorkflowService>().toHaveProperty("markNodeTerminal");
-    expectTypeOf<WorkflowService>().toHaveProperty("setEngine");
+  it("WorkflowDagSnapshot pins the header + nodes + edges shape", () => {
     expectTypeOf<WorkflowDagSnapshot>().toHaveProperty("workflow");
     expectTypeOf<WorkflowDagSnapshot>().toHaveProperty("nodes");
     expectTypeOf<WorkflowDagSnapshot>().toHaveProperty("edges");
   });
 
-  it("service mutation methods keep workflowId positional and opts last", () => {
-    expectTypeOf<WorkflowService["addNode"]>().parameters.toEqualTypeOf<
-      [workflowId: string, opts: AddNodeOpts]
-    >();
-    expectTypeOf<WorkflowService["addEdge"]>().parameters.toEqualTypeOf<
-      [workflowId: string, opts: AddEdgeOpts]
-    >();
-    expectTypeOf<WorkflowService["addSubgraph"]>().parameters.toEqualTypeOf<
-      [workflowId: string, opts: AddSubgraphOpts]
-    >();
-    expectTypeOf<WorkflowService["removeNode"]>().parameters.toEqualTypeOf<
-      [workflowId: string, nodeId: string]
-    >();
-    expectTypeOf<WorkflowService["removeEdge"]>().parameters.toEqualTypeOf<
-      [workflowId: string, opts: RemoveEdgeOpts]
-    >();
-    expectTypeOf<WorkflowService["replaceSpec"]>().parameters.toEqualTypeOf<
-      [workflowId: string, nodeId: string, opts: ReplaceSpecOpts]
-    >();
-    expectTypeOf<WorkflowService["cancelNode"]>().parameters.toEqualTypeOf<
-      [workflowId: string, nodeId: string]
-    >();
-    expectTypeOf<WorkflowService["finishWorkflow"]>().parameters.toEqualTypeOf<
-      [workflowId: string, opts: FinishWorkflowOpts]
-    >();
-    expectTypeOf<WorkflowService["cancelWorkflow"]>().parameters.toEqualTypeOf<
-      [workflowId: string, opts: CancelWorkflowOpts]
-    >();
-    expectTypeOf<WorkflowService["dispatchAtomic"]>().parameters.toEqualTypeOf<
-      [nodeId: string, opts?: DispatchAtomicOpts]
-    >();
-    expectTypeOf<WorkflowService["list"]>().parameters.toEqualTypeOf<[opts?: ListWorkflowOpts]>();
+  it("preserves the composition surface (composeWorkflowModule + options)", () => {
+    expectTypeOf(composeWorkflowModule).parameters.toEqualTypeOf<[WorkflowModuleOptions]>();
+    expectTypeOf(composeWorkflowModule).returns.resolves.toEqualTypeOf<WorkflowModule>();
+    expectTypeOf<WorkflowModuleOptions>().toHaveProperty("workspaceDir");
+    expectTypeOf<WorkflowModuleOptions>().toHaveProperty("runners");
   });
 
-  it("mutation opts carry only non-subject fields", () => {
-    expectTypeOf<AddNodeOpts>().toHaveProperty("kind");
-    expectTypeOf<AddNodeOpts>().toHaveProperty("spec");
-    expectTypeOf<AddNodeOpts>().toHaveProperty("parents");
-    expectTypeOf<AddNodeOpts>().not.toHaveProperty("workflowId");
-    expectTypeOf<AddEdgeOpts>().toHaveProperty("fromNodeId");
-    expectTypeOf<AddEdgeOpts>().toHaveProperty("toNodeId");
-    expectTypeOf<AddEdgeOpts>().not.toHaveProperty("workflowId");
-    expectTypeOf<RemoveEdgeOpts>().toHaveProperty("fromNodeId");
-    expectTypeOf<RemoveEdgeOpts>().toHaveProperty("toNodeId");
-    expectTypeOf<ReplaceSpecOpts>().toHaveProperty("newSpec");
-    expectTypeOf<ReplaceSpecOpts>().not.toHaveProperty("nodeId");
-    expectTypeOf<ReplaceSpecOpts>().not.toHaveProperty("newKind");
-    expectTypeOf<AddSubgraphOpts>().toHaveProperty("nodes");
-    expectTypeOf<AddSubgraphOpts>().toHaveProperty("edges");
-    expectTypeOf<FinishWorkflowOpts>().toHaveProperty("outcome");
-    expectTypeOf<CancelWorkflowOpts>().toHaveProperty("cancellation");
-    expectTypeOf<DispatchAtomicOpts>().toHaveProperty("onTerminal");
-    expectTypeOf<ListWorkflowOpts>().toHaveProperty("coordinatorAgent");
-    expectTypeOf<ListWorkflowOpts>().toHaveProperty("createdSince");
-    expectTypeOf<ListWorkflowOpts>().toHaveProperty("idLike");
+  it("WorkflowModule is a use-case container plus the engine seam (no service facade)", () => {
+    // Read + write use-case instances are exposed directly; there is no
+    // `service` facade in the CQRS layout.
+    expectTypeOf<WorkflowModule>().not.toHaveProperty("service");
+    expectTypeOf<WorkflowModule>().toHaveProperty("engine");
+    expectTypeOf<WorkflowModule>().toHaveProperty("close");
+    for (const key of [
+      "createWorkflow",
+      "deleteWorkflow",
+      "purgeWorkflow",
+      "addNode",
+      "addEdge",
+      "cancelNode",
+      "finishWorkflow",
+      "cancelWorkflow",
+      "removeNode",
+      "removeEdge",
+      "replaceNodeSpec",
+      "addSubgraph",
+      "respondHumanNode",
+      "getWorkflow",
+      "listWorkflows",
+      "getDag",
+      "getNode",
+      "countAwaitingHuman",
+      "aggregateByOrigin",
+    ] as const) {
+      expectTypeOf<WorkflowModule>().toHaveProperty(key);
+    }
   });
 
-  it("NodeRef is a discriminated union over the existing | temp tag", () => {
-    // The substrate accepts either a real persisted node id or a
-    // batch-local tempId; the discriminator `kind` MUST stay narrow
-    // so consumers can switch exhaustively.
-    expectTypeOf<NodeRef>().toEqualTypeOf<
-      | { readonly kind: "existing"; readonly id: string }
-      | { readonly kind: "temp"; readonly tempId: string }
-    >();
-  });
-
-  it("AddSubgraph node + edge + result shapes pin the public contract", () => {
-    expectTypeOf<AddSubgraphNodeInput>().toHaveProperty("tempId");
-    expectTypeOf<AddSubgraphNodeInput>().toHaveProperty("kind");
-    expectTypeOf<AddSubgraphNodeInput>().toHaveProperty("spec");
-    expectTypeOf<AddSubgraphNodeInput["tempId"]>().toBeString();
-    expectTypeOf<AddSubgraphNodeInput["kind"]>().toEqualTypeOf<WorkflowNodeKind>();
-
-    expectTypeOf<AddSubgraphEdgeInput>().toHaveProperty("from");
-    expectTypeOf<AddSubgraphEdgeInput>().toHaveProperty("to");
-    expectTypeOf<AddSubgraphEdgeInput["from"]>().toEqualTypeOf<NodeRef>();
-    expectTypeOf<AddSubgraphEdgeInput["to"]>().toEqualTypeOf<NodeRef>();
-
-    expectTypeOf<AddSubgraphResult>().toHaveProperty("insertedNodes");
-    expectTypeOf<AddSubgraphInsertedNode>().toHaveProperty("tempId");
-    expectTypeOf<AddSubgraphInsertedNode>().toHaveProperty("nodeId");
-    expectTypeOf<AddSubgraphInsertedNode>().toHaveProperty("phase");
-    expectTypeOf<AddSubgraphInsertedNode["phase"]>().toBeNumber();
-  });
-
-  it("exports the error classes with their canonical constructor signatures", () => {
-    const errs: Error[] = [
-      new WorkflowEdgeNotFoundError("wf-id", "from-id", "to-id"),
-      new WorkflowRemoveNodeOrphansChildError("wf-id", "node-id", "child-id"),
-      new WorkflowRemoveEdgeOrphansChildError("wf-id", "from-id", "to-id"),
-      new WorkflowSubgraphEmptyError(),
-      new WorkflowSubgraphTempIdInvalidError("duplicate tempId"),
-      new WorkflowSubgraphTempParentlessError("tempId-x"),
-      new WorkflowSubgraphNodeRefUnresolvedError("wf-id", "temp", "missing"),
-      new WorkflowSubgraphCyclicError("wf-id", "from", "to"),
-      new WorkflowSubgraphMultipleCoordTempsError("wf-id"),
-    ];
-    expectTypeOf(errs[0]!).toExtend<Error>();
+  it("read + write use-cases expose an execute(request) method", () => {
+    expectTypeOf<WorkflowModule["createWorkflow"]>().toHaveProperty("execute");
+    expectTypeOf<WorkflowModule["addSubgraph"]>().toHaveProperty("execute");
+    expectTypeOf<WorkflowModule["getDag"]>().toHaveProperty("execute");
+    expectTypeOf<WorkflowModule["listWorkflows"]>().toHaveProperty("execute");
   });
 });

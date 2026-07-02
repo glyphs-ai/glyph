@@ -10,16 +10,21 @@ import {
   TASK_ARTIFACT_SUBDIR,
   type TaskModule,
 } from "@glyphs-ai/task";
-import { workflowDir as resolveWorkflowDir, type WorkflowService } from "@glyphs-ai/workflow";
+import {
+  type GetWorkflowDagResponse,
+  workflowDir as resolveWorkflowDir,
+  type WorkflowId,
+  type WorkflowModule,
+} from "@glyphs-ai/workflow";
 import type { Context } from "hono";
 import { contentTypeFor, mimeBucketFor } from "../../util/mime-bucket.js";
 import { safeJoinNested } from "../../util/safe-join.js";
 import { streamFileAsResponse } from "../../util/stream-file.js";
-import { workflowsErrorPolicy } from "../_error-policies/workflows.js";
+import { respondWorkflowError, workflowsErrorPolicy } from "../_error-policies/workflows.js";
 import { respondError } from "../_respond-error.js";
 
 export interface ArtifactRouteDeps {
-  readonly resolve: (c: Context) => WorkflowService;
+  readonly resolve: (c: Context) => WorkflowModule;
   readonly resolveTasks: (c: Context) => TaskModule;
   readonly resolveWorkspaceDir: (c: Context) => string;
 }
@@ -42,14 +47,16 @@ export async function handleListArtifacts(
   deps: ArtifactRouteDeps,
 ): Promise<Response> {
   const { resolve, resolveTasks, resolveWorkspaceDir } = deps;
-  let snapshot: Awaited<ReturnType<WorkflowService["getDag"]>>;
+  let snapshot: GetWorkflowDagResponse;
   try {
-    snapshot = await resolve(c).getDag(wfid);
+    const snapshotResult = await resolve(c).getDag.execute({ workflowId: wfid as WorkflowId });
+    if (snapshotResult.isErr()) throw snapshotResult.error;
+    snapshot = snapshotResult.value;
   } catch (err) {
-    return respondError(c, err, {
+    return respondWorkflowError(c, err, {
       route: "workflows.artifacts.list",
       policy: workflowsErrorPolicy,
-      meta: { workflowId: wfid },
+      meta: { workflowId: wfid as WorkflowId },
     });
   }
 
@@ -85,7 +92,7 @@ export async function handleListArtifacts(
       return respondError(c, new TaskOperationError(found.error), {
         route: "workflows.artifacts.list",
         policy: workflowsErrorPolicy,
-        meta: { workflowId: wfid, nodeId: node.id },
+        meta: { workflowId: wfid as WorkflowId, nodeId: node.id },
       });
     }
     if (found.value === null) continue;
@@ -183,14 +190,16 @@ export async function handleStreamArtifact(
     // `wfid`'s DAG before its task artifact is served, so the `wfid` path
     // segment can't be bypassed to read another (or a deleted) workflow's
     // node bytes. Mirrors the list route, which only walks `wfid`'s own nodes.
-    let snapshot: Awaited<ReturnType<WorkflowService["getDag"]>>;
+    let snapshot: GetWorkflowDagResponse;
     try {
-      snapshot = await resolve(c).getDag(wfid);
+      const snapshotResult = await resolve(c).getDag.execute({ workflowId: wfid as WorkflowId });
+      if (snapshotResult.isErr()) throw snapshotResult.error;
+      snapshot = snapshotResult.value;
     } catch (err) {
-      return respondError(c, err, {
+      return respondWorkflowError(c, err, {
         route: "workflows.artifacts.stream",
         policy: workflowsErrorPolicy,
-        meta: { workflowId: wfid, nodeId },
+        meta: { workflowId: wfid as WorkflowId, nodeId },
       });
     }
     if (!snapshot.nodes.some((n) => n.id === nodeId)) {

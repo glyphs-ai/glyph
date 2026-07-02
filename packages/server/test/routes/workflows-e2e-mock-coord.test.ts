@@ -77,7 +77,6 @@ function makeAutoSucceedRunner(
       readonly workflowId: string;
       readonly nodeId: string;
       readonly spec: unknown;
-      readonly nodeDir: string;
       readonly onTerminal: (result: WorkflowNodeTerminalResult) => void;
     }) {
       dispatchCalls.push({ workflowId: dispatchOpts.workflowId, nodeId: dispatchOpts.nodeId });
@@ -134,7 +133,7 @@ async function makeHarness(): Promise<Harness> {
     logger: silentLogger,
   });
   const app = workflowsRoutes(
-    () => module.service,
+    () => module,
     () =>
       ({
         findLatestByOrigin: { execute: () => okAsync(null) },
@@ -310,7 +309,7 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     });
     expect(cancelRes.status).toBe(409);
     const cancelErr = (await cancelRes.json()) as { code?: string };
-    expect(cancelErr.code).toBe("WorkflowAlreadyTerminalError");
+    expect(cancelErr.code).toBe("WorkflowAlreadyTerminal");
 
     // 7. Sanity-check the runner call counts. Coord dispatches: the
     //    initial coord (auto-succeeded) and the detector-inserted
@@ -423,7 +422,7 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     });
     expect(edgeRes.status).toBe(409);
     const errBody = (await edgeRes.json()) as { code?: string };
-    expect(errBody.code).toBe("WorkflowNodeNotMutableError");
+    expect(errBody.code).toBe("WorkflowNodeNotMutable");
 
     // Clean termination.
     await h.app.request(`/${wfid}/cancel`, {

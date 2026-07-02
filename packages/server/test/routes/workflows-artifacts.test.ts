@@ -8,7 +8,7 @@
  * walk reads real `readdir`/`stat`; mocking the fs module would be more
  * fragile than just touching a few files).
  *
- * `findTaskByWorkflowNode` is stubbed at the resolver boundary so we
+ * `findLatestByOrigin` is stubbed at the resolver boundary so we
  * don't have to spin up the task-service db; the byte handler needs
  * `{ id, status }` so it can switch `Cache-Control` based on whether
  * the owning task is terminal.
@@ -17,7 +17,7 @@
  *  1. list returns workflow-summary entries with `kind: "workflow-summary"`
  *  2. list returns per-node entries with kind/nodeId/taskId/mimeBucket
  *  3. list returns `{ artifacts: [] }` when both namespaces are empty
- *  4. list 404s when getDag rejects with WorkflowNotFoundError
+ *  4. list 404s when getDag rejects with WorkflowNotFound
  *  5. list 500s when a node task lookup faults (not a silent skip)
  *  6. GET summary/<name> streams bytes with `Cache-Control: no-store`
  *  7. GET nodes/<nid>/<name> with terminal task → `Cache-Control: max-age=300`
@@ -31,13 +31,13 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { TaskModule } from "@glyphs-ai/task";
-import type { WorkflowDagSnapshot } from "@glyphs-ai/workflow";
-import {
-  WorkflowEdgeEntity,
-  WorkflowEntity,
-  WorkflowNodeEntity,
-  WorkflowNotFoundError,
-  type WorkflowService,
+import type {
+  GetWorkflowNodeResponse,
+  GetWorkflowResponse,
+  WorkflowDagSnapshot,
+  WorkflowEdgeView,
+  WorkflowId,
+  WorkflowModule,
 } from "@glyphs-ai/workflow";
 import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,73 +48,63 @@ const COORD_NID = "550e8400-e29b-41d4-a716-446655440001";
 const WORKER_NID = "550e8400-e29b-41d4-a716-446655440002";
 const WORKER_TID = "20260607-aaaa1111";
 
-function makeHeader(): WorkflowEntity {
-  return WorkflowEntity.fromRow({
+function makeHeader(): GetWorkflowResponse {
+  return {
     id: WID,
     brief: "ship feature X",
-    details: null,
     coordinatorAgent: "coord-agent",
     status: "running",
     origin: "standalone",
-    originId: null,
-    metadata: "{}",
+    metadata: {},
     createdAt: "2026-06-07T00:00:00.000Z",
     startedAt: "2026-06-07T00:00:00.000Z",
-    endedAt: null,
-    success: null,
-    failure: null,
-    cancellation: null,
-  });
+  } as GetWorkflowResponse;
 }
 
-function makeCoord(): WorkflowNodeEntity {
-  return WorkflowNodeEntity.fromRow({
+function makeCoord(): GetWorkflowNodeResponse {
+  return {
     id: COORD_NID,
     workflowId: WID,
     kind: "coordinator",
-    specJson: JSON.stringify({ agent: "coord-agent" }),
+    spec: { agent: "coord-agent" },
     phase: 0,
     status: "running",
+    metadata: {},
     createdAt: "2026-06-07T00:00:00.000Z",
     readyAt: "2026-06-07T00:00:00.000Z",
     runningAt: "2026-06-07T00:00:00.000Z",
-    metadata: "{}",
-    endedAt: null,
-  });
+  } as GetWorkflowNodeResponse;
 }
 
-function makeWorker(): WorkflowNodeEntity {
-  return WorkflowNodeEntity.fromRow({
+function makeWorker(): GetWorkflowNodeResponse {
+  return {
     id: WORKER_NID,
     workflowId: WID,
     kind: "worker",
-    specJson: JSON.stringify({ agent: "writer", brief: "draft" }),
+    spec: { agent: "writer", brief: "draft" },
     phase: 1,
     status: "succeeded",
+    metadata: {},
     createdAt: "2026-06-07T00:00:01.000Z",
     readyAt: "2026-06-07T00:00:01.000Z",
     runningAt: "2026-06-07T00:00:02.000Z",
-    metadata: "{}",
     endedAt: "2026-06-07T00:00:03.000Z",
-  });
+  } as GetWorkflowNodeResponse;
 }
 
 function makeDag(): WorkflowDagSnapshot {
   return {
     workflow: makeHeader(),
     nodes: [makeCoord(), makeWorker()],
-    edges: [
-      WorkflowEdgeEntity.fromRow({ workflowId: WID, fromNodeId: COORD_NID, toNodeId: WORKER_NID }),
-    ],
+    edges: [{ workflowId: WID, from: COORD_NID, to: WORKER_NID } as WorkflowEdgeView],
   };
 }
 
-function stubService(overrides: Partial<Record<keyof WorkflowService, unknown>>): WorkflowService {
-  const stub: Partial<Record<keyof WorkflowService, unknown>> = {
-    getDag: vi.fn(async () => makeDag()),
-    ...overrides,
+function stubModule(overrides: { getDag?: { execute: ReturnType<typeof vi.fn> } }): WorkflowModule {
+  const stub = {
+    getDag: overrides.getDag ?? { execute: vi.fn(() => okAsync(makeDag())) },
   };
-  return stub as unknown as WorkflowService;
+  return stub as unknown as WorkflowModule;
 }
 
 interface TaskStub {
@@ -164,7 +154,7 @@ function stubTasks(map: Record<string, TaskStubValue>): TaskStub {
   };
 }
 
-function mountRoutes(svc: WorkflowService, tasks: TaskStub, workspaceDir: string) {
+function mountRoutes(svc: WorkflowModule, tasks: TaskStub, workspaceDir: string) {
   return workflowsRoutes(
     () => svc,
     () => tasks as unknown as TaskModule,
@@ -196,7 +186,7 @@ describe("workflowsRoutes — artifacts list", () => {
       "fake-png",
     );
 
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({});
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
     expect(res.status).toBe(200);
@@ -215,7 +205,7 @@ describe("workflowsRoutes — artifacts list", () => {
       "result.json",
       "{}",
     );
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({ [WORKER_NID]: WORKER_TID });
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
     expect(res.status).toBe(200);
@@ -229,7 +219,7 @@ describe("workflowsRoutes — artifacts list", () => {
   });
 
   it("returns an empty array when both namespaces are empty", async () => {
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({});
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
     expect(res.status).toBe(200);
@@ -238,23 +228,23 @@ describe("workflowsRoutes — artifacts list", () => {
   });
 
   it("404s when the workflow id is unknown", async () => {
-    const svc = stubService({
-      getDag: vi.fn(async () => {
-        throw new WorkflowNotFoundError(WID);
-      }),
+    const svc = stubModule({
+      getDag: {
+        execute: vi.fn(() => errAsync({ type: "WorkflowNotFound", workflowId: WID as WorkflowId })),
+      },
     });
     const tasks = stubTasks({});
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("WorkflowNotFoundError");
+    expect(body.code).toBe("WorkflowNotFound");
   });
 
   it("500s when a node task lookup faults (not a silent skip)", async () => {
     // A `findLatestByOrigin` fault (e.g. the task DB is unavailable) must
     // surface as a 5xx, not be folded into "no task" — otherwise the list
     // would 200 with entries missing and mask the outage.
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks: TaskStub = {
       findLatestByOrigin: {
         execute: vi.fn(() =>
@@ -274,7 +264,7 @@ describe("workflowsRoutes — artifacts bytes", () => {
       "report.md",
       "# hello world",
     );
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({});
     const encoded = encodeURIComponent("summary/report.md");
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
@@ -291,7 +281,7 @@ describe("workflowsRoutes — artifacts bytes", () => {
       "out.txt",
       "result",
     );
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({ [WORKER_NID]: { id: WORKER_TID, status: "succeeded" } });
     const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
@@ -310,7 +300,7 @@ describe("workflowsRoutes — artifacts bytes", () => {
       "out.txt",
       "partial",
     );
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({ [WORKER_NID]: { id: WORKER_TID, status: "running" } });
     const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
@@ -322,7 +312,7 @@ describe("workflowsRoutes — artifacts bytes", () => {
 
   it("streams node bytes with Cache-Control: max-age=300 when task is failed (terminal)", async () => {
     await writeFileAt(path.join(workspaceDir, "tasks", WORKER_TID, "artifact"), "out.txt", "boom");
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({ [WORKER_NID]: { id: WORKER_TID, status: "failed" } });
     const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
@@ -331,7 +321,7 @@ describe("workflowsRoutes — artifacts bytes", () => {
   });
 
   it("404s when no task is dispatched for the node", async () => {
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({}); // empty map → null lookup
     const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
@@ -343,7 +333,7 @@ describe("workflowsRoutes — artifacts bytes", () => {
     // (it belongs to some other workflow). The stream route must refuse to
     // serve it under this `wfid`, so a node id alone can't reach another
     // workflow's task artifacts.
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({ "unknown-node": { id: WORKER_TID, status: "succeeded" } });
     const encoded = encodeURIComponent("nodes/unknown-node/out.txt");
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
@@ -352,7 +342,7 @@ describe("workflowsRoutes — artifacts bytes", () => {
   });
 
   it("rejects traversal attempts in the artifact path with 400", async () => {
-    const svc = stubService({});
+    const svc = stubModule({});
     const tasks = stubTasks({});
     const encoded = encodeURIComponent("summary/../../escape.md");
     const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);

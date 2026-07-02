@@ -24,7 +24,7 @@
  */
 
 import type { TaskModule } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { TaskOperationError } from "../../src/wiring/_task-operation-error.js";
@@ -56,7 +56,7 @@ function stubDeps(
 ): {
   catalog: CatalogAgentLookup;
   tasks: TaskModule;
-  workflows: WorkflowService;
+  workflows: WorkflowModule;
   getAgent: ReturnType<typeof vi.fn>;
   createWorkflow: ReturnType<typeof vi.fn>;
   listWorkflows: ReturnType<typeof vi.fn>;
@@ -70,18 +70,24 @@ function stubDeps(
     if (opts.getAgentThrows !== undefined) throw opts.getAgentThrows;
     return opts.agent === undefined ? COORD_OK : opts.agent;
   });
-  const createWorkflow = vi.fn(async () => opts.createReturn ?? { workflowId: "wf-xyz" });
+  const createWorkflow = vi.fn(() => okAsync(opts.createReturn ?? { workflowId: "wf-xyz" }));
   // Models the substrate's `(origin, origin_id)` SQL filter: the handler
   // delegates schedule-scoping to `list`, so the stub honours `originId`
   // rather than the handler re-filtering client-side.
-  const listWorkflows = vi.fn(async (filter?: { originId?: string }) => {
+  const listWorkflows = vi.fn((filter?: { originId?: string }) => {
     const all = opts.workflows ?? [];
-    return filter?.originId === undefined ? all : all.filter((w) => w.originId === filter.originId);
+    return okAsync(
+      filter?.originId === undefined ? all : all.filter((w) => w.originId === filter.originId),
+    );
   });
-  const getDag = vi.fn(async (id: string) => ({
-    nodes: opts.dagNodes?.[id] ?? [],
-  }));
-  const deleteWorkflow = vi.fn(async () => undefined);
+  const getDag = vi.fn((request: { workflowId: string }) =>
+    okAsync({
+      workflow: { id: request.workflowId, status: "succeeded" },
+      nodes: opts.dagNodes?.[request.workflowId] ?? [],
+      edges: [],
+    }),
+  );
+  const deleteWorkflow = vi.fn(() => okAsync(undefined));
   const hasInFlightForWorkflowNode = vi.fn((req: { originId: string }) =>
     okAsync(opts.inFlightNodes?.has(req.originId) ?? false),
   );
@@ -99,11 +105,11 @@ function stubDeps(
     deleteTask: { execute: deleteTask },
   } as unknown as TaskModule;
   const workflows = {
-    createWorkflow,
-    list: listWorkflows,
-    getDag,
-    deleteWorkflow,
-  } as unknown as WorkflowService;
+    createWorkflow: { execute: createWorkflow },
+    listWorkflows: { execute: listWorkflows },
+    getDag: { execute: getDag },
+    deleteWorkflow: { execute: deleteWorkflow },
+  } as unknown as WorkflowModule;
 
   return {
     catalog,
@@ -411,7 +417,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
 
     // Workflow dir purged, and ONLY the terminal same-schedule run is dropped.
     expect(deps.deleteWorkflow).toHaveBeenCalledTimes(1);
-    expect(deps.deleteWorkflow).toHaveBeenCalledWith("wf-done", { purgeDir: true });
+    expect(deps.deleteWorkflow).toHaveBeenCalledWith({ workflowId: "wf-done", purgeDir: true });
   });
 
   it("skips a node with no backing task (no throw)", async () => {
@@ -426,7 +432,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
     expect(out).toEqual({ deletedCount: 1 });
     expect(deps.deleteTask).toHaveBeenCalledTimes(1);
     expect(deps.deleteTask).toHaveBeenCalledWith({ id: "task-1", purge: true });
-    expect(deps.deleteWorkflow).toHaveBeenCalledWith("wf-done", { purgeDir: true });
+    expect(deps.deleteWorkflow).toHaveBeenCalledWith({ workflowId: "wf-done", purgeDir: true });
   });
 
   it("skips a terminal run that still has an in-flight node task (no partial delete)", async () => {

@@ -1,43 +1,7 @@
-/**
- * Per-domain error policy for the workflows routes.
- *
- * Source of truth for the (class, status) pairs is the workflow
- * substrate's error catalog in `packages/workflow/src/errors.ts`.
- *
- * Status assignments:
- *
- *   - 400 — caller-fixable structural validation. Note: the
- *           defensive enum / kind guards
- *           (`WorkflowNodeKindCorruptionError`,
- *           `WorkflowEnumValueCorruptionError`) are deliberately
- *           NOT listed here: they signal that a persisted row or
- *           internal lookup carried a value outside the closed enum,
- *           which is schema corruption and maps to 500. The
- *           caller-input shape guard for kind
- *           (`WorkflowNodeKindShapeError`) is the legitimate 400
- *           bucket for kind validation.
- *   - 404 — addressing miss (workflow / node / edge not in this
- *           workspace).
- *   - 409 — CAS / FSM / DAG conflict against existing state (workflow
- *           already terminal, node not mutable at the requested verb,
- *           edge would close a cycle, remove would orphan a child,
- *           etc.). The substrate emits these AFTER the row exists —
- *           the caller observed a stale state.
- *
- * Agent-resolution failures from the coord-kind runner's `validate`
- * surface through task union values (`AgentNotFound` /
- * `AgentResolutionFailed`) and are covered by `codeStatuses` below.
- * They are reachable via `POST /workflows` at create time AND via the
- * DAG-mutation routes (`addNode`, `addSubgraph`, `replaceNodeSpec`)
- * when the runner re-validates an agent FQN.
- *
- * Coord-runner validate-time capability rejection
- * (`WorkflowCoordAgentNotCapableError`) is listed below with a stable
- * body builder that pins the rejection to the `coordinatorAgent` form
- * field, matching the task `EntryNotReady` union envelope shape.
- */
-
 import {
+  TaskOperationError,
+  type TaskRouteError,
+  taskErrorWireBody,
   taskUnionCodeStatuses,
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
@@ -45,145 +9,245 @@ import {
   WorkflowWorkerNotInCoordMenuError,
   WorkflowWorkerSpecError,
 } from "@glyphs-ai/api";
-import {
-  EmptyParentsError,
-  InvalidWorkflowIdError,
-  InvalidWorkflowNodeIdError,
-  MultipleSuccessorCoordsError,
-  OrphanCoordInsertError,
-  ParentStateError,
-  WorkflowAlreadyTerminalError,
-  WorkflowDagInvariantError,
-  WorkflowDeleteRequiresTerminalError,
-  WorkflowEdgeCycleError,
-  WorkflowEdgeNotFoundError,
-  WorkflowEnumValueCorruptionError,
-  WorkflowError,
-  WorkflowNodeKindCorruptionError,
-  WorkflowNodeKindShapeError,
-  WorkflowNodeNotFoundError,
-  WorkflowNodeNotMutableError,
-  WorkflowNodeSpecError,
-  WorkflowNotFoundError,
-  WorkflowRemoveEdgeOrphansChildError,
-  WorkflowRemoveNodeOrphansChildError,
-  WorkflowSubgraphCyclicError,
-  WorkflowSubgraphEmptyError,
-  WorkflowSubgraphMultipleCoordTempsError,
-  WorkflowSubgraphNodeRefUnresolvedError,
-  WorkflowSubgraphTempIdInvalidError,
-  WorkflowSubgraphTempParentlessError,
+import type {
+  AddWorkflowEdgeError,
+  AddWorkflowNodeError,
+  AddWorkflowSubgraphError,
+  AggregateWorkflowsByOriginError,
+  CancelWorkflowError,
+  CancelWorkflowNodeError,
+  CountAwaitingHumanError,
+  CreateWorkflowError,
+  DeleteWorkflowError,
+  FinishWorkflowError,
+  GetWorkflowDagError,
+  GetWorkflowError,
+  GetWorkflowNodeError,
+  ListWorkflowsError,
+  NodeSpecError,
+  PurgeWorkflowError,
+  RemoveWorkflowEdgeError,
+  RemoveWorkflowNodeError,
+  ReplaceWorkflowNodeSpecError,
+  RespondToHumanNodeError,
+  WorkflowDeleteRequiresTerminal,
 } from "@glyphs-ai/workflow";
-import type { ErrorPolicy } from "../_respond-error.js";
+import type { Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { ErrorPolicy, RespondErrorOpts } from "../_respond-error.js";
+import { respondError } from "../_respond-error.js";
 import { opaqueWorkerNotInCoordMenuBody } from "./_shared-bodies.js";
+
+type CodeStatusEntry = NonNullable<ErrorPolicy["codeStatuses"]>[number];
+
+export type WorkflowRouteError =
+  | AddWorkflowEdgeError
+  | AddWorkflowNodeError
+  | AddWorkflowSubgraphError
+  | AggregateWorkflowsByOriginError
+  | CancelWorkflowError
+  | CancelWorkflowNodeError
+  | CountAwaitingHumanError
+  | CreateWorkflowError
+  | DeleteWorkflowError
+  | FinishWorkflowError
+  | GetWorkflowDagError
+  | GetWorkflowError
+  | GetWorkflowNodeError
+  | ListWorkflowsError
+  | PurgeWorkflowError
+  | RemoveWorkflowEdgeError
+  | RemoveWorkflowNodeError
+  | ReplaceWorkflowNodeSpecError
+  | RespondToHumanNodeError;
+
+type WorkflowErrorType = WorkflowRouteError["type"];
+
+const STATUS_BY_TYPE: Readonly<Record<WorkflowErrorType, ContentfulStatusCode>> = {
+  WorkflowNotFound: 404,
+  WorkflowNodeNotFound: 404,
+  WorkflowEdgeNotFound: 404,
+  NodeSpecError: 400,
+  EmptyParents: 400,
+  WorkflowSubgraphEmpty: 400,
+  WorkflowSubgraphTempIdInvalid: 400,
+  WorkflowSubgraphTempParentless: 400,
+  WorkflowSubgraphNodeRefUnresolved: 400,
+  HumanNodeResponseInvalid: 400,
+  WorkflowAlreadyTerminal: 409,
+  WorkflowNodeNotMutable: 409,
+  WorkflowDeleteRequiresTerminal: 409,
+  EdgeCycle: 409,
+  MultipleSuccessorCoords: 409,
+  OrphanCoordInsert: 409,
+  ParentState: 409,
+  RemoveNodeOrphansChild: 409,
+  RemoveEdgeOrphansChild: 409,
+  WorkflowSubgraphCyclic: 409,
+  WorkflowSubgraphMultipleCoordTemps: 409,
+  DagInvariant: 409,
+  WorkflowCorruption: 500,
+  WorkflowEnumValueCorruption: 500,
+  WorkflowNodeKindShape: 500,
+  WorkflowNodeKindCorruption: 500,
+  DatabaseUnavailable: 500,
+  WorkflowDirReservationFailed: 500,
+};
+
+function workflowWireBody(err: WorkflowRouteError): Record<string, unknown> {
+  switch (err.type) {
+    case "WorkflowNotFound":
+      return { error: `workflow not found: ${err.workflowId}`, code: err.type };
+    case "WorkflowNodeNotFound":
+      return { error: `workflow node not found: ${err.nodeId}`, code: err.type };
+    case "WorkflowEdgeNotFound":
+      return {
+        error: `workflow edge not found: ${err.fromNodeId} -> ${err.toNodeId}`,
+        code: err.type,
+      };
+    case "NodeSpecError":
+      return nodeSpecWireBody(err);
+    case "EmptyParents":
+      return { error: "node must have at least one parent", code: err.type };
+    case "WorkflowSubgraphEmpty":
+      return { error: "subgraph must contain at least one node", code: err.type };
+    case "WorkflowSubgraphTempIdInvalid":
+      return { error: err.reason, code: err.type };
+    case "WorkflowSubgraphTempParentless":
+      return { error: `temp node has no parent: ${err.tempId}`, code: err.type };
+    case "WorkflowSubgraphNodeRefUnresolved":
+      return { error: `subgraph node ref unresolved: ${err.refValue}`, code: err.type };
+    case "HumanNodeResponseInvalid":
+      return { error: err.reason, code: err.type };
+    case "WorkflowAlreadyTerminal":
+      return {
+        error: `workflow ${err.workflowId} is already terminal (${err.status})`,
+        code: err.type,
+      };
+    case "WorkflowNodeNotMutable":
+      return {
+        error: `workflow node ${err.nodeId} is not mutable from ${err.status}`,
+        code: err.type,
+        status: err.status,
+        transition: err.verb,
+      };
+    case "WorkflowDeleteRequiresTerminal":
+      return workflowDeleteRequiresTerminalBody(err);
+    case "EdgeCycle":
+      return { error: "edge would create a cycle", code: err.type };
+    case "MultipleSuccessorCoords":
+      return { error: "coordinator node already has a successor coordinator", code: err.type };
+    case "OrphanCoordInsert":
+      return { error: "coordinator insert would orphan the DAG frontier", code: err.type };
+    case "ParentState":
+      return {
+        error: `parent ${err.parentNodeId} is ${err.parentStatus}; cannot attach ${err.nodeKind}`,
+        code: err.type,
+      };
+    case "RemoveNodeOrphansChild":
+      return { error: `removing node would orphan child ${err.orphanedChildId}`, code: err.type };
+    case "RemoveEdgeOrphansChild":
+      return { error: "removing edge would orphan a child", code: err.type };
+    case "WorkflowSubgraphCyclic":
+      return { error: "subgraph would create a cycle", code: err.type };
+    case "WorkflowSubgraphMultipleCoordTemps":
+      return { error: "subgraph contains multiple coordinator temp nodes", code: err.type };
+    case "DagInvariant":
+      return { error: "workflow DAG invariant violation", code: err.type };
+    case "WorkflowCorruption":
+    case "WorkflowEnumValueCorruption":
+    case "WorkflowNodeKindShape":
+    case "WorkflowNodeKindCorruption":
+    case "DatabaseUnavailable":
+    case "WorkflowDirReservationFailed":
+      return { error: "internal error" };
+  }
+}
+
+function nodeSpecWireBody(err: NodeSpecError): Record<string, unknown> {
+  const cause = err.cause;
+  if (cause instanceof WorkflowCoordAgentNotCapableError) {
+    return {
+      error: cause.message,
+      code: cause.name,
+      field: "coordinatorAgent",
+      agent: cause.agentFqn,
+    };
+  }
+  if (cause instanceof WorkflowWorkerNotInCoordMenuError) {
+    return opaqueWorkerNotInCoordMenuBody(cause);
+  }
+  if (
+    cause instanceof WorkflowCoordSpecError ||
+    cause instanceof WorkflowWorkerSpecError ||
+    cause instanceof WorkflowHumanSpecError
+  ) {
+    return { error: (cause as Error).message, code: cause.name };
+  }
+  return { error: err.reason, code: err.type };
+}
+
+function workflowDeleteRequiresTerminalBody(
+  err: WorkflowDeleteRequiresTerminal,
+): Record<string, unknown> {
+  return {
+    error: `workflow ${err.workflowId} must be terminal before delete (current: ${err.status})`,
+    code: err.type,
+    status: err.status,
+    transition: "delete",
+  };
+}
+
+function withCode(err: WorkflowRouteError): WorkflowRouteError & { readonly code: string } {
+  return Object.assign(Object.create(null), err, { code: err.type });
+}
+
+function workflowCodeStatus(type: WorkflowErrorType): CodeStatusEntry {
+  return [type, STATUS_BY_TYPE[type], (err) => workflowWireBody(err as WorkflowRouteError)];
+}
 
 export const workflowsErrorPolicy: ErrorPolicy = {
   name: "workflows",
-  statuses: [
-    // 404 — addressing miss
-    [WorkflowNotFoundError, 404],
-    [WorkflowNodeNotFoundError, 404],
-    [WorkflowEdgeNotFoundError, 404],
-
-    // 400 — caller-fixable structural validation
-    [InvalidWorkflowIdError, 400],
-    [InvalidWorkflowNodeIdError, 400],
-    [WorkflowNodeSpecError, 400],
-    [EmptyParentsError, 400],
-    [WorkflowSubgraphEmptyError, 400],
-    [WorkflowSubgraphTempIdInvalidError, 400],
-    [WorkflowSubgraphTempParentlessError, 400],
-    [WorkflowSubgraphNodeRefUnresolvedError, 400],
-    // The shape guard for `kind` fires on caller input — `kind` must
-    // be a non-empty string before the substrate even tries to map
-    // it to a runner. Honest 400.
-    [WorkflowNodeKindShapeError, 400],
-    // Coord-runner capability rejection — the requested coordinator
-    // agent's catalog frontmatter declares no `dependencies.agents`
-    // dispatch menu. Caller-fixable: pick a different agent (or add
-    // the menu to the existing one). Body pins the error to the
-    // form field so the dashboard can render it inline. Matches the
-    // task `EntryNotReady` union envelope shape.
-    [
-      WorkflowCoordAgentNotCapableError,
-      400,
-      (err) => {
-        const e = err as WorkflowCoordAgentNotCapableError;
-        return {
-          error: e.message,
-          code: e.name,
-          field: "coordinatorAgent",
-          agent: e.agentFqn,
-        };
-      },
-    ],
-    // Coord-runner strict-shape rejection — the coord node spec is
-    // not an object, has a missing/empty `agent`, or carries an
-    // unknown key. Reachable from `POST /workflows` AND from
-    // DAG-mutation routes (`addNode` / `addSubgraph` /
-    // `replaceNodeSpec`). The message templates are safe by
-    // construction, so the default `errorBody` builder is sufficient.
-    [WorkflowCoordSpecError, 400],
-    // Worker-runner spec-shape rejection. Same safe-message rule as
-    // WorkflowCoordSpecError, but for worker-kind nodes.
-    [WorkflowWorkerSpecError, 400],
-    // Human-runner strict-shape rejection — non-object spec, missing /
-    // empty `prompt`, invalid `promptStyle`, or malformed `choices`.
-    // Same safe-by-construction message rule as the coord / worker spec
-    // errors; keeps the three node runners isomorphic. It subclasses
-    // `WorkflowError`, so the catch-all entry below would also map it to
-    // 400 — listed explicitly so the policy reads as the source of truth.
-    [WorkflowHumanSpecError, 400],
-    // Worker-runner menu-membership rejection — the worker node's
-    // `spec.agent` is not in the coordinator's `dependencies.agents`
-    // dispatch menu. Caller-fixable (400), but the message enumerates
-    // the coordinator's full menu (internal workflow topology), so the
-    // wire body is collapsed to an opaque `{ error, code }` envelope.
-    // Routed by instanceof here rather than the `INTERNAL_ERROR_NAMES`
-    // string-match (retained as defense-in-depth) so a class/`.name`
-    // drift can't silently break the opaque routing.
-    [WorkflowWorkerNotInCoordMenuError, 400, opaqueWorkerNotInCoordMenuBody],
-
-    // 500 — defensive guards that fire only when a persisted row or
-    // internal lookup carries a value outside the closed enum. These
-    // signal schema corruption / older-binary-leftover rows, NOT
-    // caller mistakes; the response body is an opaque sanitized
-    // string at the respond-error layer (see SAFE_ERROR_NAMES).
-    [WorkflowNodeKindCorruptionError, 500],
-    [WorkflowEnumValueCorruptionError, 500],
-
-    // 409 — FSM / DAG conflict against existing state
-    [WorkflowAlreadyTerminalError, 409],
-    [WorkflowNodeNotMutableError, 409],
-    // Delete-while-running. The route attaches a customBody to surface
-    // `{ code, status, transition: 'delete' }` so the dashboard
-    // branches on `transition` to render a "Cancel first" CTA — the
-    // same envelope precedent as task's InvalidTransition + delete
-    // verb.
-    [WorkflowDeleteRequiresTerminalError, 409],
-    [WorkflowEdgeCycleError, 409],
-    [MultipleSuccessorCoordsError, 409],
-    [OrphanCoordInsertError, 409],
-    [ParentStateError, 409],
-    [WorkflowRemoveNodeOrphansChildError, 409],
-    [WorkflowRemoveEdgeOrphansChildError, 409],
-    [WorkflowSubgraphCyclicError, 409],
-    [WorkflowSubgraphMultipleCoordTempsError, 409],
-    // §3 leaf-frontier invariant — `addSubgraph` batch produced 0,
-    // 2+, or worker-only leaves. Caller observed a stale DAG state
-    // and submitted a batch that would have left the workflow
-    // structurally stuck. 409 because it's a state-conflict against
-    // the substrate's well-formedness rules.
-    [WorkflowDagInvariantError, 409],
-
-    // `WorkflowError` is the abstract base — listed LAST so concrete
-    // subclasses match first. Defaults to 400 (most workflow-base
-    // throws are caller validation flavors).
-    [WorkflowError, 400],
+  statuses: [],
+  codeStatuses: [
+    ...taskUnionCodeStatuses,
+    ...(Object.keys(STATUS_BY_TYPE) as WorkflowErrorType[]).map(workflowCodeStatus),
   ],
-  // Task-dispatch failures inside worker / coord node runs surface as a
-  // `TaskOperationError` carrying the task union `type` as `.code`;
-  // resolve their status + body from the shared task-error table so the
-  // wire `code` matches the task routes.
-  codeStatuses: [...taskUnionCodeStatuses],
 };
+
+export function respondWorkflowError(c: Context, err: unknown, opts: RespondErrorOpts): Response {
+  if (!isWorkflowRouteError(err)) {
+    return respondError(c, err, { ...opts, policy: workflowsErrorPolicy });
+  }
+  if (err.type === "NodeSpecError" && err.cause instanceof TaskOperationError) {
+    return respondError(c, err.cause, { ...opts, policy: workflowsErrorPolicy });
+  }
+  return respondError(c, withCode(err), { ...opts, policy: workflowsErrorPolicy });
+}
+
+export function workflowCustomDeleteBody(err: unknown): Record<string, unknown> | null {
+  if (isWorkflowDeleteRequiresTerminal(err)) return workflowDeleteRequiresTerminalBody(err);
+  if (err instanceof TaskOperationError && err.code === "InvalidTransition") {
+    return taskErrorWireBody(err.detail as TaskRouteError, "delete");
+  }
+  return null;
+}
+
+function isWorkflowDeleteRequiresTerminal(err: unknown): err is WorkflowDeleteRequiresTerminal {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "type" in err &&
+    err.type === "WorkflowDeleteRequiresTerminal"
+  );
+}
+
+function isWorkflowRouteError(err: unknown): err is WorkflowRouteError {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "type" in err &&
+    typeof err.type === "string" &&
+    err.type in STATUS_BY_TYPE
+  );
+}

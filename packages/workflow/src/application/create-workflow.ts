@@ -1,0 +1,166 @@
+import { err, ok, type Result, ResultAsync, safeTry } from "neverthrow";
+import { z } from "zod";
+import { generateWorkflowNodeId, WorkflowNodeIdSchema } from "../domain/node/workflow-node-id.js";
+import { COORDINATOR_KIND } from "../domain/node/workflow-node-kind.js";
+import type { WorkflowEntityCorruption } from "../domain/workflow/workflow-corruption.js";
+import {
+  type WorkflowAlreadyTerminal,
+  WorkflowEntity,
+} from "../domain/workflow/workflow-entity.js";
+import type {
+  EmptyParents,
+  MultipleSuccessorCoords,
+  OrphanCoordInsert,
+  ParentState,
+} from "../domain/workflow/workflow-errors.js";
+import { generateWorkflowId, WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
+import type {
+  DatabaseUnavailable,
+  WorkflowNodeNotFound,
+  WorkflowRepository,
+} from "../domain/workflow/workflow-repository.js";
+import type { WorkflowSandbox } from "../infrastructure/file/workflow-sandbox.js";
+import type { WorkflowDispatchCoordinator } from "./engine/workflow-engine.js";
+import { runnerFor, type WorkflowRunners } from "./ports/workflow-node-runner.js";
+import type { UseCase, UseCaseResult } from "./use-case.js";
+
+export const CreateWorkflowRequestSchema = z
+  .object({
+    brief: z.string().min(1),
+    details: z.string().optional(),
+    coordinatorAgent: z.string().min(1),
+    origin: z.string().min(1).optional(),
+    originId: z.string().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+export type CreateWorkflowRequest = z.infer<typeof CreateWorkflowRequestSchema>;
+export const CreateWorkflowResponseSchema = z.object({
+  workflowId: WorkflowIdSchema,
+  initialCoordNodeId: WorkflowNodeIdSchema,
+});
+export type CreateWorkflowResponse = z.infer<typeof CreateWorkflowResponseSchema>;
+export type NodeSpecError = {
+  readonly type: "NodeSpecError";
+  readonly nodeKind: string;
+  readonly reason: string;
+  readonly cause?: unknown;
+};
+export type WorkflowDirReservationFailed = {
+  readonly type: "WorkflowDirReservationFailed";
+  readonly workflowId: string;
+  readonly dir: string;
+  readonly cause: unknown;
+};
+export type CreateWorkflowError =
+  | NodeSpecError
+  | WorkflowDirReservationFailed
+  | WorkflowEntityCorruption
+  | WorkflowNodeNotFound
+  | WorkflowAlreadyTerminal
+  | DatabaseUnavailable
+  | OrphanCoordInsert
+  | MultipleSuccessorCoords
+  | EmptyParents
+  | ParentState;
+export interface CreateWorkflowDeps {
+  readonly repo: WorkflowRepository;
+  readonly coordinator: WorkflowDispatchCoordinator;
+  readonly runners: WorkflowRunners;
+  readonly sandbox: WorkflowSandbox;
+  readonly now: () => Date;
+  readonly randomBytes: (n: number) => Buffer;
+  readonly randomUUID: () => string;
+}
+
+export class CreateWorkflowUseCase
+  implements UseCase<CreateWorkflowRequest, CreateWorkflowResponse, CreateWorkflowError>
+{
+  constructor(private readonly deps: CreateWorkflowDeps) {}
+  execute(
+    request: CreateWorkflowRequest,
+  ): UseCaseResult<CreateWorkflowResponse, CreateWorkflowError> {
+    const parsed = CreateWorkflowRequestSchema.parse(request);
+    const deps = this.deps;
+    const workflowId = generateWorkflowId(deps.now, deps.randomBytes);
+    const initialCoordNodeId = generateWorkflowNodeId(deps.randomUUID);
+    const nowIso = deps.now().toISOString();
+    const runner = runnerFor(deps.runners, COORDINATOR_KIND);
+    return safeTry<CreateWorkflowResponse, CreateWorkflowError>(async function* () {
+      const validated = yield* ResultAsync.fromPromise(
+        runner.validate(
+          { agent: parsed.coordinatorAgent },
+          { workflowId, workflowStatus: "running", coordinatorAgent: parsed.coordinatorAgent },
+        ),
+        (cause): NodeSpecError => ({
+          type: "NodeSpecError",
+          nodeKind: COORDINATOR_KIND,
+          reason: errorReason(cause),
+          cause,
+        }),
+      );
+      const spec = assertCoordinatorSpecAgent(validated, COORDINATOR_KIND);
+      if (spec.isErr()) return err(spec.error);
+      const wfDir = deps.sandbox.workflowDir(workflowId);
+      yield* deps.sandbox.reserve(workflowId).mapErr(
+        (cause): WorkflowDirReservationFailed => ({
+          type: "WorkflowDirReservationFailed",
+          workflowId,
+          dir: wfDir,
+          cause,
+        }),
+      );
+      const workflow = WorkflowEntity.create({
+        id: workflowId,
+        brief: parsed.brief,
+        ...(parsed.details !== undefined ? { details: parsed.details } : {}),
+        coordinatorAgent: spec.value.agent,
+        ...(parsed.origin !== undefined ? { origin: parsed.origin } : {}),
+        ...(parsed.originId !== undefined ? { originId: parsed.originId } : {}),
+        ...(parsed.metadata !== undefined ? { metadata: parsed.metadata } : {}),
+        createdAt: nowIso,
+      });
+      const added = workflow.addNode({
+        nodeId: initialCoordNodeId,
+        kind: COORDINATOR_KIND,
+        validatedSpec: spec.value,
+        parents: [],
+        nowIso,
+      });
+      if (added.isErr()) {
+        await deps.sandbox.remove(workflowId);
+        return err(added.error);
+      }
+      const inserted = await deps.repo.insert(workflow);
+      if (inserted.isErr()) {
+        await deps.sandbox.remove(workflowId);
+        return err(inserted.error);
+      }
+      yield* deps.coordinator.dispatch(workflowId, initialCoordNodeId);
+      deps.coordinator.triggerWorkflowTick(workflowId);
+      return ok({ workflowId, initialCoordNodeId });
+    });
+  }
+}
+
+export function assertCoordinatorSpecAgent(
+  spec: unknown,
+  nodeKind: string,
+): Result<{ readonly agent: string }, NodeSpecError> {
+  if (typeof spec !== "object" || spec === null)
+    return err({ type: "NodeSpecError", nodeKind, reason: "coordinator spec must be an object" });
+  const agent = (spec as { readonly agent?: unknown }).agent;
+  if (typeof agent !== "string" || agent.length === 0)
+    return err({
+      type: "NodeSpecError",
+      nodeKind,
+      reason: "coordinator spec must include a non-empty agent",
+    });
+  return ok({ ...(spec as Record<string, unknown>), agent });
+}
+
+function errorReason(cause: unknown): string {
+  if (cause instanceof Error) return cause.message;
+  if (typeof cause === "string") return cause;
+  return "unknown error";
+}

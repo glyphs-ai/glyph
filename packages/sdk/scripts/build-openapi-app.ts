@@ -32,7 +32,7 @@ import type { CatalogModule } from "@glyphs-ai/catalog";
 import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import type { ScheduleService } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { createApiApp, registerOpenApiDoc } from "../../server/src/routes/_openapi.js";
 import { configRoutes } from "../../server/src/routes/config.js";
@@ -189,7 +189,7 @@ function stubScheduleService(): ScheduleService {
   return throwingStub("stubScheduleService");
 }
 
-function stubWorkflowService(): WorkflowService {
+function stubWorkflowService(): WorkflowModule {
   return throwingStub("stubWorkflowService");
 }
 

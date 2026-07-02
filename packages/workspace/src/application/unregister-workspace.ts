@@ -15,7 +15,7 @@ export const UnregisterWorkspaceRequestSchema = z
 export type UnregisterWorkspaceRequest = z.infer<typeof UnregisterWorkspaceRequestSchema>;
 
 export const UnregisterWorkspaceResponseSchema = z.void();
-export type UnregisterWorkspaceResponse = void;
+export type UnregisterWorkspaceResponse = undefined;
 
 export type UnregisterWorkspaceError = ProvisioningFailed | DatabaseUnavailable;
 

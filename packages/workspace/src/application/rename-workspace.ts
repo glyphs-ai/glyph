@@ -16,7 +16,7 @@ export const RenameWorkspaceRequestSchema = z
 export type RenameWorkspaceRequest = z.infer<typeof RenameWorkspaceRequestSchema>;
 
 export const RenameWorkspaceResponseSchema = z.void();
-export type RenameWorkspaceResponse = void;
+export type RenameWorkspaceResponse = undefined;
 
 export type RenameWorkspaceError = WorkspaceNotRegistered | DatabaseUnavailable;
 

@@ -1,6 +1,5 @@
 import {
   RegisterWorkspaceRequestSchema,
-  RenameWorkspaceRequestSchema,
   type WorkspaceId,
   type WorkspaceName,
 } from "@glyphs-ai/workspace";

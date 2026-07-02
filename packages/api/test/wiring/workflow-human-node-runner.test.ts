@@ -8,11 +8,7 @@
  * file scopes to the validator.
  */
 
-import {
-  WorkflowError,
-  type WorkflowNodeValidateCtx,
-  type WorkflowService,
-} from "@glyphs-ai/workflow";
+import type { WorkflowModule, WorkflowNodeValidateCtx } from "@glyphs-ai/workflow";
 import { describe, expect, it } from "vitest";
 import {
   makeHumanNodeRunner,
@@ -28,11 +24,11 @@ const VALIDATE_CTX: WorkflowNodeValidateCtx = {
 function makeRunner() {
   // Validator does not call into the service, so a never-invoked
   // getter is enough — keeps the runner constructor happy without
-  // standing up a real WorkflowService.
+  // standing up a real WorkflowModule.
   const getService = () => {
     throw new Error("getService should not be called from validate()");
   };
-  return makeHumanNodeRunner({ getService: getService as unknown as () => WorkflowService });
+  return makeHumanNodeRunner({ getService: getService as unknown as () => WorkflowModule });
 }
 
 describe("makeHumanNodeRunner — validate", () => {
@@ -73,7 +69,9 @@ describe("makeHumanNodeRunner — validate", () => {
 
   it("rejects a spec missing promptStyle", async () => {
     const r = makeRunner();
-    await expect(r.validate({ prompt: "x" }, VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowError);
+    await expect(r.validate({ prompt: "x" }, VALIDATE_CTX)).rejects.toBeInstanceOf(
+      WorkflowHumanSpecError,
+    );
     await expect(r.validate({ prompt: "x" }, VALIDATE_CTX)).rejects.toThrow(/promptStyle/);
   });
 
@@ -81,33 +79,33 @@ describe("makeHumanNodeRunner — validate", () => {
     const r = makeRunner();
     await expect(
       r.validate({ prompt: "x", promptStyle: "html" }, VALIDATE_CTX),
-    ).rejects.toBeInstanceOf(WorkflowError);
+    ).rejects.toBeInstanceOf(WorkflowHumanSpecError);
     await expect(
       r.validate({ prompt: "x", promptStyle: "PLAIN" }, VALIDATE_CTX),
-    ).rejects.toBeInstanceOf(WorkflowError);
+    ).rejects.toBeInstanceOf(WorkflowHumanSpecError);
     await expect(r.validate({ prompt: "x", promptStyle: 1 }, VALIDATE_CTX)).rejects.toBeInstanceOf(
-      WorkflowError,
+      WorkflowHumanSpecError,
     );
     await expect(
       r.validate({ prompt: "x", promptStyle: null }, VALIDATE_CTX),
-    ).rejects.toBeInstanceOf(WorkflowError);
+    ).rejects.toBeInstanceOf(WorkflowHumanSpecError);
   });
 
   it("rejects non-object specs", async () => {
     const r = makeRunner();
-    await expect(r.validate(null, VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowError);
-    await expect(r.validate("oops", VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowError);
-    await expect(r.validate([], VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowError);
+    await expect(r.validate(null, VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowHumanSpecError);
+    await expect(r.validate("oops", VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowHumanSpecError);
+    await expect(r.validate([], VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowHumanSpecError);
   });
 
   it("rejects missing or empty prompt", async () => {
     const r = makeRunner();
     await expect(r.validate({ promptStyle: "plain" }, VALIDATE_CTX)).rejects.toBeInstanceOf(
-      WorkflowError,
+      WorkflowHumanSpecError,
     );
     await expect(
       r.validate({ prompt: "   ", promptStyle: "plain" }, VALIDATE_CTX),
-    ).rejects.toBeInstanceOf(WorkflowError);
+    ).rejects.toBeInstanceOf(WorkflowHumanSpecError);
   });
 
   it("rejects too many choices", async () => {
@@ -118,14 +116,14 @@ describe("makeHumanNodeRunner — validate", () => {
     }));
     await expect(
       r.validate({ prompt: "p", promptStyle: "plain", choices: tooMany }, VALIDATE_CTX),
-    ).rejects.toBeInstanceOf(WorkflowError);
+    ).rejects.toBeInstanceOf(WorkflowHumanSpecError);
   });
 
-  it("rejects with WorkflowHumanSpecError (a WorkflowError subclass) carrying its canonical name", async () => {
+  it("rejects with WorkflowHumanSpecError (an Error subclass) carrying its canonical name", async () => {
     const r = makeRunner();
     const rejection = r.validate({ prompt: "x" }, VALIDATE_CTX);
     await expect(rejection).rejects.toBeInstanceOf(WorkflowHumanSpecError);
-    await expect(rejection).rejects.toBeInstanceOf(WorkflowError);
+    await expect(rejection).rejects.toBeInstanceOf(WorkflowHumanSpecError);
     await expect(rejection).rejects.toMatchObject({ name: "WorkflowHumanSpecError" });
   });
 
@@ -143,6 +141,6 @@ describe("makeHumanNodeRunner — validate", () => {
         },
         VALIDATE_CTX,
       ),
-    ).rejects.toBeInstanceOf(WorkflowError);
+    ).rejects.toBeInstanceOf(WorkflowHumanSpecError);
   });
 });

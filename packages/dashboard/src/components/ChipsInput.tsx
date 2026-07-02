@@ -288,7 +288,7 @@ export function ChipsInput({
           aria-autocomplete="list"
           aria-haspopup="listbox"
           aria-controls={listboxId}
-          aria-expanded={showDropdown ? true : false}
+          aria-expanded={Boolean(showDropdown)}
           {...(activeOptionId !== undefined ? { "aria-activedescendant": activeOptionId } : {})}
         />
       </div>

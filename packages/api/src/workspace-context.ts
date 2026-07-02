@@ -24,7 +24,7 @@ import {
   type TaskModule,
 } from "@glyphs-ai/task";
 import type { Spawner } from "@glyphs-ai/terminal";
-import { composeWorkflowModule, type WorkflowService } from "@glyphs-ai/workflow";
+import { composeWorkflowModule, type WorkflowModule } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
 import { type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
@@ -117,14 +117,14 @@ export interface WorkspaceContext {
   /**
    * Per-workspace DAG-orchestration substrate. Hands the
    * coordinator-kind dispatch path a task-module-backed runner via
-   * a two-phase `getService` thunk (the runner needs a ref to the
-   * `WorkflowService` it sits inside), and the worker-kind
+   * a two-phase `getModule` thunk (the runner needs a ref to the
+   * `WorkflowModule` it sits inside), and the worker-kind
    * dispatch path a sibling runner over the same task module.
    * Closed FIRST in `close()` so the engine's drain step (which
    * calls into `tasks.cancelTask.execute` for any live nodes) still has
    * a live task module to talk to.
    */
-  readonly workflows: WorkflowService;
+  readonly workflows: WorkflowModule;
   /** Closes all backing connections. Idempotent. */
   close(): Promise<void>;
 }
@@ -455,20 +455,20 @@ export class WorkspaceContextRegistry {
     let scheduleModule: Awaited<ReturnType<typeof composeScheduleModule>>;
     let workflowModule: Awaited<ReturnType<typeof composeWorkflowModule>>;
     // Two-phase init seam: the coord runner needs a ref to the
-    // `WorkflowService` it lives inside (to read header `brief` /
+    // `WorkflowModule` it lives inside (to read header `brief` /
     // `details` at dispatch time), but the service is constructed
     // by `composeWorkflowModule` which itself requires the runner.
     // The thunk lets us build the runner first, call compose, then
     // assign the ref. Mirrors the engine ↔ service two-phase init
     // in `@glyphs-ai/workflow`.
-    let workflowSvc: WorkflowService | null = null;
-    const getWorkflowService = (): WorkflowService => {
-      if (workflowSvc === null) {
+    let workflowRef: WorkflowModule | null = null;
+    const getWorkflowModule = (): WorkflowModule => {
+      if (workflowRef === null) {
         throw new Error(
-          "workspace-context: workflow service accessed before composeWorkflowModule completed",
+          "workspace-context: workflow module accessed before composeWorkflowModule completed",
         );
       }
-      return workflowSvc;
+      return workflowRef;
     };
     try {
       catalogModule = composeCatalog({ dbFile });
@@ -559,7 +559,7 @@ export class WorkspaceContextRegistry {
       const coordRunner = makeCoordNodeRunner({
         tasks: taskModule,
         catalog: catalogPorts,
-        getService: getWorkflowService,
+        getModule: getWorkflowModule,
         // The coord runner injects `GLYPH_WORKFLOW_DIR` into the
         // dispatched coord task's subprocess env via
         // `workflowDir(workspaceDir, wfid)`. The workspaceDir is the
@@ -575,7 +575,7 @@ export class WorkspaceContextRegistry {
         logger: this.logger,
       });
       const humanRunner = makeHumanNodeRunner({
-        getService: getWorkflowService,
+        getModule: getWorkflowModule,
       });
       workflowModule = await composeWorkflowModule({
         dbFile,
@@ -583,17 +583,17 @@ export class WorkspaceContextRegistry {
         logger: this.logger,
         runners: { coordinator: coordRunner, worker: workerRunner, human: humanRunner },
       });
-      workflowSvc = workflowModule.service;
+      workflowRef = workflowModule;
       cleanup.push(() => workflowModule.close());
 
       // Register workflow kind AFTER compose so the handler can
-      // reference the live WorkflowService for dispatch / hasInFlight
+      // reference the live WorkflowModule for dispatch / hasInFlight
       // / deleteTerminalByOrigin. Both kinds are now registered; recover()
       // below will preflight all persisted rows and fire catchups.
       scheduleModule.service.registerKind(
         "workflow",
         makeWorkflowKindHandler({
-          workflows: workflowModule.service,
+          workflows: workflowModule,
           tasks: taskModule,
           catalog: catalogPorts,
         }),
@@ -611,7 +611,7 @@ export class WorkspaceContextRegistry {
       sessions: sessionModule,
       tasks: taskModule,
       schedules: scheduleModule.service,
-      workflows: workflowModule.service,
+      workflows: workflowModule,
       async close() {
         // Per-module try/catch: a throw from one module's close()
         // must NOT skip the others. Without per-module catches a
