@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -75,6 +75,23 @@ describe("LocalTaskSandbox.listArtifacts", () => {
     const workdir = (await sandbox.reserve(ID))._unsafeUnwrap();
     const r = await sandbox.listArtifacts(workdir);
     expect(r._unsafeUnwrap()).toEqual([]);
+  });
+
+  it("recursively lists files at any depth, sorted by path", async () => {
+    const workdir = (await sandbox.reserve(ID))._unsafeUnwrap();
+    await sandbox.materialize({ workdir, brief: "b", details: undefined });
+    const art = join(workdir, "artifact");
+    mkdirSync(join(art, "sub", "deep"), { recursive: true });
+    writeFileSync(join(art, "top.txt"), "t");
+    writeFileSync(join(art, "sub", "mid.txt"), "m");
+    writeFileSync(join(art, "sub", "deep", "leaf.txt"), "l");
+    const r = await sandbox.listArtifacts(workdir);
+    const expected = [
+      join(art, "top.txt"),
+      join(art, "sub", "mid.txt"),
+      join(art, "sub", "deep", "leaf.txt"),
+    ].sort((a, b) => a.localeCompare(b));
+    expect(r._unsafeUnwrap()).toEqual(expected);
   });
 });
 

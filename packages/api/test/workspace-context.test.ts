@@ -24,7 +24,7 @@
  */
 import type { CatalogModule } from "@glyphs-ai/catalog";
 import { InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
-import type { ScheduleService } from "@glyphs-ai/schedule";
+import type { ScheduleModule } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceModule } from "@glyphs-ai/workspace";
@@ -106,14 +106,14 @@ vi.mock("@glyphs-ai/schedule", () => ({
   composeScheduleModule: vi.fn(async () => {
     if (mocks.scheduleThrow !== null) throw mocks.scheduleThrow;
     return {
-      service: {
-        registerKind: vi.fn(),
-        recover: vi.fn(async () => undefined),
-      } as unknown as ScheduleService,
+      engine: {
+        registerKind: vi.fn(() => ok(undefined)),
+        recover: vi.fn(() => okAsync(undefined)),
+      },
       close: vi.fn(async () => {
         mocks.sequence.push("schedule");
       }),
-    };
+    } as unknown as ScheduleModule;
   }),
 }));
 
@@ -162,7 +162,7 @@ vi.mock("../src/wiring/workflow-worker-task-runner.js", () => ({
   })),
 }));
 
-import { okAsync } from "neverthrow";
+import { ok, okAsync } from "neverthrow";
 import { WorkspaceContextRegistry } from "../src/workspace-context.js";
 
 function makeRegistry(opts: { workspaceExists?: boolean } = {}): WorkspaceContextRegistry {

@@ -47,7 +47,7 @@ function mountApp() {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "missing workspace id" }, 400);
     const ctx = await application.getContext(id);
-    if (!ctx) return c.json({ error: "not registered", code: "WorkspaceNotRegistered" }, 404);
+    if (!ctx) return c.json({ error: "not found", code: "WorkspaceNotFound" }, 404);
     c.set("catalog", ctx.catalog);
     await next();
   });

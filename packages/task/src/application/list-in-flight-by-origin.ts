@@ -1,11 +1,12 @@
+import { and, eq, notInArray } from "drizzle-orm";
 import { z } from "zod";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
-import type { TaskEntity } from "../domain/task-entity.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { TaskIdSchema } from "../domain/task-id.js";
-import type { DatabaseUnavailable, TaskRepository } from "../domain/task-repository.js";
-import { TaskStatusSchema } from "../domain/task-status.js";
+import type { DatabaseUnavailable } from "../domain/task-repository.js";
+import { TaskStatusSchema, TERMINAL_TASK_STATUSES } from "../domain/task-status.js";
 import { TaskSuccessSchema } from "../domain/task-success.js";
+import { projectTaskRow, type TaskQueries } from "../infrastructure/drizzle/task-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const ListInFlightByOriginRequestSchema = z
@@ -13,29 +14,30 @@ export const ListInFlightByOriginRequestSchema = z
   .strict();
 export type ListInFlightByOriginRequest = z.infer<typeof ListInFlightByOriginRequestSchema>;
 
-const TaskViewSchema = z.object({
-  id: TaskIdSchema,
-  agent: z.string(),
-  brief: z.string(),
-  details: z.string().optional(),
-  origin: z.string(),
-  originId: z.string().optional(),
-  status: TaskStatusSchema,
-  metadata: z.record(z.string(), z.unknown()),
-  createdAt: z.string(),
-  startedAt: z.string(),
-  endedAt: z.string().optional(),
-  success: TaskSuccessSchema.optional(),
-  failure: TaskFailureSchema.optional(),
-  cancellation: TaskCancellationSchema.optional(),
-});
-export const ListInFlightByOriginResponseSchema = z.array(TaskViewSchema);
+export const ListInFlightByOriginResponseSchema = z.array(
+  z.object({
+    id: TaskIdSchema,
+    agent: z.string(),
+    brief: z.string(),
+    details: z.string().optional(),
+    origin: z.string(),
+    originId: z.string().optional(),
+    status: TaskStatusSchema,
+    metadata: z.record(z.string(), z.unknown()),
+    createdAt: z.string(),
+    startedAt: z.string(),
+    endedAt: z.string().optional(),
+    success: TaskSuccessSchema.optional(),
+    failure: TaskFailureSchema.optional(),
+    cancellation: TaskCancellationSchema.optional(),
+  }),
+);
 export type ListInFlightByOriginResponse = z.infer<typeof ListInFlightByOriginResponseSchema>;
 
 export type ListInFlightByOriginError = DatabaseUnavailable;
 
 export interface ListInFlightByOriginDeps {
-  readonly repository: TaskRepository;
+  readonly query: TaskQueries;
 }
 
 /**
@@ -53,27 +55,20 @@ export class ListInFlightByOriginUseCase
     request: ListInFlightByOriginRequest,
   ): UseCaseResult<ListInFlightByOriginResponse, ListInFlightByOriginError> {
     const { origin, originId } = ListInFlightByOriginRequestSchema.parse(request);
-    return this.deps.repository
-      .listInFlightByOrigin({ origin, originId })
-      .map((tasks) => tasks.map(toTaskView));
+    const q = this.deps.query;
+    return q.query((db) =>
+      db
+        .select()
+        .from(q.tasks)
+        .where(
+          and(
+            eq(q.tasks.origin, origin),
+            eq(q.tasks.originId, originId),
+            notInArray(q.tasks.status, [...TERMINAL_TASK_STATUSES]),
+          ),
+        )
+        .all()
+        .map(projectTaskRow),
+    );
   }
-}
-
-function toTaskView(task: TaskEntity): z.infer<typeof TaskViewSchema> {
-  return {
-    id: task.id,
-    agent: task.agent,
-    brief: task.brief,
-    ...(task.details !== undefined ? { details: task.details } : {}),
-    origin: task.origin,
-    ...(task.originId !== undefined ? { originId: task.originId } : {}),
-    status: task.status,
-    metadata: { ...task.metadata },
-    createdAt: task.createdAt,
-    startedAt: task.startedAt,
-    ...(task.endedAt !== undefined ? { endedAt: task.endedAt } : {}),
-    ...(task.success !== undefined ? { success: task.success } : {}),
-    ...(task.failure !== undefined ? { failure: task.failure } : {}),
-    ...(task.cancellation !== undefined ? { cancellation: task.cancellation } : {}),
-  };
 }

@@ -1,8 +1,10 @@
 /**
- * Workspace aggregate. Use-cases validate inputs, call entity
- * mutators, and persist the aggregate through the repository.
- * `lastOpenedAt` is nullable and response projections coalesce it to
- * `createdAt`.
+ * Workspace aggregate — a pure rich-domain object. Use-cases validate
+ * inputs, call entity mutators, and persist through the repository's
+ * `save`. The entity carries no persistence state: the repository owns
+ * change-tracking (it snapshots the row at `get` time and diffs at `save`
+ * time), so the entity is unaware of INSERT-vs-UPDATE. `lastOpenedAt` is
+ * nullable and response projections coalesce it to `createdAt`.
  */
 
 import type { WorkspaceId } from "./workspace-id.js";
@@ -16,6 +18,14 @@ export interface CreateWorkspaceArgs {
   readonly now: string;
 }
 
+export interface RehydrateWorkspaceArgs {
+  readonly id: WorkspaceId;
+  readonly workspaceDir: string;
+  readonly name: WorkspaceName;
+  readonly createdAt: string;
+  readonly lastOpenedAt: string | null;
+}
+
 export class WorkspaceEntity {
   public readonly id: WorkspaceId;
   public readonly workspaceDir: string;
@@ -23,14 +33,7 @@ export class WorkspaceEntity {
   public readonly createdAt: string;
   private _lastOpenedAt: string | null;
 
-  /** Direct construction for trusted rehydration and tests. */
-  constructor(args: {
-    readonly id: WorkspaceId;
-    readonly workspaceDir: string;
-    readonly name: WorkspaceName;
-    readonly createdAt: string;
-    readonly lastOpenedAt: string | null;
-  }) {
+  private constructor(args: RehydrateWorkspaceArgs) {
     this.id = args.id;
     this.workspaceDir = args.workspaceDir;
     this._name = args.name;
@@ -46,7 +49,7 @@ export class WorkspaceEntity {
     return this._lastOpenedAt;
   }
 
-  /** Mint a new aggregate and seed `lastOpenedAt` to `now`. */
+  /** Mint a new aggregate (seeds `lastOpenedAt` to `now`). */
   static create(args: CreateWorkspaceArgs): WorkspaceEntity {
     return new WorkspaceEntity({
       id: args.id,
@@ -55,6 +58,11 @@ export class WorkspaceEntity {
       createdAt: args.now,
       lastOpenedAt: args.now,
     });
+  }
+
+  /** Rebuild a persisted aggregate from its stored fields (see the mapper). */
+  static rehydrate(args: RehydrateWorkspaceArgs): WorkspaceEntity {
+    return new WorkspaceEntity(args);
   }
 
   /** Update the display name; same-name updates are a no-op. */

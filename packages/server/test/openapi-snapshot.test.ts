@@ -17,30 +17,27 @@
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
 import {
   catalogRoutes,
+  configRoutes,
+  healthRoutes,
+  injectWorkspaceIdParam,
+  runtimesRoutes,
   scheduledTasksRoutes,
+  scheduledWorkflowsRoutes,
+  schedulesRoutes,
   sessionsRoutes,
   tasksRoutes,
+  workflowsRoutes,
   workspacesRoutes,
 } from "@glyphs-ai/api";
 import type { CatalogModule } from "@glyphs-ai/catalog";
 import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
-import type { ScheduleService } from "@glyphs-ai/schedule";
+import type { ScheduleModule } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { describe, expect, it } from "vitest";
-import {
-  createApiApp,
-  injectWorkspaceIdParam,
-  registerOpenApiDoc,
-} from "../src/routes/_openapi.js";
-import { configRoutes } from "../src/routes/config.js";
-import { healthRoutes } from "../src/routes/health.js";
-import { runtimesRoutes } from "../src/routes/runtimes.js";
-import { scheduledWorkflowsRoutes } from "../src/routes/scheduled-workflows.js";
-import { schedulesRoutes } from "../src/routes/schedules.js";
-import { workflowsRoutes } from "../src/routes/workflows.js";
+import { createApiApp, registerOpenApiDoc } from "../src/routes/_openapi.js";
 
 /**
  * Mirror of `runServer`'s mount tree, parameterised over deps so the
@@ -213,10 +210,10 @@ function stubTaskManager(): TaskModule {
   });
 }
 
-function stubScheduleService(): ScheduleService {
-  return new Proxy({} as ScheduleService, {
+function stubScheduleService(): ScheduleModule {
+  return new Proxy({} as ScheduleModule, {
     get() {
-      throw new Error("stubScheduleService: not callable");
+      throw new Error("stubScheduleModule: not callable");
     },
   });
 }

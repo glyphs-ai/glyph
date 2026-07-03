@@ -9,7 +9,7 @@ import {
   type SkillFqn,
 } from "@glyphs-ai/catalog";
 import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
-import { composeScheduleModule, type ScheduleService } from "@glyphs-ai/schedule";
+import { composeScheduleModule, type ScheduleModule } from "@glyphs-ai/schedule";
 import {
   type AgentNotFound,
   type AgentResolutionFailed,
@@ -113,7 +113,7 @@ export interface WorkspaceContext {
    * and torn down before tasks in `close()` so a fire in flight
    * doesn't race a closed task module.
    */
-  readonly schedules: ScheduleService;
+  readonly schedules: ScheduleModule;
   /**
    * Per-workspace DAG-orchestration substrate. Hands the
    * coordinator-kind dispatch path a task-module-backed runner via
@@ -541,13 +541,14 @@ export class WorkspaceContextRegistry {
       // load-bearing for the catchup path: a catchup fire (next
       // fire in the past at boot) needs the freshly-reconciled
       // task list when it checks hasInFlightByOrigin.
-      scheduleModule.service.registerKind(
+      const registerTask = scheduleModule.engine.registerKind(
         "task",
         makeTaskKindHandler({
           tasks: taskModule,
           catalog: catalogPorts,
         }),
       );
+      if (registerTask.isErr()) throw new Error(registerTask.error.type);
 
       // Workflow substrate composed BEFORE recover() so the workflow
       // kind handler is registered and recover()'s catchup path can
@@ -590,7 +591,7 @@ export class WorkspaceContextRegistry {
       // reference the live WorkflowModule for dispatch / hasInFlight
       // / deleteTerminalByOrigin. Both kinds are now registered; recover()
       // below will preflight all persisted rows and fire catchups.
-      scheduleModule.service.registerKind(
+      const registerWorkflow = scheduleModule.engine.registerKind(
         "workflow",
         makeWorkflowKindHandler({
           workflows: workflowModule,
@@ -598,7 +599,9 @@ export class WorkspaceContextRegistry {
           catalog: catalogPorts,
         }),
       );
-      await scheduleModule.service.recover();
+      if (registerWorkflow.isErr()) throw new Error(registerWorkflow.error.type);
+      const recovered = await scheduleModule.engine.recover();
+      if (recovered.isErr()) throw new Error(recovered.error.type);
     } catch (err) {
       await teardown();
       throw err;
@@ -610,7 +613,7 @@ export class WorkspaceContextRegistry {
       catalog: catalogModule,
       sessions: sessionModule,
       tasks: taskModule,
-      schedules: scheduleModule.service,
+      schedules: scheduleModule,
       workflows: workflowModule,
       async close() {
         // Per-module try/catch: a throw from one module's close()

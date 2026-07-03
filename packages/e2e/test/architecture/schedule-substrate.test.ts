@@ -17,7 +17,7 @@
  *                                        partial index `(origin, origin_id)`
  *                                        backs the lookup)
  *
- * Flow: `schedule-service.dispatch()` hands the registered handler an
+ * Flow: the schedule engine's `dispatch()` hands the registered handler an
  * envelope `{ scheduleId: entity.id, … }`; the api wiring handlers create
  * the task/workflow with `origin: "schedule"` and `originId: scheduleId`;
  * the task/workflow repositories locate that work by the typed
@@ -61,8 +61,8 @@ const ORIGIN_PAIR_INDEX =
 const LEGACY_SCHEDULE_ID_INDEX_DROP = /DROP INDEX IF EXISTS [`"]?\w*schedule_id_idx[`"]?/i;
 
 describe("schedule substrate: producer envelope", () => {
-  it("schedule-service hands the handler { scheduleId: entity.id }", () => {
-    const src = readSrc("schedule/src/schedule-service.ts");
+  it("schedule-engine hands the handler { scheduleId: entity.id }", () => {
+    const src = readSrc("schedule/src/application/engine/schedule-engine.ts");
     expect(src).toMatch(/scheduleId:\s*entity\.id/);
   });
 });
@@ -89,10 +89,10 @@ describe("schedule substrate: repositories query the typed origin_id column", ()
     expect(src).not.toMatch(LEGACY_SCHEDULE_ID_JSON_PATH);
   });
 
-  it("workflow-repository locates scheduled work via the (origin, origin_id) columns", () => {
-    const src = readSrc("workflow/src/workflow-repository.ts");
-    expect(src).toMatch(/eq\(\s*workflows\.origin\s*,/);
-    expect(src).toMatch(/(?:eq|inArray)\(\s*workflows\.originId\s*,/);
+  it("aggregate-workflows-by-origin locates scheduled work via the (origin, origin_id) columns", () => {
+    const src = readSrc("workflow/src/application/aggregate-workflows-by-origin.ts");
+    expect(src).toMatch(/eq\(\s*q\.workflows\.origin\s*,/);
+    expect(src).toMatch(/(?:eq|inArray)\(\s*q\.workflows\.originId\s*,/);
     expect(src).not.toMatch(LEGACY_SCHEDULE_ID_JSON_PATH);
   });
 });
@@ -100,7 +100,7 @@ describe("schedule substrate: repositories query the typed origin_id column", ()
 describe("schedule substrate: composite partial index backs the column query", () => {
   for (const [pkg, rel] of [
     ["task", "task/src/infrastructure/drizzle/task-migrations.ts"],
-    ["workflow", "workflow/src/migrations.ts"],
+    ["workflow", "workflow/src/infrastructure/drizzle/workflow-migrations.ts"],
   ] as const) {
     it(`${pkg} migration creates the (origin, origin_id) partial index`, () => {
       const src = readSrc(rel);

@@ -28,26 +28,42 @@ export type WorkspacePathConflict = {
   readonly existingId: WorkspaceId | undefined;
 };
 
-export type WorkspaceNotRegistered = {
-  readonly type: "WorkspaceNotRegistered";
+/**
+ * "The row is absent" outcome for {@link WorkspaceRepository.get}. A
+ * use-case decides how to interpret a missing row: open/rename surface it
+ * directly as the caller-facing error; unregister treats it as idempotent
+ * success.
+ */
+export type WorkspaceNotFound = {
+  readonly type: "WorkspaceNotFound";
   readonly id: WorkspaceId;
 };
 
 /**
- * Persistence port for the workspace registry. Reads return
- * {@link WorkspaceEntity}; row shapes stay inside infrastructure.
- * Methods return `ResultAsync` and adapters map driver failures to
+ * Persistence port for the mutable workspace aggregate. Reads return
+ * {@link WorkspaceEntity}; row shapes stay inside infrastructure. Methods
+ * return `ResultAsync` and adapters map driver failures to
  * `DatabaseUnavailable`.
+ *
+ * Write-side only — pure reads (list, last-opened, path lookup) live on
+ * the read-side `WorkspaceQueries`. `save` is an upsert keyed on the
+ * entity's snapshot: a freshly `create()`d aggregate (null snapshot) is
+ * INSERTed and may surface the unique-constraint conflicts; a loaded
+ * aggregate is UPDATEd (mutable columns only) and cannot conflict.
  */
 export interface WorkspaceRepository {
-  findById(id: WorkspaceId): ResultAsync<WorkspaceEntity | undefined, DatabaseUnavailable>;
-  findByPath(workspaceDir: string): ResultAsync<WorkspaceEntity | undefined, DatabaseUnavailable>;
-  findAllByLastOpened(): ResultAsync<WorkspaceEntity[], DatabaseUnavailable>;
-  findLastOpened(): ResultAsync<WorkspaceEntity | undefined, DatabaseUnavailable>;
-  findLastOpenedId(): ResultAsync<WorkspaceId | undefined, DatabaseUnavailable>;
-  insert(
+  /** Load the aggregate for mutation; captures a snapshot for save-time diffing. */
+  get(id: WorkspaceId): ResultAsync<WorkspaceEntity, WorkspaceNotFound | DatabaseUnavailable>;
+
+  /**
+   * Persist the aggregate. New (null-snapshot) entities INSERT — surfacing
+   * `WorkspaceIdConflict` / `WorkspacePathConflict` from the unique
+   * constraints; loaded entities UPDATE only the mutable columns (or no-op
+   * when nothing diverged), which cannot conflict.
+   */
+  save(
     entity: WorkspaceEntity,
   ): ResultAsync<void, DatabaseUnavailable | WorkspaceIdConflict | WorkspacePathConflict>;
-  save(entity: WorkspaceEntity): ResultAsync<void, DatabaseUnavailable>;
+
   delete(id: WorkspaceId): ResultAsync<void, DatabaseUnavailable>;
 }

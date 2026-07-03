@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TaskBriefSchema } from "../../../src/domain/task-brief.js";
 import { TaskEntity } from "../../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../../src/domain/task-id.js";
 import { TaskMapper } from "../../../src/infrastructure/drizzle/task-mapper.js";
@@ -53,7 +54,7 @@ describe("TaskMapper.toRow", () => {
     const entity = TaskEntity.create({
       id: ID,
       agent: "public/demo",
-      brief: "do it",
+      brief: TaskBriefSchema.parse("do it"),
       createdAt: CREATED_AT,
       metadata: { runtime: "copilot", foo: "bar" },
     });
@@ -63,7 +64,13 @@ describe("TaskMapper.toRow", () => {
   });
 
   it("JSON-encodes the terminal payload columns", () => {
-    const succeeded = TaskEntity.create({ id: ID, agent: "a", brief: "b", createdAt: CREATED_AT })
+    const succeeded = TaskEntity.create({
+      id: ID,
+      agent: "a",
+      brief: TaskBriefSchema.parse("b"),
+      createdAt: CREATED_AT,
+    });
+    succeeded
       .complete({ output: "done", artifacts: ["/w/artifact/a.html"] }, { now: CREATED_AT })
       ._unsafeUnwrap();
     const row = TaskMapper.toRow(succeeded);
@@ -87,7 +94,7 @@ describe("TaskMapper.toEntity", () => {
     const original = TaskEntity.create({
       id: ID,
       agent: "public/demo",
-      brief: "do it",
+      brief: TaskBriefSchema.parse("do it"),
       details: "body",
       createdAt: CREATED_AT,
       metadata: { runtime: "copilot", tag: "x" },

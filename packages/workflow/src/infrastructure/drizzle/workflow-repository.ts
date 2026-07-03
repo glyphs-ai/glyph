@@ -2,7 +2,6 @@ import { and, eq } from "drizzle-orm";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import type { WorkflowNodeEntity } from "../../domain/node/workflow-node-entity.js";
-import type { WorkflowEntityCorruption } from "../../domain/workflow/workflow-corruption.js";
 import type {
   WorkflowEntity,
   WorkflowHeaderSnapshot,
@@ -11,6 +10,7 @@ import type {
 import type { WorkflowId } from "../../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
+  WorkflowEntityCorruption,
   WorkflowNotFound,
   WorkflowRepository,
 } from "../../domain/workflow/workflow-repository.js";

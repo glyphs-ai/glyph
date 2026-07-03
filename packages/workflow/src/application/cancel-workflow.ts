@@ -1,11 +1,11 @@
 import { err, ok, ResultAsync } from "neverthrow";
 import { z } from "zod";
 import { WorkflowCancellationSchema } from "../domain/workflow/workflow-cancellation.js";
-import type { WorkflowEntityCorruption } from "../domain/workflow/workflow-corruption.js";
 import type { WorkflowAlreadyTerminal } from "../domain/workflow/workflow-entity.js";
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
+  WorkflowEntityCorruption,
   WorkflowNotFound,
   WorkflowRepository,
 } from "../domain/workflow/workflow-repository.js";

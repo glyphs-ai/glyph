@@ -1,21 +1,29 @@
-import { and, eq, gte, type SQL } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { SessionEntity } from "../../domain/session-entity.js";
 import type { SessionId } from "../../domain/session-id.js";
 import type {
   DatabaseUnavailable,
-  FindAllSessionsFilter,
   SessionIdConflict,
   SessionNotFound,
   SessionRepository,
 } from "../../domain/session-repository.js";
 import type { Db } from "./session-db.js";
-import { SessionMapper } from "./session-mapper.js";
+import { SessionMapper, type SessionRow } from "./session-mapper.js";
 import { sessions } from "./session-schema.js";
 
-/** Drizzle-backed adapter for {@link SessionRepository}. */
+/**
+ * Drizzle-backed write-side adapter for {@link SessionRepository}.
+ *
+ * Change-tracking lives here, not on the entity: `get` snapshots the loaded
+ * row into a `WeakMap` keyed on the returned entity; `save` looks the entity
+ * up — absent ⇒ INSERT (a freshly `create()`d aggregate, may hit the PRIMARY
+ * KEY), present ⇒ diff the current row against the snapshot and UPDATE only
+ * the changed columns (or no-op).
+ */
 export class DrizzleSessionRepository implements SessionRepository {
   private readonly db: Db;
+  private readonly snapshots = new WeakMap<SessionEntity, SessionRow>();
 
   constructor(opts: { db: Db }) {
     this.db = opts.db;
@@ -26,54 +34,38 @@ export class DrizzleSessionRepository implements SessionRepository {
   }
 
   get(id: SessionId): ResultAsync<SessionEntity, SessionNotFound | DatabaseUnavailable> {
-    return this.findById(id).andThen(
-      (entity): ResultAsync<SessionEntity, SessionNotFound | DatabaseUnavailable> =>
-        entity === undefined ? errAsync({ type: "SessionNotFound", id }) : okAsync(entity),
-    );
-  }
-
-  findById(id: SessionId): ResultAsync<SessionEntity | undefined, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => this.db.select().from(sessions).where(eq(sessions.id, id)).get())(),
       DrizzleSessionRepository.asDatabaseUnavailable,
-    ).map((row) => (row ? SessionMapper.toDomain(row) : undefined));
+    ).andThen((row) => {
+      if (!row) return errAsync<SessionEntity, SessionNotFound>({ type: "SessionNotFound", id });
+      const entity = SessionMapper.toDomain(row);
+      this.snapshots.set(entity, SessionMapper.toRow(entity));
+      return okAsync(entity);
+    });
   }
 
-  findAll(filter: FindAllSessionsFilter): ResultAsync<SessionEntity[], DatabaseUnavailable> {
+  save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable | SessionIdConflict> {
+    const snapshot = this.snapshots.get(entity);
+    const current = SessionMapper.toRow(entity);
+    // Untracked entity ⇒ never loaded ⇒ INSERT (may hit a PRIMARY KEY conflict).
+    if (snapshot === undefined) {
+      return ResultAsync.fromPromise(
+        (async () => {
+          this.db.insert(sessions).values(current).run();
+        })(),
+        (cause) => this.translateInsertError(cause, entity),
+      ).map(() => this.track(entity, current));
+    }
+    // Tracked entity: UPDATE only the columns that diverged from the snapshot.
+    const diff = diffRow(snapshot, current);
+    if (Object.keys(diff).length === 0) return okAsync(undefined);
     return ResultAsync.fromPromise(
       (async () => {
-        const filters: SQL[] = [];
-        if (filter.createdSince !== undefined) {
-          filters.push(gte(sessions.createdAt, filter.createdSince));
-        }
-        if (filter.agent !== undefined) filters.push(eq(sessions.agent, filter.agent));
-        const query = this.db.select().from(sessions);
-        return filters.length > 0 ? query.where(and(...filters)).all() : query.all();
+        this.db.update(sessions).set(diff).where(eq(sessions.id, entity.id)).run();
       })(),
       DrizzleSessionRepository.asDatabaseUnavailable,
-    ).map((rows) => rows.map((row) => SessionMapper.toDomain(row)));
-  }
-
-  insert(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable | SessionIdConflict> {
-    return ResultAsync.fromPromise(
-      (async () => {
-        this.db.insert(sessions).values(SessionMapper.toRow(entity)).run();
-      })(),
-      (cause) => this.translateInsertError(cause, entity),
-    );
-  }
-
-  save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable> {
-    return ResultAsync.fromPromise(
-      (async () => {
-        this.db
-          .update(sessions)
-          .set(SessionMapper.toRow(entity))
-          .where(eq(sessions.id, entity.id))
-          .run();
-      })(),
-      DrizzleSessionRepository.asDatabaseUnavailable,
-    );
+    ).map(() => this.track(entity, current));
   }
 
   delete(id: SessionId): ResultAsync<void, DatabaseUnavailable> {
@@ -83,6 +75,11 @@ export class DrizzleSessionRepository implements SessionRepository {
       })(),
       DrizzleSessionRepository.asDatabaseUnavailable,
     );
+  }
+
+  /** Record the persisted row as the entity's tracked snapshot. */
+  private track(entity: SessionEntity, row: SessionRow): void {
+    this.snapshots.set(entity, row);
   }
 
   /** Translate a SQLite PRIMARY KEY violation into `SessionIdConflict`. */
@@ -96,4 +93,19 @@ export class DrizzleSessionRepository implements SessionRepository {
     }
     return DrizzleSessionRepository.asDatabaseUnavailable(cause);
   }
+}
+
+/**
+ * Shallow column-wise diff: the subset of `current`'s columns whose value
+ * differs from `snapshot`. All session columns are primitives (string |
+ * null), so identity comparison is exact.
+ */
+function diffRow(snapshot: SessionRow, current: SessionRow): Partial<SessionRow> {
+  const diff: Partial<SessionRow> = {};
+  for (const key of Object.keys(current) as (keyof SessionRow)[]) {
+    if (current[key] !== snapshot[key]) {
+      diff[key] = current[key] as SessionRow[keyof SessionRow] as never;
+    }
+  }
+  return diff;
 }

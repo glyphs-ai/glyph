@@ -6,6 +6,9 @@
  * `Schedule` / `PreviewScheduleResult` domain types from
  * `@glyphs-ai/schedule`.
  */
+
+import { TaskBriefSchema } from "@glyphs-ai/task";
+import { WorkflowBriefSchema } from "@glyphs-ai/workflow";
 import { z } from "zod";
 
 // ─── Trigger + envelope (schedule domain) ─────────────────────────
@@ -126,17 +129,7 @@ export const TaskTargetDataRequestSchema = z
     agent: z.string().refine((s) => s.trim().length > 0, {
       message: "target.agent must be a non-empty string",
     }),
-    brief: z
-      .string()
-      .refine((s) => s.trim().length > 0, {
-        message: "target.brief must be a non-empty string",
-      })
-      .refine((s) => !s.includes("\n") && !s.includes("\r"), {
-        message: "target.brief must be a single line — pass long content via target.details",
-      })
-      .refine((s) => s.trim().length <= 200, {
-        message: "target.brief must be at most 200 chars",
-      }),
+    brief: TaskBriefSchema,
     details: z.string().optional(),
     runtime: z
       .string()
@@ -155,18 +148,7 @@ export const TaskTargetPatchRequestSchema = z
         message: "target.agent must be a non-empty string",
       })
       .optional(),
-    brief: z
-      .string()
-      .refine((s) => s.trim().length > 0, {
-        message: "target.brief must be a non-empty string",
-      })
-      .refine((s) => !s.includes("\n") && !s.includes("\r"), {
-        message: "target.brief must be a single line — pass long content via target.details",
-      })
-      .refine((s) => s.trim().length <= 200, {
-        message: "target.brief must be at most 200 chars",
-      })
-      .optional(),
+    brief: TaskBriefSchema.optional(),
     details: z.string().nullable().optional(),
     runtime: z
       .string()
@@ -183,17 +165,7 @@ export const WorkflowTargetDataRequestSchema = z
     coordinatorAgent: z.string().refine((s) => s.trim().length > 0, {
       message: "target.coordinatorAgent must be a non-empty string",
     }),
-    brief: z
-      .string()
-      .refine((s) => s.trim().length > 0, {
-        message: "target.brief must be a non-empty string",
-      })
-      .refine((s) => !s.includes("\n") && !s.includes("\r"), {
-        message: "target.brief must be a single line — pass long content via target.details",
-      })
-      .refine((s) => s.trim().length <= 200, {
-        message: "target.brief must be at most 200 chars",
-      }),
+    brief: WorkflowBriefSchema,
     details: z.string().optional(),
   })
   .strict();
@@ -206,18 +178,7 @@ export const WorkflowTargetPatchRequestSchema = z
         message: "target.coordinatorAgent must be a non-empty string",
       })
       .optional(),
-    brief: z
-      .string()
-      .refine((s) => s.trim().length > 0, {
-        message: "target.brief must be a non-empty string",
-      })
-      .refine((s) => !s.includes("\n") && !s.includes("\r"), {
-        message: "target.brief must be a single line — pass long content via target.details",
-      })
-      .refine((s) => s.trim().length <= 200, {
-        message: "target.brief must be at most 200 chars",
-      })
-      .optional(),
+    brief: WorkflowBriefSchema.optional(),
     details: z.string().nullable().optional(),
   })
   .strict();

@@ -60,7 +60,7 @@ export const TaskMapper = {
     );
     if (cancellation.isErr()) return err(cancellation.error);
 
-    return TaskEntity.fromStored({
+    return TaskEntity.rehydrate({
       id: row.id,
       agent: row.agent,
       brief: row.brief,

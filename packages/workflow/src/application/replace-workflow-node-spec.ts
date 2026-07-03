@@ -2,13 +2,15 @@ import { err, ok, ResultAsync } from "neverthrow";
 import { z } from "zod";
 import { WorkflowNodeIdSchema } from "../domain/node/workflow-node-id.js";
 import { COORDINATOR_KIND, type WorkflowNodeKind } from "../domain/node/workflow-node-kind.js";
-import type { WorkflowEntityCorruption } from "../domain/workflow/workflow-corruption.js";
 import type { WorkflowAlreadyTerminal } from "../domain/workflow/workflow-entity.js";
-import type { WorkflowNodeNotMutable } from "../domain/workflow/workflow-errors.js";
+import type {
+  WorkflowNodeNotFound,
+  WorkflowNodeNotMutable,
+} from "../domain/workflow/workflow-entity-errors.js";
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
-  WorkflowNodeNotFound,
+  WorkflowEntityCorruption,
   WorkflowNotFound,
   WorkflowRepository,
 } from "../domain/workflow/workflow-repository.js";

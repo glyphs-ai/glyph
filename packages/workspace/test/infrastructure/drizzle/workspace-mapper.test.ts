@@ -36,7 +36,7 @@ describe("WorkspaceMapper.toDomain", () => {
 
 describe("WorkspaceMapper.toRow", () => {
   it("extracts every column from an entity (round-trips with toDomain)", () => {
-    const e = new WorkspaceEntity({
+    const e = WorkspaceEntity.rehydrate({
       id: "11111111-1111-4111-8111-111111111111" as WorkspaceId,
       name: "Demo" as WorkspaceName,
       workspaceDir: "/x",
@@ -47,7 +47,7 @@ describe("WorkspaceMapper.toRow", () => {
   });
 
   it("writes null lastOpenedAt when the entity carries null", () => {
-    const e = new WorkspaceEntity({
+    const e = WorkspaceEntity.rehydrate({
       id: "11111111-1111-4111-8111-111111111111" as WorkspaceId,
       name: "Demo" as WorkspaceName,
       workspaceDir: "/x",
@@ -58,7 +58,7 @@ describe("WorkspaceMapper.toRow", () => {
   });
 
   it("reflects post-mutation state", () => {
-    const e = new WorkspaceEntity({
+    const e = WorkspaceEntity.rehydrate({
       id: "11111111-1111-4111-8111-111111111111" as WorkspaceId,
       name: "Old" as WorkspaceName,
       workspaceDir: "/x",

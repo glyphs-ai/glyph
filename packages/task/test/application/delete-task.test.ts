@@ -2,7 +2,8 @@ import { errAsync, okAsync } from "neverthrow";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type MockProxy, mock } from "vitest-mock-extended";
 import { DeleteTaskUseCase } from "../../src/application/delete-task.js";
-import type { TaskSupervisor } from "../../src/application/supervision/index.js";
+import type { TaskSupervisor } from "../../src/application/supervision/task-supervisor.js";
+import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import { TaskEntity } from "../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../src/domain/task-id.js";
 import type { TaskRepository } from "../../src/domain/task-repository.js";
@@ -21,31 +22,59 @@ beforeEach(() => {
 });
 
 function terminal(): TaskEntity {
-  return TaskEntity.create({ id: ID, agent: "a", brief: "b", createdAt: CREATED_AT })
-    .complete({ output: null, artifacts: [] }, { now: CREATED_AT })
-    ._unsafeUnwrap();
+  const t = TaskEntity.create({
+    id: ID,
+    agent: "a",
+    brief: TaskBriefSchema.parse("b"),
+    createdAt: CREATED_AT,
+  });
+  t.complete({ output: null, artifacts: [] }, { now: CREATED_AT })._unsafeUnwrap();
+  return t;
 }
 
 function runningTask(): TaskEntity {
-  return TaskEntity.create({ id: ID, agent: "a", brief: "b", createdAt: CREATED_AT });
+  return TaskEntity.create({
+    id: ID,
+    agent: "a",
+    brief: TaskBriefSchema.parse("b"),
+    createdAt: CREATED_AT,
+  });
 }
 
 describe("DeleteTaskUseCase", () => {
-  it("deletes a terminal task without enqueuing a purge by default", async () => {
+  it("deletes a terminal task without purging by default", async () => {
     repo.get.mockReturnValue(okAsync(terminal()));
     repo.delete.mockReturnValue(okAsync(undefined));
     const res = await useCase.execute({ id: ID });
     expect(res.isOk()).toBe(true);
     expect(repo.delete).toHaveBeenCalledWith(ID);
-    expect(supervisor.enqueuePurge).not.toHaveBeenCalled();
+    expect(supervisor.purge).not.toHaveBeenCalled();
   });
 
-  it("enqueues a background purge when purge: true", async () => {
+  it("purges physical resources BEFORE deleting the row when purge: true", async () => {
     const done = terminal();
     repo.get.mockReturnValue(okAsync(done));
+    supervisor.purge.mockReturnValue(okAsync(undefined));
     repo.delete.mockReturnValue(okAsync(undefined));
-    await useCase.execute({ id: ID, purge: true });
-    expect(supervisor.enqueuePurge).toHaveBeenCalledWith(done);
+    const res = await useCase.execute({ id: ID, purge: true });
+    expect(res.isOk()).toBe(true);
+    expect(supervisor.purge).toHaveBeenCalledWith(done);
+    expect(repo.delete).toHaveBeenCalledWith(ID);
+    // The row is the durable journal: purge must complete before the row is removed.
+    const purgeOrder = supervisor.purge.mock.invocationCallOrder.at(0) ?? 0;
+    const deleteOrder = repo.delete.mock.invocationCallOrder.at(0) ?? 0;
+    expect(purgeOrder).toBeGreaterThan(0);
+    expect(deleteOrder).toBeGreaterThan(purgeOrder);
+  });
+
+  it("keeps the row (no delete) and surfaces PurgeFailed when purge fails", async () => {
+    repo.get.mockReturnValue(okAsync(terminal()));
+    supervisor.purge.mockReturnValue(
+      errAsync({ type: "PurgeFailed", taskId: ID, cause: new Error("rm") }),
+    );
+    const e = (await useCase.execute({ id: ID, purge: true }))._unsafeUnwrapErr();
+    expect(e.type).toBe("PurgeFailed");
+    expect(repo.delete).not.toHaveBeenCalled();
   });
 
   it("rejects deleting a non-terminal task with InvalidTransition", async () => {

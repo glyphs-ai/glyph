@@ -16,8 +16,10 @@ import { ListTasksUseCase } from "./application/list-tasks.js";
 import type { AgentResolver } from "./application/ports/agent-resolver.js";
 import { RecoverOrphanedTasksUseCase } from "./application/recover-orphaned-tasks.js";
 import { ResolveArtifactPathUseCase } from "./application/resolve-artifact-path.js";
-import { InMemoryLiveProcessRegistry, TaskSupervisor } from "./application/supervision/index.js";
+import { InMemoryLiveProcessRegistry } from "./application/supervision/in-memory-live-process-registry.js";
+import { TaskSupervisor } from "./application/supervision/task-supervisor.js";
 import { openDb } from "./infrastructure/drizzle/task-db.js";
+import { DrizzleTaskQueries } from "./infrastructure/drizzle/task-queries.js";
 import { DrizzleTaskRepository } from "./infrastructure/drizzle/task-repository.js";
 import { LocalTaskSandbox } from "./infrastructure/file/local-task-sandbox.js";
 import { tasksRoot } from "./task-paths.js";
@@ -46,8 +48,6 @@ export interface TaskModule {
   liveCount(): number;
   /** Kill live subprocesses, drain exit watchers, and stop accepting new dispatches. */
   shutdown(): Promise<void>;
-  /** Test seam: await queued background workdir / runtime-state purges. */
-  drainPurges(): Promise<void>;
   /** Close the underlying SQLite connection. Does NOT stop subprocesses — call `shutdown` first. */
   close(): Promise<void>;
 }
@@ -84,6 +84,7 @@ export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskMo
   const randomBytes = opts.randomBytes ?? cryptoRandomBytes;
 
   const repository = new DrizzleTaskRepository({ db, logger });
+  const query = new DrizzleTaskQueries({ db });
   const sandbox = new LocalTaskSandbox({ root: tasksRoot(opts.workspaceDir) });
   const liveProcesses = new InMemoryLiveProcessRegistry();
   const supervisor = new TaskSupervisor({
@@ -108,31 +109,32 @@ export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskMo
     }),
     cancelTask: new CancelTaskUseCase({ supervisor }),
     deleteTask: new DeleteTaskUseCase({ repository, supervisor }),
-    getTask: new GetTaskUseCase({ repository, runtimeRegistry: opts.runtimeRegistry }),
-    listTasks: new ListTasksUseCase({ repository }),
+    getTask: new GetTaskUseCase({ query, runtimeRegistry: opts.runtimeRegistry }),
+    listTasks: new ListTasksUseCase({ query }),
     getTaskActivity: new GetTaskActivityUseCase({
-      repository,
+      query,
       runtimeRegistry: opts.runtimeRegistry,
     }),
     getTaskActivityStream: new GetTaskActivityStreamUseCase({
-      repository,
+      query,
       runtimeRegistry: opts.runtimeRegistry,
     }),
-    recoverOrphanedTasks: new RecoverOrphanedTasksUseCase({ repository, now, logger }),
-    resolveArtifactPath: new ResolveArtifactPathUseCase({ repository }),
-    hasInFlightByOrigin: new HasInFlightByOriginUseCase({ repository }),
-    listInFlightByOrigin: new ListInFlightByOriginUseCase({ repository }),
-    findLatestByOrigin: new FindLatestByOriginUseCase({ repository }),
-    deleteTerminalByOrigin: new DeleteTerminalByOriginUseCase({ repository, supervisor }),
-    aggregateByOrigin: new AggregateByOriginUseCase({ repository }),
+    recoverOrphanedTasks: new RecoverOrphanedTasksUseCase({ repository, query, now, logger }),
+    resolveArtifactPath: new ResolveArtifactPathUseCase({ query }),
+    hasInFlightByOrigin: new HasInFlightByOriginUseCase({ query }),
+    listInFlightByOrigin: new ListInFlightByOriginUseCase({ query }),
+    findLatestByOrigin: new FindLatestByOriginUseCase({ query }),
+    deleteTerminalByOrigin: new DeleteTerminalByOriginUseCase({
+      repository,
+      supervisor,
+      logger,
+    }),
+    aggregateByOrigin: new AggregateByOriginUseCase({ query }),
     liveCount() {
       return supervisor.liveCount();
     },
     shutdown() {
       return supervisor.shutdown();
-    },
-    drainPurges() {
-      return supervisor.drainPurges();
     },
     async close() {
       close();

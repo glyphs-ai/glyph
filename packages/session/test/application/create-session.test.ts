@@ -41,7 +41,7 @@ beforeEach(() => {
   sandbox.remove.mockReturnValue(okAsync(undefined));
   runtime.provision.mockReturnValue(okAsync({ runtimeSessionId: "rsid-1" }));
   runtime.deleteState.mockReturnValue(okAsync(undefined));
-  repo.insert.mockReturnValue(okAsync(undefined));
+  repo.save.mockReturnValue(okAsync(undefined));
   useCase = new CreateSessionUseCase({
     repo,
     runtimeRegistry,
@@ -80,7 +80,7 @@ describe("CreateSessionUseCase — happy path", () => {
       preview: null,
       lastLaunchMode: null,
     });
-    expect(repo.insert).toHaveBeenCalledTimes(1);
+    expect(repo.save).toHaveBeenCalledTimes(1);
   });
 
   it("defaults the runtime kind to copilot", async () => {
@@ -116,11 +116,11 @@ describe("CreateSessionUseCase — error channel + rollback", () => {
     const err = (await useCase.execute({ agent: "public/demo" }))._unsafeUnwrapErr();
     expect(err.type).toBe("RuntimeProvisionFailed");
     expect(sandbox.remove).toHaveBeenCalledWith(ID);
-    expect(repo.insert).not.toHaveBeenCalled();
+    expect(repo.save).not.toHaveBeenCalled();
   });
 
   it("rolls back sandbox + runtime state when insert conflicts", async () => {
-    repo.insert.mockReturnValue(errAsync({ type: "SessionIdConflict", id: ID as never }));
+    repo.save.mockReturnValue(errAsync({ type: "SessionIdConflict", id: ID as never }));
     const err = (await useCase.execute({ agent: "public/demo" }))._unsafeUnwrapErr();
     expect(err.type).toBe("SessionIdConflict");
     expect(sandbox.remove).toHaveBeenCalledWith(ID);

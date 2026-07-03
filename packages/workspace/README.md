@@ -22,16 +22,17 @@ packages/workspace/src/
     workspace.entity.ts        WorkspaceEntity (pkg-owned domain shape)
     workspace-id.ts            WorkspaceId schema + branded type
     workspace-name.ts          WorkspaceName schema + branded type
-    workspace-repository.ts    repository port + repository error atoms
+    workspace-repository.ts    repository port (write-side: get/save/delete) + error atoms
     workspace-provisioner.ts   filesystem provisioner port + error atom
   application/
     *.ts                       one use-case class per operation
     workspace-public.ts        curated domain/error surface exported by index.ts
   infrastructure/drizzle/
     workspace-schema.ts        Drizzle table def (private; only types exported)
-    workspace-db.ts            openDb() factory + Db handle type
+    workspace-db.ts            openWorkspaceDb() factory + Db handle type
     workspace-migrations.ts    applyWorkspaceMigrations
-    workspace-repository.ts    Drizzle repository adapter
+    workspace-repository.ts    Drizzle write-side adapter (get/save/delete)
+    workspace-queries.ts       Drizzle read-side adapter (query() + workspaces table)
   infrastructure/file/
     local-workspace-provisioner.ts  creates/removes sessions/, tasks/, workflows/
   workspace-module.ts          composeWorkspaceModule({ dbFile, defaultWorkspaceParent, logger? })
@@ -47,10 +48,13 @@ contracts, the curated cross-use-case domain/error surface, and
 `UseCase` / `UseCaseResult`:
 
 ```ts
-import { composeWorkspaceModule } from "@glyphs-ai/workspace";
+import { composeWorkspaceModule, openWorkspaceDb } from "@glyphs-ai/workspace";
 
+// The caller (assembler) opens the DB and owns its lifecycle. `url` is a
+// libsql URL — a `file:` URL in production, `":memory:"` in tests.
+const { db, close } = await openWorkspaceDb({ url: "file:///abs/path/to/global.db" });
 const workspace = await composeWorkspaceModule({
-  dbFile: "/abs/path/to/global.db",
+  db,
   defaultWorkspaceParent: "/abs/path/to/$GLYPH_HOME/workspaces",
 });
 
@@ -66,7 +70,7 @@ await workspace.openWorkspace.execute({ id });
 await workspace.renameWorkspace.execute({ id, name });
 await workspace.unregisterWorkspace.execute({ id, purge: false });
 
-await workspace.close();                                  // closes the SQLite handle
+await close();                                           // caller closes the libsql handle
 ```
 
 DTOs, schemas, and error unions are exported from the package root:
@@ -122,7 +126,7 @@ package root:
 
 ```
 WorkspaceError
-├── WorkspaceNotRegistered    id has no entry in the registry
+├── WorkspaceNotFound         id has no entry in the registry
 ├── WorkspaceIdConflict       workspace id primary-key collision
 ├── WorkspacePathConflict     workspaceDir already registered
 ├── DatabaseUnavailable       registry-level storage failure
@@ -135,6 +139,21 @@ typed error: use-cases parse inputs with their Zod schemas, so a
 malformed id / name / workspaceDir raises a `ZodError`, which the api
 layer maps to a 400 `ValidationError` envelope.
 
+The write-side repository's `get(id)` returns the entity directly and
+signals a missing row with `WorkspaceNotFound`. Use-cases interpret it
+at their boundary: `rename` / `open` surface it as their caller-facing
+error, while `unregister` treats it as idempotent success.
+
+Change-tracking lives in the repository, not the entity. `WorkspaceEntity`
+is a pure rich-domain object (`create` / `rehydrate` + mutators, no
+persistence state). The repository keeps a `WeakMap<WorkspaceEntity, Row>`:
+`get` snapshots the loaded row against the returned entity; `save` looks the
+entity up — absent ⇒ INSERT (a freshly `create()`d aggregate), present ⇒
+diff the current row against the snapshot and UPDATE only the changed
+columns (or no-op). Persisting a mutation is therefore always `get` →
+mutate → `save`; the `WeakMap` releases entries when the entity is
+garbage-collected, so there is nothing to dispose per request.
+
 Workspace precondition and infrastructure failures are
 discriminated-union values returned in the use-case `Err` channel.
 `getWorkspace.execute({ id })` raises a `ZodError` for a malformed id
@@ -143,8 +162,8 @@ and returns `Ok(null)` only for a valid-but-unknown id.
 Concurrency: `registerWorkspace`'s pre-flight conflict checks are
 best-effort UX. Two concurrent registers can race past them; the
 UNIQUE / PRIMARY KEY constraints on the `workspaces` table are the
-deterministic backstop, and the insert is wrapped to translate SQLite
-constraint errors back into typed domain errors.
+deterministic backstop, and the save's INSERT path is wrapped to
+translate SQLite constraint errors back into typed domain errors.
 
 ## Workspace skeleton
 
@@ -162,7 +181,10 @@ beneath them.
 pnpm --filter @glyphs-ai/workspace test
 ```
 
-Repository tests open `dbFile: ":memory:"` via `openDb` so the schema
-goes through the real migrator; use-case tests mock the repository.
-Vitest runs in `forks` pool (better-sqlite3's native binding segfaults
-on worker-thread teardown on Windows).
+Repository and read-query tests open `openWorkspaceDb({ url: ":memory:" })`
+(via `test/support/open-test-workspace-db.ts`) so the schema goes through the
+real migrator; each `:memory:` connection is its own isolated db needing no
+file cleanup. Read use-case tests drive the real `DrizzleWorkspaceQueries`
+against that in-memory DB, while write use-case tests mock the repository.
+Vitest runs in `forks` pool (native SQLite bindings can segfault on
+worker-thread teardown on Windows).

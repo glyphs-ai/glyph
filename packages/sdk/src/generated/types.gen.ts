@@ -203,7 +203,7 @@ export type PutApiWorkspacesCurrentErrors = {
      */
     400: unknown;
     /**
-     * Workspace not registered
+     * Workspace not found
      */
     404: unknown;
     /**
@@ -261,7 +261,7 @@ export type GetApiWorkspacesByIdData = {
 
 export type GetApiWorkspacesByIdErrors = {
     /**
-     * Workspace not registered
+     * Workspace not found
      */
     404: unknown;
     /**
@@ -280,7 +280,7 @@ export type GetApiWorkspacesByIdResponses = {
         workspaceDir: string;
         createdAt: string;
         lastOpenedAt: string;
-    };
+    } | null;
 };
 
 export type GetApiWorkspacesByIdResponse = GetApiWorkspacesByIdResponses[keyof GetApiWorkspacesByIdResponses];
@@ -302,7 +302,7 @@ export type PatchApiWorkspacesByIdErrors = {
      */
     400: unknown;
     /**
-     * Workspace not registered
+     * Workspace not found
      */
     404: unknown;
     /**
@@ -321,7 +321,7 @@ export type PatchApiWorkspacesByIdResponses = {
         workspaceDir: string;
         createdAt: string;
         lastOpenedAt: string;
-    };
+    } | null;
 };
 
 export type PatchApiWorkspacesByIdResponse = PatchApiWorkspacesByIdResponses[keyof PatchApiWorkspacesByIdResponses];
@@ -337,7 +337,7 @@ export type PostApiWorkspacesByIdReloadData = {
 
 export type PostApiWorkspacesByIdReloadErrors = {
     /**
-     * Workspace not registered
+     * Workspace not found
      */
     404: unknown;
     /**
@@ -458,7 +458,7 @@ export type DeleteApiWorkspacesByIdSessionsBySidData = {
 
 export type DeleteApiWorkspacesByIdSessionsBySidErrors = {
     /**
-     * Runtime state deletion failed
+     * Runtime state / workdir removal failed
      */
     409: unknown;
     /**
@@ -511,7 +511,7 @@ export type GetApiWorkspacesByIdSessionsBySidResponses = {
         lastActiveAt: string | null;
         preview: string | null;
         lastLaunchMode: 'local' | 'remote' | null;
-    };
+    } | null;
 };
 
 export type GetApiWorkspacesByIdSessionsBySidResponse = GetApiWorkspacesByIdSessionsBySidResponses[keyof GetApiWorkspacesByIdSessionsBySidResponses];
@@ -533,10 +533,6 @@ export type PostApiWorkspacesByIdSessionsBySidSpawnErrors = {
      * Malformed request body
      */
     400: unknown;
-    /**
-     * Session not found
-     */
-    404: unknown;
     /**
      * Internal error
      */
@@ -568,9 +564,9 @@ export type GetApiWorkspacesByIdTasksData = {
     };
     query?: {
         agent?: string;
-        runtime?: string;
         createdSince?: string;
-        status?: string;
+        runtime?: string;
+        status?: 'running' | 'succeeded' | 'failed' | 'cancelled';
     };
     url: '/api/workspaces/{id}/tasks';
 };
@@ -595,7 +591,7 @@ export type GetApiWorkspacesByIdTasksResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -610,10 +606,7 @@ export type GetApiWorkspacesByIdTasksResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -669,7 +662,7 @@ export type PostApiWorkspacesByIdTasksResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -684,10 +677,7 @@ export type PostApiWorkspacesByIdTasksResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -775,7 +765,7 @@ export type GetApiWorkspacesByIdTasksByTidResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -790,10 +780,7 @@ export type GetApiWorkspacesByIdTasksByTidResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -810,7 +797,7 @@ export type GetApiWorkspacesByIdTasksByTidResponses = {
             kind: 'cascade';
             message: string;
         };
-    };
+    } | null;
 };
 
 export type GetApiWorkspacesByIdTasksByTidResponse = GetApiWorkspacesByIdTasksByTidResponses[keyof GetApiWorkspacesByIdTasksByTidResponses];
@@ -853,7 +840,7 @@ export type PostApiWorkspacesByIdTasksByTidCancelResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -868,10 +855,7 @@ export type PostApiWorkspacesByIdTasksByTidCancelResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -933,9 +917,9 @@ export type GetApiWorkspacesByIdTasksByTidActivityData = {
         tid: string;
     };
     query?: {
-        before?: string;
-        after?: string;
-        limit?: string;
+        before?: number | null;
+        after?: number | null;
+        limit?: number;
     };
     url: '/api/workspaces/{id}/tasks/{tid}/activity';
 };
@@ -1098,9 +1082,9 @@ export type GetApiWorkspacesByIdScheduledTasksData = {
     };
     query?: {
         agent?: string;
-        runtime?: string;
         createdSince?: string;
-        status?: string;
+        runtime?: string;
+        status?: 'running' | 'succeeded' | 'failed' | 'cancelled';
         scheduleId?: string;
     };
     url: '/api/workspaces/{id}/scheduled-tasks';
@@ -1126,7 +1110,7 @@ export type GetApiWorkspacesByIdScheduledTasksResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -1141,10 +1125,7 @@ export type GetApiWorkspacesByIdScheduledTasksResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {

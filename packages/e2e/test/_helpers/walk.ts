@@ -1,8 +1,8 @@
 /**
  * Shared filesystem-walk helpers for the repo-wide architecture audits
- * (`inter-service-imports`, `tier-invisibility`, `test-layout-convention`,
- * `split-convention`). Centralises the recursive `readdirSync` traversal
- * each audit reimplemented so they share one definition of "what counts
+ * (`inter-service-imports`, `tier-invisibility`, `split-convention`).
+ * Centralises the recursive `readdirSync` traversal each audit
+ * reimplemented so they share one definition of "what counts
  * as glyph source" and one skip policy.
  *
  * Two shapes:
@@ -24,11 +24,6 @@ export const DEFAULT_SKIP_DIRS: ReadonlySet<string> = new Set(["node_modules", "
 /** Matches a TypeScript / TSX source file by name. */
 export function isTsFile(name: string): boolean {
   return name.endsWith(".ts") || name.endsWith(".tsx");
-}
-
-/** Matches a Vitest spec file by name. */
-export function isTestFile(name: string): boolean {
-  return name.endsWith(".test.ts") || name.endsWith(".test.tsx");
 }
 
 /** True iff `p` exists and is a directory. */

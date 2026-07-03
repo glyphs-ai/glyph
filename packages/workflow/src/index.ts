@@ -18,53 +18,164 @@
  * kind-agnostic and takes no dependency on the wire layer.
  */
 
-// ─── Application: use-cases, engine, ports, ids ──────────────────────
-export * from "./application/index.js";
-export * from "./domain/edge/workflow-edge-entity.js";
-export * from "./domain/node/workflow-human-node.js";
-export * from "./domain/node/workflow-node-entity.js";
-export * from "./domain/node/workflow-node-kind.js";
-export * from "./domain/node/workflow-node-retry.js";
-export * from "./domain/node/workflow-node-status.js";
-export * from "./domain/workflow/workflow-cancellation.js";
-export * from "./domain/workflow/workflow-corruption.js";
-export * from "./domain/workflow/workflow-dag.js";
-export * from "./domain/workflow/workflow-dispatch-readiness.js";
-export type {
-  IllegalNodeTransition,
-  NodeRef,
-  NormalizedSubgraphInput,
-  SubgraphEdgeShape,
-  SubgraphNodeInput,
-  SubgraphTempNodeShape,
-  WorkflowAlreadyTerminal,
-  WorkflowCreateArgs,
-  WorkflowHeaderSnapshot,
-  WorkflowNodeSnapshot,
-  WorkflowReconstituteArgs,
-  WorkflowSnapshot,
-} from "./domain/workflow/workflow-entity.js";
-// ─── Domain: entities, value objects, error atoms (ids come via the
-//     application barrel) ──
+// ─── Application: per-use-case wire contracts ──────────────────────
 export {
-  normalizeSubgraphInput,
-  validateSubgraphShape,
-  WorkflowEntity,
-} from "./domain/workflow/workflow-entity.js";
-export * from "./domain/workflow/workflow-errors.js";
-export * from "./domain/workflow/workflow-failure.js";
-export * from "./domain/workflow/workflow-origin.js";
-export type {
-  DatabaseUnavailable,
-  WorkflowEdgeNotFound,
-  WorkflowNodeNotFound,
-  WorkflowNotFound,
-  WorkflowRepository,
-} from "./domain/workflow/workflow-repository.js";
-export * from "./domain/workflow/workflow-status.js";
-export * from "./domain/workflow/workflow-stuck-recovery.js";
-export * from "./domain/workflow/workflow-success.js";
-// ─── Path helpers ───────────────────────────────────────────────────
-export * from "./infrastructure/file/workflow-sandbox.js";
-// ─── Composition ────────────────────────────────────────────────────
-export * from "./workflow-module.js";
+  type AddWorkflowEdgeError,
+  type AddWorkflowEdgeRequest,
+  AddWorkflowEdgeRequestSchema,
+  type AddWorkflowEdgeResponse,
+  AddWorkflowEdgeResponseSchema,
+} from "./application/add-workflow-edge.js";
+export {
+  type AddWorkflowNodeError,
+  type AddWorkflowNodeRequest,
+  AddWorkflowNodeRequestSchema,
+  type AddWorkflowNodeResponse,
+  AddWorkflowNodeResponseSchema,
+} from "./application/add-workflow-node.js";
+export {
+  type AddWorkflowSubgraphError,
+  type AddWorkflowSubgraphRequest,
+  AddWorkflowSubgraphRequestSchema,
+  type AddWorkflowSubgraphResponse,
+  AddWorkflowSubgraphResponseSchema,
+} from "./application/add-workflow-subgraph.js";
+export {
+  type AggregateWorkflowsByOriginError,
+  type AggregateWorkflowsByOriginRequest,
+  AggregateWorkflowsByOriginRequestSchema,
+  type AggregateWorkflowsByOriginResponse,
+  AggregateWorkflowsByOriginResponseSchema,
+} from "./application/aggregate-workflows-by-origin.js";
+export {
+  type CancelWorkflowError,
+  type CancelWorkflowRequest,
+  CancelWorkflowRequestSchema,
+  type CancelWorkflowResponse,
+} from "./application/cancel-workflow.js";
+export {
+  type CancelWorkflowNodeError,
+  type CancelWorkflowNodeRequest,
+  CancelWorkflowNodeRequestSchema,
+  type CancelWorkflowNodeResponse,
+} from "./application/cancel-workflow-node.js";
+export {
+  type CountAwaitingHumanError,
+  type CountAwaitingHumanRequest,
+  CountAwaitingHumanRequestSchema,
+  type CountAwaitingHumanResponse,
+  CountAwaitingHumanResponseSchema,
+} from "./application/count-awaiting-human.js";
+export {
+  type CreateWorkflowError,
+  type CreateWorkflowRequest,
+  CreateWorkflowRequestSchema,
+  type CreateWorkflowResponse,
+  CreateWorkflowResponseSchema,
+  type NodeSpecError,
+} from "./application/create-workflow.js";
+export {
+  type DeleteWorkflowError,
+  type DeleteWorkflowRequest,
+  DeleteWorkflowRequestSchema,
+  type DeleteWorkflowResponse,
+  type WorkflowDeleteRequiresTerminal,
+} from "./application/delete-workflow.js";
+// ─── Application: engine and ports ─────────────────────────────────
+export {
+  type WorkflowDispatchCoordinator,
+  WorkflowEngine,
+  type WorkflowEngineOpts,
+} from "./application/engine/workflow-engine.js";
+export {
+  type FinishWorkflowError,
+  type FinishWorkflowRequest,
+  FinishWorkflowRequestSchema,
+  type FinishWorkflowResponse,
+} from "./application/finish-workflow.js";
+export {
+  type GetWorkflowError,
+  type GetWorkflowRequest,
+  GetWorkflowRequestSchema,
+  type GetWorkflowResponse,
+  GetWorkflowResponseSchema,
+} from "./application/get-workflow.js";
+export {
+  type GetWorkflowDagError,
+  type GetWorkflowDagRequest,
+  GetWorkflowDagRequestSchema,
+  type GetWorkflowDagResponse,
+  GetWorkflowDagResponseSchema,
+  type WorkflowDagSnapshot,
+  type WorkflowEdgeView,
+} from "./application/get-workflow-dag.js";
+export {
+  type GetWorkflowNodeError,
+  type GetWorkflowNodeRequest,
+  GetWorkflowNodeRequestSchema,
+  type GetWorkflowNodeResponse,
+  GetWorkflowNodeResponseSchema,
+} from "./application/get-workflow-node.js";
+export {
+  type ListWorkflowsError,
+  type ListWorkflowsRequest,
+  ListWorkflowsRequestSchema,
+  type ListWorkflowsResponse,
+  ListWorkflowsResponseSchema,
+} from "./application/list-workflows.js";
+export {
+  runnerFor,
+  type WorkflowNodeDispatchOpts,
+  type WorkflowNodeRunner,
+  type WorkflowNodeTerminalResult,
+  type WorkflowNodeValidateCtx,
+  type WorkflowRunners,
+} from "./application/ports/workflow-node-runner.js";
+export {
+  type PurgeWorkflowError,
+  type PurgeWorkflowRequest,
+  PurgeWorkflowRequestSchema,
+  type PurgeWorkflowResponse,
+} from "./application/purge-workflow.js";
+export {
+  type RemoveWorkflowEdgeError,
+  type RemoveWorkflowEdgeRequest,
+  RemoveWorkflowEdgeRequestSchema,
+  type RemoveWorkflowEdgeResponse,
+} from "./application/remove-workflow-edge.js";
+export {
+  type RemoveWorkflowNodeError,
+  type RemoveWorkflowNodeRequest,
+  RemoveWorkflowNodeRequestSchema,
+  type RemoveWorkflowNodeResponse,
+} from "./application/remove-workflow-node.js";
+export {
+  type ReplaceWorkflowNodeSpecError,
+  type ReplaceWorkflowNodeSpecRequest,
+  ReplaceWorkflowNodeSpecRequestSchema,
+  type ReplaceWorkflowNodeSpecResponse,
+} from "./application/replace-workflow-node-spec.js";
+export {
+  type RespondToHumanNodeError,
+  type RespondToHumanNodeRequest,
+  RespondToHumanNodeRequestSchema,
+  type RespondToHumanNodeResponse,
+  RespondToHumanNodeResponseSchema,
+} from "./application/respond-to-human-node.js";
+// ─── Shared cross-use-case surface (re-exported from domain) ───────
+export * from "./application/workflow-public.js";
+// ─── Path helpers ──────────────────────────────────────────────────
+export {
+  WORKFLOW_SUBDIR,
+  WorkflowSandbox,
+  workflowDir,
+  workflowRoot,
+} from "./infrastructure/file/workflow-sandbox.js";
+// ─── Composition root ──────────────────────────────────────────────
+export {
+  composeWorkflowModule,
+  type Db,
+  schema,
+  type WorkflowModule,
+  type WorkflowModuleOptions,
+} from "./workflow-module.js";

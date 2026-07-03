@@ -22,6 +22,11 @@
 
 export { catalogErrorPolicy } from "./_error-policies/catalog.js";
 export {
+  respondScheduleError,
+  type ScheduleRouteError,
+  schedulesErrorPolicy,
+} from "./_error-policies/schedules.js";
+export {
   type RespondSessionErrorOpts,
   respondSessionError,
   type SessionRouteError,
@@ -31,6 +36,12 @@ export {
   taskErrorWireBody,
   taskUnionCodeStatuses,
 } from "./_error-policies/tasks.js";
+export {
+  respondWorkflowError,
+  type WorkflowRouteError,
+  workflowCustomDeleteBody,
+  workflowsErrorPolicy,
+} from "./_error-policies/workflows.js";
 export {
   type ErrorPolicy,
   errorBody,
@@ -45,18 +56,37 @@ export {
 // HTTP route helpers — shared OpenAPI app factory and error utilities.
 // Consumed by `@glyphs-ai/server` (re-exports them to its own route
 // modules) and by route modules co-located here in api.
-export { createApiApp, errorResponse, jsonRequest, jsonResponse } from "./_http-helpers.js";
+export {
+  createApiApp,
+  errorResponse,
+  injectWorkspaceIdParam,
+  jsonRequest,
+  jsonResponse,
+} from "./_http-helpers.js";
 // Orchestration (composeApplication + per-workspace WorkspaceContext)
 export {
   type Application,
   composeApplication,
 } from "./application.js";
+export {
+  countAwaitingHuman,
+  iterationCountForNodes,
+  projectWorkflowDag,
+  projectWorkflowHeader,
+  projectWorkflowNodeWithTaskId,
+} from "./routes/_workflow-projection.js";
 // Route factories — each returns an OpenAPIHono sub-app mountable by
 // the server's transport layer.
 export { type CatalogResolver, catalogRoutes } from "./routes/catalog/index.js";
+export { configRoutes } from "./routes/config.js";
+export { healthRoutes } from "./routes/health.js";
+export { runtimesRoutes } from "./routes/runtimes.js";
 export { scheduledTasksRoutes } from "./routes/scheduled-tasks.js";
+export { scheduledWorkflowsRoutes } from "./routes/scheduled-workflows.js";
+export { schedulesRoutes } from "./routes/schedules.js";
 export { sessionsRoutes } from "./routes/sessions.js";
 export { tasksRoutes } from "./routes/tasks.js";
+export { type WorkflowStatus, workflowsRoutes } from "./routes/workflows.js";
 export { workspacesRoutes } from "./routes/workspaces.js";
 // Transport-agnostic zod schemas mirroring every wire contract. The
 // OpenAPI projection in `@glyphs-ai/server` consumes these; other

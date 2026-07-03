@@ -10,18 +10,18 @@ import {
   type WorkflowNodeKind,
   WorkflowNodeKindSchema,
 } from "../domain/node/workflow-node-kind.js";
-import type { WorkflowEntityCorruption } from "../domain/workflow/workflow-corruption.js";
 import type { WorkflowAlreadyTerminal } from "../domain/workflow/workflow-entity.js";
 import type {
   EmptyParents,
   MultipleSuccessorCoords,
   OrphanCoordInsert,
   ParentState,
-} from "../domain/workflow/workflow-errors.js";
+  WorkflowNodeNotFound,
+} from "../domain/workflow/workflow-entity-errors.js";
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
-  WorkflowNodeNotFound,
+  WorkflowEntityCorruption,
   WorkflowNotFound,
   WorkflowRepository,
 } from "../domain/workflow/workflow-repository.js";

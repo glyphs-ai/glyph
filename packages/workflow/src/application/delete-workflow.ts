@@ -1,9 +1,9 @@
 import { err, ok, ResultAsync } from "neverthrow";
 import { z } from "zod";
-import type { WorkflowEntityCorruption } from "../domain/workflow/workflow-corruption.js";
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
+  WorkflowEntityCorruption,
   WorkflowNotFound,
   WorkflowRepository,
 } from "../domain/workflow/workflow-repository.js";

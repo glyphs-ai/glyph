@@ -1,9 +1,13 @@
 import type { ActivityItem, RuntimeRegistry } from "@glyphs-ai/runtime";
-import { okAsync } from "neverthrow";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { CorruptedTask } from "../domain/task-entity.js";
 import { TaskIdSchema } from "../domain/task-id.js";
-import type { DatabaseUnavailable, TaskRepository } from "../domain/task-repository.js";
+import type { DatabaseUnavailable } from "../domain/task-repository.js";
+import {
+  metaString,
+  projectTaskRow,
+  type TaskQueries,
+} from "../infrastructure/drizzle/task-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const GetTaskActivityStreamRequestSchema = z
@@ -17,10 +21,10 @@ export type GetTaskActivityStreamRequest = z.infer<typeof GetTaskActivityStreamR
 
 export type GetTaskActivityStreamResponse = AsyncIterable<ActivityItem> | null;
 
-export type GetTaskActivityStreamError = CorruptedTask | DatabaseUnavailable;
+export type GetTaskActivityStreamError = DatabaseUnavailable;
 
 export interface GetTaskActivityStreamDeps {
-  readonly repository: TaskRepository;
+  readonly query: TaskQueries;
   readonly runtimeRegistry: RuntimeRegistry;
 }
 
@@ -42,25 +46,29 @@ export class GetTaskActivityStreamUseCase
   ): UseCaseResult<GetTaskActivityStreamResponse, GetTaskActivityStreamError> {
     const { id, after, signal } = GetTaskActivityStreamRequestSchema.parse(request);
     const deps = this.deps;
-    return deps.repository.findById(id).andThen((task) => {
-      const nothing = okAsync<GetTaskActivityStreamResponse, GetTaskActivityStreamError>(null);
-      // Streaming a terminal task is wasted work — force callers to the
-      // one-shot endpoint for post-mortem reads.
-      if (task === undefined || task.status !== "running") return nothing;
-      const runtimeName = task.metadataString("runtime");
-      if (runtimeName === undefined) return nothing;
-      const runtimeSessionId = task.metadataString("runtimeSessionId");
-      if (runtimeSessionId === undefined) return nothing;
-      const found = deps.runtimeRegistry.get(runtimeName);
-      if (found.isErr()) return nothing;
-      const runtime = found.value;
-      if (typeof runtime.streamActivity !== "function") return nothing;
-      return okAsync<GetTaskActivityStreamResponse, GetTaskActivityStreamError>(
-        runtime.streamActivity(runtimeSessionId, {
+    const q = deps.query;
+    return q
+      .query((db) => {
+        const row = db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
+        return row === undefined ? null : projectTaskRow(row);
+      })
+      .map((view): GetTaskActivityStreamResponse => {
+        if (view === null) return null;
+        // Streaming a terminal task is wasted work — force callers to the
+        // one-shot endpoint for post-mortem reads.
+        if (view.status !== "running") return null;
+        const runtimeName = metaString(view.metadata, "runtime");
+        if (runtimeName === undefined) return null;
+        const runtimeSessionId = metaString(view.metadata, "runtimeSessionId");
+        if (runtimeSessionId === undefined) return null;
+        const found = deps.runtimeRegistry.get(runtimeName);
+        if (found.isErr()) return null;
+        const runtime = found.value;
+        if (typeof runtime.streamActivity !== "function") return null;
+        return runtime.streamActivity(runtimeSessionId, {
           ...(after !== undefined ? { after } : {}),
           ...(signal !== undefined ? { signal } : {}),
-        }),
-      );
-    });
+        });
+      });
   }
 }

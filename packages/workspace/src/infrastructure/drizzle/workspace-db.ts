@@ -1,27 +1,31 @@
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
-import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
+import { type Client, createClient } from "@libsql/client";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import { applyWorkspaceMigrations } from "./workspace-migrations.js";
 import * as schema from "./workspace-schema.js";
 
 /** The pkg's drizzle DB handle, parameterized by the workspace tables. */
-export type Db = BetterSQLite3Database<typeof schema>;
+export type Db = LibSQLDatabase<typeof schema>;
 
 /**
- * Open the workspace SQLite DB in WAL mode, apply migrations, and
- * return the drizzle handle plus `close`.
+ * Open a workspace DB (libsql) at `url`, set WAL pragmas, apply migrations,
+ * and return the drizzle handle plus `close`. The caller decides the `url`
+ * (a `file:` URL for a real path, chosen by the assembler) — this package
+ * owns the schema + migrations, never the file-path/`:memory:` policy. The
+ * returned handle is not closed by the workspace module; whoever opened it
+ * owns `close`.
  */
-export function openDb(dbFile: string): { db: Db; close(): void } {
-  const sqlite: BetterSqliteDatabase = new Database(dbFile);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("synchronous = NORMAL");
+export async function openWorkspaceDb(opts: { url: string }): Promise<{ db: Db; close(): void }> {
+  const client: Client = createClient({ url: opts.url });
+  await client.execute("PRAGMA journal_mode = WAL");
+  await client.execute("PRAGMA synchronous = NORMAL");
   // No foreign-key constraints exist in this schema.
-  sqlite.pragma("busy_timeout = 5000");
-  const db: Db = drizzle(sqlite, { schema });
+  await client.execute("PRAGMA busy_timeout = 5000");
   try {
-    applyWorkspaceMigrations(db);
+    await applyWorkspaceMigrations(client);
   } catch (err) {
-    sqlite.close();
+    client.close();
     throw err;
   }
-  return { db, close: () => sqlite.close() };
+  const db: Db = drizzle(client, { schema });
+  return { db, close: () => client.close() };
 }

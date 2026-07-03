@@ -14,7 +14,7 @@ const VALID_ID = "11111111-1111-4111-8111-111111111111" as WorkspaceId;
 const WS_DIR = process.platform === "win32" ? "C:\\workspaces\\demo" : "/workspaces/demo";
 
 function entity() {
-  return new WorkspaceEntity({
+  return WorkspaceEntity.rehydrate({
     id: VALID_ID,
     name: "Demo" as WorkspaceName,
     workspaceDir: WS_DIR,
@@ -30,7 +30,7 @@ let useCase: UnregisterWorkspaceUseCase;
 beforeEach(() => {
   repo = mock<WorkspaceRepository>();
   provisioner = mock<WorkspaceProvisioner>();
-  repo.findById.mockReturnValue(okAsync(undefined));
+  repo.get.mockReturnValue(errAsync({ type: "WorkspaceNotFound", id: VALID_ID }));
   repo.delete.mockReturnValue(okAsync(undefined));
   provisioner.teardown.mockReturnValue(okAsync(undefined));
   useCase = new UnregisterWorkspaceUseCase({ repo, provisioner });
@@ -49,7 +49,7 @@ describe("UnregisterWorkspaceUseCase — input validation", () => {
 });
 
 describe("UnregisterWorkspaceUseCase — idempotent on unknown id", () => {
-  it("Ok + no teardown + no delete when findById returns undefined", async () => {
+  it("Ok + no teardown + no delete when repo.get returns WorkspaceNotFound", async () => {
     const res = await useCase.execute({ id: VALID_ID });
     expect(res.isOk()).toBe(true);
     expect(provisioner.teardown).not.toHaveBeenCalled();
@@ -59,7 +59,7 @@ describe("UnregisterWorkspaceUseCase — idempotent on unknown id", () => {
 
 describe("UnregisterWorkspaceUseCase — purge=false (default)", () => {
   it("calls repo.delete only, no teardown", async () => {
-    repo.findById.mockReturnValue(okAsync(entity()));
+    repo.get.mockReturnValue(okAsync(entity()));
     const res = await useCase.execute({ id: VALID_ID });
     expect(res.isOk()).toBe(true);
     expect(provisioner.teardown).not.toHaveBeenCalled();
@@ -67,7 +67,7 @@ describe("UnregisterWorkspaceUseCase — purge=false (default)", () => {
   });
 
   it("explicit purge=false behaves the same as default", async () => {
-    repo.findById.mockReturnValue(okAsync(entity()));
+    repo.get.mockReturnValue(okAsync(entity()));
     const res = await useCase.execute({ id: VALID_ID, purge: false });
     expect(res.isOk()).toBe(true);
     expect(provisioner.teardown).not.toHaveBeenCalled();
@@ -77,7 +77,7 @@ describe("UnregisterWorkspaceUseCase — purge=false (default)", () => {
 
 describe("UnregisterWorkspaceUseCase — purge=true", () => {
   it("teardown then delete, in order", async () => {
-    repo.findById.mockReturnValue(okAsync(entity()));
+    repo.get.mockReturnValue(okAsync(entity()));
     const calls: string[] = [];
     provisioner.teardown.mockImplementation((dir) => {
       calls.push(`teardown:${dir}`);
@@ -96,28 +96,25 @@ describe("UnregisterWorkspaceUseCase — purge=true", () => {
 });
 
 describe("UnregisterWorkspaceUseCase — error channel", () => {
-  it("DatabaseUnavailable propagated from repo.findById", async () => {
-    repo.findById.mockReturnValue(
-      errAsync({ type: "DatabaseUnavailable", cause: new Error("boom") }),
-    );
+  it("DatabaseUnavailable propagated from repo.get", async () => {
+    repo.get.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause: new Error("boom") }));
     const res = await useCase.execute({ id: VALID_ID, purge: true });
     expect(res._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
     expect(provisioner.teardown).not.toHaveBeenCalled();
   });
 
   it("ProvisioningFailed propagated from teardown (purge=true)", async () => {
-    repo.findById.mockReturnValue(okAsync(entity()));
+    repo.get.mockReturnValue(okAsync(entity()));
     provisioner.teardown.mockReturnValue(
       errAsync({ type: "ProvisioningFailed", workspaceDir: WS_DIR, cause: new Error("EACCES") }),
     );
     const res = await useCase.execute({ id: VALID_ID, purge: true });
     expect(res._unsafeUnwrapErr().type).toBe("ProvisioningFailed");
-    // Delete is skipped when teardown fails.
     expect(repo.delete).not.toHaveBeenCalled();
   });
 
   it("DatabaseUnavailable propagated from repo.delete", async () => {
-    repo.findById.mockReturnValue(okAsync(entity()));
+    repo.get.mockReturnValue(okAsync(entity()));
     repo.delete.mockReturnValue(
       errAsync({ type: "DatabaseUnavailable", cause: new Error("boom") }),
     );

@@ -13,15 +13,6 @@ export { extractWorkflowNodeRetryMetadata };
 export const STUCK_RETRY_MAX_ATTEMPTS = 5;
 export const STUCK_RETRY_LIMIT = "STUCK_RETRY_LIMIT";
 
-export type StuckRecoveryOutcome =
-  | { readonly inserted: false }
-  | {
-      readonly inserted: true;
-      readonly retryNodeId: string;
-      readonly reason: WorkflowNodeRetryReason;
-      readonly attempt: number;
-    };
-
 export function classifyStuckReason(
   leaves: readonly WorkflowNodeEntity[],
 ): WorkflowNodeRetryReason | undefined {

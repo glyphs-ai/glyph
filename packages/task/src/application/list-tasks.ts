@@ -1,15 +1,12 @@
+import { and, eq, gte, inArray, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
-import type { TaskEntity } from "../domain/task-entity.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { TaskIdSchema } from "../domain/task-id.js";
-import type {
-  DatabaseUnavailable,
-  ListTasksFilter,
-  TaskRepository,
-} from "../domain/task-repository.js";
+import type { DatabaseUnavailable } from "../domain/task-repository.js";
 import { TaskStatusSchema } from "../domain/task-status.js";
 import { TaskSuccessSchema } from "../domain/task-success.js";
+import { projectTaskRow, type TaskQueries } from "../infrastructure/drizzle/task-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const ListTasksRequestSchema = z
@@ -17,43 +14,43 @@ export const ListTasksRequestSchema = z
     agent: z.string().optional(),
     createdSince: z.string().optional(),
     runtime: z.string().optional(),
-    statuses: z.array(TaskStatusSchema).optional(),
+    status: TaskStatusSchema.optional(),
     origin: z.union([z.string(), z.array(z.string())]).optional(),
     originId: z.string().optional(),
   })
   .strict();
 export type ListTasksRequest = z.infer<typeof ListTasksRequestSchema>;
 
-const TaskViewSchema = z.object({
-  id: TaskIdSchema,
-  agent: z.string(),
-  brief: z.string(),
-  details: z.string().optional(),
-  origin: z.string(),
-  originId: z.string().optional(),
-  status: TaskStatusSchema,
-  metadata: z.record(z.string(), z.unknown()),
-  createdAt: z.string(),
-  startedAt: z.string(),
-  endedAt: z.string().optional(),
-  success: TaskSuccessSchema.optional(),
-  failure: TaskFailureSchema.optional(),
-  cancellation: TaskCancellationSchema.optional(),
-});
-export const ListTasksResponseSchema = z.array(TaskViewSchema);
+export const ListTasksResponseSchema = z.array(
+  z.object({
+    id: TaskIdSchema,
+    agent: z.string(),
+    brief: z.string(),
+    details: z.string().optional(),
+    origin: z.string(),
+    originId: z.string().optional(),
+    status: TaskStatusSchema,
+    metadata: z.record(z.string(), z.unknown()),
+    createdAt: z.string(),
+    startedAt: z.string(),
+    endedAt: z.string().optional(),
+    success: TaskSuccessSchema.optional(),
+    failure: TaskFailureSchema.optional(),
+    cancellation: TaskCancellationSchema.optional(),
+  }),
+);
 export type ListTasksResponse = z.infer<typeof ListTasksResponseSchema>;
 
 export type ListTasksError = DatabaseUnavailable;
 
 export interface ListTasksDeps {
-  readonly repository: TaskRepository;
+  readonly query: TaskQueries;
 }
 
 /**
  * List persisted tasks, newest first. All filters are pushed down to the
- * indexed SQLite query; corrupted rows are warn-and-skipped in the repository.
- * Ordering is `createdAt` descending with `id` as the deterministic tiebreak
- * for tasks created in the same millisecond.
+ * indexed SQLite query. Ordering is `createdAt` descending with `id` as the
+ * deterministic tiebreak for tasks created in the same millisecond.
  */
 export class ListTasksUseCase
   implements UseCase<ListTasksRequest, ListTasksResponse, ListTasksError>
@@ -62,43 +59,32 @@ export class ListTasksUseCase
 
   execute(request: ListTasksRequest): UseCaseResult<ListTasksResponse, ListTasksError> {
     const parsed = ListTasksRequestSchema.parse(request);
-    // Build the filter with only the keys actually present — under
-    // exactOptionalPropertyTypes a `key: undefined` is not assignable to an
-    // optional `key?:` property.
-    const filter: ListTasksFilter = {
-      ...(parsed.agent !== undefined ? { agent: parsed.agent } : {}),
-      ...(parsed.createdSince !== undefined ? { createdSince: parsed.createdSince } : {}),
-      ...(parsed.runtime !== undefined ? { runtime: parsed.runtime } : {}),
-      ...(parsed.statuses !== undefined ? { statuses: parsed.statuses } : {}),
-      ...(parsed.origin !== undefined ? { origin: parsed.origin } : {}),
-      ...(parsed.originId !== undefined ? { originId: parsed.originId } : {}),
-    };
-    return this.deps.repository.findAll(filter).map((tasks) =>
-      tasks
-        .sort((a, b) => {
+    const q = this.deps.query;
+    return q
+      .query((db) => {
+        const filters: SQL[] = [];
+        if (parsed.agent !== undefined) filters.push(eq(q.tasks.agent, parsed.agent));
+        if (parsed.runtime !== undefined) filters.push(eq(q.tasks.runtime, parsed.runtime));
+        if (parsed.createdSince !== undefined) {
+          filters.push(gte(q.tasks.createdAt, parsed.createdSince));
+        }
+        if (parsed.status !== undefined) {
+          filters.push(eq(q.tasks.status, parsed.status));
+        }
+        if (parsed.origin !== undefined) {
+          const origins = Array.isArray(parsed.origin) ? parsed.origin : [parsed.origin];
+          if (origins.length > 0) filters.push(inArray(q.tasks.origin, origins));
+        }
+        if (parsed.originId !== undefined) filters.push(eq(q.tasks.originId, parsed.originId));
+        const select = db.select().from(q.tasks);
+        const rows = filters.length > 0 ? select.where(and(...filters)).all() : select.all();
+        return rows.map(projectTaskRow);
+      })
+      .map((views) =>
+        views.sort((a, b) => {
           const byCreated = b.createdAt.localeCompare(a.createdAt);
           return byCreated !== 0 ? byCreated : b.id.localeCompare(a.id);
-        })
-        .map(toTaskView),
-    );
+        }),
+      );
   }
-}
-
-function toTaskView(task: TaskEntity): z.infer<typeof TaskViewSchema> {
-  return {
-    id: task.id,
-    agent: task.agent,
-    brief: task.brief,
-    ...(task.details !== undefined ? { details: task.details } : {}),
-    origin: task.origin,
-    ...(task.originId !== undefined ? { originId: task.originId } : {}),
-    status: task.status,
-    metadata: { ...task.metadata },
-    createdAt: task.createdAt,
-    startedAt: task.startedAt,
-    ...(task.endedAt !== undefined ? { endedAt: task.endedAt } : {}),
-    ...(task.success !== undefined ? { success: task.success } : {}),
-    ...(task.failure !== undefined ? { failure: task.failure } : {}),
-    ...(task.cancellation !== undefined ? { cancellation: task.cancellation } : {}),
-  };
 }

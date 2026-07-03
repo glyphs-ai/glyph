@@ -1,6 +1,6 @@
 import type { ResultAsync } from "neverthrow";
+import type { WorkflowNodeKind } from "../node/workflow-node-kind.js";
 import type { WorkflowId } from "../workflow/workflow-id.js";
-import type { WorkflowEntityCorruption } from "./workflow-corruption.js";
 import type { WorkflowEntity } from "./workflow-entity.js";
 
 /** Persistence fault atom for repository IO failures (the SQLite driver threw). */
@@ -15,20 +15,45 @@ export type WorkflowNotFound = {
   readonly workflowId: string;
 };
 
-/** Business outcome for a missing workflow-node row. */
-export type WorkflowNodeNotFound = {
-  readonly type: "WorkflowNodeNotFound";
-  readonly workflowId?: string;
-  readonly nodeId: string;
+// ─── Rehydration corruption ──────────────────────────────────────
+// Surfaced by `get` when a persisted row cannot be mapped back to a
+// valid aggregate. The infrastructure mapper is the sole producer.
+
+/** A persisted scalar or payload shape is incompatible with the domain schema. */
+export type WorkflowCorruption = {
+  readonly type: "WorkflowCorruption";
+  readonly field: string;
+  readonly value: string;
+  readonly allowed: readonly string[];
 };
 
-/** Business outcome for a missing DAG edge. */
-export type WorkflowEdgeNotFound = {
-  readonly type: "WorkflowEdgeNotFound";
-  readonly workflowId: string;
-  readonly fromNodeId: string;
-  readonly toNodeId: string;
+/** A persisted enum value is outside the current vocabulary. */
+export type WorkflowEnumValueCorruption = {
+  readonly type: "WorkflowEnumValueCorruption";
+  readonly field: string;
+  readonly value: string;
+  readonly allowed: readonly string[];
 };
+
+/** A node kind value has the wrong scalar shape. */
+export type WorkflowNodeKindShape = {
+  readonly type: "WorkflowNodeKindShape";
+  readonly value: unknown;
+};
+
+/** A string node kind is outside the closed substrate kind set. */
+export type WorkflowNodeKindCorruption = {
+  readonly type: "WorkflowNodeKindCorruption";
+  readonly kind: string;
+  readonly allowed: readonly WorkflowNodeKind[];
+};
+
+/** Corruption atoms emitted when the mapper rehydrates a persisted row. */
+export type WorkflowEntityCorruption =
+  | WorkflowCorruption
+  | WorkflowEnumValueCorruption
+  | WorkflowNodeKindShape
+  | WorkflowNodeKindCorruption;
 
 /** CQRS write-side repository for the mutable workflow aggregate. */
 export interface WorkflowRepository {
@@ -38,9 +63,3 @@ export interface WorkflowRepository {
   ): ResultAsync<WorkflowEntity, WorkflowNotFound | WorkflowEntityCorruption | DatabaseUnavailable>;
   save(entity: WorkflowEntity): ResultAsync<void, DatabaseUnavailable>;
 }
-
-export type WorkflowTx = never;
-export type OriginAggregate = never;
-export type ListWorkflowsFilter = never;
-export type WorkflowStatusUpdate = never;
-export type WorkflowNodeLifecyclePatch = never;

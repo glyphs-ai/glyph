@@ -116,8 +116,8 @@ export interface ListTasksOpts {
   runtime?: string;
   /** ISO 8601 (the server canonicalises). */
   createdSince?: string;
-  /** Statuses to include. The server joins with `,` for the query. */
-  statuses?: TaskStatus[];
+  /** Filter to a single task status. */
+  status?: TaskStatus;
 }
 
 export const listTasks = (opts: ListTasksOpts = {}): Promise<TaskRecord[]> => {
@@ -125,7 +125,7 @@ export const listTasks = (opts: ListTasksOpts = {}): Promise<TaskRecord[]> => {
   if (opts.agent) qs.set("agent", opts.agent);
   if (opts.runtime) qs.set("runtime", opts.runtime);
   if (opts.createdSince) qs.set("createdSince", opts.createdSince);
-  if (opts.statuses && opts.statuses.length > 0) qs.set("status", opts.statuses.join(","));
+  if (opts.status) qs.set("status", opts.status);
   const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
   return fetchJson<TaskRecord[]>(`${workspacePrefix()}/tasks${suffix}`, "tasks");
 };
@@ -141,8 +141,8 @@ export interface ListScheduledTasksOpts {
   runtime?: string;
   /** ISO 8601 (the server canonicalises). */
   createdSince?: string;
-  /** Statuses to include. The server joins with `,` for the query. */
-  statuses?: TaskStatus[];
+  /** Filter to a single task status. */
+  status?: TaskStatus;
   /** Exact match on the schedule's `origin_id` (wire param `scheduleId`). */
   scheduleId?: string;
 }
@@ -158,7 +158,7 @@ export const listScheduledTasks = (opts: ListScheduledTasksOpts = {}): Promise<T
   if (opts.agent) qs.set("agent", opts.agent);
   if (opts.runtime) qs.set("runtime", opts.runtime);
   if (opts.createdSince) qs.set("createdSince", opts.createdSince);
-  if (opts.statuses && opts.statuses.length > 0) qs.set("status", opts.statuses.join(","));
+  if (opts.status) qs.set("status", opts.status);
   if (opts.scheduleId) qs.set("scheduleId", opts.scheduleId);
   const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
   return fetchJson<TaskRecord[]>(

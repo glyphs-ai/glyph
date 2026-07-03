@@ -141,7 +141,7 @@ const task = (
   })
 )._unsafeUnwrap();
 
-await tasks.listTasks.execute({ statuses: ["running"], agent: "writer" }); // ListTasksResponse
+await tasks.listTasks.execute({ status: "running", agent: "writer" }); // ListTasksResponse
 await tasks.getTask.execute({ id: task.id }); // GetTaskResponse (task view | null)
 await tasks.cancelTask.execute({ id: task.id }); // best-effort SIGTERM
 await tasks.deleteTask.execute({ id: task.id, purge: false });

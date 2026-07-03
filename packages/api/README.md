@@ -154,27 +154,30 @@ resources. The class is intentionally not exported from
 
 ## Wire schemas
 
-`src/schemas/` holds the [zod](https://zod.dev) schemas for every HTTP
-wire shape, one module per domain (`health`, `runtimes`,
-`server-config`, `workspaces`, `sessions`, `tasks`, `schedules`,
-`workflows`, `catalog`). They are **plain, transport-agnostic zod** —
-no `hono` or `@hono/zod-openapi` import — so this package stays free of
-any HTTP-transport dependency. `@glyphs-ai/server` imports them and
-projects them to an OpenAPI 3.1 document (served at `/api/openapi.json`,
-with Swagger UI at `/api/docs`); the schemas are the single source of
-truth for both the documented response shapes and the runtime 400
-request validation.
+`src/schemas/` holds the [zod](https://zod.dev) schemas for the **shared /
+multi-route** HTTP wire shapes, one module per domain (`schedules`,
+`workflows`, `catalog`). They are **plain, transport-agnostic zod** — no
+`hono` or `@hono/zod-openapi` import — so this package stays free of any
+HTTP-transport dependency. `@glyphs-ai/server` mounts the route factories and
+projects their schemas to an OpenAPI 3.1 document (served at
+`/api/openapi.json`, with Swagger UI at `/api/docs`); the schemas are the
+single source of truth for both the documented response shapes and the
+runtime 400 request validation.
 
-Each schema's wire type is its `z.infer` — exported alongside the schema
-(e.g. `export type HealthResponse = z.infer<typeof HealthResponseSchema>`).
-The runtime validator and the TS type derive from one definition, so they
-cannot drift.
+Each schema's wire type is its `z.infer`, exported alongside the schema, so
+the runtime validator and the TS type derive from one definition and cannot
+drift.
+
+**Single-route system endpoints** (`GET /api/health`, `/api/runtimes`,
+`/api/config`) co-locate their schema + `z.infer` type directly in the
+matching `src/routes/*.ts` module rather than a shared `schemas/` file —
+there is no second consumer to share them with.
 
 ```ts
-import { HealthResponseSchema, type HealthResponse } from "@glyphs-ai/api";
+import { ScheduleTriggerSchema } from "@glyphs-ai/api";
 
-HealthResponseSchema.parse(payload); // runtime validation
-type T = typeof HealthResponseSchema; // OpenAPI projection input (in server)
+ScheduleTriggerSchema.parse(payload); // runtime validation
+type T = typeof ScheduleTriggerSchema; // OpenAPI projection input (in server)
 ```
 
 ## Tier

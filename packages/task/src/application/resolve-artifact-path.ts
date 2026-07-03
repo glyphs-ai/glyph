@@ -1,8 +1,9 @@
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { CorruptedTask } from "../domain/task-entity.js";
 import { TaskIdSchema } from "../domain/task-id.js";
-import type { DatabaseUnavailable, TaskRepository } from "../domain/task-repository.js";
+import type { DatabaseUnavailable } from "../domain/task-repository.js";
+import { projectTaskRow, type TaskQueries } from "../infrastructure/drizzle/task-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const ResolveArtifactPathRequestSchema = z
@@ -12,10 +13,10 @@ export type ResolveArtifactPathRequest = z.infer<typeof ResolveArtifactPathReque
 
 export type ResolveArtifactPathResponse = string | null;
 
-export type ResolveArtifactPathError = CorruptedTask | DatabaseUnavailable;
+export type ResolveArtifactPathError = DatabaseUnavailable;
 
 export interface ResolveArtifactPathDeps {
-  readonly repository: TaskRepository;
+  readonly query: TaskQueries;
 }
 
 /**
@@ -35,11 +36,15 @@ export class ResolveArtifactPathUseCase
     request: ResolveArtifactPathRequest,
   ): UseCaseResult<ResolveArtifactPathResponse, ResolveArtifactPathError> {
     const { id, name } = ResolveArtifactPathRequestSchema.parse(request);
-    return this.deps.repository.findById(id).map((task): string | null => {
-      if (task === undefined || task.status === "running") return null;
+    const q = this.deps.query;
+    return q.query((db): ResolveArtifactPathResponse => {
+      const row = db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
+      if (row === undefined) return null;
+      const view = projectTaskRow(row);
+      if (view.status === "running") return null;
       const requested = path.basename(name);
       if (requested === "" || requested === "." || requested === "..") return null;
-      const allowed = task.success?.artifacts ?? [];
+      const allowed = view.success?.artifacts ?? [];
       const match = allowed.find((abs) => path.basename(abs) === requested);
       return match ?? null;
     });

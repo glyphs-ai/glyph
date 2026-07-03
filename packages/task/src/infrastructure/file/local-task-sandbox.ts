@@ -87,17 +87,16 @@ export class LocalTaskSandbox implements TaskSandbox {
       (async () => {
         let entries: import("node:fs").Dirent[];
         try {
-          entries = await readdir(dir, { withFileTypes: true });
+          entries = await readdir(dir, { withFileTypes: true, recursive: true });
         } catch (err) {
           // A not-yet-created artifact dir is the normal "no artifacts" case.
           if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
           throw err;
         }
-        const names = entries
+        return entries
           .filter((e) => e.isFile())
-          .map((e) => e.name)
+          .map((e) => path.join(e.parentPath, e.name))
           .sort((a, b) => a.localeCompare(b));
-        return names.map((name) => path.join(dir, name));
       })(),
       (cause): ArtifactListingFailed => ({ type: "ArtifactListingFailed", cause }),
     );

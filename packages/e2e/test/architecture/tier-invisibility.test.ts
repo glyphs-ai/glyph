@@ -57,7 +57,7 @@
  *
  * Hosting: lives in `@glyphs-ai/e2e/test/architecture/` alongside the
  * other repo-wide architectural audits (`inter-service-imports`,
- * `split-convention`, `test-layout-convention`). The audit is
+ * `split-convention`). The audit is
  * repo-wide and walks `packages/{dashboard,cli}/{src,test}/**` —
  * the fenced consumers it polices.
  */

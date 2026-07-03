@@ -54,7 +54,6 @@ const STATUS_BY_TYPE: Readonly<Record<TaskErrorType, ContentfulStatusCode>> = {
   AgentNotFound: 400,
   RuntimeDoesNotSupportTasks: 400,
   DispatchKernelEnvCollision: 400,
-  UnsafeFramingPrompt: 400,
   EntryNotReady: 409,
   InvalidTransition: 409,
   ManagerShuttingDown: 503,
@@ -65,6 +64,7 @@ const STATUS_BY_TYPE: Readonly<Record<TaskErrorType, ContentfulStatusCode>> = {
   RuntimeHeadlessLaunchFailed: 500,
   RuntimeActivityReadFailed: 500,
   CorruptedTask: 500,
+  PurgeFailed: 500,
 };
 
 const MESSAGE_BY_TYPE: Readonly<Record<TaskErrorType, string>> = {
@@ -72,7 +72,6 @@ const MESSAGE_BY_TYPE: Readonly<Record<TaskErrorType, string>> = {
   AgentNotFound: "agent not found",
   RuntimeDoesNotSupportTasks: "runtime does not support task dispatch",
   DispatchKernelEnvCollision: "subprocess env key collides with a kernel key",
-  UnsafeFramingPrompt: "framing prompt is not safe to pass to the runtime",
   EntryNotReady: "agent is not ready",
   InvalidTransition: "illegal task state transition",
   ManagerShuttingDown: "task manager is shutting down",
@@ -83,6 +82,7 @@ const MESSAGE_BY_TYPE: Readonly<Record<TaskErrorType, string>> = {
   RuntimeHeadlessLaunchFailed: "internal error",
   RuntimeActivityReadFailed: "internal error",
   CorruptedTask: "internal error",
+  PurgeFailed: "internal error",
 };
 
 export interface RespondTaskErrorOpts {

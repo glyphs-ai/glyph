@@ -14,7 +14,6 @@ test/
   architecture/
     inter-service-imports.test.ts    # T0/T1 pkgs only type-import sibling T0/T1
     split-convention.test.ts         # facade + sibling-subdir split discipline
-    test-layout-convention.test.ts   # test path mirrors src path
     tier-invisibility.test.ts        # app consumers only see allowlisted surfaces
   cli/
     bundle-smoke.test.ts             # single-file `bundle/glyph.js` (opt-in: BUNDLE_SMOKE=1)

@@ -1,41 +1,47 @@
 import type { RuntimeRegistry } from "@glyphs-ai/runtime";
+import { eq } from "drizzle-orm";
 import { okAsync } from "neverthrow";
 import { z } from "zod";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
-import type { CorruptedTask, TaskEntity } from "../domain/task-entity.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { TaskIdSchema } from "../domain/task-id.js";
-import type { DatabaseUnavailable, TaskRepository } from "../domain/task-repository.js";
+import type { DatabaseUnavailable } from "../domain/task-repository.js";
 import { TaskStatusSchema } from "../domain/task-status.js";
 import { TaskSuccessSchema } from "../domain/task-success.js";
+import {
+  metaString,
+  projectTaskRow,
+  type TaskQueries,
+} from "../infrastructure/drizzle/task-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const GetTaskRequestSchema = z.object({ id: TaskIdSchema }).strict();
 export type GetTaskRequest = z.infer<typeof GetTaskRequestSchema>;
 
-const TaskViewSchema = z.object({
-  id: TaskIdSchema,
-  agent: z.string(),
-  brief: z.string(),
-  details: z.string().optional(),
-  origin: z.string(),
-  originId: z.string().optional(),
-  status: TaskStatusSchema,
-  metadata: z.record(z.string(), z.unknown()),
-  createdAt: z.string(),
-  startedAt: z.string(),
-  endedAt: z.string().optional(),
-  success: TaskSuccessSchema.optional(),
-  failure: TaskFailureSchema.optional(),
-  cancellation: TaskCancellationSchema.optional(),
-});
-export const GetTaskResponseSchema = TaskViewSchema.nullable();
+export const GetTaskResponseSchema = z
+  .object({
+    id: TaskIdSchema,
+    agent: z.string(),
+    brief: z.string(),
+    details: z.string().optional(),
+    origin: z.string(),
+    originId: z.string().optional(),
+    status: TaskStatusSchema,
+    metadata: z.record(z.string(), z.unknown()),
+    createdAt: z.string(),
+    startedAt: z.string(),
+    endedAt: z.string().optional(),
+    success: TaskSuccessSchema.optional(),
+    failure: TaskFailureSchema.optional(),
+    cancellation: TaskCancellationSchema.optional(),
+  })
+  .nullable();
 export type GetTaskResponse = z.infer<typeof GetTaskResponseSchema>;
 
-export type GetTaskError = CorruptedTask | DatabaseUnavailable;
+export type GetTaskError = DatabaseUnavailable;
 
 export interface GetTaskDeps {
-  readonly repository: TaskRepository;
+  readonly query: TaskQueries;
   readonly runtimeRegistry: RuntimeRegistry;
 }
 
@@ -51,55 +57,44 @@ export class GetTaskUseCase implements UseCase<GetTaskRequest, GetTaskResponse, 
   execute(request: GetTaskRequest): UseCaseResult<GetTaskResponse, GetTaskError> {
     const { id } = GetTaskRequestSchema.parse(request);
     const deps = this.deps;
-    return deps.repository.findById(id).andThen((task) => {
-      if (task === undefined) return okAsync<GetTaskResponse, GetTaskError>(null);
-      if (task.status !== "running")
-        return okAsync<GetTaskResponse, GetTaskError>(toTaskView(task));
-      return enrichWithRuntimeMetadata(deps, task).map(
-        (enriched): GetTaskResponse => toTaskView(enriched),
-      );
-    });
+    const q = deps.query;
+    return q
+      .query((db): GetTaskResponse => {
+        const row = db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
+        return row === undefined ? null : projectTaskRow(row);
+      })
+      .andThen((view) => {
+        if (view === null || view.status !== "running") return okAsync<GetTaskResponse>(view);
+        return runtimeLastActiveAt(deps, view).map(
+          (lastActiveAt): GetTaskResponse =>
+            lastActiveAt === null
+              ? view
+              : { ...view, metadata: { ...view.metadata, lastActiveAtRuntime: lastActiveAt } },
+        );
+      });
   }
 }
 
 /**
- * Fold the runtime's `lastActiveAt` into a running task's metadata bag. Pure
- * (never mutates input, never persists); returns the task unchanged when the
- * runtime is unregistered, has no session id, or reports no activity.
+ * Read the runtime's live `lastActiveAt` for a running task, or `null` when
+ * the runtime is unregistered, the task has no session id, or the runtime
+ * reports no activity. Never mutates the view — the caller folds the value in.
  */
-function enrichWithRuntimeMetadata(
+function runtimeLastActiveAt(
   deps: GetTaskDeps,
-  task: TaskEntity,
-): UseCaseResult<TaskEntity, never> {
-  const runtimeName = task.metadataString("runtime");
-  if (runtimeName === undefined) return okAsync(task);
+  view: NonNullable<GetTaskResponse>,
+): UseCaseResult<string | null, never> {
+  const runtimeName = metaString(view.metadata, "runtime");
+  if (runtimeName === undefined) return okAsync(null);
   const found = deps.runtimeRegistry.get(runtimeName);
-  if (found.isErr()) return okAsync(task);
-  const runtimeSessionId = task.metadataString("runtimeSessionId");
-  if (runtimeSessionId === undefined) return okAsync(task);
+  if (found.isErr()) return okAsync(null);
+  const runtimeSessionId = metaString(view.metadata, "runtimeSessionId");
+  if (runtimeSessionId === undefined) return okAsync(null);
   // readMetadata is best-effort (never-failing Result) — a runtime fault
   // resolves to null rather than breaking the read.
-  return found.value.readMetadata(runtimeSessionId).map((meta): TaskEntity => {
-    if (meta === null || meta.lastActiveAt === null) return task;
-    return task.withMetadata({ ...task.metadata, lastActiveAtRuntime: meta.lastActiveAt });
-  });
-}
-
-function toTaskView(task: TaskEntity): z.infer<typeof TaskViewSchema> {
-  return {
-    id: task.id,
-    agent: task.agent,
-    brief: task.brief,
-    ...(task.details !== undefined ? { details: task.details } : {}),
-    origin: task.origin,
-    ...(task.originId !== undefined ? { originId: task.originId } : {}),
-    status: task.status,
-    metadata: { ...task.metadata },
-    createdAt: task.createdAt,
-    startedAt: task.startedAt,
-    ...(task.endedAt !== undefined ? { endedAt: task.endedAt } : {}),
-    ...(task.success !== undefined ? { success: task.success } : {}),
-    ...(task.failure !== undefined ? { failure: task.failure } : {}),
-    ...(task.cancellation !== undefined ? { cancellation: task.cancellation } : {}),
-  };
+  return found.value
+    .readMetadata(runtimeSessionId)
+    .map((meta): string | null =>
+      meta === null || meta.lastActiveAt === null ? null : meta.lastActiveAt,
+    );
 }

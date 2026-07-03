@@ -16,7 +16,7 @@ import type {
   ProvisioningFailed,
   WorkspaceError,
   WorkspaceIdConflict,
-  WorkspaceNotRegistered,
+  WorkspaceNotFound,
   WorkspacePathConflict,
 } from "@glyphs-ai/workspace";
 import type { Context } from "hono";
@@ -35,13 +35,13 @@ const STATUS_BY_TYPE: Readonly<
   Record<
     | WorkspaceIdConflict["type"]
     | WorkspacePathConflict["type"]
-    | WorkspaceNotRegistered["type"]
+    | WorkspaceNotFound["type"]
     | DatabaseUnavailable["type"]
     | ProvisioningFailed["type"],
     ContentfulStatusCode
   >
 > = {
-  WorkspaceNotRegistered: 404,
+  WorkspaceNotFound: 404,
   WorkspaceIdConflict: 409,
   WorkspacePathConflict: 409,
   DatabaseUnavailable: 500,
@@ -52,13 +52,13 @@ const MESSAGE_BY_TYPE: Readonly<
   Record<
     | WorkspaceIdConflict["type"]
     | WorkspacePathConflict["type"]
-    | WorkspaceNotRegistered["type"]
+    | WorkspaceNotFound["type"]
     | DatabaseUnavailable["type"]
     | ProvisioningFailed["type"],
     string
   >
 > = {
-  WorkspaceNotRegistered: "workspace not registered",
+  WorkspaceNotFound: "workspace not found",
   WorkspaceIdConflict: "workspace id already registered",
   WorkspacePathConflict: "workspace directory already registered",
   DatabaseUnavailable: "internal error",

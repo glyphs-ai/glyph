@@ -55,9 +55,10 @@ export interface TaskSandbox {
   materialize(args: MaterializeWorkdirArgs): ResultAsync<void, WorkdirMaterializationFailed>;
 
   /**
-   * Absolute paths of regular files directly under `<workdir>/artifact/`,
-   * sorted lexicographically by name. Resolves to `[]` when the directory is
-   * absent; a genuine read fault surfaces `ArtifactListingFailed`.
+   * Absolute paths of every regular file anywhere under `<workdir>/artifact/`
+   * (recursively, at any depth), sorted lexicographically by path. Resolves to
+   * `[]` when the directory is absent; a genuine read fault surfaces
+   * `ArtifactListingFailed`.
    */
   listArtifacts(workdir: string): ResultAsync<readonly string[], ArtifactListingFailed>;
 

@@ -11,9 +11,10 @@
  * Exports:
  *   - Per use-case: its `Request` / `Response` Zod schemas + inferred
  *     types and `Error` union — the wire contract.
- *   - Curated domain surface via `./application/index.js`: the branded
- *     `SessionId` + schema and the error atoms the use-case error
- *     unions are built from.
+ *   - Curated domain surface via `./application/session-public.js`: the
+ *     branded `SessionId` + schema and the domain error atoms the use-case
+ *     error unions are built from. Application-layer + runtime error atoms
+ *     (agent resolution / runtime) are exported directly from this file.
  *   - The host-supplied port (`AgentResolver`) and the runtime/terminal
  *     data types adapter authors need (`LaunchCommand`, `ResolvedAgent`).
  *   - `composeSessionModule` → `SessionModule`: the DI container a host
@@ -28,7 +29,14 @@
  */
 
 // ─── runtime data types re-exported for adapter authors ────────────
-export type { LaunchCommand, ResolvedAgent } from "@glyphs-ai/runtime";
+export type {
+  LaunchCommand,
+  ResolvedAgent,
+  RuntimeLaunchFailed,
+  RuntimeProvisionFailed,
+  RuntimeStateDeletionFailed,
+  UnknownRuntime,
+} from "@glyphs-ai/runtime";
 // ─── use-case wire contracts ───────────────────────────────────────
 export {
   type BuildInteractiveLaunchError,
@@ -57,10 +65,6 @@ export {
   type GetSessionResponse,
   GetSessionResponseSchema,
 } from "./application/get-session.js";
-// ─── curated domain surface (SessionId, error atoms) ───────────────
-// Funnelled through the application barrel so this file never mentions
-// `./domain/*` directly — domain stays private to the package.
-export * from "./application/index.js";
 export {
   type ListSessionsError,
   type ListSessionsRequest,
@@ -69,7 +73,15 @@ export {
   ListSessionsResponseSchema,
 } from "./application/list-sessions.js";
 // ─── host-supplied ports ───────────────────────────────────────────
-export type { AgentResolver } from "./application/ports/agent-resolver.js";
+export type {
+  AgentNotFound,
+  AgentResolutionFailed,
+  AgentResolver,
+} from "./application/ports/agent-resolver.js";
+// ─── curated domain surface (SessionId, error atoms) ───────────────
+// Funnelled through session-public so this file never mentions
+// `./domain/*` directly — domain stays private to the package.
+export * from "./application/session-public.js";
 export {
   type SpawnInteractiveError,
   type SpawnInteractiveRequest,

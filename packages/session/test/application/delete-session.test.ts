@@ -11,7 +11,7 @@ import type { SessionSandbox } from "../../src/domain/session-sandbox.js";
 const ID = SessionIdSchema.parse("20260508-9dfbdf05");
 
 function entity(runtimeSessionId: string | null): SessionEntity {
-  return new SessionEntity({
+  return SessionEntity.rehydrate({
     id: ID,
     agent: "public/demo",
     runtime: "copilot",

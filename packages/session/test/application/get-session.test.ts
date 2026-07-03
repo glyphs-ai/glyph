@@ -1,58 +1,97 @@
 import type { Runtime, RuntimeRegistry, RuntimeSessionMetadata } from "@glyphs-ai/runtime";
 import { err, errAsync, ok, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { type MockProxy, mock } from "vitest-mock-extended";
 import { GetSessionUseCase } from "../../src/application/get-session.js";
-import { SessionEntity } from "../../src/domain/session-entity.js";
+import { type RehydrateSessionArgs, SessionEntity } from "../../src/domain/session-entity.js";
 import { SessionIdSchema } from "../../src/domain/session-id.js";
-import type { SessionRepository } from "../../src/domain/session-repository.js";
+import type { DatabaseUnavailable } from "../../src/domain/session-repository.js";
 import type { SessionSandbox } from "../../src/domain/session-sandbox.js";
+import type { Db } from "../../src/infrastructure/drizzle/session-db.js";
+import { openDb } from "../../src/infrastructure/drizzle/session-db.js";
+import { SessionMapper } from "../../src/infrastructure/drizzle/session-mapper.js";
+import {
+  DrizzleSessionQueries,
+  type SessionQueries,
+} from "../../src/infrastructure/drizzle/session-queries.js";
+import { sessions } from "../../src/infrastructure/drizzle/session-schema.js";
 
 const ID = SessionIdSchema.parse("20260508-9dfbdf05");
 const WORKDIR = `/ws/sessions/${ID}`;
 
-function entity(runtimeSessionId: string | null): SessionEntity {
-  return new SessionEntity({
+async function seed(db: Db, args: RehydrateSessionArgs): Promise<void> {
+  await db
+    .insert(sessions)
+    .values(SessionMapper.toRow(SessionEntity.rehydrate(args)))
+    .run();
+}
+
+function entity(runtimeSessionId: string | null): RehydrateSessionArgs {
+  return {
     id: ID,
     agent: "public/demo",
     runtime: "copilot",
     createdAt: "2026-05-08T01:05:00.000Z",
     runtimeSessionId,
     lastLaunchMode: null,
-  });
+  };
 }
 
-let repo: MockProxy<SessionRepository>;
-let runtimeRegistry: MockProxy<RuntimeRegistry>;
-let runtime: MockProxy<Runtime>;
-let sandbox: MockProxy<SessionSandbox>;
-let useCase: GetSessionUseCase;
-
-beforeEach(() => {
-  repo = mock<SessionRepository>();
-  runtimeRegistry = mock<RuntimeRegistry>();
-  runtime = mock<Runtime>();
-  sandbox = mock<SessionSandbox>();
+function setup(): {
+  readonly db: Db;
+  readonly useCase: GetSessionUseCase;
+  readonly runtimeRegistry: MockProxy<RuntimeRegistry>;
+  readonly runtime: MockProxy<Runtime>;
+  readonly sandbox: MockProxy<SessionSandbox>;
+} {
+  const { db } = openDb(":memory:");
+  const runtimeRegistry = mock<RuntimeRegistry>();
+  const runtime = mock<Runtime>();
+  const sandbox = mock<SessionSandbox>();
   runtimeRegistry.get.mockReturnValue(ok(runtime));
   runtime.readMetadata.mockReturnValue(okAsync(null));
   sandbox.resolve.mockReturnValue(WORKDIR);
-  useCase = new GetSessionUseCase({ repo, runtimeRegistry, sandbox });
-});
+  return {
+    db,
+    runtimeRegistry,
+    runtime,
+    sandbox,
+    useCase: new GetSessionUseCase({
+      query: new DrizzleSessionQueries({ db }),
+      runtimeRegistry,
+      sandbox,
+    }),
+  };
+}
+
+function failingQueries(): SessionQueries {
+  return {
+    sessions,
+    query<T>(_fn: (db: Db) => T) {
+      return errAsync<T, DatabaseUnavailable>({
+        type: "DatabaseUnavailable",
+        cause: new Error("boom"),
+      });
+    },
+  };
+}
 
 describe("GetSessionUseCase", () => {
   it("returns null when the session is absent", async () => {
-    repo.findById.mockReturnValue(okAsync(undefined));
+    const { useCase } = setup();
     expect((await useCase.execute({ id: ID }))._unsafeUnwrap()).toBeNull();
   });
 
   it("returns null when the session's runtime is no longer registered", async () => {
-    repo.findById.mockReturnValue(okAsync(entity("rsid-1")));
+    const { db, useCase, runtimeRegistry } = setup();
+    await seed(db, entity("rsid-1"));
     runtimeRegistry.get.mockReturnValue(err({ type: "UnknownRuntime", runtime: "copilot" }));
     expect((await useCase.execute({ id: ID }))._unsafeUnwrap()).toBeNull();
   });
 
   it("projects the base view when there is no runtime session yet", async () => {
-    repo.findById.mockReturnValue(okAsync(entity(null)));
+    const { db, useCase, runtime } = setup();
+    await seed(db, entity(null));
     const view = (await useCase.execute({ id: ID }))._unsafeUnwrap();
     expect(view).toEqual({
       id: ID,
@@ -69,7 +108,8 @@ describe("GetSessionUseCase", () => {
   });
 
   it("refreshes lastActiveAt + preview from live runtime metadata", async () => {
-    repo.findById.mockReturnValue(okAsync(entity("rsid-1")));
+    const { db, useCase, runtime } = setup();
+    await seed(db, entity("rsid-1"));
     const meta: RuntimeSessionMetadata = {
       title: "Draft the post",
       userTitled: false,
@@ -81,8 +121,14 @@ describe("GetSessionUseCase", () => {
     expect(view?.lastActiveAt).toBe("2026-05-08T02:00:00.000Z");
   });
 
-  it("propagates DatabaseUnavailable from the repository", async () => {
-    repo.findById.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause: null }));
+  it("propagates DatabaseUnavailable from the query", async () => {
+    const runtimeRegistry = mock<RuntimeRegistry>();
+    const sandbox = mock<SessionSandbox>();
+    const useCase = new GetSessionUseCase({
+      query: failingQueries(),
+      runtimeRegistry,
+      sandbox,
+    });
     expect((await useCase.execute({ id: ID }))._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
   });
 });

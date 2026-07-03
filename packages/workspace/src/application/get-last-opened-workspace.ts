@@ -1,8 +1,10 @@
+import { desc } from "drizzle-orm";
 import pino, { type Logger } from "pino";
 import { z } from "zod";
-import { WorkspaceIdSchema } from "../domain/workspace-id.js";
-import { WorkspaceNameSchema } from "../domain/workspace-name.js";
-import type { DatabaseUnavailable, WorkspaceRepository } from "../domain/workspace-repository.js";
+import { type WorkspaceId, WorkspaceIdSchema } from "../domain/workspace-id.js";
+import { type WorkspaceName, WorkspaceNameSchema } from "../domain/workspace-name.js";
+import type { DatabaseUnavailable } from "../domain/workspace-repository.js";
+import type { WorkspaceQueries } from "../infrastructure/drizzle/workspace-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const GetLastOpenedWorkspaceRequestSchema = z.object({}).strict();
@@ -22,13 +24,13 @@ export type GetLastOpenedWorkspaceResponse = z.infer<typeof GetLastOpenedWorkspa
 export type GetLastOpenedWorkspaceError = DatabaseUnavailable;
 
 export interface GetLastOpenedWorkspaceDeps {
-  readonly repo: WorkspaceRepository;
+  readonly query: WorkspaceQueries;
   readonly logger?: Logger;
 }
 
 const silentLogger: Logger = pino({ level: "silent" });
 
-/** Return the most recently opened workspace, or `null` when empty. */
+/** Return the most-recently-opened workspace, or `null` when empty. */
 export class GetLastOpenedWorkspaceUseCase
   implements
     UseCase<
@@ -46,16 +48,22 @@ export class GetLastOpenedWorkspaceUseCase
     request: GetLastOpenedWorkspaceRequest,
   ): UseCaseResult<GetLastOpenedWorkspaceResponse, GetLastOpenedWorkspaceError> {
     GetLastOpenedWorkspaceRequestSchema.parse(request);
-    return this.deps.repo
-      .findLastOpened()
-      .map((entity): GetLastOpenedWorkspaceResponse => {
-        if (!entity) return null;
+    const q = this.deps.query;
+    return q
+      .query<GetLastOpenedWorkspaceResponse>(async (db) => {
+        const row = await db
+          .select()
+          .from(q.workspaces)
+          .orderBy(desc(q.workspaces.lastOpenedAt), desc(q.workspaces.createdAt), q.workspaces.id)
+          .limit(1)
+          .get();
+        if (row === undefined) return null;
         return {
-          id: entity.id,
-          name: entity.name,
-          workspaceDir: entity.workspaceDir,
-          createdAt: entity.createdAt,
-          lastOpenedAt: entity.lastOpenedAt ?? entity.createdAt,
+          id: row.id as WorkspaceId,
+          name: row.name as WorkspaceName,
+          workspaceDir: row.workspaceDir,
+          createdAt: row.createdAt,
+          lastOpenedAt: row.lastOpenedAt ?? row.createdAt,
         };
       })
       .mapErr((err) => {

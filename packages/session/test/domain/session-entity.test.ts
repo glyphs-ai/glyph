@@ -23,8 +23,8 @@ describe("SessionEntity.create", () => {
 });
 
 describe("SessionEntity — rehydration + mutation", () => {
-  it("the constructor rehydrates a persisted lastLaunchMode", () => {
-    const entity = new SessionEntity({
+  it("rehydrate restores a persisted lastLaunchMode", () => {
+    const entity = SessionEntity.rehydrate({
       id: ID,
       agent: "public/demo",
       runtime: "copilot",

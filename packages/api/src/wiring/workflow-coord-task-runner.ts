@@ -70,6 +70,7 @@ import type {
   TaskId,
   TaskModule,
 } from "@glyphs-ai/task";
+import { TaskBriefSchema } from "@glyphs-ai/task";
 import {
   type WorkflowId,
   type WorkflowModule,
@@ -120,7 +121,7 @@ export const DEFAULT_COORD_MAX_POLL_ERRORS = 3;
  * statement separator on Windows, so a multi-line prompt would be
  * truncated. A unit test asserts this invariant on the shipped
  * constant, and task re-validates the forwarded prompt on every
- * dispatch (`UnsafeFramingPrompt`).
+ * dispatch via `FramingPromptSchema`.
  */
 export const COORD_FRAMING_PROMPT_COPILOT =
   "You are running as a workflow coordinator. " +
@@ -348,7 +349,7 @@ export function makeCoordNodeRunner(
       const spec = opts.spec as WorkflowCoordinatorNodeSpec;
       const dispatchResult = await tasks.dispatchTask.execute({
         agent: spec.agent,
-        brief: wf.brief,
+        brief: TaskBriefSchema.parse(wf.brief),
         // Conditional spread: passing `details: undefined` into
         // `tasks.dispatch` can serialize as the literal string
         // "undefined" downstream. Mirrors the worker runner's

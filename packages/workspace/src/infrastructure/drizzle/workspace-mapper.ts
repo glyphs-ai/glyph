@@ -9,8 +9,9 @@ export type WorkspaceRow = typeof workspaces.$inferSelect;
 
 export const WorkspaceMapper = {
   toDomain(row: WorkspaceRow): WorkspaceEntity {
-    // Trusted rehydration from persisted registry rows.
-    return new WorkspaceEntity({
+    // Trusted rehydration from persisted registry rows. Change-tracking is
+    // the repository's concern (it snapshots the row separately).
+    return WorkspaceEntity.rehydrate({
       id: row.id as WorkspaceId,
       workspaceDir: row.workspaceDir,
       name: row.name as WorkspaceName,

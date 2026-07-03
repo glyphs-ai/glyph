@@ -1,5 +1,6 @@
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
+import { TaskBriefSchema } from "@glyphs-ai/task";
 import type { TaskTargetData, TaskTargetPatch } from "../wire/index.js";
 import {
   TaskOperationError,
@@ -53,16 +54,11 @@ export function makeTaskKindHandler(opts: {
       if (typeof obj.agent !== "string" || obj.agent.trim().length === 0) {
         throw new TaskScheduleTargetError("Task target requires non-empty agent");
       }
-      if (typeof obj.brief !== "string" || obj.brief.trim().length === 0) {
-        throw new TaskScheduleTargetError("Task target requires non-empty brief");
-      }
-      if (obj.brief.includes("\n") || obj.brief.includes("\r")) {
+      const briefResult = TaskBriefSchema.safeParse(obj.brief);
+      if (!briefResult.success) {
         throw new TaskScheduleTargetError(
-          "Task target brief must be a single line (no newline characters); pass long content via details",
+          `Task target ${briefResult.error.issues[0]?.message ?? "has an invalid brief"}`,
         );
-      }
-      if (obj.brief.trim().length > 200) {
-        throw new TaskScheduleTargetError("Task target brief must be 200 characters or fewer");
       }
       if (obj.details !== undefined && typeof obj.details !== "string") {
         throw new TaskScheduleTargetError("Task target details, when set, must be a string");
@@ -93,7 +89,7 @@ export function makeTaskKindHandler(opts: {
 
       const validated: TaskTargetData = {
         agent: obj.agent as string,
-        brief: obj.brief as string,
+        brief: briefResult.data,
         ...(obj.details !== undefined ? { details: obj.details as string } : {}),
         ...(obj.runtime !== undefined ? { runtime: obj.runtime as string } : {}),
       };
@@ -157,7 +153,7 @@ export function makeTaskKindHandler(opts: {
       const t = data as TaskTargetData;
       const result = await tasks.dispatchTask.execute({
         agent: t.agent,
-        brief: t.brief,
+        brief: TaskBriefSchema.parse(t.brief),
         // `{ details: undefined }` is NOT equivalent to omitting the
         // key under exactOptionalPropertyTypes; conditional spread.
         ...(t.details !== undefined ? { details: t.details } : {}),

@@ -1,84 +1,164 @@
-import type { Runtime, RuntimeRegistry } from "@glyphs-ai/runtime";
+import type { Runtime, RuntimeRegistry, RuntimeSessionMetadata } from "@glyphs-ai/runtime";
 import { err, errAsync, ok, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { type MockProxy, mock } from "vitest-mock-extended";
 import { ListSessionsUseCase } from "../../src/application/list-sessions.js";
-import { SessionEntity } from "../../src/domain/session-entity.js";
+import { type RehydrateSessionArgs, SessionEntity } from "../../src/domain/session-entity.js";
 import { SessionIdSchema } from "../../src/domain/session-id.js";
-import type { SessionRepository } from "../../src/domain/session-repository.js";
+import type { DatabaseUnavailable } from "../../src/domain/session-repository.js";
 import type { SessionSandbox } from "../../src/domain/session-sandbox.js";
+import type { Db } from "../../src/infrastructure/drizzle/session-db.js";
+import { openDb } from "../../src/infrastructure/drizzle/session-db.js";
+import { SessionMapper } from "../../src/infrastructure/drizzle/session-mapper.js";
+import {
+  DrizzleSessionQueries,
+  type SessionQueries,
+} from "../../src/infrastructure/drizzle/session-queries.js";
+import { sessions } from "../../src/infrastructure/drizzle/session-schema.js";
 
 const NEWER = SessionIdSchema.parse("20260510-aaaaaaaa");
 const OLDER = SessionIdSchema.parse("20260508-bbbbbbbb");
 const UNREG = SessionIdSchema.parse("20260509-cccccccc");
 
-function entity(id: string, runtime: string, createdAt: string): SessionEntity {
-  return new SessionEntity({
-    id: SessionIdSchema.parse(id),
-    agent: "public/demo",
-    runtime,
-    createdAt,
-    runtimeSessionId: null,
-    lastLaunchMode: null,
-  });
+async function seed(db: Db, args: RehydrateSessionArgs): Promise<void> {
+  await db
+    .insert(sessions)
+    .values(SessionMapper.toRow(SessionEntity.rehydrate(args)))
+    .run();
 }
 
-let repo: MockProxy<SessionRepository>;
-let runtimeRegistry: MockProxy<RuntimeRegistry>;
-let runtime: MockProxy<Runtime>;
-let sandbox: MockProxy<SessionSandbox>;
-let useCase: ListSessionsUseCase;
+function entity(
+  id: string,
+  runtime: string,
+  createdAt: string,
+  overrides: Partial<Pick<RehydrateSessionArgs, "agent" | "runtimeSessionId">> = {},
+): RehydrateSessionArgs {
+  return {
+    id: SessionIdSchema.parse(id),
+    agent: overrides.agent ?? "public/demo",
+    runtime,
+    createdAt,
+    runtimeSessionId: overrides.runtimeSessionId ?? null,
+    lastLaunchMode: null,
+  };
+}
 
-beforeEach(() => {
-  repo = mock<SessionRepository>();
-  runtimeRegistry = mock<RuntimeRegistry>();
-  runtime = mock<Runtime>();
-  sandbox = mock<SessionSandbox>();
+function setup(): {
+  readonly db: Db;
+  readonly useCase: ListSessionsUseCase;
+  readonly runtimeRegistry: MockProxy<RuntimeRegistry>;
+  readonly runtime: MockProxy<Runtime>;
+  readonly sandbox: MockProxy<SessionSandbox>;
+} {
+  const { db } = openDb(":memory:");
+  const runtimeRegistry = mock<RuntimeRegistry>();
+  const runtime = mock<Runtime>();
+  const sandbox = mock<SessionSandbox>();
   runtimeRegistry.get.mockImplementation((kind) =>
     kind === "copilot" ? ok(runtime) : err({ type: "UnknownRuntime", runtime: kind }),
   );
   runtime.readMetadata.mockReturnValue(okAsync(null));
   sandbox.resolve.mockImplementation((id) => `/ws/sessions/${id}`);
-  useCase = new ListSessionsUseCase({ repo, runtimeRegistry, sandbox });
-});
+  return {
+    db,
+    runtimeRegistry,
+    runtime,
+    sandbox,
+    useCase: new ListSessionsUseCase({
+      query: new DrizzleSessionQueries({ db }),
+      runtimeRegistry,
+      sandbox,
+    }),
+  };
+}
+
+function failingQueries(): SessionQueries {
+  return {
+    sessions,
+    query<T>(_fn: (db: Db) => T) {
+      return errAsync<T, DatabaseUnavailable>({
+        type: "DatabaseUnavailable",
+        cause: new Error("boom"),
+      });
+    },
+  };
+}
 
 describe("ListSessionsUseCase", () => {
   it("drops sessions whose runtime is unregistered and sorts newest-first", async () => {
-    repo.findAll.mockReturnValue(
-      okAsync([
-        entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"),
-        entity(UNREG, "gemini", "2026-05-09T00:00:00.000Z"),
-        entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z"),
-      ]),
-    );
+    const { db, useCase } = setup();
+    await seed(db, entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"));
+    await seed(db, entity(UNREG, "gemini", "2026-05-09T00:00:00.000Z"));
+    await seed(db, entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z"));
+
     const list = (await useCase.execute({}))._unsafeUnwrap();
     expect(list.map((s) => s.id)).toEqual([NEWER, OLDER]);
   });
 
-  it("forwards agent + createdSince filters to the repository", async () => {
-    repo.findAll.mockReturnValue(okAsync([]));
-    await useCase.execute({ agent: "public/demo", createdSince: "2026-05-01T00:00:00.000Z" });
-    expect(repo.findAll).toHaveBeenCalledWith({
-      agent: "public/demo",
-      createdSince: "2026-05-01T00:00:00.000Z",
+  it("filters by agent", async () => {
+    const { db, useCase } = setup();
+    await seed(db, entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"));
+    await seed(db, entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z", { agent: "public/other" }));
+
+    const list = (await useCase.execute({ agent: "public/other" }))._unsafeUnwrap();
+    expect(list.map((s) => s.id)).toEqual([NEWER]);
+  });
+
+  it("filters by createdSince with an inclusive lower bound", async () => {
+    const { db, useCase } = setup();
+    await seed(db, entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"));
+    await seed(db, entity(UNREG, "copilot", "2026-05-09T00:00:00.000Z"));
+    await seed(db, entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z"));
+
+    const list = (
+      await useCase.execute({ createdSince: "2026-05-09T00:00:00.000Z" })
+    )._unsafeUnwrap();
+    expect(list.map((s) => s.id)).toEqual([NEWER, UNREG]);
+  });
+
+  it("sorts by refreshed activity newest-first", async () => {
+    const { db, useCase, runtime } = setup();
+    await seed(
+      db,
+      entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z", { runtimeSessionId: "rsid-old" }),
+    );
+    await seed(
+      db,
+      entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z", { runtimeSessionId: "rsid-new" }),
+    );
+    runtime.readMetadata.mockImplementation((runtimeSessionId) => {
+      const meta: RuntimeSessionMetadata = {
+        title: runtimeSessionId,
+        userTitled: false,
+        lastActiveAt:
+          runtimeSessionId === "rsid-old" ? "2026-05-11T00:00:00.000Z" : "2026-05-10T00:00:00.000Z",
+      };
+      return okAsync(meta);
     });
+
+    const list = (await useCase.execute({}))._unsafeUnwrap();
+    expect(list.map((s) => s.id)).toEqual([OLDER, NEWER]);
   });
 
   it("activeSince filters never-active rows on their createdAt", async () => {
-    repo.findAll.mockReturnValue(
-      okAsync([
-        entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"),
-        entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z"),
-      ]),
-    );
+    const { db, useCase } = setup();
+    await seed(db, entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"));
+    await seed(db, entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z"));
+
     const list = (
       await useCase.execute({ activeSince: "2026-05-09T00:00:00.000Z" })
     )._unsafeUnwrap();
     expect(list.map((s) => s.id)).toEqual([NEWER]);
   });
 
-  it("propagates DatabaseUnavailable from the repository", async () => {
-    repo.findAll.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause: null }));
+  it("propagates DatabaseUnavailable from the query", async () => {
+    const runtimeRegistry = mock<RuntimeRegistry>();
+    const sandbox = mock<SessionSandbox>();
+    const useCase = new ListSessionsUseCase({
+      query: failingQueries(),
+      runtimeRegistry,
+      sandbox,
+    });
     expect((await useCase.execute({}))._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
   });
 });

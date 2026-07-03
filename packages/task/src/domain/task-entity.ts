@@ -1,4 +1,5 @@
 import { err, ok, type Result } from "neverthrow";
+import { type TaskBrief, TaskBriefSchema } from "./task-brief.js";
 import type { TaskCancellation } from "./task-cancellation.js";
 import type { TaskFailure } from "./task-failure.js";
 import { type InvalidTaskId, type TaskId, TaskIdSchema } from "./task-id.js";
@@ -33,7 +34,7 @@ const CANCELLATION_KINDS = new Set(["user", "cascade"]);
 export interface TaskCreateArgs {
   readonly id: TaskId;
   readonly agent: string;
-  readonly brief: string;
+  readonly brief: TaskBrief;
   readonly details?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
   /** Defaults to `"standalone"`. */
@@ -45,10 +46,10 @@ export interface TaskCreateArgs {
 }
 
 /**
- * Args accepted by {@link TaskEntity.fromStored}. Mirrors the public field
+ * Args accepted by {@link TaskEntity.rehydrate}. Mirrors the public field
  * layout; the SQL row shape is a private detail of the repository.
  */
-export interface TaskFromStoredArgs {
+export interface RehydrateTaskArgs {
   readonly id: string;
   readonly agent: string;
   readonly brief: string;
@@ -84,7 +85,7 @@ export interface TaskTransitionOpts {
  * Construction:
  *  - {@link TaskEntity.create}     — for new tasks; status starts at
  *    `running` (there is no intermediate non-terminal state).
- *  - {@link TaskEntity.fromStored} — rehydrates a row; returns
+ *  - {@link TaskEntity.rehydrate} — rehydrates a row; returns
  *    `CorruptedTask` (or `InvalidTaskId`) instead of an entity on bad data.
  *
  * State machine: `running → {succeeded | failed | cancelled}`; terminal
@@ -96,26 +97,27 @@ export class TaskEntity {
   private constructor(
     private readonly _id: TaskId,
     private readonly _agent: string,
-    private readonly _brief: string,
+    private readonly _brief: TaskBrief,
     private readonly _details: string | undefined,
     private readonly _origin: TaskOrigin,
     private readonly _originId: string | undefined,
-    private readonly _status: TaskStatus,
-    private readonly _metadata: Readonly<Record<string, unknown>>,
+    private _status: TaskStatus,
+    private _metadata: Readonly<Record<string, unknown>>,
     private readonly _createdAt: string,
     private readonly _startedAt: string,
-    private readonly _endedAt: string | undefined,
-    private readonly _success: TaskSuccess | undefined,
-    private readonly _failure: TaskFailure | undefined,
-    private readonly _cancellation: TaskCancellation | undefined,
+    private _endedAt: string | undefined,
+    private _success: TaskSuccess | undefined,
+    private _failure: TaskFailure | undefined,
+    private _cancellation: TaskCancellation | undefined,
   ) {}
 
   /**
    * Construct a fresh task in `running` status. `startedAt` is set to
    * `createdAt` — there is no intermediate non-terminal state between
-   * dispatch and the subprocess starting. The id is minted upstream
-   * (validated branded {@link TaskId}); the brief is validated by the
-   * dispatch request schema, so this factory cannot fail.
+   * dispatch and the subprocess starting. Both the branded {@link TaskId}
+   * and {@link TaskBrief} are minted upstream through their schemas, so the
+   * type system guarantees this factory only ever receives validated inputs;
+   * it cannot fail.
    */
   static create(args: TaskCreateArgs): TaskEntity {
     return new TaskEntity(
@@ -143,7 +145,7 @@ export class TaskEntity {
    * Returns `InvalidTaskId` (id syntax) or `CorruptedTask` (anything else)
    * instead of an entity on bad data.
    */
-  static fromStored(args: TaskFromStoredArgs): Result<TaskEntity, InvalidTaskId | CorruptedTask> {
+  static rehydrate(args: RehydrateTaskArgs): Result<TaskEntity, InvalidTaskId | CorruptedTask> {
     const parsedId = TaskIdSchema.safeParse(args.id);
     if (!parsedId.success) {
       return err({ type: "InvalidTaskId", id: args.id });
@@ -153,8 +155,9 @@ export class TaskEntity {
       err({ type: "CorruptedTask", id: args.id, reason });
 
     if (typeof args.agent !== "string") return corrupt("task.agent must be a string");
-    if (typeof args.brief !== "string" || args.brief.length === 0) {
-      return corrupt("task.brief must be a non-empty string");
+    const parsedBrief = TaskBriefSchema.safeParse(args.brief);
+    if (!parsedBrief.success) {
+      return corrupt("task.brief must be a non-empty single-line string (≤ 200 characters)");
     }
     if (args.details !== undefined && typeof args.details !== "string") {
       return corrupt("task.details, when present, must be a string");
@@ -215,7 +218,7 @@ export class TaskEntity {
       new TaskEntity(
         id,
         args.agent,
-        args.brief,
+        parsedBrief.data,
         args.details,
         args.origin,
         args.originId,
@@ -237,7 +240,7 @@ export class TaskEntity {
   get agent(): string {
     return this._agent;
   }
-  get brief(): string {
+  get brief(): TaskBrief {
     return this._brief;
   }
   get details(): string | undefined {
@@ -287,109 +290,56 @@ export class TaskEntity {
     return this._cancellation;
   }
 
-  // ─── state transitions ────────────────────────────────────
+  // ─── state transitions (in-place) ─────────────────────────
 
   /** Transition `running → succeeded`, attaching the success payload. */
-  complete(
-    success: TaskSuccess,
-    opts: TaskTransitionOpts = {},
-  ): Result<TaskEntity, InvalidTransition> {
+  complete(success: TaskSuccess, opts: TaskTransitionOpts = {}): Result<void, InvalidTransition> {
     if (this._status !== "running") {
       return err({ type: "InvalidTransition", from: this._status, eventType: "complete" });
     }
-    return ok(
-      this.transition({
-        status: "succeeded",
-        endedAt: opts.now ?? new Date().toISOString(),
-        success,
-        metadata: this.mergeMetadata(opts.metadata),
-      }),
-    );
+    this._status = "succeeded";
+    this._endedAt = opts.now ?? new Date().toISOString();
+    this._success = success;
+    this._metadata = this.mergeMetadata(opts.metadata);
+    return ok(undefined);
   }
 
   /** Transition `running → failed`, attaching `failure` for visibility. */
-  fail(failure: TaskFailure, opts: TaskTransitionOpts = {}): Result<TaskEntity, InvalidTransition> {
+  fail(failure: TaskFailure, opts: TaskTransitionOpts = {}): Result<void, InvalidTransition> {
     if (this._status !== "running") {
       return err({ type: "InvalidTransition", from: this._status, eventType: "fail" });
     }
-    return ok(
-      this.transition({
-        status: "failed",
-        endedAt: opts.now ?? new Date().toISOString(),
-        failure,
-        metadata: this.mergeMetadata(opts.metadata),
-      }),
-    );
+    this._status = "failed";
+    this._endedAt = opts.now ?? new Date().toISOString();
+    this._failure = failure;
+    this._metadata = this.mergeMetadata(opts.metadata);
+    return ok(undefined);
   }
 
   /** Transition `running → cancelled`. */
   cancel(
     cancellation: TaskCancellation,
     opts: TaskTransitionOpts = {},
-  ): Result<TaskEntity, InvalidTransition> {
+  ): Result<void, InvalidTransition> {
     if (this._status !== "running") {
       return err({ type: "InvalidTransition", from: this._status, eventType: "cancel" });
     }
-    return ok(
-      this.transition({
-        status: "cancelled",
-        endedAt: opts.now ?? new Date().toISOString(),
-        cancellation,
-        metadata: this.mergeMetadata(opts.metadata),
-      }),
-    );
+    this._status = "cancelled";
+    this._endedAt = opts.now ?? new Date().toISOString();
+    this._cancellation = cancellation;
+    this._metadata = this.mergeMetadata(opts.metadata);
+    return ok(undefined);
   }
 
   /**
    * Replace the metadata bag wholesale, preserving status + timing +
    * terminal payload. Pure metadata enrichment, so it cannot fail.
    */
-  withMetadata(metadata: Readonly<Record<string, unknown>>): TaskEntity {
-    return new TaskEntity(
-      this._id,
-      this._agent,
-      this._brief,
-      this._details,
-      this._origin,
-      this._originId,
-      this._status,
-      Object.freeze({ ...metadata }),
-      this._createdAt,
-      this._startedAt,
-      this._endedAt,
-      this._success,
-      this._failure,
-      this._cancellation,
-    );
+  replaceMetadata(metadata: Readonly<Record<string, unknown>>): void {
+    this._metadata = Object.freeze({ ...metadata });
   }
 
   // ─── internals ─────────────────────────────────────────────
-
-  private transition(patch: {
-    readonly status: TaskStatus;
-    readonly metadata: Readonly<Record<string, unknown>>;
-    readonly endedAt?: string;
-    readonly success?: TaskSuccess;
-    readonly failure?: TaskFailure;
-    readonly cancellation?: TaskCancellation;
-  }): TaskEntity {
-    return new TaskEntity(
-      this._id,
-      this._agent,
-      this._brief,
-      this._details,
-      this._origin,
-      this._originId,
-      patch.status,
-      patch.metadata,
-      this._createdAt,
-      this._startedAt,
-      patch.endedAt !== undefined ? patch.endedAt : this._endedAt,
-      patch.success !== undefined ? patch.success : this._success,
-      patch.failure !== undefined ? patch.failure : this._failure,
-      patch.cancellation !== undefined ? patch.cancellation : this._cancellation,
-    );
-  }
 
   private mergeMetadata(
     patch: Readonly<Record<string, unknown>> | undefined,

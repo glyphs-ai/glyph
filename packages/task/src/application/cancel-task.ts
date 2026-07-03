@@ -6,7 +6,7 @@ import { TaskIdSchema } from "../domain/task-id.js";
 import type { DatabaseUnavailable, TaskNotFound } from "../domain/task-repository.js";
 import { TaskStatusSchema } from "../domain/task-status.js";
 import { TaskSuccessSchema } from "../domain/task-success.js";
-import type { ManagerShuttingDown, TaskSupervisor } from "./supervision/index.js";
+import type { ManagerShuttingDown, TaskSupervisor } from "./supervision/task-supervisor.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const CancelTaskRequestSchema = z.object({ id: TaskIdSchema }).strict();

@@ -20,7 +20,7 @@ const launch: LaunchCommand = {
 };
 
 function entity(lastLaunchMode: LaunchMode | null): SessionEntity {
-  return new SessionEntity({
+  return SessionEntity.rehydrate({
     id: ID,
     agent: "public/demo",
     runtime: "copilot",

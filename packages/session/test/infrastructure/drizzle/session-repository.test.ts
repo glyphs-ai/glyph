@@ -9,90 +9,94 @@ function setupRepo(): DrizzleSessionRepository {
   return new DrizzleSessionRepository({ db });
 }
 
-const ID_A = SessionIdSchema.parse("20260508-aaaaaaaa");
-const ID_B = SessionIdSchema.parse("20260509-bbbbbbbb");
-
-function sessionA(): SessionEntity {
-  return new SessionEntity({
-    id: ID_A,
-    agent: "public/alpha",
-    runtime: "copilot",
-    createdAt: "2026-05-08T00:00:00.000Z",
-    runtimeSessionId: "rsid-a",
-    lastLaunchMode: null,
-  });
-}
-
-function sessionB(): SessionEntity {
-  return new SessionEntity({
-    id: ID_B,
-    agent: "public/beta",
-    runtime: "copilot",
-    createdAt: "2026-05-09T00:00:00.000Z",
-    runtimeSessionId: null,
-    lastLaunchMode: null,
-  });
-}
-
 let repo: DrizzleSessionRepository;
 
 beforeEach(() => {
   repo = setupRepo();
 });
 
+const STATE_A = {
+  id: SessionIdSchema.parse("20260508-aaaaaaaa"),
+  agent: "public/alpha",
+  runtime: "copilot",
+  runtimeSessionId: "rsid-a",
+  now: "2026-05-08T00:00:00.000Z",
+};
+
+function fresh(args: typeof STATE_A): SessionEntity {
+  return SessionEntity.create(args);
+}
+
 describe("DrizzleSessionRepository", () => {
-  it("inserts an entity and retrieves it by id", async () => {
-    expect((await repo.insert(sessionA())).isOk()).toBe(true);
-    const found = (await repo.findById(ID_A))._unsafeUnwrap();
-    expect(found).toBeInstanceOf(SessionEntity);
-    expect(found?.agent).toBe("public/alpha");
-    expect(found?.runtimeSessionId).toBe("rsid-a");
-  });
+  describe("save + get round-trip", () => {
+    it("inserts an entity and retrieves it by id", async () => {
+      const saveRes = await repo.save(fresh(STATE_A));
+      expect(saveRes.isOk()).toBe(true);
 
-  it("findById returns undefined for an unknown id", async () => {
-    expect((await repo.findById(ID_A))._unsafeUnwrap()).toBeUndefined();
-  });
+      const found = (await repo.get(STATE_A.id))._unsafeUnwrap();
+      expect(found).toBeInstanceOf(SessionEntity);
+      expect(found.id).toBe(STATE_A.id);
+      expect(found.agent).toBe("public/alpha");
+      expect(found.runtime).toBe("copilot");
+      expect(found.createdAt).toBe("2026-05-08T00:00:00.000Z");
+      expect(found.runtimeSessionId).toBe("rsid-a");
+      expect(found.lastLaunchMode).toBeNull();
+    });
 
-  it("get returns SessionNotFound for an unknown id", async () => {
-    expect((await repo.get(ID_A))._unsafeUnwrapErr()).toEqual({
-      type: "SessionNotFound",
-      id: ID_A,
+    it("returns SessionNotFound for an unknown id", async () => {
+      const res = await repo.get(STATE_A.id);
+      const err = res._unsafeUnwrapErr();
+      expect(err.type).toBe("SessionNotFound");
+      if (err.type === "SessionNotFound") expect(err.id).toBe(STATE_A.id);
     });
   });
 
-  it("insert of a duplicate id yields SessionIdConflict", async () => {
-    await repo.insert(sessionA());
-    expect((await repo.insert(sessionA()))._unsafeUnwrapErr()).toEqual({
-      type: "SessionIdConflict",
-      id: ID_A,
+  describe("save (diff write of mutated aggregate)", () => {
+    it("persists markLaunched — re-read shows the new launch mode", async () => {
+      await repo.save(fresh(STATE_A));
+      const loaded = (await repo.get(STATE_A.id))._unsafeUnwrap();
+      loaded.markLaunched("remote");
+
+      const saveRes = await repo.save(loaded);
+      expect(saveRes.isOk()).toBe(true);
+
+      const reread = (await repo.get(STATE_A.id))._unsafeUnwrap();
+      expect(reread.lastLaunchMode).toBe("remote");
+      expect(reread.agent).toBe(STATE_A.agent);
+      expect(reread.createdAt).toBe(STATE_A.now);
+    });
+
+    it("is a no-op when a loaded entity has no mutable changes", async () => {
+      await repo.save(fresh(STATE_A));
+      const loaded = (await repo.get(STATE_A.id))._unsafeUnwrap();
+
+      const saveRes = await repo.save(loaded);
+      expect(saveRes.isOk()).toBe(true);
+
+      const reread = (await repo.get(STATE_A.id))._unsafeUnwrap();
+      expect(reread.lastLaunchMode).toBeNull();
+      expect(reread.runtimeSessionId).toBe(STATE_A.runtimeSessionId);
     });
   });
 
-  it("findAll filters by agent", async () => {
-    await repo.insert(sessionA());
-    await repo.insert(sessionB());
-    const rows = (await repo.findAll({ agent: "public/beta" }))._unsafeUnwrap();
-    expect(rows.map((r) => r.id)).toEqual([ID_B]);
+  describe("delete", () => {
+    it("removes the row so get returns SessionNotFound", async () => {
+      await repo.save(fresh(STATE_A));
+      await repo.delete(STATE_A.id);
+
+      const res = await repo.get(STATE_A.id);
+      expect(res._unsafeUnwrapErr().type).toBe("SessionNotFound");
+    });
   });
 
-  it("findAll filters by createdSince (inclusive lower bound)", async () => {
-    await repo.insert(sessionA());
-    await repo.insert(sessionB());
-    const rows = (await repo.findAll({ createdSince: "2026-05-09T00:00:00.000Z" }))._unsafeUnwrap();
-    expect(rows.map((r) => r.id)).toEqual([ID_B]);
-  });
-
-  it("save persists a mutated launch mode", async () => {
-    const entity = sessionA();
-    await repo.insert(entity);
-    entity.markLaunched("remote");
-    expect((await repo.save(entity)).isOk()).toBe(true);
-    expect((await repo.get(ID_A))._unsafeUnwrap().lastLaunchMode).toBe("remote");
-  });
-
-  it("delete removes the row", async () => {
-    await repo.insert(sessionA());
-    await repo.delete(ID_A);
-    expect((await repo.findById(ID_A))._unsafeUnwrap()).toBeUndefined();
+  describe("constraint violations translate to typed errors", () => {
+    it("rejects duplicate id with SessionIdConflict", async () => {
+      await repo.save(fresh(STATE_A));
+      const dup = SessionEntity.create({ ...STATE_A, agent: "public/other" });
+      const res = await repo.save(dup);
+      const err = res._unsafeUnwrapErr();
+      expect(err.type).toBe("SessionIdConflict");
+      if (err.type === "SessionIdConflict") expect(err.id).toBe(STATE_A.id);
+    });
   });
 });

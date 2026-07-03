@@ -7,16 +7,13 @@ import {
   WorkflowNodeKindSchema,
 } from "../../domain/node/workflow-node-kind.js";
 import { WorkflowNodeStatusSchema } from "../../domain/node/workflow-node-status.js";
+import { WorkflowBriefSchema } from "../../domain/workflow/workflow-brief.js";
 import { WorkflowCancellationSchema } from "../../domain/workflow/workflow-cancellation.js";
-import {
-  type WorkflowEntityCorruption,
-  workflowCorruption,
-  workflowEnumValueCorruption,
-} from "../../domain/workflow/workflow-corruption.js";
 import { WorkflowEntity } from "../../domain/workflow/workflow-entity.js";
 import { WorkflowFailureSchema } from "../../domain/workflow/workflow-failure.js";
 import { WorkflowIdSchema } from "../../domain/workflow/workflow-id.js";
 import { WorkflowOriginSchema } from "../../domain/workflow/workflow-origin.js";
+import type { WorkflowEntityCorruption } from "../../domain/workflow/workflow-repository.js";
 import { WorkflowStatusSchema } from "../../domain/workflow/workflow-status.js";
 import { WorkflowSuccessSchema } from "../../domain/workflow/workflow-success.js";
 import type {
@@ -95,12 +92,37 @@ function toWorkflowHeader(
   WorkflowEntityCorruption
 > {
   const id = WorkflowIdSchema.safeParse(row.id);
-  if (!id.success) return err(workflowCorruption("id", row.id, ["valid workflow id"]));
+  if (!id.success)
+    return err({
+      type: "WorkflowCorruption",
+      field: "id",
+      value: String(row.id),
+      allowed: ["valid workflow id"],
+    });
   const status = WorkflowStatusSchema.safeParse(row.status);
   if (!status.success)
-    return err(workflowEnumValueCorruption("status", row.status, WorkflowStatusSchema.options));
+    return err({
+      type: "WorkflowEnumValueCorruption",
+      field: "status",
+      value: String(row.status),
+      allowed: WorkflowStatusSchema.options,
+    });
   const origin = WorkflowOriginSchema.safeParse(row.origin);
-  if (!origin.success) return err(workflowCorruption("origin", row.origin, ["non-empty string"]));
+  if (!origin.success)
+    return err({
+      type: "WorkflowCorruption",
+      field: "origin",
+      value: String(row.origin),
+      allowed: ["non-empty string"],
+    });
+  const brief = WorkflowBriefSchema.safeParse(row.brief);
+  if (!brief.success)
+    return err({
+      type: "WorkflowCorruption",
+      field: "brief",
+      value: String(row.brief),
+      allowed: ["non-empty single-line string (≤ 200 characters)"],
+    });
   const metadata = parseJsonObject("metadata", row.metadata);
   if (metadata.isErr()) return err(metadata.error);
   const success = parseJsonSchemaColumn("success", row.success, WorkflowSuccessSchema);
@@ -122,7 +144,7 @@ function toWorkflowHeader(
   if (terminal !== undefined) return err(terminal);
   return ok({
     id: id.data,
-    brief: row.brief,
+    brief: brief.data,
     details: row.details ?? undefined,
     coordinatorAgent: row.coordinatorAgent,
     status: status.data,
@@ -140,10 +162,21 @@ function toWorkflowHeader(
 
 function toNodeEntity(row: WorkflowNodeRow): Result<WorkflowNodeEntity, WorkflowEntityCorruption> {
   const id = WorkflowNodeIdSchema.safeParse(row.id);
-  if (!id.success) return err(workflowCorruption("id", row.id, ["valid workflow node id"]));
+  if (!id.success)
+    return err({
+      type: "WorkflowCorruption",
+      field: "id",
+      value: String(row.id),
+      allowed: ["valid workflow node id"],
+    });
   const workflowId = WorkflowIdSchema.safeParse(row.workflowId);
   if (!workflowId.success)
-    return err(workflowCorruption("workflowId", row.workflowId, ["valid workflow id"]));
+    return err({
+      type: "WorkflowCorruption",
+      field: "workflowId",
+      value: String(row.workflowId),
+      allowed: ["valid workflow id"],
+    });
   const kind = WorkflowNodeKindSchema.safeParse(row.kind);
   if (!kind.success)
     return err(
@@ -153,7 +186,12 @@ function toNodeEntity(row: WorkflowNodeRow): Result<WorkflowNodeEntity, Workflow
     );
   const status = WorkflowNodeStatusSchema.safeParse(row.status);
   if (!status.success)
-    return err(workflowEnumValueCorruption("status", row.status, WorkflowNodeStatusSchema.options));
+    return err({
+      type: "WorkflowEnumValueCorruption",
+      field: "status",
+      value: String(row.status),
+      allowed: WorkflowNodeStatusSchema.options,
+    });
   const spec = parseJsonColumn<unknown>("specJson", row.specJson);
   if (spec.isErr()) return err(spec.error);
   const metadata = parseJsonObject("metadata", row.metadata);
@@ -178,13 +216,28 @@ function toNodeEntity(row: WorkflowNodeRow): Result<WorkflowNodeEntity, Workflow
 function toEdgeEntity(row: WorkflowEdgeRow): Result<WorkflowEdgeEntity, WorkflowEntityCorruption> {
   const workflowId = WorkflowIdSchema.safeParse(row.workflowId);
   if (!workflowId.success)
-    return err(workflowCorruption("workflowId", row.workflowId, ["valid workflow id"]));
+    return err({
+      type: "WorkflowCorruption",
+      field: "workflowId",
+      value: String(row.workflowId),
+      allowed: ["valid workflow id"],
+    });
   const from = WorkflowNodeIdSchema.safeParse(row.fromNodeId);
   if (!from.success)
-    return err(workflowCorruption("fromNodeId", row.fromNodeId, ["valid workflow node id"]));
+    return err({
+      type: "WorkflowCorruption",
+      field: "fromNodeId",
+      value: String(row.fromNodeId),
+      allowed: ["valid workflow node id"],
+    });
   const to = WorkflowNodeIdSchema.safeParse(row.toNodeId);
   if (!to.success)
-    return err(workflowCorruption("toNodeId", row.toNodeId, ["valid workflow node id"]));
+    return err({
+      type: "WorkflowCorruption",
+      field: "toNodeId",
+      value: String(row.toNodeId),
+      allowed: ["valid workflow node id"],
+    });
   return ok(
     WorkflowEdgeEntity.reconstitute({ workflowId: workflowId.data, from: from.data, to: to.data }),
   );
@@ -224,7 +277,12 @@ function validateTerminalInvariant(
     cancellation === undefined
   )
     return undefined;
-  return workflowCorruption("terminalPayload", status, ["exactly the matching terminal payload"]);
+  return {
+    type: "WorkflowCorruption",
+    field: "terminalPayload",
+    value: String(status),
+    allowed: ["exactly the matching terminal payload"],
+  };
 }
 function parseJsonObject(
   name: string,
@@ -233,7 +291,12 @@ function parseJsonObject(
   const parsed = parseJsonColumn<unknown>(name, raw);
   if (parsed.isErr()) return err(parsed.error);
   if (parsed.value === null || typeof parsed.value !== "object" || Array.isArray(parsed.value))
-    return err(workflowCorruption(name, raw, ["JSON object"]));
+    return err({
+      type: "WorkflowCorruption",
+      field: name,
+      value: String(raw),
+      allowed: ["JSON object"],
+    });
   return ok(parsed.value as Record<string, unknown>);
 }
 function parseJsonColumn<T>(
@@ -244,7 +307,12 @@ function parseJsonColumn<T>(
   try {
     return ok(JSON.parse(raw) as T);
   } catch {
-    return err(workflowCorruption(name, raw, ["valid JSON"]));
+    return err({
+      type: "WorkflowCorruption",
+      field: name,
+      value: String(raw),
+      allowed: ["valid JSON"],
+    });
   }
 }
 
@@ -258,9 +326,20 @@ function parseJsonSchemaColumn<T>(
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return err(workflowCorruption(name, raw, ["valid JSON"]));
+    return err({
+      type: "WorkflowCorruption",
+      field: name,
+      value: String(raw),
+      allowed: ["valid JSON"],
+    });
   }
   const result = schema.safeParse(parsed);
-  if (!result.success) return err(workflowCorruption(name, raw, [`valid ${name} payload`]));
+  if (!result.success)
+    return err({
+      type: "WorkflowCorruption",
+      field: name,
+      value: String(raw),
+      allowed: [`valid ${name} payload`],
+    });
   return ok(result.data);
 }

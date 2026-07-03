@@ -6,10 +6,5 @@
  * (`z.infer`, re-exported alongside each schema) both derive from it.
  */
 export * from "./catalog.js";
-export * from "./health.js";
-export * from "./runtimes.js";
 export * from "./schedules.js";
-export * from "./server-config.js";
-export * from "./sessions.js";
-export * from "./tasks.js";
 export * from "./workflows.js";

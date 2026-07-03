@@ -4,6 +4,7 @@ import {
   type WorkflowNodeId,
   WorkflowNodeIdSchema,
 } from "../../../src/domain/node/workflow-node-id.js";
+import { WorkflowBriefSchema } from "../../../src/domain/workflow/workflow-brief.js";
 import { WorkflowEntity } from "../../../src/domain/workflow/workflow-entity.js";
 import { type WorkflowId, WorkflowIdSchema } from "../../../src/domain/workflow/workflow-id.js";
 import { type Db, openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
@@ -28,7 +29,7 @@ function nodeId(i: number): WorkflowNodeId {
 function makeWorkflow(id: WorkflowId): WorkflowEntity {
   const wf = WorkflowEntity.create({
     id,
-    brief: "b",
+    brief: WorkflowBriefSchema.parse("b"),
     coordinatorAgent: "coord-a",
     createdAt: NOW,
   });

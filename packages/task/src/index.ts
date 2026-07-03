@@ -11,10 +11,11 @@
  *   - Per use-case: its `Request` + `Response` Zod schemas + inferred
  *     types and `Error` union — the wire contract. Each use-case owns its
  *     own request/response shape; there is no shared task DTO.
- *   - Curated domain surface via `./application/index.js`: the branded
+ *   - Curated domain surface via `./application/task-public.js`: the branded
  *     `TaskId`, the task value-object schemas (`TaskStatusSchema`,
- *     `TaskSuccessSchema`, …), and the error atoms the use-case error
- *     unions are built from.
+ *     `TaskSuccessSchema`, …), and the domain error atoms the use-case error
+ *     unions are built from. Application-layer + runtime error atoms (dispatch
+ *     / agent-resolution / supervision) are exported directly from this file.
  *   - The host-supplied `AgentResolver` port and the runtime data types
  *     adapter authors need (`ResolvedAgent`, `ActivityItem`, `ActivityResult`).
  *   - `composeTaskModule` → `TaskModule`: the DI container a host builds
@@ -29,7 +30,13 @@
  */
 
 // ─── runtime data types re-exported for adapter authors ────────────
-export type { ActivityItem, ActivityResult, ResolvedAgent } from "@glyphs-ai/runtime";
+export type {
+  ActivityItem,
+  ActivityResult,
+  ResolvedAgent,
+  RuntimeActivityReadFailed,
+  RuntimeHeadlessLaunchFailed,
+} from "@glyphs-ai/runtime";
 export {
   type AggregateByOriginError,
   type AggregateByOriginRequest,
@@ -41,6 +48,7 @@ export {
   type CancelTaskRequest,
   CancelTaskRequestSchema,
   type CancelTaskResponse,
+  CancelTaskResponseSchema,
 } from "./application/cancel-task.js";
 export {
   type DeleteTaskError,
@@ -55,11 +63,14 @@ export {
   type DeleteTerminalByOriginResponse,
 } from "./application/delete-terminal-by-origin.js";
 export {
+  type DispatchKernelEnvCollision,
   type DispatchTaskError,
   type DispatchTaskRequest,
   DispatchTaskRequestSchema,
   type DispatchTaskResponse,
-  type UnsafeFramingPrompt,
+  DispatchTaskResponseSchema,
+  type EntryNotReady,
+  type RuntimeDoesNotSupportTasks,
 } from "./application/dispatch-task.js";
 export {
   type FindLatestByOriginError,
@@ -72,12 +83,15 @@ export {
   type GetTaskRequest,
   GetTaskRequestSchema,
   type GetTaskResponse,
+  GetTaskResponseSchema,
 } from "./application/get-task.js";
 export {
   type GetTaskActivityError,
   type GetTaskActivityRequest,
   GetTaskActivityRequestSchema,
   type GetTaskActivityResponse,
+  TASK_ACTIVITY_DEFAULT_LIMIT,
+  TASK_ACTIVITY_MAX_LIMIT,
 } from "./application/get-task-activity.js";
 export {
   type GetTaskActivityStreamError,
@@ -91,10 +105,6 @@ export {
   HasInFlightByOriginRequestSchema,
   type HasInFlightByOriginResponse,
 } from "./application/has-in-flight-by-origin.js";
-// ─── curated domain surface (TaskId, value-object schemas, error atoms) ─────────
-// Funnelled through the application barrel so this file never mentions
-// `./domain/*` directly — domain stays private to the package.
-export * from "./application/index.js";
 export {
   type ListInFlightByOriginError,
   type ListInFlightByOriginRequest,
@@ -106,11 +116,15 @@ export {
   type ListTasksRequest,
   ListTasksRequestSchema,
   type ListTasksResponse,
+  ListTasksResponseSchema,
 } from "./application/list-tasks.js";
 // ─── host-supplied ports ───────────────────────────────────────────
 export type {
   AgentEntry,
+  AgentNotFound,
+  AgentResolutionFailed,
   AgentResolver,
+  BlockedReason,
 } from "./application/ports/agent-resolver.js";
 export {
   type RecoverOrphanedTasksError,
@@ -124,6 +138,15 @@ export {
   ResolveArtifactPathRequestSchema,
   type ResolveArtifactPathResponse,
 } from "./application/resolve-artifact-path.js";
+// ─── supervision lifecycle atoms (surfaced through use-case error unions) ───
+export type {
+  ManagerShuttingDown,
+  PurgeFailed,
+} from "./application/supervision/task-supervisor.js";
+// ─── curated domain surface (TaskId, value-object schemas, error atoms) ─────────
+// Funnelled through task-public so this file never mentions `./domain/*`
+// directly — domain stays private to the package.
+export * from "./application/task-public.js";
 // ─── use-case contract ─────────────────────────────────────────────
 export type { UseCase, UseCaseResult } from "./application/use-case.js";
 export {

@@ -7,36 +7,35 @@ import {
   type RegisterWorkspaceRequest,
   RegisterWorkspaceUseCase,
 } from "../../src/application/register-workspace.js";
-import { WorkspaceEntity } from "../../src/domain/workspace-entity.js";
 import type { WorkspaceId } from "../../src/domain/workspace-id.js";
 import type { WorkspaceName } from "../../src/domain/workspace-name.js";
 import type { WorkspaceProvisioner } from "../../src/domain/workspace-provisioner.js";
 import type { WorkspaceRepository } from "../../src/domain/workspace-repository.js";
+import type { WorkspaceQueries } from "../../src/infrastructure/drizzle/workspace-queries.js";
 
 const OTHER_ID = "22222222-2222-4222-8222-222222222222" as WorkspaceId;
 const ABS_DIR = process.platform === "win32" ? "C:\\workspaces\\project" : "/workspaces/project";
 const DEFAULT_PARENT = process.platform === "win32" ? "C:\\glyph\\workspaces" : "/glyph/workspaces";
 
-/**
- * Builds a typed request while keeping each test's raw name and directory
- * visible at the call site.
- */
 function req(name: string, workspaceDir?: string): RegisterWorkspaceRequest {
   return { name: name as WorkspaceName, ...(workspaceDir !== undefined ? { workspaceDir } : {}) };
 }
 
 let repo: MockProxy<WorkspaceRepository>;
+let query: MockProxy<WorkspaceQueries>;
 let provisioner: MockProxy<WorkspaceProvisioner>;
 let useCase: RegisterWorkspaceUseCase;
 
 beforeEach(() => {
   repo = mock<WorkspaceRepository>();
+  query = mock<WorkspaceQueries>();
   provisioner = mock<WorkspaceProvisioner>();
-  repo.findByPath.mockReturnValue(okAsync(undefined));
-  repo.insert.mockReturnValue(okAsync(undefined));
+  query.query.mockReturnValue(okAsync(undefined));
+  repo.save.mockReturnValue(okAsync(undefined));
   provisioner.provision.mockReturnValue(okAsync(undefined));
   useCase = new RegisterWorkspaceUseCase({
     repo,
+    query,
     provisioner,
     defaultWorkspaceParent: DEFAULT_PARENT,
   });
@@ -52,15 +51,16 @@ describe("RegisterWorkspaceUseCase — input validation (ZodError)", () => {
   ];
   for (const { label, input } of cases) {
     it(`rejects ${label}`, async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing schema rejection of arbitrary shapes.
-      expect(() => useCase.execute(input as any)).toThrow(ZodError);
-      expect(repo.insert).not.toHaveBeenCalled();
+      expect(() => useCase.execute(input as Parameters<typeof useCase.execute>[0])).toThrow(
+        ZodError,
+      );
+      expect(repo.save).not.toHaveBeenCalled();
     });
   }
 });
 
 describe("RegisterWorkspaceUseCase — happy path", () => {
-  it("mints id, resolves dir, provisions, inserts, returns Workspace", async () => {
+  it("mints id, resolves dir, provisions, saves, returns Workspace", async () => {
     const res = await useCase.execute(req("Demo", ABS_DIR));
     const view = res._unsafeUnwrap();
 
@@ -70,7 +70,7 @@ describe("RegisterWorkspaceUseCase — happy path", () => {
     expect(view.id).toMatch(/^[0-9a-f-]{36}$/i);
     expect(view.lastOpenedAt).toBe(view.createdAt);
     expect(provisioner.provision).toHaveBeenCalledWith(resolved);
-    expect(repo.insert).toHaveBeenCalledWith(
+    expect(repo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         id: view.id,
         name: "Demo",
@@ -95,31 +95,24 @@ describe("RegisterWorkspaceUseCase — happy path", () => {
 });
 
 describe("RegisterWorkspaceUseCase — error channel", () => {
-  it("WorkspacePathConflict from pre-flight findByPath", async () => {
-    const existing = new WorkspaceEntity({
-      id: OTHER_ID,
-      name: "Existing" as WorkspaceName,
-      workspaceDir: path.resolve(ABS_DIR),
-      createdAt: "2025-01-01T00:00:00.000Z",
-      lastOpenedAt: "2025-01-02T00:00:00.000Z",
-    });
-    repo.findByPath.mockReturnValue(okAsync(existing));
+  it("WorkspacePathConflict from pre-flight query", async () => {
+    query.query.mockReturnValue(okAsync({ id: OTHER_ID }));
     const res = await useCase.execute(req("Demo", ABS_DIR));
     const err = res._unsafeUnwrapErr();
     expect(err.type).toBe("WorkspacePathConflict");
     if (err.type === "WorkspacePathConflict") expect(err.existingId).toBe(OTHER_ID);
     expect(provisioner.provision).not.toHaveBeenCalled();
-    expect(repo.insert).not.toHaveBeenCalled();
+    expect(repo.save).not.toHaveBeenCalled();
   });
 
-  it("WorkspaceIdConflict propagated from repo.insert (PRIMARY KEY race)", async () => {
-    repo.insert.mockReturnValue(errAsync({ type: "WorkspaceIdConflict", id: "X" as WorkspaceId }));
+  it("WorkspaceIdConflict propagated from repo.save (PRIMARY KEY race)", async () => {
+    repo.save.mockReturnValue(errAsync({ type: "WorkspaceIdConflict", id: "X" as WorkspaceId }));
     const res = await useCase.execute(req("Demo", ABS_DIR));
     expect(res._unsafeUnwrapErr().type).toBe("WorkspaceIdConflict");
   });
 
-  it("WorkspacePathConflict propagated from repo.insert (UNIQUE race)", async () => {
-    repo.insert.mockReturnValue(
+  it("WorkspacePathConflict propagated from repo.save (UNIQUE race)", async () => {
+    repo.save.mockReturnValue(
       errAsync({
         type: "WorkspacePathConflict",
         workspaceDir: path.resolve(ABS_DIR),
@@ -140,11 +133,11 @@ describe("RegisterWorkspaceUseCase — error channel", () => {
     );
     const res = await useCase.execute(req("Demo", ABS_DIR));
     expect(res._unsafeUnwrapErr().type).toBe("ProvisioningFailed");
-    expect(repo.insert).not.toHaveBeenCalled();
+    expect(repo.save).not.toHaveBeenCalled();
   });
 
-  it("DatabaseUnavailable propagated from repo.findByPath", async () => {
-    repo.findByPath.mockReturnValue(
+  it("DatabaseUnavailable propagated from query", async () => {
+    query.query.mockReturnValue(
       errAsync({ type: "DatabaseUnavailable", cause: new Error("disk corrupt") }),
     );
     const res = await useCase.execute(req("Demo", ABS_DIR));

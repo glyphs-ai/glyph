@@ -22,9 +22,9 @@ describe("WorkspaceEntity.create", () => {
   });
 });
 
-describe("WorkspaceEntity constructor", () => {
+describe("WorkspaceEntity.rehydrate", () => {
   it("accepts persisted state verbatim — lastOpenedAt may be null", () => {
-    const e = new WorkspaceEntity({
+    const e = WorkspaceEntity.rehydrate({
       id: ID,
       name: "Demo" as WorkspaceName,
       workspaceDir: "/x",
@@ -61,7 +61,7 @@ describe("WorkspaceEntity.rename", () => {
 
 describe("WorkspaceEntity.markOpened", () => {
   it("stores the timestamp as ISO-8601", () => {
-    const e = new WorkspaceEntity({
+    const e = WorkspaceEntity.rehydrate({
       id: ID,
       name: "Demo" as WorkspaceName,
       workspaceDir: "/x",

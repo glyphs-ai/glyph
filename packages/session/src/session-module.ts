@@ -9,6 +9,7 @@ import { ListSessionsUseCase } from "./application/list-sessions.js";
 import type { AgentResolver } from "./application/ports/agent-resolver.js";
 import { SpawnInteractiveUseCase } from "./application/spawn-interactive.js";
 import { openDb } from "./infrastructure/drizzle/session-db.js";
+import { DrizzleSessionQueries } from "./infrastructure/drizzle/session-queries.js";
 import { DrizzleSessionRepository } from "./infrastructure/drizzle/session-repository.js";
 import { LocalSessionSandbox, sessionsRoot } from "./infrastructure/file/local-session-sandbox.js";
 
@@ -54,6 +55,7 @@ export interface SessionModuleOptions {
 export async function composeSessionModule(opts: SessionModuleOptions): Promise<SessionModule> {
   const { db, close } = openDb(opts.dbFile);
   const repo = new DrizzleSessionRepository({ db });
+  const query = new DrizzleSessionQueries({ db });
   const runtimeRegistry = opts.runtimeRegistry;
   const sandbox = new LocalSessionSandbox({ root: sessionsRoot(opts.workspaceDir) });
   const now = opts.now ?? (() => new Date());
@@ -78,8 +80,8 @@ export async function composeSessionModule(opts: SessionModuleOptions): Promise<
       now,
       randomBytes,
     }),
-    listSessions: new ListSessionsUseCase({ repo, runtimeRegistry, sandbox }),
-    getSession: new GetSessionUseCase({ repo, runtimeRegistry, sandbox }),
+    listSessions: new ListSessionsUseCase({ query, runtimeRegistry, sandbox }),
+    getSession: new GetSessionUseCase({ query, runtimeRegistry, sandbox }),
     deleteSession: new DeleteSessionUseCase({ repo, runtimeRegistry, sandbox }),
     buildInteractiveLaunch,
     spawnInteractive: new SpawnInteractiveUseCase({

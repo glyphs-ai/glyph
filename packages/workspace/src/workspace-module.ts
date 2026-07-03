@@ -8,11 +8,13 @@ import { OpenWorkspaceUseCase } from "./application/open-workspace.js";
 import { RegisterWorkspaceUseCase } from "./application/register-workspace.js";
 import { RenameWorkspaceUseCase } from "./application/rename-workspace.js";
 import { UnregisterWorkspaceUseCase } from "./application/unregister-workspace.js";
-import { openDb } from "./infrastructure/drizzle/workspace-db.js";
+import type { Db } from "./infrastructure/drizzle/workspace-db.js";
+import { DrizzleWorkspaceQueries } from "./infrastructure/drizzle/workspace-queries.js";
 import { DrizzleWorkspaceRepository } from "./infrastructure/drizzle/workspace-repository.js";
 import { LocalWorkspaceProvisioner } from "./infrastructure/file/local-workspace-provisioner.js";
 
-/** Public workspace use-cases plus module lifecycle. */
+/** Public workspace use-cases. The module owns no resources — the caller
+ * assembles the `db` (see {@link openWorkspaceDb}) and owns its lifecycle. */
 export interface WorkspaceModule {
   readonly registerWorkspace: RegisterWorkspaceUseCase;
   readonly openWorkspace: OpenWorkspaceUseCase;
@@ -22,18 +24,17 @@ export interface WorkspaceModule {
   readonly listWorkspaces: ListWorkspacesUseCase;
   readonly getLastOpenedWorkspace: GetLastOpenedWorkspaceUseCase;
   readonly getLastOpenedWorkspaceId: GetLastOpenedWorkspaceIdUseCase;
-  /** Closes the underlying SQLite connection. Idempotent. */
-  close(): Promise<void>;
 }
 
 export interface WorkspaceModuleOptions {
-  readonly dbFile: string;
+  /** Assembled DB handle (or a transaction). The module never closes it. */
+  readonly db: Db;
   /** Parent directory for auto-created workspace directories. */
   readonly defaultWorkspaceParent: string;
   readonly logger?: Logger;
 }
 
-/** Open the workspace DB and assemble the use-case module. */
+/** Assemble the use-case module over a caller-provided `db`. */
 export async function composeWorkspaceModule(
   opts: WorkspaceModuleOptions,
 ): Promise<WorkspaceModule> {
@@ -44,14 +45,16 @@ export async function composeWorkspaceModule(
       )}`,
     );
   }
-  const { db, close } = openDb(opts.dbFile);
+  const db = opts.db;
   const repo = new DrizzleWorkspaceRepository({ db });
+  const query = new DrizzleWorkspaceQueries({ db });
   const provisioner = new LocalWorkspaceProvisioner();
   const loggerDep = opts.logger ? { logger: opts.logger } : {};
 
   return {
     registerWorkspace: new RegisterWorkspaceUseCase({
       repo,
+      query,
       provisioner,
       defaultWorkspaceParent: opts.defaultWorkspaceParent,
       ...loggerDep,
@@ -59,12 +62,9 @@ export async function composeWorkspaceModule(
     openWorkspace: new OpenWorkspaceUseCase({ repo, ...loggerDep }),
     renameWorkspace: new RenameWorkspaceUseCase({ repo, ...loggerDep }),
     unregisterWorkspace: new UnregisterWorkspaceUseCase({ repo, provisioner, ...loggerDep }),
-    getWorkspace: new GetWorkspaceUseCase({ repo, ...loggerDep }),
-    listWorkspaces: new ListWorkspacesUseCase({ repo, ...loggerDep }),
-    getLastOpenedWorkspace: new GetLastOpenedWorkspaceUseCase({ repo, ...loggerDep }),
-    getLastOpenedWorkspaceId: new GetLastOpenedWorkspaceIdUseCase({ repo, ...loggerDep }),
-    async close() {
-      close();
-    },
+    getWorkspace: new GetWorkspaceUseCase({ query, ...loggerDep }),
+    listWorkspaces: new ListWorkspacesUseCase({ query, ...loggerDep }),
+    getLastOpenedWorkspace: new GetLastOpenedWorkspaceUseCase({ query, ...loggerDep }),
+    getLastOpenedWorkspaceId: new GetLastOpenedWorkspaceIdUseCase({ query, ...loggerDep }),
   };
 }

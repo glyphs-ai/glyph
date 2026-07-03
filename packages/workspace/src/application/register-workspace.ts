@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { errAsync, okAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import { z } from "zod";
@@ -13,6 +14,7 @@ import type {
   WorkspacePathConflict,
   WorkspaceRepository,
 } from "../domain/workspace-repository.js";
+import type { WorkspaceQueries } from "../infrastructure/drizzle/workspace-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 /** Request body for creating a workspace; ids are minted internally. */
@@ -44,6 +46,7 @@ export type RegisterWorkspaceError =
 
 export interface RegisterWorkspaceDeps {
   readonly repo: WorkspaceRepository;
+  readonly query: WorkspaceQueries;
   readonly provisioner: WorkspaceProvisioner;
   /** Parent directory for auto-created workspace directories. */
   readonly defaultWorkspaceParent: string;
@@ -78,14 +81,21 @@ export class RegisterWorkspaceUseCase
 
     this.logger.debug({ useCase: "registerWorkspace", id, workspaceDir }, "executing");
 
-    return this.deps.repo
-      .findByPath(workspaceDir)
+    const q = this.deps.query;
+    return q
+      .query<{ id: string } | undefined>((db) =>
+        db
+          .select({ id: q.workspaces.id })
+          .from(q.workspaces)
+          .where(eq(q.workspaces.workspaceDir, workspaceDir))
+          .get(),
+      )
       .andThen<undefined, RegisterWorkspaceError>((existing) =>
         existing
           ? errAsync({
               type: "WorkspacePathConflict" as const,
               workspaceDir,
-              existingId: existing.id,
+              existingId: existing.id as WorkspaceId,
             })
           : okAsync(undefined),
       )
@@ -97,7 +107,7 @@ export class RegisterWorkspaceUseCase
           workspaceDir,
           now: new Date().toISOString(),
         });
-        return this.deps.repo.insert(entity).map(() => entity);
+        return this.deps.repo.save(entity).map(() => entity);
       })
       .map((entity): RegisterWorkspaceResponse => {
         this.logger.debug({ useCase: "registerWorkspace", id: entity.id }, "executed");

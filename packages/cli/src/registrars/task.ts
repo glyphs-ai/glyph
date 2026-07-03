@@ -38,7 +38,7 @@ export function registerTaskCommands(program: Command, slot: Slot): void {
     .option("--agent <name>", "Filter by agent name")
     .option("--runtime <kind>", "Filter by runtime kind")
     .option("--created-since <iso>", "Drop tasks created before this ISO 8601 timestamp")
-    .option("--status <csv>", "Comma-separated list (running, succeeded, failed, cancelled)")
+    .option("--status <status>", "Filter by status (running, succeeded, failed, or cancelled)")
     .action(async (opts: Record<string, unknown>) => {
       slot.result = await taskList({
         ...parseWorkspaceFlags(opts),

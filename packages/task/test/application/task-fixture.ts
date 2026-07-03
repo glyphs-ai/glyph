@@ -21,11 +21,12 @@ import { InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import { okAsync } from "neverthrow";
 import type { Logger } from "pino";
 import { mock } from "vitest-mock-extended";
+import { InMemoryLiveProcessRegistry } from "../../src/application/supervision/in-memory-live-process-registry.js";
 import {
-  InMemoryLiveProcessRegistry,
   type RunDispatchArgs,
   TaskSupervisor,
-} from "../../src/application/supervision/index.js";
+} from "../../src/application/supervision/task-supervisor.js";
+import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import type { TaskEntity } from "../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../src/domain/task-id.js";
 import { TERMINAL_TASK_STATUSES } from "../../src/domain/task-status.js";
@@ -162,7 +163,7 @@ export function dispatchArgs(overrides: Partial<RunDispatchArgs> = {}): RunDispa
     resolved: RESOLVED,
     runtime: new FakeHeadlessRuntime(),
     framingPrompt: "read TASK.md then exit",
-    brief: "do it",
+    brief: TaskBriefSchema.parse("do it"),
     details: undefined,
     origin: "standalone",
     originId: undefined,
@@ -187,8 +188,13 @@ export function captureLogger(): { calls: { msg: string; meta?: object }[]; logg
 /** Poll the repository until `id` reaches a terminal status. */
 export async function awaitTerminal(repo: DrizzleTaskRepository, id: TaskId): Promise<TaskEntity> {
   for (let i = 0; i < 100; i++) {
-    const found = (await repo.findById(id))._unsafeUnwrap();
-    if (found && (TERMINAL_TASK_STATUSES as readonly string[]).includes(found.status)) return found;
+    const found = await repo.get(id);
+    if (
+      found.isOk() &&
+      (TERMINAL_TASK_STATUSES as readonly string[]).includes(found.value.status)
+    ) {
+      return found.value;
+    }
     await new Promise((r) => setTimeout(r, 5));
   }
   throw new Error(`awaitTerminal: task ${id} never reached terminal`);

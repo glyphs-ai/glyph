@@ -70,6 +70,7 @@ import type {
   TaskId,
   TaskModule,
 } from "@glyphs-ai/task";
+import { TaskBriefSchema } from "@glyphs-ai/task";
 import type {
   WorkflowNodeRunner,
   WorkflowNodeTerminalResult,
@@ -219,16 +220,11 @@ export function makeWorkerNodeRunner(
       if (typeof obj.agent !== "string" || obj.agent.trim().length === 0) {
         throw new WorkflowWorkerSpecError("Worker node spec requires non-empty agent");
       }
-      if (typeof obj.brief !== "string" || obj.brief.trim().length === 0) {
-        throw new WorkflowWorkerSpecError("Worker node spec requires non-empty brief");
-      }
-      if (obj.brief.includes("\n") || obj.brief.includes("\r")) {
+      const briefResult = TaskBriefSchema.safeParse(obj.brief);
+      if (!briefResult.success) {
         throw new WorkflowWorkerSpecError(
-          "Worker node spec brief must be a single line (no newline characters); pass long content via details",
+          `Worker node spec ${briefResult.error.issues[0]?.message ?? "has an invalid brief"}`,
         );
-      }
-      if (obj.brief.trim().length > 200) {
-        throw new WorkflowWorkerSpecError("Worker node spec brief must be 200 characters or fewer");
       }
       if (obj.details !== undefined && typeof obj.details !== "string") {
         throw new WorkflowWorkerSpecError("Worker node spec details, when set, must be a string");
@@ -282,7 +278,7 @@ export function makeWorkerNodeRunner(
 
       const validated: WorkflowWorkerNodeSpec = {
         agent: obj.agent,
-        brief: obj.brief,
+        brief: briefResult.data,
         ...(obj.details !== undefined ? { details: obj.details } : {}),
         ...(obj.runtime !== undefined ? { runtime: obj.runtime } : {}),
       };
@@ -293,7 +289,7 @@ export function makeWorkerNodeRunner(
       const spec = opts.spec as WorkflowWorkerNodeSpec;
       const dispatchResult = await tasks.dispatchTask.execute({
         agent: spec.agent,
-        brief: spec.brief,
+        brief: TaskBriefSchema.parse(spec.brief),
         ...(spec.details !== undefined ? { details: spec.details } : {}),
         ...(spec.runtime !== undefined ? { runtime: spec.runtime } : {}),
         origin: "workflow",

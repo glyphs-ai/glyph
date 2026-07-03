@@ -2,7 +2,8 @@ import { errAsync, okAsync } from "neverthrow";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type MockProxy, mock } from "vitest-mock-extended";
 import { CancelTaskUseCase } from "../../src/application/cancel-task.js";
-import type { TaskSupervisor } from "../../src/application/supervision/index.js";
+import type { TaskSupervisor } from "../../src/application/supervision/task-supervisor.js";
+import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import { TaskEntity } from "../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../src/domain/task-id.js";
 
@@ -19,9 +20,13 @@ beforeEach(() => {
 
 describe("CancelTaskUseCase", () => {
   it("delegates to the supervisor and projects the cancelled DTO", async () => {
-    const cancelled = TaskEntity.create({ id: ID, agent: "a", brief: "b", createdAt: CREATED_AT })
-      .cancel({ kind: "user", message: "stop" }, { now: CREATED_AT })
-      ._unsafeUnwrap();
+    const cancelled = TaskEntity.create({
+      id: ID,
+      agent: "a",
+      brief: TaskBriefSchema.parse("b"),
+      createdAt: CREATED_AT,
+    });
+    cancelled.cancel({ kind: "user", message: "stop" }, { now: CREATED_AT })._unsafeUnwrap();
     supervisor.cancel.mockReturnValue(okAsync(cancelled));
     const res = (await useCase.execute({ id: ID }))._unsafeUnwrap();
     expect(res.status).toBe("cancelled");

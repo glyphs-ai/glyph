@@ -1,6 +1,7 @@
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import type { TaskId, TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
+import { WorkflowBriefSchema } from "@glyphs-ai/workflow";
 import type { WorkflowTargetData, WorkflowTargetPatch } from "../wire/index.js";
 import { taskAgentResolutionFailed } from "./_task-operation-error.js";
 
@@ -66,17 +67,10 @@ export function makeWorkflowKindHandler(opts: {
           "Workflow target requires non-empty coordinatorAgent",
         );
       }
-      if (typeof obj.brief !== "string" || obj.brief.trim().length === 0) {
-        throw new WorkflowScheduleTargetError("Workflow target requires non-empty brief");
-      }
-      if (obj.brief.includes("\n") || obj.brief.includes("\r")) {
+      const briefResult = WorkflowBriefSchema.safeParse(obj.brief);
+      if (!briefResult.success) {
         throw new WorkflowScheduleTargetError(
-          "Workflow target brief must be a single line (no newline characters); pass long content via details",
-        );
-      }
-      if (obj.brief.trim().length > 200) {
-        throw new WorkflowScheduleTargetError(
-          "Workflow target brief must be 200 characters or fewer",
+          `Workflow target ${briefResult.error.issues[0]?.message ?? "has an invalid brief"}`,
         );
       }
       if (obj.details !== undefined && typeof obj.details !== "string") {
@@ -121,7 +115,7 @@ export function makeWorkflowKindHandler(opts: {
 
       const validated: WorkflowTargetData = {
         coordinatorAgent: obj.coordinatorAgent as string,
-        brief: obj.brief as string,
+        brief: briefResult.data,
         ...(obj.details !== undefined ? { details: obj.details as string } : {}),
       };
       return validated;

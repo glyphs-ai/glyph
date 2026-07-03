@@ -59,12 +59,17 @@ export const listSessions = async (opts: ListSessionsOpts = {}): Promise<Session
   return unwrap(await getApiWorkspacesByIdSessions({ path: { id: requireWorkspaceId() }, query }));
 };
 
-export const getSession = async (sessionId: string): Promise<SessionView> =>
-  unwrap(
+export const getSession = async (sessionId: string): Promise<SessionView> => {
+  const session = unwrap(
     await getApiWorkspacesByIdSessionsBySid({
       path: { id: requireWorkspaceId(), sid: sessionId },
     }),
   );
+  // The route 404s on a missing session, so a 200 body is never null;
+  // this guards the nullable wire type the OpenAPI now declares.
+  if (session === null) throw new Error(`session ${sessionId} not found`);
+  return session;
+};
 
 export interface CreateSessionOpts {
   agent: string;

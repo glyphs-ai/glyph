@@ -23,24 +23,25 @@
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
 import {
   catalogRoutes,
+  configRoutes,
+  createApiApp,
+  healthRoutes,
+  runtimesRoutes,
   scheduledTasksRoutes,
+  scheduledWorkflowsRoutes,
+  schedulesRoutes,
   sessionsRoutes,
   tasksRoutes,
+  workflowsRoutes,
   workspacesRoutes,
 } from "@glyphs-ai/api";
 import type { CatalogModule } from "@glyphs-ai/catalog";
 import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
-import type { ScheduleService } from "@glyphs-ai/schedule";
+import type { ScheduleModule } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import { createApiApp, registerOpenApiDoc } from "../../server/src/routes/_openapi.js";
-import { configRoutes } from "../../server/src/routes/config.js";
-import { healthRoutes } from "../../server/src/routes/health.js";
-import { runtimesRoutes } from "../../server/src/routes/runtimes.js";
-import { scheduledWorkflowsRoutes } from "../../server/src/routes/scheduled-workflows.js";
-import { schedulesRoutes } from "../../server/src/routes/schedules.js";
-import { workflowsRoutes } from "../../server/src/routes/workflows.js";
+import { registerOpenApiDoc } from "../../server/src/routes/_openapi.js";
 
 /**
  * Codegen-only identity for the assembled spec — NOT the runtime `info`.
@@ -185,7 +186,7 @@ function stubTaskManager(): TaskModule {
   return throwingStub("stubTaskManager");
 }
 
-function stubScheduleService(): ScheduleService {
+function stubScheduleService(): ScheduleModule {
   return throwingStub("stubScheduleService");
 }
 

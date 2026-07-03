@@ -1,9 +1,13 @@
-import type { TaskModule, TaskStatus } from "@glyphs-ai/task";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import {
+  ListTasksRequestSchema,
+  ListTasksResponseSchema,
+  type TaskModule,
+  type TaskStatus,
+} from "@glyphs-ai/task";
+import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { respondTaskError } from "../_error-policies/tasks.js";
 import { createApiApp, errorResponse, jsonResponse } from "../_http-helpers.js";
-import { ScheduledTaskListQuerySchema, TaskSchema } from "../schemas/tasks.js";
 
 export function scheduledTasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
   const app = createApiApp();
@@ -14,19 +18,23 @@ export function scheduledTasksRoutes(resolve: (c: Context) => TaskModule): OpenA
       path: "/",
       tags: ["scheduled-tasks"],
       summary: "List schedule-launched tasks",
-      request: { query: ScheduledTaskListQuerySchema },
+      // Query reuses the task read-model's list contract, dropping the
+      // server-owned `origin` scoping (pinned to "schedule") and re-mapping its
+      // `originId` to the `scheduleId` wire param. Unknown params stay lenient
+      // (`.strip()`).
+      request: {
+        query: ListTasksRequestSchema.omit({ origin: true, originId: true })
+          .extend({ scheduleId: z.string().optional() })
+          .strip(),
+      },
       responses: {
-        200: jsonResponse(TaskSchema.array(), "Tasks"),
+        200: jsonResponse(ListTasksResponseSchema, "Tasks"),
         400: errorResponse("Malformed query"),
         500: errorResponse("Internal error"),
       },
     }),
     async (c) => {
-      const agent = c.req.query("agent");
-      const runtime = c.req.query("runtime");
-      const createdSince = c.req.query("createdSince");
-      const status = c.req.query("status");
-      const scheduleId = c.req.query("scheduleId");
+      const { agent, runtime, createdSince, status, scheduleId } = c.req.valid("query");
 
       let createdSinceIso: string | undefined;
       if (createdSince !== undefined) {
@@ -37,42 +45,23 @@ export function scheduledTasksRoutes(resolve: (c: Context) => TaskModule): OpenA
         createdSinceIso = new Date(t).toISOString();
       }
 
-      let statuses: TaskStatus[] | undefined;
-      if (status !== undefined) {
-        const valid = new Set<TaskStatus>(["running", "succeeded", "failed", "cancelled"]);
-        const parts = status
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
-        const bad = parts.find((s) => !valid.has(s as TaskStatus));
-        if (bad !== undefined) {
-          return c.json(
-            {
-              error: `unknown status: ${JSON.stringify(bad)} (expected running, succeeded, failed, cancelled)`,
-            },
-            400,
-          );
-        }
-        statuses = parts as TaskStatus[];
-      }
-
       const opts: {
         agent?: string;
         runtime?: string;
         createdSince?: string;
-        statuses?: TaskStatus[];
+        status?: TaskStatus;
         origin: "schedule";
         originId?: string;
       } = { origin: "schedule" };
       if (agent !== undefined) opts.agent = agent;
       if (runtime !== undefined) opts.runtime = runtime;
       if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
-      if (statuses !== undefined) opts.statuses = statuses;
+      if (status !== undefined) opts.status = status;
       if (scheduleId !== undefined) opts.originId = scheduleId;
 
       const res = await resolve(c).listTasks.execute(opts);
       return res.match(
-        (list) => c.json(TaskSchema.array().parse(list)),
+        (list) => c.json(list),
         (err) => respondTaskError(c, err, { route: "scheduled-tasks.list" }),
       );
     },

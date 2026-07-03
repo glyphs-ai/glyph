@@ -5,6 +5,7 @@
  */
 
 import {
+  type GetApiWorkspacesByIdScheduledTasksData,
   getApiWorkspacesByIdScheduledTasks,
   getApiWorkspacesByIdScheduledWorkflows,
   getApiWorkspacesByIdSchedules,
@@ -156,7 +157,7 @@ export interface ScheduleListTasksOpts extends WorkspaceFlagOpts {
   readonly agent?: string;
   readonly runtime?: string;
   readonly createdSince?: string;
-  /** Comma-separated TaskStatus values. */
+  /** One of the TaskStatus values (running, succeeded, failed, cancelled). */
   readonly status?: string;
 }
 
@@ -164,18 +165,18 @@ export async function scheduleListTasks(opts: ScheduleListTasksOpts = {}): Promi
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const query: {
-      scheduleId?: string;
-      agent?: string;
-      runtime?: string;
-      createdSince?: string;
-      status?: string;
-    } = {};
+    const query: NonNullable<GetApiWorkspacesByIdScheduledTasksData["query"]> = {};
     if (opts.scheduleId !== undefined) query.scheduleId = opts.scheduleId;
     if (opts.agent !== undefined) query.agent = opts.agent;
     if (opts.runtime !== undefined) query.runtime = opts.runtime;
     if (opts.createdSince !== undefined) query.createdSince = opts.createdSince;
-    if (opts.status !== undefined) query.status = opts.status;
+    // `opts.status` is a raw CLI string; the server validates it against the
+    // TaskStatus enum and returns a 400 (surfaced as-is) for a bad value.
+    if (opts.status !== undefined) {
+      query.status = opts.status as NonNullable<
+        NonNullable<GetApiWorkspacesByIdScheduledTasksData["query"]>["status"]
+      >;
+    }
     const list = unwrap(
       await getApiWorkspacesByIdScheduledTasks({
         path: { id: workspaceId },

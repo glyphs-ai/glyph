@@ -72,5 +72,10 @@ export const removeWorkspace = async (
 export const updateWorkspaceMetadata = async (
   workspaceId: string,
   patch: { name: string },
-): Promise<WorkspaceListItem> =>
-  unwrap(await patchApiWorkspacesById({ path: { id: workspaceId }, body: patch }));
+): Promise<WorkspaceListItem> => {
+  const updated = unwrap(await patchApiWorkspacesById({ path: { id: workspaceId }, body: patch }));
+  // The route 404s on a missing workspace, so a 200 body is never null;
+  // this guards the nullable wire type the OpenAPI now declares.
+  if (updated === null) throw new Error(`workspace ${workspaceId} not found`);
+  return updated;
+};

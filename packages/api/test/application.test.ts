@@ -122,7 +122,10 @@ afterEach(async () => {
 
 async function makeApp(): Promise<Application> {
   const app = await composeApplication({
-    workspace: { dbFile: ":memory:", defaultWorkspaceParent: path.join(scratch, "workspaces") },
+    workspace: {
+      dbUrl: ":memory:",
+      defaultWorkspaceParent: path.join(scratch, "workspaces"),
+    },
     runtimeRegistry: makeRegistry(),
   });
   apps.push(app);
@@ -133,7 +136,7 @@ describe("composeApplication", () => {
   it("rejects a relative defaultWorkspaceParent", async () => {
     await expect(
       composeApplication({
-        workspace: { dbFile: ":memory:", defaultWorkspaceParent: "relative/path" },
+        workspace: { dbUrl: ":memory:", defaultWorkspaceParent: "relative/path" },
         runtimeRegistry: makeRegistry(),
       }),
     ).rejects.toThrow(/absolute/);
@@ -195,7 +198,10 @@ describe("Application orchestration", () => {
 
   it("close disposes the registry and the workspace module", async () => {
     const app = await composeApplication({
-      workspace: { dbFile: ":memory:", defaultWorkspaceParent: path.join(scratch, "workspaces") },
+      workspace: {
+        dbUrl: ":memory:",
+        defaultWorkspaceParent: path.join(scratch, "workspaces"),
+      },
       runtimeRegistry: makeRegistry(),
     });
     const ws = await ok(app.workspace.registerWorkspace.execute({ name: "demo" as WorkspaceName }));

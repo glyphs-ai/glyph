@@ -8,7 +8,7 @@ import type {
   TaskRepository,
 } from "../domain/task-repository.js";
 import { TERMINAL_TASK_STATUSES } from "../domain/task-status.js";
-import type { TaskSupervisor } from "./supervision/index.js";
+import type { PurgeFailed, TaskSupervisor } from "./supervision/task-supervisor.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const DeleteTaskRequestSchema = z
@@ -22,6 +22,7 @@ export type DeleteTaskError =
   | TaskNotFound
   | CorruptedTask
   | InvalidTransition
+  | PurgeFailed
   | DatabaseUnavailable;
 
 export interface DeleteTaskDeps {
@@ -31,9 +32,10 @@ export interface DeleteTaskDeps {
 
 /**
  * Remove a task record. The task MUST be terminal — non-terminal input →
- * `InvalidTransition` (cancel it first). Row removal IS the "task is deleted"
- * semantic and completes synchronously; `purge` additionally enqueues a
- * fire-and-forget background removal of the workdir + runtime state.
+ * `InvalidTransition` (cancel it first). When `purge` is set, the workdir +
+ * runtime state are removed FIRST, then the row: the row is the durable
+ * journal a crash leaves behind, and purge is idempotent, so a `PurgeFailed`
+ * leaves the row intact for a later retry instead of orphaning the resources.
  */
 export class DeleteTaskUseCase
   implements UseCase<DeleteTaskRequest, DeleteTaskResponse, DeleteTaskError>
@@ -53,14 +55,11 @@ export class DeleteTaskUseCase
             eventType: "delete",
           });
         }
-        // Row removal IS the "deleted" semantic and resolves synchronously; a
-        // requested purge is enqueued fire-and-forget afterwards. `andThen`
-        // (not `map`) keeps the callback on the Result rail with an explicit
-        // `okAsync` tail.
-        return deps.repository.delete(id).andThen(() => {
-          if (purge === true) deps.supervisor.enqueuePurge(existing);
-          return okAsync<void, DeleteTaskError>(undefined);
-        });
+        // Purge physical resources BEFORE removing the row; a PurgeFailed keeps
+        // the row (the journal) so a later delete retry re-runs the purge.
+        const purgeStep: UseCaseResult<void, DeleteTaskError> =
+          purge === true ? deps.supervisor.purge(existing) : okAsync(undefined);
+        return purgeStep.andThen(() => deps.repository.delete(id));
       })
       .map(() => undefined);
   }

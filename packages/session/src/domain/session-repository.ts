@@ -23,22 +23,15 @@ export type SessionIdConflict = {
   readonly id: SessionId;
 };
 
-export interface FindAllSessionsFilter {
-  readonly createdSince?: string;
-  readonly agent?: string;
-}
-
 /**
- * Persistence port for the session aggregate. Reads return
- * {@link SessionEntity}; row shapes stay inside infrastructure. Error
- * unions are inlined per signature (no per-op alias); `findById` treats
- * absence as `undefined`, `get` asserts existence.
+ * Write-side persistence port for the session aggregate. Pure reads
+ * (findById / findAll) live on the read-side {@link SessionQueries}. `get`
+ * loads the aggregate for mutation (asserting existence); `save` is an
+ * upsert keyed on the repository's change-tracker (a freshly `create()`d
+ * aggregate INSERTs — surfacing `SessionIdConflict` — a loaded one UPDATEs).
  */
 export interface SessionRepository {
   get(id: SessionId): ResultAsync<SessionEntity, SessionNotFound | DatabaseUnavailable>;
-  findById(id: SessionId): ResultAsync<SessionEntity | undefined, DatabaseUnavailable>;
-  findAll(filter: FindAllSessionsFilter): ResultAsync<SessionEntity[], DatabaseUnavailable>;
-  insert(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable | SessionIdConflict>;
-  save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable>;
+  save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable | SessionIdConflict>;
   delete(id: SessionId): ResultAsync<void, DatabaseUnavailable>;
 }

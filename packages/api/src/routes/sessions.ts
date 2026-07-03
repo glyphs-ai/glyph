@@ -1,16 +1,18 @@
-import type { SessionId } from "@glyphs-ai/session";
+import {
+  CreateSessionRequestSchema,
+  CreateSessionResponseSchema,
+  GetSessionResponseSchema,
+  ListSessionsRequestSchema,
+  ListSessionsResponseSchema,
+  type SessionId,
+  SpawnInteractiveRequestSchema,
+  type SpawnInteractiveResponse,
+  SpawnInteractiveResponseSchema,
+} from "@glyphs-ai/session";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { respondSessionError } from "../_error-policies/sessions.js";
 import { logEvent } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
-import {
-  CreateSessionRequestSchema,
-  SessionListQuerySchema,
-  SessionSchema,
-  SpawnSessionRequestSchema,
-  type SpawnSessionResponse,
-  SpawnSessionResponseSchema,
-} from "../schemas/sessions.js";
 import type { WorkspaceContext } from "../workspace-context.js";
 
 /**
@@ -43,9 +45,9 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       path: "/",
       tags: ["sessions"],
       summary: "List sessions",
-      request: { query: SessionListQuerySchema },
+      request: { query: ListSessionsRequestSchema },
       responses: {
-        200: jsonResponse(SessionSchema.array(), "Sessions"),
+        200: jsonResponse(ListSessionsResponseSchema, "Sessions"),
         400: errorResponse("Malformed query"),
         500: errorResponse("Internal error"),
       },
@@ -97,7 +99,7 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       summary: "Create a session",
       request: { body: jsonRequest(CreateSessionRequestSchema) },
       responses: {
-        201: jsonResponse(SessionSchema, "Created session"),
+        201: jsonResponse(CreateSessionResponseSchema, "Created session"),
         400: errorResponse("Malformed request body"),
         500: errorResponse("Internal error"),
       },
@@ -136,7 +138,7 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       summary: "Get a session",
       request: { params: SessionPathSchema },
       responses: {
-        200: jsonResponse(SessionSchema, "Session"),
+        200: jsonResponse(GetSessionResponseSchema, "Session"),
         404: errorResponse("Session not found"),
         500: errorResponse("Internal error"),
       },
@@ -210,10 +212,13 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       summary: "Spawn an interactive terminal for a session",
       request: {
         params: SessionPathSchema,
-        body: jsonRequest(SpawnSessionRequestSchema, false),
+        body: jsonRequest(SpawnInteractiveRequestSchema.omit({ id: true }).strict(), false),
       },
       responses: {
-        200: jsonResponse(SpawnSessionResponseSchema, "Spawn outcome (ok=false on launch failure)"),
+        200: jsonResponse(
+          SpawnInteractiveResponseSchema,
+          "Spawn outcome (ok=false on launch failure)",
+        ),
         400: errorResponse("Malformed request body"),
         500: errorResponse("Internal error"),
       },
@@ -230,7 +235,7 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
         (outcome) => {
           if (outcome.ok) {
             logEvent(c, "session spawned", { sessionId: id, remote, launcher: outcome.launcher });
-            return c.json<SpawnSessionResponse>({
+            return c.json<SpawnInteractiveResponse>({
               ok: true,
               launcher: outcome.launcher,
               display: outcome.display,
@@ -242,7 +247,7 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
             code: outcome.code,
             reason: outcome.error,
           });
-          return c.json<SpawnSessionResponse>({
+          return c.json<SpawnInteractiveResponse>({
             ok: false,
             error: outcome.error,
             code: outcome.code,

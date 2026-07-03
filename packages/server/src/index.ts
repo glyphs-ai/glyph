@@ -8,12 +8,19 @@ process.env.UV_THREADPOOL_SIZE ??= "16";
 import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import path, { sep as pathSep } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   catalogRoutes,
   composeApplication,
+  configRoutes,
+  healthRoutes,
+  runtimesRoutes,
   scheduledTasksRoutes,
+  scheduledWorkflowsRoutes,
+  schedulesRoutes,
   sessionsRoutes,
   tasksRoutes,
+  workflowsRoutes,
   workspacesRoutes,
 } from "@glyphs-ai/api";
 import {
@@ -34,12 +41,6 @@ import { requestId } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { type WorkspaceVars, workspaceContextMiddleware } from "./middleware/workspace-context.js";
 import { createApiApp, registerOpenApiDoc } from "./routes/_openapi.js";
-import { configRoutes } from "./routes/config.js";
-import { healthRoutes } from "./routes/health.js";
-import { runtimesRoutes } from "./routes/runtimes.js";
-import { scheduledWorkflowsRoutes } from "./routes/scheduled-workflows.js";
-import { schedulesRoutes } from "./routes/schedules.js";
-import { workflowsRoutes } from "./routes/workflows.js";
 import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-env.js";
 
 // Route manifest and wire types live in `@glyphs-ai/api` (its `wire/`
@@ -204,7 +205,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
 
   const composition = await composeApplication({
     workspace: {
-      dbFile: globalDbPath(home),
+      dbUrl: pathToFileURL(globalDbPath(home)).href,
       defaultWorkspaceParent: workspacesParentDir(home),
     },
     runtimeRegistry,

@@ -8,7 +8,7 @@ export type { ProvisioningFailed } from "../domain/workspace-provisioner.js";
 export type {
   DatabaseUnavailable,
   WorkspaceIdConflict,
-  WorkspaceNotRegistered,
+  WorkspaceNotFound,
   WorkspacePathConflict,
 } from "../domain/workspace-repository.js";
 
@@ -16,7 +16,7 @@ import type { ProvisioningFailed } from "../domain/workspace-provisioner.js";
 import type {
   DatabaseUnavailable,
   WorkspaceIdConflict,
-  WorkspaceNotRegistered,
+  WorkspaceNotFound,
   WorkspacePathConflict,
 } from "../domain/workspace-repository.js";
 
@@ -24,6 +24,6 @@ import type {
 export type WorkspaceError =
   | WorkspaceIdConflict
   | WorkspacePathConflict
-  | WorkspaceNotRegistered
+  | WorkspaceNotFound
   | DatabaseUnavailable
   | ProvisioningFailed;

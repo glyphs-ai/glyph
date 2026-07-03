@@ -1,10 +1,12 @@
 import type { RuntimeRegistry } from "@glyphs-ai/runtime";
+import { and, eq, gte, type SQL } from "drizzle-orm";
 import { ResultAsync } from "neverthrow";
 import { z } from "zod";
-import type { SessionEntity } from "../domain/session-entity.js";
-import { SessionIdSchema } from "../domain/session-id.js";
-import type { DatabaseUnavailable, SessionRepository } from "../domain/session-repository.js";
+import { type SessionId, SessionIdSchema } from "../domain/session-id.js";
+import type { DatabaseUnavailable } from "../domain/session-repository.js";
 import type { SessionSandbox } from "../domain/session-sandbox.js";
+import type { SessionRow } from "../infrastructure/drizzle/session-mapper.js";
+import type { SessionQueries } from "../infrastructure/drizzle/session-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const ListSessionsRequestSchema = z
@@ -16,26 +18,25 @@ export const ListSessionsRequestSchema = z
   .strict();
 export type ListSessionsRequest = z.infer<typeof ListSessionsRequestSchema>;
 
-const SessionViewSchema = z.object({
-  id: SessionIdSchema,
-  workdir: z.string(),
-  agent: z.string(),
-  runtime: z.string(),
-  runtimeSessionId: z.string().nullable(),
-  createdAt: z.string(),
-  lastActiveAt: z.string().nullable(),
-  preview: z.string().nullable(),
-  lastLaunchMode: z.enum(["local", "remote"]).nullable(),
-});
-type SessionView = z.infer<typeof SessionViewSchema>;
-
-export const ListSessionsResponseSchema = z.array(SessionViewSchema);
+export const ListSessionsResponseSchema = z.array(
+  z.object({
+    id: SessionIdSchema,
+    workdir: z.string(),
+    agent: z.string(),
+    runtime: z.string(),
+    runtimeSessionId: z.string().nullable(),
+    createdAt: z.string(),
+    lastActiveAt: z.string().nullable(),
+    preview: z.string().nullable(),
+    lastLaunchMode: z.enum(["local", "remote"]).nullable(),
+  }),
+);
 export type ListSessionsResponse = z.infer<typeof ListSessionsResponseSchema>;
 
 export type ListSessionsError = DatabaseUnavailable;
 
 export interface ListSessionsDeps {
-  readonly repo: SessionRepository;
+  readonly query: SessionQueries;
   readonly runtimeRegistry: RuntimeRegistry;
   readonly sandbox: SessionSandbox;
 }
@@ -54,16 +55,20 @@ export class ListSessionsUseCase
   execute(request: ListSessionsRequest): UseCaseResult<ListSessionsResponse, ListSessionsError> {
     const { agent, createdSince, activeSince } = ListSessionsRequestSchema.parse(request);
     const deps = this.deps;
-    return deps.repo
-      .findAll({
-        ...(createdSince !== undefined ? { createdSince } : {}),
-        ...(agent !== undefined ? { agent } : {}),
+    const q = deps.query;
+    return q
+      .query((db) => {
+        const filters: SQL[] = [];
+        if (createdSince !== undefined) filters.push(gte(q.sessions.createdAt, createdSince));
+        if (agent !== undefined) filters.push(eq(q.sessions.agent, agent));
+        const select = db.select().from(q.sessions);
+        return filters.length > 0 ? select.where(and(...filters)).all() : select.all();
       })
-      .andThen((entities) =>
-        ResultAsync.fromSafePromise(Promise.all(entities.map((e) => projectAndRefresh(deps, e)))),
+      .andThen((rows) =>
+        ResultAsync.fromSafePromise(Promise.all(rows.map((r) => projectAndRefresh(deps, r)))),
       )
       .map((views) => {
-        const survivors = views.filter((v): v is SessionView => v !== null);
+        const survivors = views.filter((v): v is ListSessionsResponse[number] => v !== null);
         const filtered =
           activeSince === undefined
             ? survivors
@@ -80,23 +85,24 @@ export class ListSessionsUseCase
 
 async function projectAndRefresh(
   deps: ListSessionsDeps,
-  entity: SessionEntity,
-): Promise<SessionView | null> {
-  const resolved = deps.runtimeRegistry.get(entity.runtime);
+  row: SessionRow,
+): Promise<ListSessionsResponse[number] | null> {
+  const resolved = deps.runtimeRegistry.get(row.runtime);
   if (resolved.isErr()) return null;
-  const base: SessionView = {
-    id: entity.id,
-    workdir: deps.sandbox.resolve(entity.id),
-    agent: entity.agent,
-    runtime: entity.runtime,
-    runtimeSessionId: entity.runtimeSessionId,
-    createdAt: entity.createdAt,
+  const id = row.id as SessionId;
+  const base = {
+    id,
+    workdir: deps.sandbox.resolve(id),
+    agent: row.agent,
+    runtime: row.runtime,
+    runtimeSessionId: row.runtimeSessionId,
+    createdAt: row.createdAt,
     lastActiveAt: null,
     preview: null,
-    lastLaunchMode: entity.lastLaunchMode,
+    lastLaunchMode: row.lastLaunchMode,
   };
-  if (entity.runtimeSessionId === null) return base;
-  const meta = await resolved.value.readMetadata(entity.runtimeSessionId).unwrapOr(null);
+  if (row.runtimeSessionId === null) return base;
+  const meta = await resolved.value.readMetadata(row.runtimeSessionId).unwrapOr(null);
   if (meta === null) return base;
   return {
     ...base,
@@ -106,7 +112,10 @@ async function projectAndRefresh(
 }
 
 /** Most-recent activity first; never-active rows (null) sort to the bottom. */
-function compareByActivity(a: SessionView, b: SessionView): number {
+function compareByActivity(
+  a: ListSessionsResponse[number],
+  b: ListSessionsResponse[number],
+): number {
   const aNull = a.lastActiveAt === null;
   const bNull = b.lastActiveAt === null;
   if (aNull !== bNull) return aNull ? -1 : 1;

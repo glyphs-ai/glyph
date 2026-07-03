@@ -1,6 +1,7 @@
 import type { Runtime, RuntimeHeadlessLaunchFailed } from "@glyphs-ai/runtime";
-import { err, errAsync, ok, type Result, safeTry } from "neverthrow";
+import { err, errAsync, ok, safeTry } from "neverthrow";
 import { z } from "zod";
+import { TaskBriefSchema } from "../domain/task-brief.js";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
 import type { TaskEntity } from "../domain/task-entity.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
@@ -20,45 +21,23 @@ import type {
 } from "./ports/agent-resolver.js";
 import {
   DEFAULT_RUNTIME,
+  FramingPromptSchema,
   type LaunchableRuntime,
   type ManagerShuttingDown,
   type TaskSupervisor,
-} from "./supervision/index.js";
+} from "./supervision/task-supervisor.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 /**
  * Single-line ASCII framing prompt sent to the runtime at spawn time. Kept on
- * ONE line so `cmd.exe` never sees an LF inside the `/c` payload:
- * `ensureSafeFramingPrompt` validates whichever prompt this use-case forwards
- * (this default OR a caller override) on every dispatch, so an edit that breaks
- * the single-line rule fails the dispatch tests (which exercise the default via
+ * ONE line so `cmd.exe` never sees an LF inside the `/c` payload. Parsed
+ * through {@link FramingPromptSchema} at module load, so an edit that breaks
+ * the single-line rule fails fast (the dispatch tests exercise the default via
  * the no-prompt happy path).
  */
-const DEFAULT_TASK_FRAMING_PROMPT =
-  "1. Read TASK.md in your current working directory. That is your assignment. 2. Use ./temp/ for intermediate steps and scratch files; nothing in ./temp/ is shown to the user. 3. Save meaningful output to ./artifact/. These files ARE shown to the user. You MUST always produce at least one self-contained HTML file under ./artifact/ (inline all CSS, JS, fonts, images as data URLs; no external links or CDN references; must render correctly when opened directly from disk with no network access) as a human-readable report of your work. This HTML report is in addition to any other outputs your agent instructions or task brief require -- never skip it, never let other outputs replace it. 4. Execute the assignment, then exit.";
-
-/** A framing prompt was not safe to pass through `cmd.exe /c …` as one argv element. */
-export type UnsafeFramingPrompt = {
-  readonly type: "UnsafeFramingPrompt";
-  readonly reason: string;
-};
-
-/**
- * Guard the runtime / `cmd.exe` boundary: a framing prompt must contain no LF,
- * no CR, and only printable ASCII (0x20–0x7E). Returns the prompt unchanged
- * when safe, or `UnsafeFramingPrompt` otherwise — run on whichever prompt this
- * use-case forwards (the default OR a caller override) so an unsafe override is
- * rejected pre-spawn.
- */
-function ensureSafeFramingPrompt(prompt: string): Result<string, UnsafeFramingPrompt> {
-  if (prompt.includes("\n") || prompt.includes("\r") || /[^\x20-\x7E]/.test(prompt)) {
-    return err({
-      type: "UnsafeFramingPrompt",
-      reason: "framing prompt must be single-line printable ASCII",
-    });
-  }
-  return ok(prompt);
-}
+const DEFAULT_TASK_FRAMING_PROMPT = FramingPromptSchema.parse(
+  "1. Read TASK.md in your current working directory. That is your assignment. 2. Use ./temp/ for intermediate steps and scratch files; nothing in ./temp/ is shown to the user. 3. Save meaningful output to ./artifact/. These files ARE shown to the user. You MUST always produce at least one self-contained HTML file under ./artifact/ (inline all CSS, JS, fonts, images as data URLs; no external links or CDN references; must render correctly when opened directly from disk with no network access) as a human-readable report of your work. This HTML report is in addition to any other outputs your agent instructions or task brief require -- never skip it, never let other outputs replace it. 4. Execute the assignment, then exit.",
+);
 
 /**
  * Kernel env keys the dispatch flow always sets on the spawned subprocess. A
@@ -93,14 +72,14 @@ export function generateTaskId(now: () => Date, randomBytes: (n: number) => Buff
 export const DispatchTaskRequestSchema = z
   .object({
     agent: z.string().min(1),
-    brief: z.string().min(1),
+    brief: TaskBriefSchema,
     details: z.string().optional(),
     runtime: z.string().optional(),
     origin: z.string().optional(),
     originId: z.string().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
     subprocessEnv: z.record(z.string(), z.string()).optional(),
-    prompt: z.string().optional(),
+    prompt: FramingPromptSchema.optional(),
   })
   .strict();
 export type DispatchTaskRequest = z.infer<typeof DispatchTaskRequestSchema>;
@@ -152,7 +131,6 @@ export type EntryNotReady = {
 
 export type DispatchTaskError =
   | ManagerShuttingDown
-  | UnsafeFramingPrompt
   | DispatchKernelEnvCollision
   | AgentNotFound
   | EntryNotReady
@@ -190,9 +168,7 @@ export class DispatchTaskUseCase
 
     if (supervisor.isShuttingDown) return errAsync({ type: "ManagerShuttingDown" });
 
-    const framing = ensureSafeFramingPrompt(parsed.prompt ?? DEFAULT_TASK_FRAMING_PROMPT);
-    if (framing.isErr()) return errAsync(framing.error);
-    const framingPrompt = framing.value;
+    const framingPrompt = parsed.prompt ?? DEFAULT_TASK_FRAMING_PROMPT;
 
     const collidingKey = firstKernelEnvCollision(parsed.subprocessEnv);
     if (collidingKey !== null) {

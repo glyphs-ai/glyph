@@ -8,6 +8,7 @@
 
 import {
   deleteApiWorkspacesByIdTasksByTid,
+  type GetApiWorkspacesByIdTasksData,
   getApiWorkspacesByIdTasks,
   getApiWorkspacesByIdTasksByTid,
   getApiWorkspacesByIdTasksByTidActivity,
@@ -33,7 +34,7 @@ export interface TaskListOpts extends WorkspaceFlagOpts {
   readonly agent?: string;
   readonly runtime?: string;
   readonly createdSince?: string;
-  /** Comma-separated TaskStatus values. */
+  /** One of the TaskStatus values (running, succeeded, failed, cancelled). */
   readonly status?: string;
 }
 
@@ -49,16 +50,17 @@ export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> 
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const query: {
-      agent?: string;
-      runtime?: string;
-      createdSince?: string;
-      status?: string;
-    } = {};
+    const query: NonNullable<GetApiWorkspacesByIdTasksData["query"]> = {};
     if (opts.agent !== undefined) query.agent = opts.agent;
     if (opts.runtime !== undefined) query.runtime = opts.runtime;
     if (opts.createdSince !== undefined) query.createdSince = opts.createdSince;
-    if (opts.status !== undefined) query.status = opts.status;
+    // `opts.status` is a raw CLI string; the server validates it against the
+    // TaskStatus enum and returns a 400 (surfaced as-is) for a bad value.
+    if (opts.status !== undefined) {
+      query.status = opts.status as NonNullable<
+        NonNullable<GetApiWorkspacesByIdTasksData["query"]>["status"]
+      >;
+    }
     const list = unwrap(
       await getApiWorkspacesByIdTasks({
         path: { id: workspaceId },
@@ -283,10 +285,10 @@ export async function taskActivity(
       );
     }
 
-    const query: { before?: string; after?: string; limit?: string } = {};
-    if (opts.before !== undefined) query.before = String(opts.before);
-    if (opts.after !== undefined) query.after = String(opts.after);
-    if (opts.limit !== undefined) query.limit = String(opts.limit);
+    const query: { before?: number; after?: number; limit?: number } = {};
+    if (opts.before !== undefined) query.before = opts.before;
+    if (opts.after !== undefined) query.after = opts.after;
+    if (opts.limit !== undefined) query.limit = opts.limit;
     const payload = unwrap(
       await getApiWorkspacesByIdTasksByTidActivity({
         path: { id: workspaceId, tid: taskId },

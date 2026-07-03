@@ -1,5 +1,9 @@
 import {
+  GetLastOpenedWorkspaceIdResponseSchema,
+  GetWorkspaceResponseSchema,
+  ListWorkspacesResponseSchema,
   RegisterWorkspaceRequestSchema,
+  RegisterWorkspaceResponseSchema,
   type WorkspaceId,
   type WorkspaceName,
 } from "@glyphs-ai/workspace";
@@ -8,12 +12,11 @@ import { respondWorkspaceError } from "../_error-policies/workspaces.js";
 import { logEvent } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
 import type { Application } from "../application.js";
-import {
-  CurrentWorkspaceResponseSchema,
-  SetCurrentWorkspaceRequestSchema,
-  WorkspacePathParamsSchema,
-  WorkspaceWireSchema,
-} from "./workspaces-wire.js";
+
+/** `:id` URL path-parameter validator (the mount-level workspace id). */
+const WorkspacePathParamsSchema = z.object({ id: z.string() });
+/** Request body for `PUT /current` — select the current workspace by id. */
+const SetCurrentWorkspaceRequestSchema = z.object({ id: z.string().min(1) }).strict();
 
 /**
  * Routes for `/api/workspaces/*`. Workspace-scoped resources (sessions,
@@ -44,7 +47,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       tags: ["workspaces"],
       summary: "List registered workspaces",
       responses: {
-        200: jsonResponse(WorkspaceWireSchema.array(), "Registered workspaces"),
+        200: jsonResponse(ListWorkspacesResponseSchema, "Registered workspaces"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -69,7 +72,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
         body: jsonRequest(RegisterWorkspaceRequestSchema),
       },
       responses: {
-        201: jsonResponse(WorkspaceWireSchema, "Created workspace"),
+        201: jsonResponse(RegisterWorkspaceResponseSchema, "Created workspace"),
         400: errorResponse("Malformed request body"),
         409: errorResponse("Workspace directory already registered"),
         500: errorResponse("Internal error"),
@@ -100,7 +103,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       tags: ["workspaces"],
       summary: "Get the current workspace id",
       responses: {
-        200: jsonResponse(CurrentWorkspaceResponseSchema, "Current workspace id (or null)"),
+        200: jsonResponse(GetLastOpenedWorkspaceIdResponseSchema, "Current workspace id (or null)"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -128,9 +131,9 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
         body: jsonRequest(SetCurrentWorkspaceRequestSchema),
       },
       responses: {
-        200: jsonResponse(CurrentWorkspaceResponseSchema, "Selected workspace id"),
+        200: jsonResponse(GetLastOpenedWorkspaceIdResponseSchema, "Selected workspace id"),
         400: errorResponse("Malformed request body"),
-        404: errorResponse("Workspace not registered"),
+        404: errorResponse("Workspace not found"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -160,8 +163,8 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       summary: "Get a workspace",
       request: { params: WorkspacePathParamsSchema },
       responses: {
-        200: jsonResponse(WorkspaceWireSchema, "Workspace"),
-        404: errorResponse("Workspace not registered"),
+        200: jsonResponse(GetWorkspaceResponseSchema, "Workspace"),
+        404: errorResponse("Workspace not found"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -171,10 +174,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       return res.match(
         (view) => {
           if (!view) {
-            return c.json(
-              { error: "workspace not registered", code: "WorkspaceNotRegistered" },
-              404,
-            );
+            return c.json({ error: "workspace not found", code: "WorkspaceNotFound" }, 404);
           }
           return c.json(view);
         },
@@ -200,9 +200,9 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
         body: jsonRequest(z.object({ name: z.string() }).strict()),
       },
       responses: {
-        200: jsonResponse(WorkspaceWireSchema, "Updated workspace"),
+        200: jsonResponse(GetWorkspaceResponseSchema, "Updated workspace"),
         400: errorResponse("Malformed request body"),
-        404: errorResponse("Workspace not registered"),
+        404: errorResponse("Workspace not found"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -218,10 +218,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       return res.match(
         (view) => {
           if (!view) {
-            return c.json(
-              { error: "workspace not registered", code: "WorkspaceNotRegistered" },
-              404,
-            );
+            return c.json({ error: "workspace not found", code: "WorkspaceNotFound" }, 404);
           }
           logEvent(c, "workspace updated", { workspaceId: id, newName: body.name });
           return c.json(view);
@@ -287,7 +284,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       request: { params: WorkspacePathParamsSchema },
       responses: {
         204: errorResponse("Reloaded (no content)"),
-        404: errorResponse("Workspace not registered"),
+        404: errorResponse("Workspace not found"),
         409: errorResponse("Workspace has live tasks"),
         500: errorResponse("Internal error"),
       },
@@ -297,7 +294,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       try {
         const view = await application.reloadWorkspace(id);
         if (view === null) {
-          return c.json({ error: "workspace not registered", code: "WorkspaceNotRegistered" }, 404);
+          return c.json({ error: "workspace not found", code: "WorkspaceNotFound" }, 404);
         }
         logEvent(c, "workspace reload requested via API", { workspaceId: id });
         return c.body(null, 204);

@@ -1,7 +1,7 @@
+import type { CreateSessionResponse, SessionId } from "@glyphs-ai/session";
 import { errAsync, okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { sessionsRoutes } from "../../src/routes/sessions.js";
-import type { Session } from "../../src/schemas/sessions.js";
 import type { WorkspaceContext } from "../../src/workspace-context.js";
 
 /**
@@ -14,8 +14,8 @@ import type { WorkspaceContext } from "../../src/workspace-context.js";
  * `spawn-response-shape.test.ts` against a real module.
  */
 
-const sampleRecord: Session = {
-  id: "20260508-9dfbdf05",
+const sampleRecord: CreateSessionResponse = {
+  id: "20260508-9dfbdf05" as SessionId,
   workdir: "/tmp/wd",
   agent: "demo",
   runtime: "copilot",

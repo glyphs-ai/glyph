@@ -12,6 +12,7 @@ import {
   type WorkflowNodeStatus,
 } from "../node/workflow-node-status.js";
 import type { WorkflowId } from "../workflow/workflow-id.js";
+import type { WorkflowBrief } from "./workflow-brief.js";
 import type { WorkflowCancellation } from "./workflow-cancellation.js";
 import { computePhaseFromParents, structuralLeaves, wouldCreateCycle } from "./workflow-dag.js";
 import { parentsReadyForKind } from "./workflow-dispatch-readiness.js";
@@ -25,12 +26,13 @@ import type {
   RemoveEdgeOrphansChild,
   RemoveNodeOrphansChild,
   SubgraphError,
+  WorkflowEdgeNotFound,
+  WorkflowNodeNotFound,
   WorkflowNodeNotMutable,
-} from "./workflow-errors.js";
-import { workflowNodeNotMutable } from "./workflow-errors.js";
+} from "./workflow-entity-errors.js";
+import { workflowNodeNotMutable } from "./workflow-entity-errors.js";
 import type { WorkflowFailure } from "./workflow-failure.js";
 import type { WorkflowOrigin } from "./workflow-origin.js";
-import type { WorkflowEdgeNotFound, WorkflowNodeNotFound } from "./workflow-repository.js";
 import type { WorkflowStatus } from "./workflow-status.js";
 import {
   classifyStuckReason,
@@ -41,7 +43,7 @@ import type { WorkflowSuccess } from "./workflow-success.js";
 
 export interface WorkflowCreateArgs {
   readonly id: WorkflowId;
-  readonly brief: string;
+  readonly brief: WorkflowBrief;
   readonly details?: string;
   readonly coordinatorAgent: string;
   readonly origin?: WorkflowOrigin;
@@ -49,9 +51,10 @@ export interface WorkflowCreateArgs {
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly createdAt: string;
 }
+
 export interface WorkflowReconstituteArgs {
   readonly id: WorkflowId;
-  readonly brief: string;
+  readonly brief: WorkflowBrief;
   readonly details: string | undefined;
   readonly coordinatorAgent: string;
   readonly status: WorkflowStatus;
@@ -67,16 +70,19 @@ export interface WorkflowReconstituteArgs {
   readonly nodes: readonly WorkflowNodeEntity[];
   readonly edges: readonly WorkflowEdgeEntity[];
 }
+
 export type WorkflowAlreadyTerminal = {
   readonly type: "WorkflowAlreadyTerminal";
   readonly workflowId: string;
   readonly status: WorkflowStatus;
 };
+
 export type WorkflowDeleteRequiresTerminal = {
   readonly type: "WorkflowDeleteRequiresTerminal";
   readonly workflowId: string;
   readonly status: WorkflowStatus;
 };
+
 export type IllegalNodeTransition = {
   readonly type: "IllegalNodeTransition";
   readonly workflowId: string;
@@ -84,25 +90,31 @@ export type IllegalNodeTransition = {
   readonly status: string;
   readonly verb: string;
 };
+
 export type NodeRef =
   | { readonly kind: "existing"; readonly id: string }
   | { readonly kind: "temp"; readonly tempId: string };
+
 export interface SubgraphTempNodeShape {
   readonly tempId: string;
   readonly kind: WorkflowNodeKind;
   readonly existingParents: readonly string[];
 }
+
 export interface SubgraphNodeInput extends SubgraphTempNodeShape {
   readonly validatedSpec: unknown;
 }
+
 export interface SubgraphEdgeShape {
   readonly from: NodeRef;
   readonly to: NodeRef;
 }
+
 export interface NormalizedSubgraphInput {
   readonly nodes: readonly SubgraphTempNodeShape[];
   readonly edges: readonly SubgraphEdgeShape[];
 }
+
 export interface WorkflowNodeSnapshot {
   readonly status: WorkflowNodeStatus;
   readonly phase: number;
@@ -112,8 +124,9 @@ export interface WorkflowNodeSnapshot {
   readonly endedAt: string | undefined;
   readonly metadata: Readonly<Record<string, unknown>>;
 }
+
 export interface WorkflowHeaderSnapshot {
-  readonly brief: string;
+  readonly brief: WorkflowBrief;
   readonly details: string | undefined;
   readonly coordinatorAgent: string;
   readonly status: WorkflowStatus;
@@ -127,6 +140,7 @@ export interface WorkflowHeaderSnapshot {
   readonly failure: WorkflowFailure | undefined;
   readonly cancellation: WorkflowCancellation | undefined;
 }
+
 export interface WorkflowSnapshot {
   readonly header: WorkflowHeaderSnapshot | null;
   readonly nodes: ReadonlyMap<WorkflowNodeId, WorkflowNodeSnapshot>;
@@ -135,7 +149,7 @@ export interface WorkflowSnapshot {
 
 export class WorkflowEntity {
   private _id: WorkflowId;
-  private _brief: string;
+  private _brief: WorkflowBrief;
   private _details: string | undefined;
   private _coordinatorAgent: string;
   private _status: WorkflowStatus;
@@ -152,6 +166,7 @@ export class WorkflowEntity {
   private _edges: WorkflowEdgeEntity[];
   private readonly snapshot: WorkflowSnapshot;
   private deleted = false;
+
   private constructor(args: WorkflowReconstituteArgs, snapshot: WorkflowSnapshot) {
     this._id = args.id;
     this._brief = args.brief;
@@ -171,6 +186,7 @@ export class WorkflowEntity {
     this._edges = [...args.edges];
     this.snapshot = snapshot;
   }
+
   static create(args: WorkflowCreateArgs): WorkflowEntity {
     return new WorkflowEntity(
       {
@@ -194,21 +210,26 @@ export class WorkflowEntity {
       emptySnapshot(),
     );
   }
+
   static reconstitute(args: WorkflowReconstituteArgs): WorkflowEntity {
     return new WorkflowEntity(args, captureSnapshot(args));
   }
+
   succeed(success: WorkflowSuccess, nowIso: string): Result<void, WorkflowAlreadyTerminal> {
     return this.toTerminal("succeeded", nowIso, { success });
   }
+
   fail(failure: WorkflowFailure, nowIso: string): Result<void, WorkflowAlreadyTerminal> {
     return this.toTerminal("failed", nowIso, { failure });
   }
+
   cancel(
     cancellation: WorkflowCancellation,
     nowIso: string,
   ): Result<void, WorkflowAlreadyTerminal> {
     return this.toTerminal("cancelled", nowIso, { cancellation });
   }
+
   markDeleted(): Result<void, WorkflowDeleteRequiresTerminal> {
     if (this.status === "running")
       return err({
@@ -219,6 +240,7 @@ export class WorkflowEntity {
     this.deleted = true;
     return ok(undefined);
   }
+
   addNode(args: {
     readonly nodeId: WorkflowNodeId;
     readonly kind: WorkflowNodeKind;
@@ -266,6 +288,7 @@ export class WorkflowEntity {
     this.applyPhaseUpdates(this.recomputePhases([args.nodeId], [node], insertedEdges));
     return ok({ nodeId: args.nodeId, phase });
   }
+
   addEdge(
     from: WorkflowNodeId,
     to: WorkflowNodeId,
@@ -437,6 +460,7 @@ export class WorkflowEntity {
       this.patchCoordinatorAgent(inputByTemp.get(coordNode.tempId)?.validatedSpec);
     return ok({ insertedNodes: insertedResponse });
   }
+
   removeNode(
     nodeId: WorkflowNodeId,
   ): Result<
@@ -465,6 +489,7 @@ export class WorkflowEntity {
     this.applyPhaseUpdates(phaseUpdates);
     return ok(undefined);
   }
+
   removeEdge(
     from: WorkflowNodeId,
     to: WorkflowNodeId,
@@ -508,6 +533,7 @@ export class WorkflowEntity {
     this.applyPhaseUpdates(phaseUpdates);
     return ok(undefined);
   }
+
   replaceNodeSpec(
     nodeId: WorkflowNodeId,
     validatedSpec: unknown,
@@ -524,6 +550,7 @@ export class WorkflowEntity {
       this.patchCoordinatorAgent(validatedSpec);
     return ok(undefined);
   }
+
   replaceNodeMetadata(
     nodeId: WorkflowNodeId,
     metadata: Readonly<Record<string, unknown>>,
@@ -534,6 +561,7 @@ export class WorkflowEntity {
     this.replaceNode(node.withPatch({ metadata }));
     return ok(undefined);
   }
+
   addRetryCoordNode(args: {
     readonly nodeId: WorkflowNodeId;
     readonly parentIds: readonly WorkflowNodeId[];
@@ -571,6 +599,7 @@ export class WorkflowEntity {
     this.applyPhaseUpdates(this.recomputePhases([args.nodeId], [node], insertedEdges));
     return ok({ nodeId: args.nodeId, phase });
   }
+
   markNodeRunning(
     nodeId: WorkflowNodeId,
     nowIso: string,
@@ -600,6 +629,7 @@ export class WorkflowEntity {
     this.replaceNode(node.withPatch({ status: "running", runningAt: nowIso }));
     return ok(undefined);
   }
+
   markNodeTerminal(
     nodeId: WorkflowNodeId,
     status: TerminalWorkflowNodeStatus,
@@ -626,57 +656,75 @@ export class WorkflowEntity {
     this.replaceNode(node.withPatch({ status, endedAt: nowIso }));
     return ok(this.checkStuckAndRecover(nowIso));
   }
+
   __snapshot(): WorkflowSnapshot {
     return this.snapshot;
   }
+
   __isDeleted(): boolean {
     return this.deleted;
   }
+
   get id(): WorkflowId {
     return this._id;
   }
-  get brief(): string {
+
+  get brief(): WorkflowBrief {
     return this._brief;
   }
+
   get details(): string | undefined {
     return this._details;
   }
+
   get coordinatorAgent(): string {
     return this._coordinatorAgent;
   }
+
   get status(): WorkflowStatus {
     return this._status;
   }
+
   get origin(): WorkflowOrigin {
     return this._origin;
   }
+
   get originId(): string | undefined {
     return this._originId;
   }
+
   get metadata(): Readonly<Record<string, unknown>> {
     return this._metadata;
   }
+
   get createdAt(): string {
     return this._createdAt;
   }
+
   get startedAt(): string | undefined {
     return this._startedAt;
   }
+
   get endedAt(): string | undefined {
     return this._endedAt;
   }
+
   get success(): WorkflowSuccess | undefined {
     return this._success;
   }
+
   get failure(): WorkflowFailure | undefined {
     return this._failure;
   }
+
   get cancellation(): WorkflowCancellation | undefined {
     return this._cancellation;
   }
+
   get nodes(): readonly WorkflowNodeEntity[] {
     return this._nodes;
   }
+
   get edges(): readonly WorkflowEdgeEntity[] {
     return this._edges;
   }
@@ -699,11 +747,13 @@ export class WorkflowEntity {
     this._cancellation = payload.cancellation;
     return ok(undefined);
   }
+
   private requireRunning(): Result<void, WorkflowAlreadyTerminal> {
     return this.status !== "running"
       ? err({ type: "WorkflowAlreadyTerminal", workflowId: this.id, status: this.status })
       : ok(undefined);
   }
+
   private checkStuckAndRecover(nowIso: string): {
     readonly retryCoordInserted: WorkflowNodeId | null;
     readonly workflowFailed: boolean;
@@ -753,6 +803,7 @@ export class WorkflowEntity {
       ? { retryCoordInserted: retryNodeId, workflowFailed: false }
       : { retryCoordInserted: null, workflowFailed: false };
   }
+
   private parentEntities(
     parentIds: readonly WorkflowNodeId[],
   ): Result<readonly WorkflowNodeEntity[], WorkflowNodeNotFound> {
@@ -765,6 +816,7 @@ export class WorkflowEntity {
     }
     return ok(parents);
   }
+
   private rejectBadParentsForKind(
     kind: WorkflowNodeKind,
     parents: readonly WorkflowNodeEntity[],
@@ -781,6 +833,7 @@ export class WorkflowEntity {
         });
     return ok(undefined);
   }
+
   private enforceCoordChainInvariants(
     parentEntities: readonly WorkflowNodeEntity[],
     extraEdges: readonly { readonly from: WorkflowNodeId; readonly to: WorkflowNodeId }[] = [],
@@ -810,9 +863,11 @@ export class WorkflowEntity {
     }
     return ok(undefined);
   }
+
   private latestCoordId(): WorkflowNodeId | null {
     return this.latestCoordIdWith([]);
   }
+
   private latestCoordIdWith(extraNodes: readonly WorkflowNodeEntity[]): WorkflowNodeId | null {
     const coords = [...this.nodes, ...extraNodes].filter((node) => node.kind === COORDINATOR_KIND);
     coords.sort(
@@ -821,6 +876,7 @@ export class WorkflowEntity {
     );
     return coords[0]?.id ?? null;
   }
+
   private mostRecentCoordTerminal(): WorkflowNodeEntity | null {
     const coords = this.nodes.filter(
       (node) => node.kind === COORDINATOR_KIND && isTerminalWorkflowNodeStatus(node.status),
@@ -833,12 +889,14 @@ export class WorkflowEntity {
     );
     return coords[0] ?? null;
   }
+
   private wouldCreateCycle(newEdge: {
     readonly from: WorkflowNodeId;
     readonly to: WorkflowNodeId;
   }): boolean {
     return wouldCreateCycle(this.edges, newEdge);
   }
+
   private recomputePhases(
     startNodeIds: readonly WorkflowNodeId[],
     insertedNodes: readonly WorkflowNodeEntity[] = [],
@@ -918,24 +976,30 @@ export class WorkflowEntity {
     }
     return diff;
   }
+
   private applyPhaseUpdates(diff: ReadonlyMap<WorkflowNodeId, number>): void {
     for (const [id, phase] of diff) {
       const node = this.nodeById(id);
       if (node !== undefined && node.phase !== phase) this.replaceNode(node.withPatch({ phase }));
     }
   }
+
   private children(nodeId: WorkflowNodeId): readonly WorkflowNodeId[] {
     return this.edges.filter((edge) => edge.from === nodeId).map((edge) => edge.to);
   }
+
   private parents(nodeId: WorkflowNodeId): readonly WorkflowNodeId[] {
     return this.edges.filter((edge) => edge.to === nodeId).map((edge) => edge.from);
   }
+
   private nodeById(id: WorkflowNodeId): WorkflowNodeEntity | undefined {
     return this.nodes.find((node) => node.id === id);
   }
+
   private replaceNode(updated: WorkflowNodeEntity): void {
     this._nodes = this._nodes.map((node) => (node.id === updated.id ? updated : node));
   }
+
   private patchCoordinatorAgent(spec: unknown): void {
     const agent = coordAgent(spec);
     if (agent !== undefined) this._coordinatorAgent = agent;
@@ -961,6 +1025,7 @@ export function normalizeSubgraphInput(input: {
   }
   return { nodes, edges };
 }
+
 export function validateSubgraphShape(
   workflowId: string,
   nodes: readonly SubgraphTempNodeShape[],
@@ -1012,6 +1077,7 @@ export function validateSubgraphShape(
   }
   return ok(undefined);
 }
+
 export function resolveSubgraphTopology(
   workflowId: string,
   nodes: readonly SubgraphTempNodeShape[],
@@ -1085,6 +1151,7 @@ export function resolveSubgraphTopology(
   }
   return ok(order);
 }
+
 function captureSnapshot(args: WorkflowReconstituteArgs): WorkflowSnapshot {
   return Object.freeze({
     header: Object.freeze({
@@ -1106,6 +1173,7 @@ function captureSnapshot(args: WorkflowReconstituteArgs): WorkflowSnapshot {
     edgeKeys: new Set(args.edges.map((edge) => edgeKey(edge.from, edge.to))),
   });
 }
+
 function emptySnapshot(): WorkflowSnapshot {
   return Object.freeze({
     header: null,
@@ -1113,6 +1181,7 @@ function emptySnapshot(): WorkflowSnapshot {
     edgeKeys: new Set<string>(),
   });
 }
+
 function nodeSnapshot(node: WorkflowNodeEntity): WorkflowNodeSnapshot {
   return Object.freeze({
     status: node.status,
@@ -1124,26 +1193,33 @@ function nodeSnapshot(node: WorkflowNodeEntity): WorkflowNodeSnapshot {
     metadata: Object.freeze({ ...node.metadata }),
   });
 }
+
 function uniqueNodeIds(ids: readonly WorkflowNodeId[]): WorkflowNodeId[] {
   return Array.from(new Set(ids));
 }
+
 function coordAgent(spec: unknown): string | undefined {
   if (typeof spec !== "object" || spec === null) return undefined;
   const agent = (spec as { readonly agent?: unknown }).agent;
   return typeof agent === "string" ? agent : undefined;
 }
+
 function isNode(node: WorkflowNodeEntity | undefined): node is WorkflowNodeEntity {
   return node !== undefined;
 }
+
 function compareDesc(left: string, right: string): number {
   return right.localeCompare(left);
 }
+
 function edgeKey(from: string, to: string): string {
   return `${from}->${to}`;
 }
+
 function serializeNodeRef(ref: NodeRef): string {
   return ref.kind === "existing" ? `existing:${ref.id}` : `temp:${ref.tempId}`;
 }
+
 function collectExistingIds(
   nodes: readonly SubgraphTempNodeShape[],
   edges: readonly SubgraphEdgeShape[],
@@ -1156,6 +1232,7 @@ function collectExistingIds(
   }
   return [...ids];
 }
+
 function buildNewEdges(
   nodes: readonly SubgraphTempNodeShape[],
   edges: readonly SubgraphEdgeShape[],
@@ -1178,6 +1255,7 @@ function buildNewEdges(
     });
   return result;
 }
+
 function parentIdsForTemp(
   tempId: string,
   nodes: readonly SubgraphTempNodeShape[],

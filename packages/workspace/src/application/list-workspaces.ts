@@ -1,8 +1,10 @@
+import { desc } from "drizzle-orm";
 import pino, { type Logger } from "pino";
 import { z } from "zod";
-import { WorkspaceIdSchema } from "../domain/workspace-id.js";
-import { WorkspaceNameSchema } from "../domain/workspace-name.js";
-import type { DatabaseUnavailable, WorkspaceRepository } from "../domain/workspace-repository.js";
+import { type WorkspaceId, WorkspaceIdSchema } from "../domain/workspace-id.js";
+import { type WorkspaceName, WorkspaceNameSchema } from "../domain/workspace-name.js";
+import type { DatabaseUnavailable } from "../domain/workspace-repository.js";
+import type { WorkspaceQueries } from "../infrastructure/drizzle/workspace-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const ListWorkspacesRequestSchema = z.object({}).strict();
@@ -22,7 +24,7 @@ export type ListWorkspacesResponse = z.infer<typeof ListWorkspacesResponseSchema
 export type ListWorkspacesError = DatabaseUnavailable;
 
 export interface ListWorkspacesDeps {
-  readonly repo: WorkspaceRepository;
+  readonly query: WorkspaceQueries;
   readonly logger?: Logger;
 }
 
@@ -41,18 +43,22 @@ export class ListWorkspacesUseCase
     request: ListWorkspacesRequest,
   ): UseCaseResult<ListWorkspacesResponse, ListWorkspacesError> {
     ListWorkspacesRequestSchema.parse(request);
-    return this.deps.repo
-      .findAllByLastOpened()
-      .map(
-        (entities): ListWorkspacesResponse =>
-          entities.map((entity) => ({
-            id: entity.id,
-            name: entity.name,
-            workspaceDir: entity.workspaceDir,
-            createdAt: entity.createdAt,
-            lastOpenedAt: entity.lastOpenedAt ?? entity.createdAt,
-          })),
-      )
+    const q = this.deps.query;
+    return q
+      .query<ListWorkspacesResponse>(async (db) => {
+        const rows = await db
+          .select()
+          .from(q.workspaces)
+          .orderBy(desc(q.workspaces.lastOpenedAt), desc(q.workspaces.createdAt), q.workspaces.id)
+          .all();
+        return rows.map((row) => ({
+          id: row.id as WorkspaceId,
+          name: row.name as WorkspaceName,
+          workspaceDir: row.workspaceDir,
+          createdAt: row.createdAt,
+          lastOpenedAt: row.lastOpenedAt ?? row.createdAt,
+        }));
+      })
       .mapErr((err) => {
         this.logger.warn({ useCase: "listWorkspaces", err }, "tech failure");
         return err;

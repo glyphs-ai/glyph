@@ -353,7 +353,7 @@ describe("workspacesRoutes — POST /:id/reload", () => {
     });
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string; code: string };
-    expect(body.code).toBe("WorkspaceNotRegistered");
+    expect(body.code).toBe("WorkspaceNotFound");
   });
 
   it("returns 409 with WorkspaceHasLiveTasksError when tasks are live", async () => {

@@ -4,12 +4,12 @@ import {
   composeWorkspaceModule,
   type DatabaseUnavailable,
   type GetWorkspaceResponse,
+  openWorkspaceDb,
   type ProvisioningFailed,
   type WorkspaceId,
   type WorkspaceModule,
-  type WorkspaceModuleOptions,
   type WorkspaceName,
-  type WorkspaceNotRegistered,
+  type WorkspaceNotFound,
 } from "@glyphs-ai/workspace";
 import { ResultAsync } from "neverthrow";
 import type { Logger } from "pino";
@@ -52,7 +52,7 @@ export interface Application {
   renameWorkspace(
     workspaceId: string,
     input: { readonly name: WorkspaceName },
-  ): ResultAsync<GetWorkspaceResponse, WorkspaceNotRegistered | DatabaseUnavailable>;
+  ): ResultAsync<GetWorkspaceResponse, WorkspaceNotFound | DatabaseUnavailable>;
 
   /**
    * Unregister a workspace. Idempotent (no error if the workspaceId is
@@ -100,13 +100,35 @@ export interface Application {
 
 /** Typed opts object for `composeApplication`. */
 export interface ApplicationOpts {
-  readonly workspace: WorkspaceModuleOptions;
+  readonly workspace: {
+    /** libsql URL for the global registry DB (a `file:` URL in production,
+     * `":memory:"` in tests). The caller owns file-path policy. */
+    readonly dbUrl: string;
+    /** Parent directory for auto-created workspace directories. */
+    readonly defaultWorkspaceParent: string;
+    readonly logger?: Logger;
+  };
   readonly runtimeRegistry: RuntimeRegistry;
   readonly logger?: Logger;
 }
 
 export async function composeApplication(opts: ApplicationOpts): Promise<Application> {
-  const workspace = await composeWorkspaceModule(opts.workspace);
+  // The api layer is the assembler: it opens the global registry DB from the
+  // caller-provided url, then hands the bare handle to the workspace module
+  // (which owns schema + use-cases, never file-path policy). This composer
+  // owns the handle's lifecycle via `close()`.
+  const { db, close: closeWorkspaceDb } = await openWorkspaceDb({ url: opts.workspace.dbUrl });
+  let workspace: WorkspaceModule;
+  try {
+    workspace = await composeWorkspaceModule({
+      db,
+      defaultWorkspaceParent: opts.workspace.defaultWorkspaceParent,
+      ...(opts.workspace.logger !== undefined ? { logger: opts.workspace.logger } : {}),
+    });
+  } catch (err) {
+    closeWorkspaceDb();
+    throw err;
+  }
   const registry = new WorkspaceContextRegistry({
     getWorkspace: workspace.getWorkspace,
     runtimeRegistry: opts.runtimeRegistry,
@@ -175,7 +197,7 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
       // resource ownership (the composer composes -> the composer
       // disposes, top-down).
       await registry.closeAll();
-      await workspace.close();
+      closeWorkspaceDb();
     },
   };
 }

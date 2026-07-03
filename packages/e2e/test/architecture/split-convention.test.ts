@@ -71,7 +71,7 @@ const REQUIRED_SPLITS = new Set<string>([
   "packages/cli/src/commands/catalog",
   "packages/cli/src/commands/schedule",
   "packages/cli/src/commands/workflow",
-  "packages/server/src/routes/workflows",
+  "packages/api/src/routes/workflows",
 ]);
 
 interface ClassifiedDir {

@@ -2,7 +2,7 @@ import { err, ok, type Result, ResultAsync, safeTry } from "neverthrow";
 import { z } from "zod";
 import { generateWorkflowNodeId, WorkflowNodeIdSchema } from "../domain/node/workflow-node-id.js";
 import { COORDINATOR_KIND } from "../domain/node/workflow-node-kind.js";
-import type { WorkflowEntityCorruption } from "../domain/workflow/workflow-corruption.js";
+import { WorkflowBriefSchema } from "../domain/workflow/workflow-brief.js";
 import {
   type WorkflowAlreadyTerminal,
   WorkflowEntity,
@@ -12,11 +12,12 @@ import type {
   MultipleSuccessorCoords,
   OrphanCoordInsert,
   ParentState,
-} from "../domain/workflow/workflow-errors.js";
+  WorkflowNodeNotFound,
+} from "../domain/workflow/workflow-entity-errors.js";
 import { generateWorkflowId, WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
-  WorkflowNodeNotFound,
+  WorkflowEntityCorruption,
   WorkflowRepository,
 } from "../domain/workflow/workflow-repository.js";
 import type { WorkflowSandbox } from "../infrastructure/file/workflow-sandbox.js";
@@ -26,7 +27,7 @@ import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const CreateWorkflowRequestSchema = z
   .object({
-    brief: z.string().min(1),
+    brief: WorkflowBriefSchema,
     details: z.string().optional(),
     coordinatorAgent: z.string().min(1),
     origin: z.string().min(1).optional(),
@@ -34,7 +35,10 @@ export const CreateWorkflowRequestSchema = z
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
-export type CreateWorkflowRequest = z.infer<typeof CreateWorkflowRequestSchema>;
+// `z.input`: `brief` is a WorkflowBrief value object (transform + brand), so the
+// caller-facing request keeps it as a raw `string` — the use-case's own
+// `.parse()` validates and brands it. Consumers get the branded value out.
+export type CreateWorkflowRequest = z.input<typeof CreateWorkflowRequestSchema>;
 export const CreateWorkflowResponseSchema = z.object({
   workflowId: WorkflowIdSchema,
   initialCoordNodeId: WorkflowNodeIdSchema,

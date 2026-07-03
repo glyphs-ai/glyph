@@ -8,7 +8,7 @@ export type SessionRow = typeof sessions.$inferSelect;
 
 export const SessionMapper = {
   toDomain(row: SessionRow): SessionEntity {
-    return new SessionEntity({
+    return SessionEntity.rehydrate({
       id: row.id as SessionId,
       agent: row.agent,
       runtime: row.runtime,

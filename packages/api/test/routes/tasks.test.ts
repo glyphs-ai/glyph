@@ -2,7 +2,7 @@ import type { TaskModule } from "@glyphs-ai/task";
 import { err, ok } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { tasksRoutes } from "../../src/routes/tasks.js";
-import type { Task } from "../../src/schemas/tasks.js";
+import type { Task } from "../../src/wire/domain.js";
 
 /**
  * Local Error subclasses drive stub failures; `wrapOk` maps them to task
@@ -233,18 +233,18 @@ describe("tasksRoutes", () => {
     expect(m.list).not.toHaveBeenCalled();
   });
 
-  it("GET /?status=running,succeeded forwards the status set", async () => {
+  it("GET /?status=running forwards the single status filter", async () => {
     const list = vi.fn(async () => [sampleTask]);
     const m = stubManager({ list });
-    const res = await tasksRoutes(() => m).request("/?status=running,succeeded");
+    const res = await tasksRoutes(() => m).request("/?status=running");
     expect(res.status).toBe(200);
     expect(list).toHaveBeenCalledWith({
       origin: "standalone",
-      statuses: ["running", "succeeded"],
+      status: "running",
     });
   });
 
-  it("GET /?status=bogus returns 400 (unknown status)", async () => {
+  it("GET /?status=bogus returns 400 (invalid status enum)", async () => {
     const m = stubManager({});
     const res = await tasksRoutes(() => m).request("/?status=bogus");
     expect(res.status).toBe(400);
@@ -263,7 +263,7 @@ describe("tasksRoutes", () => {
       agent: "writer",
       runtime: "copilot",
       createdSince: "2026-05-08T01:00:00.000Z",
-      statuses: ["running"],
+      status: "running",
     });
   });
 
@@ -739,6 +739,10 @@ describe("tasksRoutes", () => {
       expect(body.error).toContain("mutually exclusive");
     });
 
+    // Field-level faults (bad cursors / out-of-range limit) are rejected by
+    // the shared query schema at the HTTP boundary, so they surface as the
+    // standard ValidationError envelope — unlike the before/after mutual
+    // exclusion above, which stays a handler-level BadRequest cross-field check.
     it.each([
       { name: "before negative", q: "before=-1" },
       { name: "before non-integer", q: "before=abc" },
@@ -753,7 +757,7 @@ describe("tasksRoutes", () => {
       const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/activity?${q}`);
       expect(res.status).toBe(400);
       const body = await jsonBody(res);
-      expect(body.code).toBe("BadRequest");
+      expect(body.code).toBe("ValidationError");
     });
   });
 

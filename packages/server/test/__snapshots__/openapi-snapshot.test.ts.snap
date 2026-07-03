@@ -301,6 +301,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 "schema": {
                   "properties": {
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i",
                       "type": [
                         "string",
                         "null",
@@ -353,6 +354,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 "schema": {
                   "properties": {
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i",
                       "type": [
                         "string",
                         "null",
@@ -372,7 +374,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Malformed request body",
           },
           "404": {
-            "description": "Workspace not registered",
+            "description": "Workspace not found",
           },
           "500": {
             "description": "Internal error",
@@ -458,14 +460,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "createdAt",
                     "lastOpenedAt",
                   ],
-                  "type": "object",
+                  "type": [
+                    "object",
+                    "null",
+                  ],
                 },
               },
             },
             "description": "Workspace",
           },
           "404": {
-            "description": "Workspace not registered",
+            "description": "Workspace not found",
           },
           "500": {
             "description": "Internal error",
@@ -536,7 +541,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "createdAt",
                     "lastOpenedAt",
                   ],
-                  "type": "object",
+                  "type": [
+                    "object",
+                    "null",
+                  ],
                 },
               },
             },
@@ -546,7 +554,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Malformed request body",
           },
           "404": {
-            "description": "Workspace not registered",
+            "description": "Workspace not found",
           },
           "500": {
             "description": "Internal error",
@@ -6199,7 +6207,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Reloaded (no content)",
           },
           "404": {
-            "description": "Workspace not registered",
+            "description": "Workspace not found",
           },
           "409": {
             "description": "Workspace has live tasks",
@@ -6235,7 +6243,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           },
           {
             "in": "query",
-            "name": "runtime",
+            "name": "createdSince",
             "required": false,
             "schema": {
               "type": "string",
@@ -6243,7 +6251,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           },
           {
             "in": "query",
-            "name": "createdSince",
+            "name": "runtime",
             "required": false,
             "schema": {
               "type": "string",
@@ -6254,6 +6262,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "name": "status",
             "required": false,
             "schema": {
+              "enum": [
+                "running",
+                "succeeded",
+                "failed",
+                "cancelled",
+              ],
               "type": "string",
             },
           },
@@ -6280,7 +6294,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "string",
                       },
                       "cancellation": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "properties": {
                               "kind": {
@@ -6329,31 +6343,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "string",
                       },
                       "failure": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "properties": {
                               "exitCode": {
                                 "type": "number",
                               },
-                              "kind": {
-                                "enum": [
-                                  "execution",
-                                ],
-                                "type": "string",
-                              },
-                              "message": {
-                                "type": "string",
-                              },
-                            },
-                            "required": [
-                              "kind",
-                              "exitCode",
-                              "message",
-                            ],
-                            "type": "object",
-                          },
-                          {
-                            "properties": {
                               "kind": {
                                 "enum": [
                                   "execution",
@@ -6412,6 +6407,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         ],
                       },
                       "id": {
+                        "pattern": "^\\d{8}-[0-9a-f]{8}$",
                         "type": "string",
                       },
                       "metadata": {
@@ -6419,11 +6415,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "object",
                       },
                       "origin": {
-                        "enum": [
-                          "standalone",
-                          "workflow",
-                          "schedule",
-                        ],
                         "type": "string",
                       },
                       "originId": {
@@ -8334,6 +8325,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "string",
                       },
                       "id": {
+                        "pattern": "^\\d{8}-[0-9a-f]{8}$",
                         "type": "string",
                       },
                       "lastActiveAt": {
@@ -8421,6 +8413,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 "additionalProperties": false,
                 "properties": {
                   "agent": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "runtime": {
@@ -8449,6 +8442,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
                     },
                     "lastActiveAt": {
@@ -8593,6 +8587,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
                     },
                     "lastActiveAt": {
@@ -8642,7 +8637,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "preview",
                     "lastLaunchMode",
                   ],
-                  "type": "object",
+                  "type": [
+                    "object",
+                    "null",
+                  ],
                 },
               },
             },
@@ -8791,7 +8789,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           },
           {
             "in": "query",
-            "name": "runtime",
+            "name": "createdSince",
             "required": false,
             "schema": {
               "type": "string",
@@ -8799,7 +8797,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           },
           {
             "in": "query",
-            "name": "createdSince",
+            "name": "runtime",
             "required": false,
             "schema": {
               "type": "string",
@@ -8810,6 +8808,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "name": "status",
             "required": false,
             "schema": {
+              "enum": [
+                "running",
+                "succeeded",
+                "failed",
+                "cancelled",
+              ],
               "type": "string",
             },
           },
@@ -8828,7 +8832,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "string",
                       },
                       "cancellation": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "properties": {
                               "kind": {
@@ -8877,31 +8881,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "string",
                       },
                       "failure": {
-                        "anyOf": [
+                        "oneOf": [
                           {
                             "properties": {
                               "exitCode": {
                                 "type": "number",
                               },
-                              "kind": {
-                                "enum": [
-                                  "execution",
-                                ],
-                                "type": "string",
-                              },
-                              "message": {
-                                "type": "string",
-                              },
-                            },
-                            "required": [
-                              "kind",
-                              "exitCode",
-                              "message",
-                            ],
-                            "type": "object",
-                          },
-                          {
-                            "properties": {
                               "kind": {
                                 "enum": [
                                   "execution",
@@ -8960,6 +8945,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         ],
                       },
                       "id": {
+                        "pattern": "^\\d{8}-[0-9a-f]{8}$",
                         "type": "string",
                       },
                       "metadata": {
@@ -8967,11 +8953,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "type": "object",
                       },
                       "origin": {
-                        "enum": [
-                          "standalone",
-                          "workflow",
-                          "schedule",
-                        ],
                         "type": "string",
                       },
                       "originId": {
@@ -9058,6 +9039,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 "additionalProperties": false,
                 "properties": {
                   "agent": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "brief": {
@@ -9093,7 +9075,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "cancellation": {
-                      "anyOf": [
+                      "oneOf": [
                         {
                           "properties": {
                             "kind": {
@@ -9142,31 +9124,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "failure": {
-                      "anyOf": [
+                      "oneOf": [
                         {
                           "properties": {
                             "exitCode": {
                               "type": "number",
                             },
-                            "kind": {
-                              "enum": [
-                                "execution",
-                              ],
-                              "type": "string",
-                            },
-                            "message": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "exitCode",
-                            "message",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
                             "kind": {
                               "enum": [
                                 "execution",
@@ -9225,6 +9188,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
                     },
                     "metadata": {
@@ -9232,11 +9196,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "workflow",
-                        "schedule",
-                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -9383,7 +9342,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "cancellation": {
-                      "anyOf": [
+                      "oneOf": [
                         {
                           "properties": {
                             "kind": {
@@ -9432,31 +9391,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "failure": {
-                      "anyOf": [
+                      "oneOf": [
                         {
                           "properties": {
                             "exitCode": {
                               "type": "number",
                             },
-                            "kind": {
-                              "enum": [
-                                "execution",
-                              ],
-                              "type": "string",
-                            },
-                            "message": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "exitCode",
-                            "message",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
                             "kind": {
                               "enum": [
                                 "execution",
@@ -9515,6 +9455,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
                     },
                     "metadata": {
@@ -9522,11 +9463,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "workflow",
-                        "schedule",
-                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -9575,7 +9511,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "createdAt",
                     "startedAt",
                   ],
-                  "type": "object",
+                  "type": [
+                    "object",
+                    "null",
+                  ],
                 },
               },
             },
@@ -9618,7 +9557,11 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "name": "before",
             "required": false,
             "schema": {
-              "type": "string",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null",
+              ],
             },
           },
           {
@@ -9626,7 +9569,11 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "name": "after",
             "required": false,
             "schema": {
-              "type": "string",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null",
+              ],
             },
           },
           {
@@ -9634,7 +9581,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "name": "limit",
             "required": false,
             "schema": {
-              "type": "string",
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer",
             },
           },
         ],
@@ -10188,7 +10138,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "cancellation": {
-                      "anyOf": [
+                      "oneOf": [
                         {
                           "properties": {
                             "kind": {
@@ -10237,31 +10187,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "failure": {
-                      "anyOf": [
+                      "oneOf": [
                         {
                           "properties": {
                             "exitCode": {
                               "type": "number",
                             },
-                            "kind": {
-                              "enum": [
-                                "execution",
-                              ],
-                              "type": "string",
-                            },
-                            "message": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "exitCode",
-                            "message",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
                             "kind": {
                               "enum": [
                                 "execution",
@@ -10320,6 +10251,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
                     },
                     "metadata": {
@@ -10327,11 +10259,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "workflow",
-                        "schedule",
-                      ],
                       "type": "string",
                     },
                     "originId": {

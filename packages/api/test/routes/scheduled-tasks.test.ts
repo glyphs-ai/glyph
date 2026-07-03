@@ -15,7 +15,7 @@ import type { TaskModule } from "@glyphs-ai/task";
 import { okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { scheduledTasksRoutes } from "../../src/routes/scheduled-tasks.js";
-import type { Task } from "../../src/schemas/tasks.js";
+import type { Task } from "../../src/wire/domain.js";
 
 const sampleScheduledTask: Task = {
   id: "20260601-sched0001",
@@ -69,24 +69,23 @@ describe("scheduledTasksRoutes", () => {
     });
   });
 
-  it("GET /?status=running,succeeded parses the CSV status set", async () => {
+  it("GET /?status=running forwards the single status filter", async () => {
     const list = vi.fn(() => okAsync([sampleScheduledTask]));
     const m = stubManager({ list });
-    const res = await scheduledTasksRoutes(() => m).request("/?status=running,succeeded");
+    const res = await scheduledTasksRoutes(() => m).request("/?status=running");
     expect(res.status).toBe(200);
     expect(list).toHaveBeenCalledWith({
       origin: "schedule",
-      statuses: ["running", "succeeded"],
+      status: "running",
     });
   });
 
-  it("GET /?status=bogus returns 400 with the same validation envelope /tasks uses", async () => {
+  it("GET /?status=bogus returns 400 with the shared ValidationError envelope", async () => {
     const m = stubManager({});
     const res = await scheduledTasksRoutes(() => m).request("/?status=bogus");
     expect(res.status).toBe(400);
     const body = await jsonBody(res);
-    expect(body.error).toMatch(/unknown status/);
-    expect(body.error).toMatch(/running, succeeded, failed, cancelled/);
+    expect(body.code).toBe("ValidationError");
     expect(m.list).not.toHaveBeenCalled();
   });
 
@@ -111,7 +110,7 @@ describe("scheduledTasksRoutes", () => {
       agent: "writer",
       runtime: "copilot",
       createdSince: "2026-05-27T00:00:00.000Z",
-      statuses: ["running"],
+      status: "running",
       originId: "sched-x",
     });
   });

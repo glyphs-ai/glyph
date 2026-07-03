@@ -6,8 +6,10 @@
  *                            spawned process is handed to the registry, so
  *                            `liveCount` sees in-flight dispatches as live.
  *   - `shuttingDown`       — gates new dispatches + cancels once shutdown starts.
- *   - `purgeQueue`         — serialised chain of background workdir /
- *                            runtime-state removals.
+ *
+ * Physical cleanup (`purge`) is synchronous and idempotent, run by the delete
+ * use-cases BEFORE they remove the DB row (the row is the durable journal a
+ * crash leaves behind for retry) — there is no background purge queue.
  *
  * The live subprocesses themselves are held by an injected
  * {@link LiveProcessRegistry}: this service never touches a `RuntimeHandle`
@@ -28,6 +30,8 @@ import type {
 } from "@glyphs-ai/runtime";
 import { err, ok, type Result, ResultAsync } from "neverthrow";
 import type { Logger } from "pino";
+import { z } from "zod";
+import type { TaskBrief } from "../../domain/task-brief.js";
 import {
   type CorruptedTask,
   type InvalidTransition,
@@ -61,6 +65,19 @@ export type LaunchableRuntime = Runtime & {
 };
 
 /**
+ * A framing prompt safe to pass through `cmd.exe /c …` as one argv element: no
+ * LF, no CR, printable ASCII only (0x20–0x7E). The single source of truth for
+ * the framing-prompt invariant — the dispatch request's `prompt` override, the
+ * default framing, and any caller override all validate against it.
+ */
+export const FramingPromptSchema = z
+  .string()
+  .refine(
+    (s) => !s.includes("\n") && !s.includes("\r") && !/[^\x20-\x7E]/.test(s),
+    "framing prompt must be single-line printable ASCII",
+  );
+
+/**
  * Prepared inputs to `TaskSupervisor.runDispatch`; the dispatch use-case has
  * already resolved the agent, picked + narrowed the runtime, and validated the
  * framing prompt + caller env before handing these over.
@@ -72,9 +89,9 @@ export interface RunDispatchArgs {
   /** The resolved agent handed to `runtime.launchHeadless`. */
   readonly resolved: ResolvedAgent;
   readonly runtime: LaunchableRuntime;
-  /** Validated single-line framing prompt (default or caller override). */
+  /** Framing prompt validated by {@link FramingPromptSchema}. */
   readonly framingPrompt: string;
-  readonly brief: string;
+  readonly brief: TaskBrief;
   readonly details: string | undefined;
   readonly origin: TaskOrigin;
   readonly originId: string | undefined;
@@ -85,6 +102,17 @@ export interface RunDispatchArgs {
 /** `dispatch` / `cancel`: the supervisor has begun shutting down; retry after restart. */
 export type ManagerShuttingDown = {
   readonly type: "ManagerShuttingDown";
+};
+
+/**
+ * `purge` couldn't fully remove a task's physical resources (runtime state or
+ * workdir). The caller leaves the DB row in place so a later delete retry
+ * re-runs the (idempotent) purge instead of orphaning the resources.
+ */
+export type PurgeFailed = {
+  readonly type: "PurgeFailed";
+  readonly taskId: string;
+  readonly cause: unknown;
 };
 
 /** Faults surfaced by {@link TaskSupervisor.runDispatch} (the stateful spawn pipeline). */
@@ -120,7 +148,6 @@ export class TaskSupervisor {
   private readonly deps: TaskSupervisorDeps;
   private readonly dispatchInProgress = new Set<string>();
   private shuttingDown = false;
-  private purgeQueue: Promise<void> = Promise.resolve();
 
   constructor(deps: TaskSupervisorDeps) {
     this.deps = deps;
@@ -255,10 +282,10 @@ export class TaskSupervisor {
     // Fold the runtime session id into metadata. Persistence failure here is
     // not rolled back — the subprocess is live, and terminal persistence will
     // retry with the same enriched metadata.
-    let running = initial;
+    const running = initial;
     if (handle.runtimeSessionId !== undefined) {
-      running = initial.withMetadata({
-        ...initial.metadata,
+      running.replaceMetadata({
+        ...running.metadata,
         runtimeSessionId: handle.runtimeSessionId,
       });
       const savedRunning = await this.deps.repository.save(running);
@@ -300,10 +327,9 @@ export class TaskSupervisor {
       });
     }
 
-    const existingResult = await this.deps.repository.findById(id);
+    const existingResult = await this.deps.repository.get(id);
     if (existingResult.isErr()) return err(existingResult.error);
     const existing = existingResult.value;
-    if (existing === undefined) return err({ type: "TaskNotFound", id });
     if (existing.status !== "running") {
       return err({ type: "InvalidTransition", from: existing.status, eventType: "cancel" });
     }
@@ -327,9 +353,8 @@ export class TaskSupervisor {
       }
     }
 
-    const finalResult = await this.deps.repository.findById(id);
+    const finalResult = await this.deps.repository.get(id);
     if (finalResult.isErr()) return err(finalResult.error);
-    if (finalResult.value === undefined) return err({ type: "TaskNotFound", id });
     return ok(finalResult.value);
   }
 
@@ -344,25 +369,21 @@ export class TaskSupervisor {
   }
 
   /**
-   * Chain a workdir + runtime-state purge onto the serial `purgeQueue`. A
-   * single chained promise (not a parallel set) keeps an `fs.rm` of a copilot
-   * state dir from saturating the libuv worker pool — on Windows one such rm
-   * pins a worker for tens of seconds. Both continuations re-enqueue so a prior
-   * failure never stalls the queue.
+   * Physically purge a terminal task's runtime state + workdir. Idempotent
+   * (rmdir of a missing dir / `deleteState` of a missing session are no-ops),
+   * so the delete use-cases run it BEFORE removing the DB row: the row is the
+   * durable journal a crash leaves behind, and a retry re-runs this safely.
+   *
+   * An unregistered runtime (dropped between dispatch and delete) is a logged
+   * skip, not a failure — its state can no longer be addressed. A genuine IO
+   * failure (`deleteState` / workdir rm) surfaces `PurgeFailed`; both steps are
+   * still attempted so a single retry cleans up as much as possible.
    */
-  enqueuePurge(existing: TaskEntity): void {
-    this.purgeQueue = this.purgeQueue.then(
-      () => this.runPurge(existing),
-      () => this.runPurge(existing),
-    );
+  purge(existing: TaskEntity): ResultAsync<void, PurgeFailed> {
+    return new ResultAsync(this.runPurge(existing));
   }
 
-  /** Await the tail of the serial purge queue. Test seam for `delete({ purge: true })`. */
-  async drainPurges(): Promise<void> {
-    await this.purgeQueue;
-  }
-
-  private async runPurge(existing: TaskEntity): Promise<void> {
+  private async runPurge(existing: TaskEntity): Promise<Result<void, PurgeFailed>> {
     const id = existing.id;
     const workdir = this.deps.sandbox.resolve(existing.id);
     const runtimeName = existing.metadataString("runtime");
@@ -372,6 +393,7 @@ export class TaskSupervisor {
     const found = this.deps.runtimeRegistry.get(runtimeKey);
     const runtime: Runtime | undefined = found.isOk() ? found.value : undefined;
 
+    let failureCause: unknown;
     if (runtime !== undefined) {
       const runtimeSessionId = existing.metadataString("runtimeSessionId");
       if (runtimeSessionId !== undefined) {
@@ -379,8 +401,9 @@ export class TaskSupervisor {
         if (deleted.isErr()) {
           this.deps.logger.warn(
             { err: deleted.error.cause, taskId: id, runtimeSessionId },
-            "task.purge: runtime.deleteState failed; orphan runtime state dir may remain",
+            "task.purge: runtime.deleteState failed; leaving row for retry",
           );
+          failureCause = deleted.error.cause;
         }
       }
     }
@@ -389,9 +412,15 @@ export class TaskSupervisor {
     if (removed.isErr()) {
       this.deps.logger.warn(
         { err: removed.error.cause, taskId: id, workdir },
-        "task.purge: workdir rm failed; orphan task workdir may remain",
+        "task.purge: workdir rm failed; leaving row for retry",
       );
+      failureCause ??= removed.error.cause;
     }
+
+    if (failureCause !== undefined) {
+      return err({ type: "PurgeFailed", taskId: id, cause: failureCause });
+    }
+    return ok(undefined);
   }
 
   /**
@@ -423,7 +452,7 @@ export class TaskSupervisor {
     decision: TerminalDecision,
   ): Promise<void> {
     const now = this.deps.now().toISOString();
-    let transition: Result<TaskEntity, InvalidTransition>;
+    let transition: Result<void, InvalidTransition>;
     switch (decision.kind) {
       case "succeeded": {
         const [output, artifacts] = await this.collectSuccessPayload(workdir, running);
@@ -446,7 +475,7 @@ export class TaskSupervisor {
     }
     // Persistence failure is warn-logged but not rethrown — the subprocess is
     // already gone, so the caller cannot act on an error here.
-    const saved = await this.deps.repository.save(transition.value);
+    const saved = await this.deps.repository.save(running);
     if (saved.isErr()) {
       this.deps.logger.warn(
         { taskId: running.id, err: saved.error },

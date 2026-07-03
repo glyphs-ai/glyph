@@ -10,12 +10,12 @@ import {
   isTerminalWorkflowNodeStatus,
   WorkflowNodeStatusSchema,
 } from "../../domain/node/workflow-node-status.js";
-import type { WorkflowEntityCorruption } from "../../domain/workflow/workflow-corruption.js";
 import { parentsReadyForKind } from "../../domain/workflow/workflow-dispatch-readiness.js";
 import type { WorkflowId } from "../../domain/workflow/workflow-id.js";
 import { WorkflowIdSchema } from "../../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
+  WorkflowEntityCorruption,
   WorkflowRepository,
 } from "../../domain/workflow/workflow-repository.js";
 import type { Db } from "../../infrastructure/drizzle/workflow-db.js";

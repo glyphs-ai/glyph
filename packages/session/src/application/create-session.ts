@@ -119,7 +119,7 @@ export class CreateSessionUseCase
         runtimeSessionId,
         now: deps.now().toISOString(),
       });
-      const inserted = await deps.repo.insert(entity);
+      const inserted = await deps.repo.save(entity);
       if (inserted.isErr()) {
         await deps.sandbox.remove(id);
         if (runtimeSessionId !== null) await rt.deleteState(runtimeSessionId);

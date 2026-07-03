@@ -1,9 +1,8 @@
 /**
  * Shared TypeScript import/export extraction for the repo-wide
  * architecture audits. Replaces the four near-identical AST/regex
- * scaffolders that previously lived in `inter-service-imports`,
- * `tier-invisibility`, and `test-layout-convention` (the latter also
- * carried a self-test-only copy).
+ * scaffolders that previously lived in `inter-service-imports` and
+ * `tier-invisibility`.
  *
  * One extractor, `extractImportRefs`, returns a classified record for
  * every module reference in a source file:

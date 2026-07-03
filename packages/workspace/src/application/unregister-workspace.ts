@@ -1,4 +1,4 @@
-import { okAsync } from "neverthrow";
+import { errAsync, okAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import { z } from "zod";
 import { WorkspaceIdSchema } from "../domain/workspace-id.js";
@@ -47,14 +47,19 @@ export class UnregisterWorkspaceUseCase
     const { id, purge = false } = UnregisterWorkspaceRequestSchema.parse(request);
     this.logger.debug({ useCase: "unregisterWorkspace", id, purge }, "executing");
     return this.deps.repo
-      .findById(id)
-      .andThen<void, UnregisterWorkspaceError>((existing) => {
-        if (!existing) return okAsync(undefined); // idempotent
+      .get(id)
+      .andThen((existing) => {
         const cleanup = purge
           ? this.deps.provisioner.teardown(existing.workspaceDir)
           : okAsync<void, ProvisioningFailed>(undefined);
         return cleanup.andThen(() => this.deps.repo.delete(id));
       })
+      .orElse((err) =>
+        // Unknown id ⇒ idempotent success (the row is already gone).
+        err.type === "WorkspaceNotFound"
+          ? okAsync<void, UnregisterWorkspaceError>(undefined)
+          : errAsync<void, UnregisterWorkspaceError>(err),
+      )
       .map(() => {
         this.logger.debug({ useCase: "unregisterWorkspace", id }, "executed");
         return undefined;

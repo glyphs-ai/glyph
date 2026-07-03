@@ -3,7 +3,7 @@
 Every error from the glyph server has the envelope `{error, code?, ...}`. The CLI's `formatError` surfaces both the human message AND the `code`, like:
 
 ```
-not found (HTTP 404, WorkspaceNotRegisteredError)
+workspace not found (HTTP 404, WorkspaceNotFound)
 ```
 
 For `EntryNotReadyError` it also unpacks `agent` and `reason` into structured CTAs:
@@ -30,8 +30,7 @@ Both are stable wire contracts. The distinction matters only if you're maintaini
 
 | code | typical HTTP | meaning | fix |
 |---|---|---|---|
-| `WorkspaceNotRegisteredError` | 404 | The workspace id doesn't exist | `glyph workspace list` to find a real id |
-| `WorkspaceNotFoundError` | 404 | Workspace metadata missing on disk | Re-create or restore from backup |
+| `WorkspaceNotFound` | 404 | The workspace id isn't registered | `glyph workspace list` to find a real id |
 | `WorkspaceCorruptedError` | 500 | Workspace SQLite row is corrupted | Server-side issue; ask user to inspect logs |
 | `WorkspaceAlreadyExistsError` | 409 | `workspace add` collided | Use a different name/workdir, or remove the existing one |
 | `WorkspaceIdConflictError` | 409 | Same workspace id used twice in concurrent `add` | Retry once; if persistent, server bug |

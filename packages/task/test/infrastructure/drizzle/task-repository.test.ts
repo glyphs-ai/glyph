@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { TaskBriefSchema } from "../../../src/domain/task-brief.js";
 import { TaskEntity } from "../../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../../src/domain/task-id.js";
+import type { Db } from "../../../src/infrastructure/drizzle/task-db.js";
 import { openDb } from "../../../src/infrastructure/drizzle/task-db.js";
 import { DrizzleTaskRepository } from "../../../src/infrastructure/drizzle/task-repository.js";
+import { tasks } from "../../../src/infrastructure/drizzle/task-schema.js";
 
 const CREATED_AT = "2026-05-08T01:05:00.000Z";
 
+let db: Db;
 let repo: DrizzleTaskRepository;
 
 beforeEach(() => {
-  const { db } = openDb(":memory:");
+  ({ db } = openDb(":memory:"));
   repo = new DrizzleTaskRepository({ db });
 });
 
@@ -17,11 +21,11 @@ function id(n: number): TaskId {
   return TaskIdSchema.parse(`20260508-${n.toString(16).padStart(8, "0")}`);
 }
 
-function running(n: number, origin: string, originId?: string, agent = "public/demo"): TaskEntity {
+function running(n: number, origin = "standalone", originId?: string): TaskEntity {
   return TaskEntity.create({
     id: id(n),
-    agent,
-    brief: "b",
+    agent: "public/demo",
+    brief: TaskBriefSchema.parse("b"),
     createdAt: CREATED_AT,
     origin,
     ...(originId !== undefined ? { originId } : {}),
@@ -29,123 +33,111 @@ function running(n: number, origin: string, originId?: string, agent = "public/d
   });
 }
 
+function terminal(n: number, origin: string, originId: string): TaskEntity {
+  const t = running(n, origin, originId);
+  t.complete({ output: null, artifacts: [] }, { now: CREATED_AT })._unsafeUnwrap();
+  return t;
+}
+
 async function save(entity: TaskEntity): Promise<void> {
   (await repo.save(entity))._unsafeUnwrap();
 }
 
-describe("DrizzleTaskRepository — CRUD", () => {
-  it("saves and reads back a task by id", async () => {
-    await save(running(1, "standalone"));
-    const found = (await repo.findById(id(1)))._unsafeUnwrap();
-    expect(found?.id).toBe("20260508-00000001");
-    expect(found?.metadata).toEqual({ runtime: "copilot" });
+describe("DrizzleTaskRepository — get / save / delete", () => {
+  it("saves (insert) then reads back a task by id", async () => {
+    await save(running(1));
+    const found = (await repo.get(id(1)))._unsafeUnwrap();
+    expect(found.id).toBe("20260508-00000001");
+    expect(found.metadata).toEqual({ runtime: "copilot" });
   });
 
-  it("findById resolves to undefined for an absent id", async () => {
-    expect((await repo.findById(id(99)))._unsafeUnwrap()).toBeUndefined();
-  });
-
-  it("get asserts existence with TaskNotFound", async () => {
+  it("get returns TaskNotFound for an absent id", async () => {
     expect((await repo.get(id(99)))._unsafeUnwrapErr().type).toBe("TaskNotFound");
   });
 
-  it("save upserts (second save updates in place)", async () => {
-    await save(running(1, "standalone"));
-    const done = running(1, "standalone")
-      .complete({ output: "x", artifacts: [] }, { now: CREATED_AT })
-      ._unsafeUnwrap();
-    await save(done);
-    expect((await repo.get(id(1)))._unsafeUnwrap().status).toBe("succeeded");
+  it("save on a tracked (loaded) entity UPDATEs it in place", async () => {
+    await save(running(1));
+    const loaded = (await repo.get(id(1)))._unsafeUnwrap();
+    loaded.complete({ output: "x", artifacts: [] }, { now: CREATED_AT })._unsafeUnwrap();
+    (await repo.save(loaded))._unsafeUnwrap();
+    const reread = (await repo.get(id(1)))._unsafeUnwrap();
+    expect(reread.status).toBe("succeeded");
+    expect(reread.success?.output).toBe("x");
   });
 
-  it("delete removes the row", async () => {
-    await save(running(1, "standalone"));
+  it("save is a no-op when a loaded entity has no changes", async () => {
+    await save(running(1));
+    const loaded = (await repo.get(id(1)))._unsafeUnwrap();
+    (await repo.save(loaded))._unsafeUnwrap();
+    const reread = (await repo.get(id(1)))._unsafeUnwrap();
+    expect(reread.status).toBe("running");
+  });
+
+  it("delete removes the row so get returns TaskNotFound", async () => {
+    await save(running(1));
     (await repo.delete(id(1)))._unsafeUnwrap();
-    expect((await repo.findById(id(1)))._unsafeUnwrap()).toBeUndefined();
+    expect((await repo.get(id(1)))._unsafeUnwrapErr().type).toBe("TaskNotFound");
   });
 });
 
-describe("DrizzleTaskRepository — findAll filters", () => {
-  beforeEach(async () => {
-    await save(running(1, "standalone", undefined, "agent-a"));
-    await save(running(2, "schedule", "sched-1", "agent-b"));
-    await save(running(3, "workflow", "node-1", "agent-a"));
-  });
-
-  it("filters by agent", async () => {
-    const rows = (await repo.findAll({ agent: "agent-a" }))._unsafeUnwrap();
-    expect(rows.map((r) => r.agent)).toEqual(["agent-a", "agent-a"]);
-  });
-
-  it("filters by origin + originId", async () => {
-    const rows = (await repo.findAll({ origin: "schedule", originId: "sched-1" }))._unsafeUnwrap();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.origin).toBe("schedule");
-  });
-
-  it("filters by an array of origins", async () => {
-    const rows = (await repo.findAll({ origin: ["schedule", "workflow"] }))._unsafeUnwrap();
-    expect(rows).toHaveLength(2);
-  });
-});
-
-describe("DrizzleTaskRepository — origin queries", () => {
-  it("hasInFlightByOrigin reflects non-terminal status", async () => {
-    await save(running(1, "schedule", "s1"));
-    expect(
-      (await repo.hasInFlightByOrigin({ origin: "schedule", originId: "s1" }))._unsafeUnwrap(),
-    ).toBe(true);
-    const done = running(1, "schedule", "s1")
-      .fail({ kind: "cascade", message: "x" }, { now: CREATED_AT })
-      ._unsafeUnwrap();
-    await save(done);
-    expect(
-      (await repo.hasInFlightByOrigin({ origin: "schedule", originId: "s1" }))._unsafeUnwrap(),
-    ).toBe(false);
-  });
-
-  it("listInFlightByOrigin returns non-terminal tasks for the (origin, originId)", async () => {
-    await save(running(1, "workflow", "node-1"));
+describe("DrizzleTaskRepository — listTerminalByOrigin", () => {
+  it("returns only TERMINAL tasks for the (origin, originId)", async () => {
+    await save(running(1, "schedule", "s1")); // running — excluded
+    await save(terminal(2, "schedule", "s1")); // terminal — included
+    await save(terminal(3, "schedule", "s2")); // other originId — excluded
     const list = (
-      await repo.listInFlightByOrigin({ origin: "workflow", originId: "node-1" })
+      await repo.listTerminalByOrigin({ origin: "schedule", originId: "s1" })
     )._unsafeUnwrap();
-    expect(list).toHaveLength(1);
+    expect(list.map((t) => t.id)).toEqual(["20260508-00000002"]);
   });
 
-  it("findLatestByOrigin returns the most recent (terminal or not) or null", async () => {
-    expect(
-      (await repo.findLatestByOrigin({ origin: "workflow", originId: "node-x" }))._unsafeUnwrap(),
-    ).toBeNull();
-    await save(running(1, "workflow", "node-1"));
-    expect(
-      (await repo.findLatestByOrigin({ origin: "workflow", originId: "node-1" }))._unsafeUnwrap()
-        ?.id,
-    ).toBe("20260508-00000001");
+  it("returns an empty array when nothing matches", async () => {
+    const list = (
+      await repo.listTerminalByOrigin({ origin: "workflow", originId: "none" })
+    )._unsafeUnwrap();
+    expect(list).toEqual([]);
   });
 
-  it("deleteTerminalByOrigin removes only terminal rows and returns them", async () => {
-    await save(running(1, "schedule", "s1")); // still running
-    const done = running(2, "schedule", "s1")
-      .complete({ output: null, artifacts: [] }, { now: CREATED_AT })
-      ._unsafeUnwrap();
-    await save(done);
-    const deleted = (
-      await repo.deleteTerminalByOrigin({ origin: "schedule", originId: "s1" })
+  it("returns TRACKED entities — a subsequent save UPDATEs (no INSERT/PK conflict)", async () => {
+    await save(terminal(2, "schedule", "s1"));
+    const list = (
+      await repo.listTerminalByOrigin({ origin: "schedule", originId: "s1" })
     )._unsafeUnwrap();
-    expect(deleted).toHaveLength(1);
-    expect((await repo.findById(id(1)))._unsafeUnwrap()).toBeDefined(); // running one kept
-    expect((await repo.findById(id(2)))._unsafeUnwrap()).toBeUndefined();
+    const t = list[0];
+    if (t === undefined) throw new Error("expected one terminal task");
+    // If the finder returned untracked entities, this save would attempt an
+    // INSERT and hit a PK conflict. Tracked ⇒ it diffs + UPDATEs.
+    t.replaceMetadata({ runtime: "copilot", tag: "x" });
+    (await repo.save(t))._unsafeUnwrap();
+    const reread = (await repo.get(id(2)))._unsafeUnwrap();
+    expect(reread.metadata.tag).toBe("x");
   });
 
-  it("aggregateByOrigin returns per-originId total + running counts", async () => {
-    await save(running(1, "schedule", "s1"));
-    const done = running(2, "schedule", "s1")
-      .complete({ output: null, artifacts: [] }, { now: CREATED_AT })
-      ._unsafeUnwrap();
-    await save(done);
-    const map = (
-      await repo.aggregateByOrigin({ origin: "schedule", originIds: ["s1"] })
+  it("warn-skips a corrupted terminal row so it is never surfaced for deletion", async () => {
+    // A terminal row with no success payload fails reconstruction. Insert it
+    // raw (bypassing the mapper) to simulate on-disk corruption.
+    db.insert(tasks)
+      .values({
+        id: "20260508-00000009",
+        agent: "a",
+        runtime: null,
+        status: "succeeded",
+        brief: "b",
+        details: null,
+        origin: "schedule",
+        originId: "s1",
+        createdAt: CREATED_AT,
+        startedAt: CREATED_AT,
+        endedAt: CREATED_AT,
+        success: null,
+        failure: null,
+        cancellation: null,
+        metadata: "{}",
+      })
+      .run();
+    const list = (
+      await repo.listTerminalByOrigin({ origin: "schedule", originId: "s1" })
     )._unsafeUnwrap();
-    expect(map.get("s1")).toEqual({ totalCount: 2, runningCount: 1 });
+    expect(list).toEqual([]);
   });
 });

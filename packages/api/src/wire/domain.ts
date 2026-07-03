@@ -18,7 +18,11 @@ export type {
   ListSkillEntriesResponse,
 } from "@glyphs-ai/catalog";
 export type { ActivityItem, TruncationInfo } from "@glyphs-ai/runtime";
-export type { PreviewScheduleResult, Schedule } from "@glyphs-ai/schedule";
+export type {
+  CreateScheduleResponse as Schedule,
+  PreviewScheduleResponse as PreviewScheduleResult,
+} from "@glyphs-ai/schedule";
+export type { DispatchTaskResponse as Task } from "@glyphs-ai/task";
 export type {
   WorkflowCancellation,
   WorkflowFailure,
@@ -37,4 +41,3 @@ export type {
   Skill,
   SkillEntry,
 } from "../schemas/catalog.js";
-export type { Task } from "../schemas/tasks.js";

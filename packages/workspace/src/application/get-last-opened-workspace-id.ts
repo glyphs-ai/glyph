@@ -1,7 +1,9 @@
+import { desc } from "drizzle-orm";
 import pino, { type Logger } from "pino";
 import { z } from "zod";
-import { WorkspaceIdSchema } from "../domain/workspace-id.js";
-import type { DatabaseUnavailable, WorkspaceRepository } from "../domain/workspace-repository.js";
+import { type WorkspaceId, WorkspaceIdSchema } from "../domain/workspace-id.js";
+import type { DatabaseUnavailable } from "../domain/workspace-repository.js";
+import type { WorkspaceQueries } from "../infrastructure/drizzle/workspace-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const GetLastOpenedWorkspaceIdRequestSchema = z.object({}).strict();
@@ -17,7 +19,7 @@ export type GetLastOpenedWorkspaceIdResponse = z.infer<
 export type GetLastOpenedWorkspaceIdError = DatabaseUnavailable;
 
 export interface GetLastOpenedWorkspaceIdDeps {
-  readonly repo: WorkspaceRepository;
+  readonly query: WorkspaceQueries;
   readonly logger?: Logger;
 }
 
@@ -41,9 +43,17 @@ export class GetLastOpenedWorkspaceIdUseCase
     request: GetLastOpenedWorkspaceIdRequest,
   ): UseCaseResult<GetLastOpenedWorkspaceIdResponse, GetLastOpenedWorkspaceIdError> {
     GetLastOpenedWorkspaceIdRequestSchema.parse(request);
-    return this.deps.repo
-      .findLastOpenedId()
-      .map((id): GetLastOpenedWorkspaceIdResponse => ({ id: id ?? null }))
+    const q = this.deps.query;
+    return q
+      .query<GetLastOpenedWorkspaceIdResponse>(async (db) => {
+        const row = await db
+          .select({ id: q.workspaces.id })
+          .from(q.workspaces)
+          .orderBy(desc(q.workspaces.lastOpenedAt), desc(q.workspaces.createdAt), q.workspaces.id)
+          .limit(1)
+          .get();
+        return { id: row === undefined ? null : (row.id as WorkspaceId) };
+      })
       .mapErr((err) => {
         this.logger.warn({ useCase: "getLastOpenedWorkspaceId", err }, "tech failure");
         return err;

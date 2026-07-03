@@ -5,7 +5,6 @@ import {
   type WorkflowCancellation,
   WorkflowCancellationSchema,
 } from "../domain/workflow/workflow-cancellation.js";
-import type { WorkflowEntityCorruption } from "../domain/workflow/workflow-corruption.js";
 import {
   type WorkflowFailure,
   WorkflowFailureSchema,
@@ -13,6 +12,7 @@ import {
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
+  WorkflowEntityCorruption,
   WorkflowNotFound,
 } from "../domain/workflow/workflow-repository.js";
 import { type WorkflowStatus, WorkflowStatusSchema } from "../domain/workflow/workflow-status.js";

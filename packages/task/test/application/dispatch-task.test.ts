@@ -4,6 +4,7 @@ import { type MockProxy, mock } from "vitest-mock-extended";
 import { ZodError } from "zod";
 import { DispatchTaskUseCase } from "../../src/application/dispatch-task.js";
 import type { AgentResolver } from "../../src/application/ports/agent-resolver.js";
+import { type TaskBrief, TaskBriefSchema } from "../../src/domain/task-brief.js";
 import { buildSupervisorFixture, RESOLVED, type SupervisorFixture } from "./task-fixture.js";
 
 let fx: SupervisorFixture;
@@ -30,19 +31,25 @@ afterEach(() => {
 
 describe("DispatchTaskUseCase — validation", () => {
   it("rejects an empty agent with ZodError", () => {
-    expect(() => useCase.execute({ agent: "", brief: "b" })).toThrow(ZodError);
+    expect(() => useCase.execute({ agent: "", brief: TaskBriefSchema.parse("b") })).toThrow(
+      ZodError,
+    );
   });
 
   it("rejects an unknown key (strict)", () => {
     expect(() =>
-      useCase.execute({ agent: "a", brief: "b", oops: 1 } as Parameters<typeof useCase.execute>[0]),
+      useCase.execute({ agent: "a", brief: "b" as TaskBrief, oops: 1 } as Parameters<
+        typeof useCase.execute
+      >[0]),
     ).toThrow(ZodError);
   });
 });
 
 describe("DispatchTaskUseCase — happy path", () => {
   it("resolves, dispatches, and returns a running task DTO", async () => {
-    const res = (await useCase.execute({ agent: "public/demo", brief: "do it" }))._unsafeUnwrap();
+    const res = (
+      await useCase.execute({ agent: "public/demo", brief: TaskBriefSchema.parse("do it") })
+    )._unsafeUnwrap();
     expect(res.status).toBe("running");
     expect(res.id).toBe("20260508-00000001");
     expect(res.agent).toBe("public/demo");
@@ -52,15 +59,20 @@ describe("DispatchTaskUseCase — happy path", () => {
 describe("DispatchTaskUseCase — pre-flight error channel", () => {
   it("refuses while the supervisor is shutting down", async () => {
     await fx.supervisor.shutdown();
-    const e = (await useCase.execute({ agent: "public/demo", brief: "b" }))._unsafeUnwrapErr();
+    const e = (
+      await useCase.execute({ agent: "public/demo", brief: TaskBriefSchema.parse("b") })
+    )._unsafeUnwrapErr();
     expect(e.type).toBe("ManagerShuttingDown");
   });
 
-  it("rejects an unsafe (multi-line) framing prompt before touching the agent", async () => {
-    const e = (
-      await useCase.execute({ agent: "public/demo", brief: "b", prompt: "line1\nline2" })
-    )._unsafeUnwrapErr();
-    expect(e.type).toBe("UnsafeFramingPrompt");
+  it("rejects an unsafe (multi-line) framing prompt before touching the agent", () => {
+    expect(() =>
+      useCase.execute({
+        agent: "public/demo",
+        brief: TaskBriefSchema.parse("b"),
+        prompt: "line1\nline2",
+      }),
+    ).toThrow(ZodError);
     expect(resolver.getEntry).not.toHaveBeenCalled();
   });
 
@@ -68,18 +80,17 @@ describe("DispatchTaskUseCase — pre-flight error channel", () => {
     ["a CR", "line1\rline2"],
     ["a non-ASCII char", "réad TASK.md"],
     ["a control char", "tab\there"],
-  ])("rejects a framing prompt with %s", async (_label, prompt) => {
-    const e = (
-      await useCase.execute({ agent: "public/demo", brief: "b", prompt })
-    )._unsafeUnwrapErr();
-    expect(e.type).toBe("UnsafeFramingPrompt");
+  ])("rejects a framing prompt with %s", (_label, prompt) => {
+    expect(() =>
+      useCase.execute({ agent: "public/demo", brief: TaskBriefSchema.parse("b"), prompt }),
+    ).toThrow(ZodError);
   });
 
   it("rejects a caller env key that collides with a kernel key", async () => {
     const e = (
       await useCase.execute({
         agent: "public/demo",
-        brief: "b",
+        brief: TaskBriefSchema.parse("b"),
         subprocessEnv: { GLYPH_WORKSPACE: "x" },
       })
     )._unsafeUnwrapErr();
@@ -88,7 +99,9 @@ describe("DispatchTaskUseCase — pre-flight error channel", () => {
 
   it("maps an absent agent to AgentNotFound", async () => {
     resolver.getEntry.mockReturnValue(okAsync(null));
-    const e = (await useCase.execute({ agent: "ghost", brief: "b" }))._unsafeUnwrapErr();
+    const e = (
+      await useCase.execute({ agent: "ghost", brief: TaskBriefSchema.parse("b") })
+    )._unsafeUnwrapErr();
     expect(e.type).toBe("AgentNotFound");
   });
 
@@ -96,7 +109,9 @@ describe("DispatchTaskUseCase — pre-flight error channel", () => {
     resolver.getEntry.mockReturnValue(
       okAsync({ status: "blocked", blockedReason: { disabledByUser: true } }),
     );
-    const e = (await useCase.execute({ agent: "public/demo", brief: "b" }))._unsafeUnwrapErr();
+    const e = (
+      await useCase.execute({ agent: "public/demo", brief: TaskBriefSchema.parse("b") })
+    )._unsafeUnwrapErr();
     expect(e.type).toBe("EntryNotReady");
   });
 
@@ -104,13 +119,19 @@ describe("DispatchTaskUseCase — pre-flight error channel", () => {
     resolver.resolve.mockReturnValue(
       errAsync({ type: "AgentResolutionFailed", agent: "public/demo", cause: null }),
     );
-    const e = (await useCase.execute({ agent: "public/demo", brief: "b" }))._unsafeUnwrapErr();
+    const e = (
+      await useCase.execute({ agent: "public/demo", brief: TaskBriefSchema.parse("b") })
+    )._unsafeUnwrapErr();
     expect(e.type).toBe("AgentResolutionFailed");
   });
 
   it("maps an unregistered runtime to RuntimeDoesNotSupportTasks", async () => {
     const e = (
-      await useCase.execute({ agent: "public/demo", brief: "b", runtime: "ghost" })
+      await useCase.execute({
+        agent: "public/demo",
+        brief: TaskBriefSchema.parse("b"),
+        runtime: "ghost",
+      })
     )._unsafeUnwrapErr();
     expect(e.type).toBe("RuntimeDoesNotSupportTasks");
   });

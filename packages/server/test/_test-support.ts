@@ -27,7 +27,7 @@ export async function setupTestSubsystem(opts: {
   );
   const defaultWorkspaceParent = path.join(opts.scratch, "default-workspaces");
   const composition = await composeApplication({
-    workspace: { dbFile: ":memory:", defaultWorkspaceParent },
+    workspace: { dbUrl: ":memory:", defaultWorkspaceParent },
     runtimeRegistry,
     ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
   });

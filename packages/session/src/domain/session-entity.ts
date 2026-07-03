@@ -1,9 +1,10 @@
 /**
  * Domain entity for a session — the persisted slice. Live fields
  * (workdir / lastActiveAt / preview) are NOT stored here; they are
- * projected per-read from the runtime + workspace layout.
+ * projected per-read from the runtime + workspace layout. The entity is
+ * a pure rich-domain object: change-tracking is the repository's concern.
  *
- * `new SessionEntity({...})` rehydrates persisted rows;
+ * `SessionEntity.rehydrate({...})` rebuilds persisted rows;
  * `SessionEntity.create` mints a fresh aggregate.
  */
 
@@ -11,7 +12,7 @@ import type { SessionId } from "./session-id.js";
 
 export type LaunchMode = "local" | "remote";
 
-export interface SessionEntityArgs {
+export interface RehydrateSessionArgs {
   readonly id: SessionId;
   readonly agent: string;
   readonly runtime: string;
@@ -37,7 +38,7 @@ export class SessionEntity {
   readonly runtimeSessionId: string | null;
   private _lastLaunchMode: LaunchMode | null;
 
-  constructor(args: SessionEntityArgs) {
+  private constructor(args: RehydrateSessionArgs) {
     this.id = args.id;
     this.agent = args.agent;
     this.runtime = args.runtime;
@@ -56,6 +57,11 @@ export class SessionEntity {
       runtimeSessionId: args.runtimeSessionId,
       lastLaunchMode: null,
     });
+  }
+
+  /** Rebuild a persisted aggregate from its stored fields (see the mapper). */
+  static rehydrate(args: RehydrateSessionArgs): SessionEntity {
+    return new SessionEntity(args);
   }
 
   get lastLaunchMode(): LaunchMode | null {

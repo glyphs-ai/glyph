@@ -11,11 +11,11 @@ import {
   type WorkflowNodeStatus,
   WorkflowNodeStatusSchema,
 } from "../domain/node/workflow-node-status.js";
-import type { WorkflowEntityCorruption } from "../domain/workflow/workflow-corruption.js";
+import type { WorkflowNodeNotFound } from "../domain/workflow/workflow-entity-errors.js";
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
 import type {
   DatabaseUnavailable,
-  WorkflowNodeNotFound,
+  WorkflowEntityCorruption,
   WorkflowRepository,
 } from "../domain/workflow/workflow-repository.js";
 import type { WorkflowDispatchCoordinator } from "./engine/workflow-engine.js";

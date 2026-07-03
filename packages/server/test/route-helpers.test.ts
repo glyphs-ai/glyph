@@ -1,8 +1,8 @@
+import { logEvent, logFault } from "@glyphs-ai/api";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { requestId } from "../src/middleware/request-id.js";
 import { requestLogger } from "../src/middleware/request-logger.js";
-import { logEvent, logFault } from "../src/routes/_shared.js";
 import { captureLogger } from "./_capture-logger.js";
 
 /**

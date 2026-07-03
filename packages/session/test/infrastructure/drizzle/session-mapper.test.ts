@@ -7,7 +7,7 @@ const ID = SessionIdSchema.parse("20260508-9dfbdf05");
 
 describe("SessionMapper", () => {
   it("round-trips an entity through toRow → toDomain", () => {
-    const entity = new SessionEntity({
+    const entity = SessionEntity.rehydrate({
       id: ID,
       agent: "public/demo",
       runtime: "copilot",
