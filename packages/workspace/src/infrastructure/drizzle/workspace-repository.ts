@@ -4,9 +4,7 @@ import type { WorkspaceEntity } from "../../domain/workspace-entity.js";
 import type { WorkspaceId } from "../../domain/workspace-id.js";
 import type {
   DatabaseUnavailable,
-  WorkspaceIdConflict,
   WorkspaceNotFound,
-  WorkspacePathConflict,
   WorkspaceRepository,
 } from "../../domain/workspace-repository.js";
 import type { Db } from "./workspace-db.js";
@@ -48,19 +46,15 @@ export class DrizzleWorkspaceRepository implements WorkspaceRepository {
     });
   }
 
-  save(
-    entity: WorkspaceEntity,
-  ): ResultAsync<void, DatabaseUnavailable | WorkspaceIdConflict | WorkspacePathConflict> {
+  save(entity: WorkspaceEntity): ResultAsync<void, DatabaseUnavailable> {
     const snapshot = this.snapshots.get(entity);
     const current = WorkspaceMapper.toRow(entity);
     // Untracked entity ⇒ never loaded ⇒ INSERT (may hit a unique conflict).
     if (snapshot === undefined) {
       return ResultAsync.fromPromise(
         this.db.insert(workspaces).values(current).run(),
-        (cause) => cause,
-      )
-        .map(() => this.track(entity, current))
-        .orElse((cause) => this.translateInsertError(cause, entity));
+        DrizzleWorkspaceRepository.asDatabaseUnavailable,
+      ).map(() => this.track(entity, current));
     }
     // Tracked entity: UPDATE only the columns that diverged from the snapshot.
     const diff = diffRow(snapshot, current);
@@ -82,66 +76,6 @@ export class DrizzleWorkspaceRepository implements WorkspaceRepository {
       DrizzleWorkspaceRepository.asDatabaseUnavailable,
     ).map(() => undefined);
   }
-
-  /**
-   * Translate SQLite constraint violations into typed domain errors.
-   * libsql wraps the driver error, so we walk the cause chain for the
-   * SQLite code + message. Pre-flight path checks are best-effort UX;
-   * constraints are the race-free backstop.
-   */
-  private translateInsertError(
-    cause: unknown,
-    entity: WorkspaceEntity,
-  ): ResultAsync<never, DatabaseUnavailable | WorkspaceIdConflict | WorkspacePathConflict> {
-    const { code, message } = extractSqliteError(cause);
-    if (code.startsWith("SQLITE_CONSTRAINT")) {
-      if (message.includes("workspaces.id") || code.endsWith("PRIMARYKEY")) {
-        return errAsync<never, WorkspaceIdConflict>({ type: "WorkspaceIdConflict", id: entity.id });
-      }
-      if (message.includes("workspaces.workspace_dir")) {
-        // Best-effort async lookup of the colliding workspace id.
-        return ResultAsync.fromPromise(
-          this.db
-            .select({ id: workspaces.id })
-            .from(workspaces)
-            .where(eq(workspaces.workspaceDir, entity.workspaceDir))
-            .get(),
-          () => undefined,
-        )
-          .orElse(() => okAsync(undefined))
-          .andThen((existing) =>
-            errAsync<never, WorkspacePathConflict>({
-              type: "WorkspacePathConflict",
-              workspaceDir: entity.workspaceDir,
-              existingId: existing ? (existing.id as WorkspaceId) : undefined,
-            }),
-          );
-      }
-    }
-    return errAsync(DrizzleWorkspaceRepository.asDatabaseUnavailable(cause));
-  }
-}
-
-/** Walk an error's cause chain, collecting the SQLite code + longest message. */
-function extractSqliteError(cause: unknown): { code: string; message: string } {
-  let code = "";
-  let message = "";
-  let cur: unknown = cause;
-  const seen = new Set<unknown>();
-  // Only capture the message from links that carry a SQLite code. libsql wraps
-  // the driver error in a DrizzleQueryError whose message is the query text +
-  // params — that would shadow the real "constraint failed: <table>.<column>"
-  // message we key on.
-  while (cur !== null && typeof cur === "object" && !seen.has(cur)) {
-    seen.add(cur);
-    const c = cur as { code?: unknown; message?: unknown; cause?: unknown };
-    if (typeof c.code === "string" && c.code.startsWith("SQLITE_")) {
-      code = c.code;
-      if (typeof c.message === "string") message = c.message;
-    }
-    cur = c.cause;
-  }
-  return { code, message };
 }
 
 /**

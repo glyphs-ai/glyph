@@ -49,6 +49,10 @@ export {
   TERMINAL_WORKFLOW_NODE_STATUSES,
   WorkflowNodeStatusSchema,
 } from "../domain/node/workflow-node-status.js";
+export type {
+  WorkflowArtifactFile,
+  WorkflowArtifactListingFailed,
+} from "../domain/workflow/workflow-artifact.js";
 export type { WorkflowBrief } from "../domain/workflow/workflow-brief.js";
 export { WorkflowBriefSchema } from "../domain/workflow/workflow-brief.js";
 export type { WorkflowCancellation } from "../domain/workflow/workflow-cancellation.js";
@@ -80,15 +84,11 @@ export {
 } from "../domain/workflow/workflow-entity.js";
 export type {
   DagInvariant,
-  EdgeCycle,
   EmptyParents,
   MultipleSuccessorCoords,
   OrphanCoordInsert,
   ParentState,
-  RemoveEdgeOrphansChild,
-  RemoveNodeOrphansChild,
   SubgraphError,
-  WorkflowEdgeNotFound,
   WorkflowNodeNotFound,
   WorkflowNodeNotMutable,
   WorkflowSubgraphCyclic,

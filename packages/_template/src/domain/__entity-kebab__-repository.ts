@@ -16,11 +16,6 @@ export type __Entity__NotFound = {
   readonly id: __Entity__Id;
 };
 
-export type __Entity__IdConflict = {
-  readonly type: "__Entity__IdConflict";
-  readonly id: __Entity__Id;
-};
-
 /**
  * Persistence port for the __Entity__ aggregate. Reads return
  * {@link __Entity__Entity}; row shapes stay inside infrastructure.
@@ -32,7 +27,7 @@ export interface __Entity__Repository {
   get(id: __Entity__Id): ResultAsync<__Entity__Entity, __Entity__NotFound | DatabaseUnavailable>;
   findById(id: __Entity__Id): ResultAsync<__Entity__Entity | undefined, DatabaseUnavailable>;
   list(): ResultAsync<__Entity__Entity[], DatabaseUnavailable>;
-  insert(entity: __Entity__Entity): ResultAsync<void, DatabaseUnavailable | __Entity__IdConflict>;
+  insert(entity: __Entity__Entity): ResultAsync<void, DatabaseUnavailable>;
   save(entity: __Entity__Entity): ResultAsync<void, DatabaseUnavailable>;
   delete(id: __Entity__Id): ResultAsync<void, DatabaseUnavailable>;
 }

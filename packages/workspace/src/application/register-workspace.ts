@@ -8,12 +8,7 @@ import { WorkspaceEntity } from "../domain/workspace-entity.js";
 import { type WorkspaceId, WorkspaceIdSchema } from "../domain/workspace-id.js";
 import { WorkspaceNameSchema } from "../domain/workspace-name.js";
 import type { ProvisioningFailed, WorkspaceProvisioner } from "../domain/workspace-provisioner.js";
-import type {
-  DatabaseUnavailable,
-  WorkspaceIdConflict,
-  WorkspacePathConflict,
-  WorkspaceRepository,
-} from "../domain/workspace-repository.js";
+import type { DatabaseUnavailable, WorkspaceRepository } from "../domain/workspace-repository.js";
 import type { WorkspaceQueries } from "../infrastructure/drizzle/workspace-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
@@ -38,8 +33,24 @@ export const RegisterWorkspaceResponseSchema = z.object({
 });
 export type RegisterWorkspaceResponse = z.infer<typeof RegisterWorkspaceResponseSchema>;
 
+/**
+ * The requested `workspaceDir` is already registered to another
+ * workspace. A `register`-owned business error, surfaced by the
+ * pre-flight uniqueness query (SQLite constraints are no longer
+ * translated — a failed INSERT is a `DatabaseUnavailable`).
+ */
+export type WorkspacePathConflict = {
+  readonly type: "WorkspacePathConflict";
+  readonly workspaceDir: string;
+  /**
+   * The id of the workspace already registered at this path. May be
+   * absent in the rare case the row was concurrently deleted between
+   * the uniqueness check and the id lookup.
+   */
+  readonly existingId: WorkspaceId | undefined;
+};
+
 export type RegisterWorkspaceError =
-  | WorkspaceIdConflict
   | WorkspacePathConflict
   | DatabaseUnavailable
   | ProvisioningFailed;
@@ -56,9 +67,8 @@ export interface RegisterWorkspaceDeps {
 const silentLogger: Logger = pino({ level: "silent" });
 
 /**
- * Create the workspace skeleton, then insert the registry row.
- * Pre-flight path checks improve UX; SQLite constraints remain the
- * race-free conflict backstop.
+ * Create the workspace root directory, then insert the registry row.
+ * Pre-flight path checks improve UX before storage writes.
  */
 export class RegisterWorkspaceUseCase
   implements UseCase<RegisterWorkspaceRequest, RegisterWorkspaceResponse, RegisterWorkspaceError>

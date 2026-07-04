@@ -9,6 +9,7 @@
  */
 
 import type { WorkflowNodeKind } from "../../domain/node/workflow-node-kind.js";
+import type { WorkflowArtifactFile } from "../../domain/workflow/workflow-artifact.js";
 import type { WorkflowStatus } from "../../domain/workflow/workflow-status.js";
 
 /**
@@ -79,6 +80,10 @@ export interface WorkflowNodeDispatchOpts {
   readonly nodeId: string;
   readonly spec: unknown;
   readonly onTerminal: (result: WorkflowNodeTerminalResult) => void;
+}
+
+export interface WorkflowNodeArtifactListing {
+  readonly artifacts: readonly WorkflowArtifactFile[];
 }
 
 /**
@@ -168,6 +173,21 @@ export interface WorkflowNodeRunner {
    * returns, and its result will simply be discarded.
    */
   cancel(nodeId: string): Promise<void>;
+
+  /**
+   * List terminal per-node artifacts for the unit-of-work backing `nodeId`.
+   * Worker runners return a listing when the node has a task; coordinator and
+   * human runners return `null` because coordinator output is surfaced as
+   * workflow-summary artifacts and human nodes have no task.
+   */
+  listArtifacts(nodeId: string): Promise<WorkflowNodeArtifactListing | null>;
+
+  /**
+   * Resolve one per-node artifact to an absolute filesystem path. Worker
+   * runners delegate to the task artifact whitelist; coordinator and human
+   * runners return `null`.
+   */
+  resolveArtifactPath(nodeId: string, relPath: string): Promise<string | null>;
 }
 
 /**

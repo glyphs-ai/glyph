@@ -1,7 +1,5 @@
 import { randomBytes as cryptoRandomBytes, randomUUID as cryptoRandomUUID } from "node:crypto";
 import pino, { type Logger } from "pino";
-import { AddWorkflowEdgeUseCase } from "./application/add-workflow-edge.js";
-import { AddWorkflowNodeUseCase } from "./application/add-workflow-node.js";
 import { AddWorkflowSubgraphUseCase } from "./application/add-workflow-subgraph.js";
 import { AggregateWorkflowsByOriginUseCase } from "./application/aggregate-workflows-by-origin.js";
 import { CancelWorkflowUseCase } from "./application/cancel-workflow.js";
@@ -14,12 +12,10 @@ import { FinishWorkflowUseCase } from "./application/finish-workflow.js";
 import { GetWorkflowUseCase } from "./application/get-workflow.js";
 import { GetWorkflowDagUseCase } from "./application/get-workflow-dag.js";
 import { GetWorkflowNodeUseCase } from "./application/get-workflow-node.js";
+import { ListWorkflowArtifactsUseCase } from "./application/list-workflow-artifacts.js";
 import { ListWorkflowsUseCase } from "./application/list-workflows.js";
 import type { WorkflowRunners } from "./application/ports/workflow-node-runner.js";
-import { PurgeWorkflowUseCase } from "./application/purge-workflow.js";
-import { RemoveWorkflowEdgeUseCase } from "./application/remove-workflow-edge.js";
-import { RemoveWorkflowNodeUseCase } from "./application/remove-workflow-node.js";
-import { ReplaceWorkflowNodeSpecUseCase } from "./application/replace-workflow-node-spec.js";
+import { ResolveWorkflowArtifactPathUseCase } from "./application/resolve-workflow-artifact-path.js";
 import { RespondToHumanNodeUseCase } from "./application/respond-to-human-node.js";
 import { type Db, openDb } from "./infrastructure/drizzle/workflow-db.js";
 import { DrizzleWorkflowQueries } from "./infrastructure/drizzle/workflow-queries.js";
@@ -40,21 +36,17 @@ import { WorkflowSandbox, workflowRoot } from "./infrastructure/file/workflow-sa
 export interface WorkflowModule {
   readonly createWorkflow: CreateWorkflowUseCase;
   readonly deleteWorkflow: DeleteWorkflowUseCase;
-  readonly purgeWorkflow: PurgeWorkflowUseCase;
-  readonly addNode: AddWorkflowNodeUseCase;
-  readonly addEdge: AddWorkflowEdgeUseCase;
   readonly cancelNode: CancelWorkflowNodeUseCase;
   readonly finishWorkflow: FinishWorkflowUseCase;
   readonly cancelWorkflow: CancelWorkflowUseCase;
-  readonly removeNode: RemoveWorkflowNodeUseCase;
-  readonly removeEdge: RemoveWorkflowEdgeUseCase;
-  readonly replaceNodeSpec: ReplaceWorkflowNodeSpecUseCase;
   readonly addSubgraph: AddWorkflowSubgraphUseCase;
   readonly respondHumanNode: RespondToHumanNodeUseCase;
   readonly getWorkflow: GetWorkflowUseCase;
   readonly listWorkflows: ListWorkflowsUseCase;
   readonly getDag: GetWorkflowDagUseCase;
   readonly getNode: GetWorkflowNodeUseCase;
+  readonly listWorkflowArtifacts: ListWorkflowArtifactsUseCase;
+  readonly resolveWorkflowArtifactPath: ResolveWorkflowArtifactPathUseCase;
   readonly countAwaitingHuman: CountAwaitingHumanUseCase;
   readonly aggregateByOrigin: AggregateWorkflowsByOriginUseCase;
   /** The event-driven engine; hosts may `drain()` it directly on shutdown. */
@@ -127,15 +119,6 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
       repo,
       sandbox,
     }),
-    purgeWorkflow: new PurgeWorkflowUseCase({ sandbox }),
-    addNode: new AddWorkflowNodeUseCase({
-      repo,
-      coordinator: engine,
-      runners: opts.runners,
-      now,
-      randomUUID,
-    }),
-    addEdge: new AddWorkflowEdgeUseCase({ repo, coordinator: engine }),
     cancelNode: new CancelWorkflowNodeUseCase({
       repo,
       coordinator: engine,
@@ -144,13 +127,6 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
     }),
     finishWorkflow: new FinishWorkflowUseCase({ repo, coordinator: engine, now }),
     cancelWorkflow: new CancelWorkflowUseCase({ repo, coordinator: engine, now }),
-    removeNode: new RemoveWorkflowNodeUseCase({ repo, coordinator: engine }),
-    removeEdge: new RemoveWorkflowEdgeUseCase({ repo, coordinator: engine }),
-    replaceNodeSpec: new ReplaceWorkflowNodeSpecUseCase({
-      repo,
-      coordinator: engine,
-      runners: opts.runners,
-    }),
     addSubgraph: new AddWorkflowSubgraphUseCase({
       repo,
       coordinator: engine,
@@ -163,6 +139,16 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
     listWorkflows: new ListWorkflowsUseCase({ query }),
     getDag: new GetWorkflowDagUseCase({ query }),
     getNode: new GetWorkflowNodeUseCase({ query }),
+    listWorkflowArtifacts: new ListWorkflowArtifactsUseCase({
+      query,
+      sandbox,
+      runners: opts.runners,
+    }),
+    resolveWorkflowArtifactPath: new ResolveWorkflowArtifactPathUseCase({
+      query,
+      sandbox,
+      runners: opts.runners,
+    }),
     countAwaitingHuman: new CountAwaitingHumanUseCase({ query }),
     aggregateByOrigin: new AggregateWorkflowsByOriginUseCase({ query }),
     engine,

@@ -1,6 +1,7 @@
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ResultAsync } from "neverthrow";
+import type { TaskArtifactFile } from "../../domain/task-artifact.js";
 import type { TaskId } from "../../domain/task-id.js";
 import type {
   ArtifactListingFailed,
@@ -10,7 +11,24 @@ import type {
   WorkdirRemovalFailed,
   WorkdirReservationFailed,
 } from "../../domain/task-sandbox.js";
-import { TASK_ARTIFACT_SUBDIR } from "../../task-paths.js";
+
+/**
+ * On-disk task layout contract. A task's workdir lives at
+ * `<workspaceDir>/tasks/<taskId>/`; user-visible output goes under the
+ * `artifact/` subdir. This sandbox materializes the layout; the task
+ * module (to build the sandbox root) and the workflow worker runner
+ * (to relativize a node's task artifacts) read the same contract from
+ * these exports, so the layout has one source of truth.
+ */
+const TASKS_SUBDIR = "tasks";
+
+/** The subdir under each task workdir holding user-visible output files. */
+export const TASK_ARTIFACT_SUBDIR = "artifact";
+
+/** Absolute root dir for a workspace's per-task workdirs (`<workspaceDir>/tasks`). */
+export function tasksRoot(workspaceDir: string): string {
+  return path.join(workspaceDir, TASKS_SUBDIR);
+}
 
 /**
  * On-disk task contract materialized into each workdir. The user's `brief` +
@@ -41,9 +59,10 @@ function formatTaskMd(brief: string, details: string | undefined): string {
  * `<root>/<id>/`; the branded task-id format (digits + hex, no path
  * separators) keeps the join under root without a separate traversal guard.
  *
- * `reserve` uses `{recursive: false}` so a missing `<root>` surfaces as a
- * composition bug (the root is pre-created by the workspace provisioner)
- * rather than silently self-healing, and a colliding id surfaces as EEXIST.
+ * `reserve` first ensures `<root>` exists (each package owns its own subdir
+ * under the workspace dir; the workspace no longer pre-creates it), then
+ * creates the per-id dir with `{recursive: false}` so a colliding id
+ * surfaces as EEXIST.
  */
 export class LocalTaskSandbox implements TaskSandbox {
   private readonly root: string;
@@ -60,6 +79,7 @@ export class LocalTaskSandbox implements TaskSandbox {
     const dir = this.resolve(id);
     return ResultAsync.fromPromise(
       (async () => {
+        await mkdir(this.root, { recursive: true });
         await mkdir(dir, { recursive: false });
         return dir;
       })(),
@@ -81,7 +101,7 @@ export class LocalTaskSandbox implements TaskSandbox {
     );
   }
 
-  listArtifacts(workdir: string): ResultAsync<readonly string[], ArtifactListingFailed> {
+  listArtifacts(workdir: string): ResultAsync<readonly TaskArtifactFile[], ArtifactListingFailed> {
     const dir = path.join(workdir, TASK_ARTIFACT_SUBDIR);
     return ResultAsync.fromPromise(
       (async () => {
@@ -93,13 +113,29 @@ export class LocalTaskSandbox implements TaskSandbox {
           if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
           throw err;
         }
-        return entries
-          .filter((e) => e.isFile())
-          .map((e) => path.join(e.parentPath, e.name))
-          .sort((a, b) => a.localeCompare(b));
+        const files: TaskArtifactFile[] = [];
+        for (const entry of entries) {
+          if (!entry.isFile()) continue;
+          const full = path.join(entry.parentPath, entry.name);
+          try {
+            const st = await stat(full);
+            files.push({
+              relPath: path.relative(dir, full).split(path.sep).join("/"),
+              size: st.size,
+              modifiedAt: st.mtime.toISOString(),
+            });
+          } catch {
+            // Best-effort: skip files that vanish between readdir and stat.
+          }
+        }
+        return files.sort((a, b) => a.relPath.localeCompare(b.relPath));
       })(),
       (cause): ArtifactListingFailed => ({ type: "ArtifactListingFailed", cause }),
     );
+  }
+
+  resolveArtifactPath(id: TaskId, relPath: string): string | null {
+    return safeJoinNested(path.join(this.resolve(id), TASK_ARTIFACT_SUBDIR), relPath);
   }
 
   remove(workdir: string): ResultAsync<void, WorkdirRemovalFailed> {
@@ -108,4 +144,24 @@ export class LocalTaskSandbox implements TaskSandbox {
       (cause): WorkdirRemovalFailed => ({ type: "WorkdirRemovalFailed", cause }),
     );
   }
+}
+
+/**
+ * Join a POSIX `rel` path under `root`, refusing empty, `.`/`..`, NUL, or
+ * any candidate that escapes `root`. Pure path math; returns `null` on any
+ * refusal so callers surface a 404 rather than reaching outside the sandbox.
+ */
+function safeJoinNested(root: string, rel: string): string | null {
+  if (rel === "" || rel.includes("\0")) return null;
+  const segs = rel.split(/[\\/]/);
+  for (const s of segs) {
+    if (s === "" || s === "." || s === ".." || s.includes("\0")) return null;
+  }
+  const normalizedRoot = path.resolve(root);
+  const candidate = path.resolve(normalizedRoot, ...segs);
+  const rootWithSep = normalizedRoot.endsWith(path.sep)
+    ? normalizedRoot
+    : normalizedRoot + path.sep;
+  if (!candidate.startsWith(rootWithSep) && candidate !== normalizedRoot) return null;
+  return candidate;
 }

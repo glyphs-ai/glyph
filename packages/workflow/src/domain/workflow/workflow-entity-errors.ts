@@ -7,21 +7,6 @@ export type WorkflowNodeNotFound = {
   readonly nodeId: string;
 };
 
-/** A referenced DAG edge is absent. */
-export type WorkflowEdgeNotFound = {
-  readonly type: "WorkflowEdgeNotFound";
-  readonly workflowId: string;
-  readonly fromNodeId: string;
-  readonly toNodeId: string;
-};
-
-export type EdgeCycle = {
-  readonly type: "EdgeCycle";
-  readonly workflowId: string;
-  readonly from: string;
-  readonly to: string;
-};
-
 export type MultipleSuccessorCoords = {
   readonly type: "MultipleSuccessorCoords";
   readonly workflowId: string;
@@ -42,20 +27,6 @@ export type ParentState = {
 };
 
 export type EmptyParents = { readonly type: "EmptyParents" };
-
-export type RemoveNodeOrphansChild = {
-  readonly type: "RemoveNodeOrphansChild";
-  readonly workflowId: string;
-  readonly nodeId: string;
-  readonly orphanedChildId: string;
-};
-
-export type RemoveEdgeOrphansChild = {
-  readonly type: "RemoveEdgeOrphansChild";
-  readonly workflowId: string;
-  readonly fromNodeId: string;
-  readonly toNodeId: string;
-};
 
 export type DagInvariant = {
   readonly type: "DagInvariant";

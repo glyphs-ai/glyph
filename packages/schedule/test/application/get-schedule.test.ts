@@ -39,4 +39,16 @@ describe("GetScheduleUseCase", () => {
     )._unsafeUnwrap();
     expect(missing).toBeNull();
   });
+
+  it("get with matching expectedKind returns the row; mismatch reads as null", async () => {
+    (await h.module.createSchedule.execute(baseCreateOpts()))._unsafeUnwrap();
+    const matched = (
+      await h.module.getSchedule.execute({ id: VALID_UUIDS[0], expectedKind: "task" })
+    )._unsafeUnwrap();
+    expect(matched?.name).toBe("daily-report");
+    const mismatched = (
+      await h.module.getSchedule.execute({ id: VALID_UUIDS[0], expectedKind: "workflow" })
+    )._unsafeUnwrap();
+    expect(mismatched).toBeNull();
+  });
 });

@@ -69,8 +69,8 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   //   Class-based: `WorkspaceHasLiveTasksError` + `WorkspaceLoadError`
   //   are api-owned (see workspace-context.ts) and surfaced as thrown
   //   classes — covered by the entries in the @glyphs-ai/api section.
-  //   DU-based: `WorkspaceIdConflict` / `WorkspaceNotFound` /
-  //   `WorkspacePathConflict` / `DatabaseUnavailable` /
+  //   DU-based: `WorkspaceNotFound` / `WorkspacePathConflict` /
+  //   `DatabaseUnavailable` /
   //   `ProvisioningFailed` flow through `respondWorkspaceError`,
   //   which builds the wire body directly from the DU `type` and
   //   bypasses this allow-list entirely.
@@ -80,17 +80,13 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "WorkflowNodeNotFoundError",
   "InvalidWorkflowIdError",
   "InvalidWorkflowNodeIdError",
+  "EmptyParentsError",
   "WorkflowAlreadyTerminalError",
   "WorkflowNodeNotMutableError",
-  "WorkflowEdgeCycleError",
-  "WorkflowEdgeNotFoundError",
   "WorkflowNodeSpecError",
   "MultipleSuccessorCoordsError",
   "OrphanCoordInsertError",
   "ParentStateError",
-  "EmptyParentsError",
-  "WorkflowRemoveNodeOrphansChildError",
-  "WorkflowRemoveEdgeOrphansChildError",
   "WorkflowDagInvariantError",
   "WorkflowSubgraphEmptyError",
   "WorkflowSubgraphTempIdInvalidError",
@@ -99,7 +95,7 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "WorkflowSubgraphCyclicError",
   "WorkflowSubgraphMultipleCoordTempsError",
   // Caller-facing kind shape guard. Reachable from
-  // `POST .../nodes` / `POST .../subgraph` when the caller supplies a
+  // `POST .../subgraph` when the caller supplies a
   // body with a non-string or empty `kind`; the substrate's defensive
   // throw surfaces the value the caller sent.
   // Messages echo only caller-supplied values — no host paths, no

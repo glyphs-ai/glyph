@@ -72,17 +72,18 @@ import type {
 } from "@glyphs-ai/task";
 import { TaskBriefSchema } from "@glyphs-ai/task";
 import type {
+  WorkflowNodeArtifactListing,
   WorkflowNodeRunner,
   WorkflowNodeTerminalResult,
   WorkflowNodeValidateCtx,
 } from "@glyphs-ai/workflow";
 import pino, { type Logger } from "pino";
-import type { WorkflowWorkerNodeSpec } from "../wire/index.js";
 import {
   TaskOperationError,
   taskAgentNotFound,
   taskAgentResolutionFailed,
 } from "./_task-operation-error.js";
+import type { WorkflowWorkerNodeSpec } from "./workflow-node-specs.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
@@ -485,6 +486,34 @@ export function makeWorkerNodeRunner(
           );
         }
       }
+    },
+
+    async listArtifacts(nodeId: string): Promise<WorkflowNodeArtifactListing | null> {
+      const found = await tasks.findLatestByOrigin.execute({
+        origin: "workflow",
+        originId: nodeId,
+      });
+      if (found.isErr()) throw taskUseCaseError(found.error);
+      const task = found.value;
+      if (task === null) return null;
+      // The task module owns its artifact listing (relPath + size + mtime);
+      // this bridge just maps node → task and forwards.
+      const listed = await tasks.listArtifacts.execute({ id: task.id });
+      if (listed.isErr()) throw taskUseCaseError(listed.error);
+      return { artifacts: listed.value };
+    },
+
+    async resolveArtifactPath(nodeId: string, relPath: string): Promise<string | null> {
+      const found = await tasks.findLatestByOrigin.execute({
+        origin: "workflow",
+        originId: nodeId,
+      });
+      if (found.isErr()) throw taskUseCaseError(found.error);
+      const task = found.value;
+      if (task === null) return null;
+      const resolved = await tasks.resolveArtifactPath.execute({ id: task.id, relPath });
+      if (resolved.isErr()) throw taskUseCaseError(resolved.error);
+      return resolved.value;
     },
 
     async dispose(): Promise<void> {

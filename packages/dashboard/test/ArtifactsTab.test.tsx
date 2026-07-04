@@ -48,17 +48,17 @@ describe("ArtifactsTab", () => {
           );
         }),
     );
-    render(<ArtifactsTab task={makeTask(["/tmp/notes.md"])} />);
+    render(<ArtifactsTab task={makeTask(["notes.md"])} />);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
     const calledUrl = String(fetchMock.mock.calls[0]?.[0]);
-    expect(calledUrl).toContain("/tasks/task-abc/artifact/notes.md");
+    expect(calledUrl).toContain("/tasks/task-abc/artifact?path=notes.md");
   });
 
   it("auto-selects the first artifact and renders the dropdown when there are multiple", async () => {
     fetchMock.mockResolvedValue(new Response("body", { status: 200 }));
-    render(<ArtifactsTab task={makeTask(["/a/one.md", "/a/two.md"])} />);
+    render(<ArtifactsTab task={makeTask(["one.md", "two.md"])} />);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
@@ -67,7 +67,7 @@ describe("ArtifactsTab", () => {
     expect(screen.getByRole("option", { name: "one.md" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "two.md" })).toBeTruthy();
     const calledUrl = String(fetchMock.mock.calls[0]?.[0]);
-    expect(calledUrl).toContain("/tasks/task-abc/artifact/one.md");
+    expect(calledUrl).toContain("/tasks/task-abc/artifact?path=one.md");
   });
 
   it("aborts the prior in-flight fetch when the selection changes", async () => {
@@ -79,7 +79,7 @@ describe("ArtifactsTab", () => {
       );
     });
 
-    render(<ArtifactsTab task={makeTask(["/a/one.md", "/a/two.md"])} />);
+    render(<ArtifactsTab task={makeTask(["one.md", "two.md"])} />);
 
     // Auto-select-first fires on mount, so the first fetch is for one.md
     // without any user interaction.
@@ -94,11 +94,11 @@ describe("ArtifactsTab", () => {
 
   it("renders a single Download link whose href reflects the current selection", async () => {
     fetchMock.mockResolvedValue(new Response("body", { status: 200 }));
-    render(<ArtifactsTab task={makeTask(["/a/one.md", "/a/two.md"])} />);
+    render(<ArtifactsTab task={makeTask(["one.md", "two.md"])} />);
 
     await waitFor(() => {
       const link = screen.getByRole("link", { name: /download/i });
-      expect(link.getAttribute("href")).toContain("/tasks/task-abc/artifact/one.md");
+      expect(link.getAttribute("href")).toContain("/tasks/task-abc/artifact?path=one.md");
     });
 
     const select = screen.getByRole("combobox", { name: /select artifact/i });
@@ -106,13 +106,13 @@ describe("ArtifactsTab", () => {
 
     await waitFor(() => {
       const link = screen.getByRole("link", { name: /download/i });
-      expect(link.getAttribute("href")).toContain("/tasks/task-abc/artifact/two.md");
+      expect(link.getAttribute("href")).toContain("/tasks/task-abc/artifact?path=two.md");
     });
   });
 
   it("renders the dropdown with a single option for the one-artifact case", async () => {
     fetchMock.mockResolvedValue(new Response("body", { status: 200 }));
-    render(<ArtifactsTab task={makeTask(["/a/only.bin"])} />);
+    render(<ArtifactsTab task={makeTask(["only.bin"])} />);
     const select = screen.getByRole("combobox", { name: /select artifact/i });
     const options = screen.getAllByRole("option");
     expect(options).toHaveLength(1);
@@ -127,7 +127,7 @@ describe("ArtifactsTab", () => {
     // container, its header, and its preview pane. Without them the
     // `.artifacts-pane` rules (full-height column, dropdown header,
     // full-bleed preview) never bind.
-    const { container } = render(<ArtifactsTab task={makeTask(["/tmp/notes.md"])} />);
+    const { container } = render(<ArtifactsTab task={makeTask(["notes.md"])} />);
     const pane = container.querySelector(".artifacts-pane");
     expect(pane).toBeTruthy();
     // The root is also the task-detail body so the parent chain

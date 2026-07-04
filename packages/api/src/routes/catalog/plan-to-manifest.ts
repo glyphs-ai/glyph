@@ -1,5 +1,5 @@
 import type { CatalogConflict, CatalogPlan, PlanNode } from "@glyphs-ai/catalog";
-import type { ResolveManifest, ResolveManifestNode } from "../../wire/plan-to-manifest.js";
+import type { ResolveManifest, ResolveManifestNode } from "../../schemas/plan-to-manifest.js";
 
 type NodeStatus = ResolveManifestNode["status"];
 

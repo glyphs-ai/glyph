@@ -34,7 +34,9 @@ export const WorkflowNodeViewSchema = z.object({
   endedAt: z.string().optional(),
 });
 
-export const GetWorkflowNodeRequestSchema = z.object({ nodeId: WorkflowNodeIdSchema }).strict();
+export const GetWorkflowNodeRequestSchema = z
+  .object({ workflowId: WorkflowIdSchema, nodeId: WorkflowNodeIdSchema })
+  .strict();
 export type GetWorkflowNodeRequest = z.infer<typeof GetWorkflowNodeRequestSchema>;
 export const GetWorkflowNodeResponseSchema = WorkflowNodeViewSchema;
 export type GetWorkflowNodeResponse = z.infer<typeof GetWorkflowNodeResponseSchema>;
@@ -52,13 +54,13 @@ export class GetWorkflowNodeUseCase
   execute(
     request: GetWorkflowNodeRequest,
   ): UseCaseResult<GetWorkflowNodeResponse, GetWorkflowNodeError> {
-    const { nodeId } = GetWorkflowNodeRequestSchema.parse(request);
+    const { workflowId, nodeId } = GetWorkflowNodeRequestSchema.parse(request);
     const q = this.deps.query;
     return q
       .query((db) => db.select().from(q.workflowNodes).where(eq(q.workflowNodes.id, nodeId)).get())
       .andThen((row) =>
-        row === undefined
-          ? errAsync({ type: "WorkflowNodeNotFound" as const, nodeId })
+        row === undefined || row.workflowId !== workflowId
+          ? errAsync({ type: "WorkflowNodeNotFound" as const, workflowId, nodeId })
           : q.query(() => toWorkflowNodeView(row)),
       );
   }

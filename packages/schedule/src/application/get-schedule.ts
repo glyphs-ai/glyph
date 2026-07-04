@@ -14,7 +14,9 @@ import type { ScheduleQueries } from "../infrastructure/drizzle/schedule-queries
 import type { ScheduleRow } from "../infrastructure/drizzle/schedule-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-export const GetScheduleRequestSchema = z.object({ id: z.string() }).strict();
+export const GetScheduleRequestSchema = z
+  .object({ id: z.string(), expectedKind: z.string().optional() })
+  .strict();
 export type GetScheduleRequest = z.infer<typeof GetScheduleRequestSchema>;
 
 export const GetScheduleResponseSchema = z
@@ -51,7 +53,11 @@ export class GetScheduleUseCase
     const q = this.deps.query;
     return q.query((db) => {
       const row = db.select().from(q.schedules).where(eq(q.schedules.id, id)).get();
-      return row === undefined ? null : toScheduleView(row);
+      if (row === undefined) return null;
+      // A kind-scoped read (e.g. GET /schedules/task/:sid) treats a row of a
+      // different kind as absent, so the wire never leaks the actual kind.
+      if (parsed.expectedKind !== undefined && row.targetKind !== parsed.expectedKind) return null;
+      return toScheduleView(row);
     });
   }
 }

@@ -160,7 +160,10 @@ const DISPATCH_OPTS_BASE = {
 describe("makeWorkerNodeRunner — validate", () => {
   it("accepts a minimal valid spec", async () => {
     const deps = stubDeps();
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     const result = await r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX);
     expect(result).toEqual({ agent: "w", brief: "b" });
     expect(deps.getAgent).toHaveBeenCalledWith("w");
@@ -169,7 +172,10 @@ describe("makeWorkerNodeRunner — validate", () => {
 
   it("preserves details + runtime when provided", async () => {
     const deps = stubDeps();
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     const result = await r.validate(
       { agent: "w", brief: "b", details: "long body", runtime: "copilot" },
       NODE_VALIDATE_CTX,
@@ -185,7 +191,10 @@ describe("makeWorkerNodeRunner — validate", () => {
 
   it("rejects non-object spec", async () => {
     const deps = stubDeps();
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     await expect(r.validate(null, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
       WorkflowWorkerSpecError,
     );
@@ -198,7 +207,10 @@ describe("makeWorkerNodeRunner — validate", () => {
 
   it("rejects missing / non-string agent", async () => {
     const deps = stubDeps();
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     await expect(r.validate({ brief: "b" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
       WorkflowWorkerSpecError,
     );
@@ -210,7 +222,10 @@ describe("makeWorkerNodeRunner — validate", () => {
 
   it("rejects multi-line brief", async () => {
     const deps = stubDeps();
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     await expect(
       r.validate({ agent: "w", brief: "line1\nline2" }, NODE_VALIDATE_CTX),
     ).rejects.toBeInstanceOf(WorkflowWorkerSpecError);
@@ -219,7 +234,10 @@ describe("makeWorkerNodeRunner — validate", () => {
 
   it("throws AgentNotFoundError when catalog returns null", async () => {
     const deps = stubDeps({ agent: null });
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     await expect(
       r.validate({ agent: "missing", brief: "b" }, NODE_VALIDATE_CTX),
     ).rejects.toMatchObject({ code: "AgentNotFound" });
@@ -228,7 +246,10 @@ describe("makeWorkerNodeRunner — validate", () => {
 
   it("throws AgentResolutionFailedError when catalog throws", async () => {
     const deps = stubDeps({ getAgentThrows: new Error("catalog down") });
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     await expect(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)).rejects.toMatchObject({
       code: "AgentResolutionFailed",
     });
@@ -251,7 +272,10 @@ describe("makeWorkerNodeRunner — validate", () => {
         dependencies: { agents: [{ fqn: "w" }, { fqn: "other" }] },
       },
     });
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     const result = await r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX);
     expect(result).toEqual({ agent: "w", brief: "b" });
     // The menu check must query the coord agent in addition to the worker.
@@ -267,7 +291,10 @@ describe("makeWorkerNodeRunner — validate", () => {
         dependencies: { agents: [{ fqn: "dev" }, { fqn: "review" }] },
       },
     });
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     await expect(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
       WorkflowWorkerNotInCoordMenuError,
     );
@@ -283,7 +310,10 @@ describe("makeWorkerNodeRunner — validate", () => {
       // an empty menu, regardless of FQN.
       coordAgent: { fqn: "coord" },
     });
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     await expect(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
       WorkflowWorkerNotInCoordMenuError,
     );
@@ -595,7 +625,10 @@ describe("makeWorkerNodeRunner — poll error budget", () => {
 describe("makeWorkerNodeRunner — hasInFlightForNode + cancel + dispose", () => {
   it("hasInFlightForNode delegates to tasks.hasInFlightByOrigin.execute", async () => {
     const deps = stubDeps({ hasInFlightReturn: true });
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     const result = await r.hasInFlightForNode("deadbeef-cafe-4bab-89ab-cafebabe1234");
     expect(result).toBe(true);
     expect(deps.hasInFlightForWorkflowNode).toHaveBeenCalledWith({
@@ -609,7 +642,10 @@ describe("makeWorkerNodeRunner — hasInFlightForNode + cancel + dispose", () =>
     const deps = stubDeps({
       listInFlightReturn: [fakeTaskRow({ id: "t-a" }), fakeTaskRow({ id: "t-b" })],
     });
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     await r.cancel("deadbeef-cafe-4bab-89ab-cafebabe1234");
     expect(deps.listInFlightForWorkflowNode).toHaveBeenCalledWith({
       origin: "workflow",
@@ -632,7 +668,10 @@ describe("makeWorkerNodeRunner — hasInFlightForNode + cancel + dispose", () =>
       return okAsync(fakeTaskRow({ id: req.id }));
     });
     (deps.tasks.cancelTask as unknown as { execute: typeof cancel }).execute = cancel;
-    const r = makeWorkerNodeRunner({ catalog: deps.catalog, tasks: deps.tasks });
+    const r = makeWorkerNodeRunner({
+      catalog: deps.catalog,
+      tasks: deps.tasks,
+    });
     // Should NOT throw; the runner logs and continues.
     await r.cancel("deadbeef-cafe-4bab-89ab-cafebabe1234");
     expect(cancel).toHaveBeenCalledTimes(2);

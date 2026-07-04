@@ -19,7 +19,6 @@ import {
   type GetScheduleUseCase,
   generateScheduleId,
   type InvalidCronExpr,
-  type InvalidJsonPath,
   type InvalidScheduleId,
   type InvalidScheduleKindName,
   type InvalidScheduleName,
@@ -31,7 +30,6 @@ import {
   type PatchScheduleError,
   type PatchScheduleRequest,
   type PatchScheduleUseCase,
-  type PreviewCountOutOfRange,
   type PreviewScheduleRequest,
   type PreviewScheduleResponse,
   type PreviewScheduleUseCase,
@@ -89,7 +87,6 @@ describe("@glyphs-ai/schedule public API guard", () => {
     expectTypeOf<InvalidScheduleId>().toHaveProperty("type");
     expectTypeOf<InvalidCronExpr>().toHaveProperty("reason");
     expectTypeOf<InvalidTimezone>().toHaveProperty("tz");
-    expectTypeOf<InvalidJsonPath>().toHaveProperty("path");
     expectTypeOf<InvalidScheduleName>().toHaveProperty("type");
     expectTypeOf<InvalidScheduleKindName>().toHaveProperty("type");
     expectTypeOf<ScheduleEnabled>().toHaveProperty("id");
@@ -99,7 +96,6 @@ describe("@glyphs-ai/schedule public API guard", () => {
     expectTypeOf<TargetValidationFailed>().toHaveProperty("cause");
     expectTypeOf<ScheduleNotFound>().toHaveProperty("id");
     expectTypeOf<DatabaseUnavailable>().toHaveProperty("cause");
-    expectTypeOf<PreviewCountOutOfRange>().toHaveProperty("n");
     expectTypeOf<CreateScheduleError>().toHaveProperty("type");
     expectTypeOf<PatchScheduleError>().toHaveProperty("type");
     expectTypeOf<DeleteScheduleError>().toHaveProperty("type");

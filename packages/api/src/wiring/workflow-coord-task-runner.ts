@@ -80,12 +80,12 @@ import {
   workflowDir,
 } from "@glyphs-ai/workflow";
 import pino, { type Logger } from "pino";
-import type { WorkflowCoordinatorNodeSpec } from "../wire/index.js";
 import {
   TaskOperationError,
   taskAgentNotFound,
   taskAgentResolutionFailed,
 } from "./_task-operation-error.js";
+import type { WorkflowCoordinatorNodeSpec } from "./workflow-node-specs.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
@@ -548,6 +548,14 @@ export function makeCoordNodeRunner(
           );
         }
       }
+    },
+
+    async listArtifacts() {
+      return null;
+    },
+
+    async resolveArtifactPath() {
+      return null;
     },
 
     async dispose(): Promise<void> {

@@ -23,7 +23,8 @@ export const CancelWorkflowNodeRequestSchema = z
   .object({ workflowId: WorkflowIdSchema, nodeId: WorkflowNodeIdSchema })
   .strict();
 export type CancelWorkflowNodeRequest = z.infer<typeof CancelWorkflowNodeRequestSchema>;
-export type CancelWorkflowNodeResponse = undefined;
+export const CancelWorkflowNodeResponseSchema = z.undefined();
+export type CancelWorkflowNodeResponse = z.infer<typeof CancelWorkflowNodeResponseSchema>;
 export type CancelWorkflowNodeError =
   | WorkflowNotFound
   | WorkflowAlreadyTerminal

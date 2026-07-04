@@ -1,12 +1,27 @@
 import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
 import { TaskBriefSchema } from "@glyphs-ai/task";
-import type { TaskTargetData, TaskTargetPatch } from "../wire/index.js";
 import {
   TaskOperationError,
   taskAgentNotFound,
   taskAgentResolutionFailed,
 } from "./_task-operation-error.js";
+
+/** Concrete task-target shape this handler validates + persists as opaque `data`. */
+interface TaskTargetData {
+  readonly agent: string;
+  readonly brief: string;
+  readonly details?: string;
+  readonly runtime?: string;
+}
+
+/** RFC 7396 deep-merge patch for a task target (`null` deletes an optional). */
+interface TaskTargetPatch {
+  readonly agent?: string;
+  readonly brief?: string;
+  readonly details?: string | null;
+  readonly runtime?: string | null;
+}
 
 interface CatalogAgentLookup {
   getAgent(fqn: string): Promise<unknown | null>;

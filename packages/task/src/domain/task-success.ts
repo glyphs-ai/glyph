@@ -11,7 +11,12 @@ export const TaskSuccessSchema = z.object({
    * was unavailable — distinct from `""` (an explicitly empty turn).
    */
   output: z.string().nullable(),
-  /** Absolute paths of `<workdir>/artifact/` files, ordered lexicographically by basename. */
+  /**
+   * Paths (POSIX, relative to `<workdir>/artifact/`) of every file captured
+   * under that dir at terminal time. Rows written before the switch to
+   * relative storage hold absolute paths; the read projection normalizes
+   * those to the same relative identity.
+   */
   artifacts: z.array(z.string()).readonly().optional(),
 });
 export type TaskSuccess = z.infer<typeof TaskSuccessSchema>;

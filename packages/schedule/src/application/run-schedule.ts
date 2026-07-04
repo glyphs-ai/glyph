@@ -1,4 +1,4 @@
-import { ok, ResultAsync, safeTry } from "neverthrow";
+import { err, ok, ResultAsync, safeTry } from "neverthrow";
 import { z } from "zod";
 import { nextRuns } from "../domain/schedule/cron.js";
 import type { ScheduleCorruption } from "../domain/schedule/schedule-errors.js";
@@ -12,7 +12,9 @@ import type { ScheduleKindNotRegistered } from "./ports/schedule-kind-handler.js
 import type { ScheduleKindRegistry } from "./ports/schedule-kind-registry.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-export const RunScheduleRequestSchema = z.object({ id: z.string() }).strict();
+export const RunScheduleRequestSchema = z
+  .object({ id: z.string(), expectedKind: z.string().optional() })
+  .strict();
 export type RunScheduleRequest = z.infer<typeof RunScheduleRequestSchema>;
 
 export const RunScheduleResponseSchema = z.object({ dispatchId: z.string() });
@@ -48,6 +50,11 @@ export class RunScheduleUseCase
     return safeTry<RunScheduleResponse, RunScheduleError>(async function* () {
       const id = yield* parseScheduleId(parsed.id);
       const entity = yield* deps.repo.get(id);
+      // A kind-scoped run (e.g. POST /schedules/task/:sid/run) treats a row of a
+      // different kind as absent — the wire must not leak the actual kind.
+      if (parsed.expectedKind !== undefined && entity.target.kind !== parsed.expectedKind) {
+        return err({ type: "ScheduleNotFound" as const, id });
+      }
       const handler = yield* deps.registry.handlerFor(entity.target.kind);
 
       const now = deps.now();

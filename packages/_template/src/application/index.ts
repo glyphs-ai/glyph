@@ -8,7 +8,6 @@
 export type { __Entity__AlreadyArchived } from "../domain/__entity-kebab__-entity.js";
 export { type __Entity__Id, __Entity__IdSchema } from "../domain/__entity-kebab__-id.js";
 export type {
-  __Entity__IdConflict,
   __Entity__NotFound,
   DatabaseUnavailable,
 } from "../domain/__entity-kebab__-repository.js";

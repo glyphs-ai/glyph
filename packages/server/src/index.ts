@@ -17,7 +17,9 @@ import {
   runtimesRoutes,
   scheduledTasksRoutes,
   scheduledWorkflowsRoutes,
-  schedulesRoutes,
+  schedulesPreviewCronRoutes,
+  schedulesTaskRoutes,
+  schedulesWorkflowRoutes,
   sessionsRoutes,
   tasksRoutes,
   workflowsRoutes,
@@ -314,18 +316,26 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   );
   app.route("/api/workspaces", scheduledWorkflowsApp);
 
-  // Schedule CRUD + run + preview. Sibling of `/scheduled-tasks` —
-  // that route is read-only over the dispatched task list; this
-  // route owns the trigger entities themselves. Both share the same
-  // workspace-scoped per-context state via the middleware.
+  // Schedule CRUD + run + preview, split by target kind. Each kind is a
+  // sibling collection under `/schedules/<kind>`; `/schedules/preview-cron` is
+  // the one kindless endpoint (a cron calculator, touches no stored row). All
+  // share the same workspace-scoped per-context state via one middleware.
   const schedulesApp = createApiApp<{ Variables: WorkspaceVars }>();
   schedulesApp.use("/:id/schedules/*", workspaceContextMiddleware(application, logger));
   schedulesApp.route(
-    "/:id/schedules",
-    schedulesRoutes(
+    "/:id/schedules/task",
+    schedulesTaskRoutes((c) => c.get("workspaceContext").schedules),
+  );
+  schedulesApp.route(
+    "/:id/schedules/workflow",
+    schedulesWorkflowRoutes(
       (c) => c.get("workspaceContext").schedules,
       (c) => c.get("workspaceContext").workflows,
     ),
+  );
+  schedulesApp.route(
+    "/:id/schedules/preview-cron",
+    schedulesPreviewCronRoutes((c) => c.get("workspaceContext").schedules),
   );
   app.route("/api/workspaces", schedulesApp);
 

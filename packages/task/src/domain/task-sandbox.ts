@@ -1,4 +1,5 @@
 import type { ResultAsync } from "neverthrow";
+import type { TaskArtifactFile } from "./task-artifact.js";
 import type { TaskId } from "./task-id.js";
 
 /** `reserve`: the exclusive `mkdir` for a task workdir faulted (EEXIST id collision, missing parent, …). */
@@ -55,12 +56,19 @@ export interface TaskSandbox {
   materialize(args: MaterializeWorkdirArgs): ResultAsync<void, WorkdirMaterializationFailed>;
 
   /**
-   * Absolute paths of every regular file anywhere under `<workdir>/artifact/`
-   * (recursively, at any depth), sorted lexicographically by path. Resolves to
-   * `[]` when the directory is absent; a genuine read fault surfaces
-   * `ArtifactListingFailed`.
+   * Every regular file under `<workdir>/artifact/` (recursively, at any
+   * depth) as a {@link TaskArtifactFile} (POSIX relPath + size + mtime),
+   * sorted by relPath. Resolves to `[]` when the directory is absent; a
+   * genuine read fault surfaces `ArtifactListingFailed`.
    */
-  listArtifacts(workdir: string): ResultAsync<readonly string[], ArtifactListingFailed>;
+  listArtifacts(workdir: string): ResultAsync<readonly TaskArtifactFile[], ArtifactListingFailed>;
+
+  /**
+   * Join a whitelisted `relPath` under `id`'s `artifact/` root to its
+   * absolute fs path; `null` if `relPath` is malformed or escapes the root.
+   * Pure path math (no I/O).
+   */
+  resolveArtifactPath(id: TaskId, relPath: string): string | null;
 
   /** Recursively remove the workdir (force). */
   remove(workdir: string): ResultAsync<void, WorkdirRemovalFailed>;

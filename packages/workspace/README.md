@@ -23,7 +23,7 @@ packages/workspace/src/
     workspace-id.ts            WorkspaceId schema + branded type
     workspace-name.ts          WorkspaceName schema + branded type
     workspace-repository.ts    repository port (write-side: get/save/delete) + error atoms
-    workspace-provisioner.ts   filesystem provisioner port + error atom
+    workspace-provisioner.ts   workspace-root provisioner port + error atom
   application/
     *.ts                       one use-case class per operation
     workspace-public.ts        curated domain/error surface exported by index.ts
@@ -34,7 +34,7 @@ packages/workspace/src/
     workspace-repository.ts    Drizzle write-side adapter (get/save/delete)
     workspace-queries.ts       Drizzle read-side adapter (query() + workspaces table)
   infrastructure/file/
-    local-workspace-provisioner.ts  creates/removes sessions/, tasks/, workflows/
+    local-workspace-provisioner.ts  ensures the workspace root dir exists
   workspace-module.ts          composeWorkspaceModule({ dbFile, defaultWorkspaceParent, logger? })
   index.ts                     public barrel (compose + use-case contracts + curated domain types)
 drizzle/                       generated SQL migrations (committed)
@@ -68,7 +68,7 @@ await workspace.getLastOpenedWorkspaceId.execute({});        // Result<string | 
 await workspace.registerWorkspace.execute({ name, workspaceDir }); // workspaceDir optional
 await workspace.openWorkspace.execute({ id });
 await workspace.renameWorkspace.execute({ id, name });
-await workspace.unregisterWorkspace.execute({ id, purge: false });
+await workspace.unregisterWorkspace.execute({ id });
 
 await close();                                           // caller closes the libsql handle
 ```
@@ -127,10 +127,9 @@ package root:
 ```
 WorkspaceError
 ├── WorkspaceNotFound         id has no entry in the registry
-├── WorkspaceIdConflict       workspace id primary-key collision
 ├── WorkspacePathConflict     workspaceDir already registered
 ├── DatabaseUnavailable       registry-level storage failure
-└── ProvisioningFailed        filesystem skeleton create/remove failure
+└── ProvisioningFailed        workspace root dir could not be created
 ```
 
 These are **precondition / conflict / infrastructure** errors. Input
@@ -165,12 +164,12 @@ UNIQUE / PRIMARY KEY constraints on the `workspaces` table are the
 deterministic backstop, and the save's INSERT path is wrapped to
 translate SQLite constraint errors back into typed domain errors.
 
-## Workspace skeleton
+## Workspace root directory
 
-`LocalWorkspaceProvisioner` creates and removes the workspace skeleton:
-`sessions/`, `tasks/`, and `workflows/`. Workspace owns these parent
-directories; the session, task, and workflow packages own entries
-beneath them.
+`LocalWorkspaceProvisioner` ensures the workspace root directory exists
+at registration so a bad path fails fast. The per-domain subdirs
+(`sessions/`, `tasks/`, `workflows/`) are created lazily by the session,
+task, and workflow packages, which own everything beneath them.
 
 `globalDbPath()` and `workspacesParentDir()` live in
 `@glyphs-ai/server` (`packages/server/src/glyph-home.ts`).

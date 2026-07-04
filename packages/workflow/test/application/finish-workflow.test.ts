@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  addIteration,
   bootstrap,
   buildWorkflowFixture,
   fixedRandomUUID,
@@ -40,17 +41,16 @@ describe("WorkflowService.finishWorkflow", () => {
 
   it("EXCLUDES running coordinator-kind nodes from the cancel reconciliation", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: pendingTask } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId: pendingTask }))._unsafeUnwrap().status).toBe(
-      "not_started",
-    );
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "pending", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const pendingTask = workerIds.pending!;
+    expect(
+      (await f.module.getNode.execute({ workflowId, nodeId: pendingTask }))._unsafeUnwrap().status,
+    ).toBe("not_started");
 
     (await f.module.finishWorkflow.execute({ workflowId, outcome: "succeeded" }))._unsafeUnwrap();
 
@@ -58,43 +58,35 @@ describe("WorkflowService.finishWorkflow", () => {
     // very task that just called finishWorkflow). The reconciliation
     // explicitly excludes running coordinator-kind nodes so the
     // in-flight call frame can exit naturally.
-    const caller = (await f.module.getNode.execute({ nodeId: initialCoordNodeId }))._unsafeUnwrap();
+    const caller = (
+      await f.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })
+    )._unsafeUnwrap();
     expect(caller.status).toBe("running");
 
     // Pending task is cancelled by reconciliation.
-    const pending = (await f.module.getNode.execute({ nodeId: pendingTask }))._unsafeUnwrap();
+    const pending = (
+      await f.module.getNode.execute({ workflowId, nodeId: pendingTask })
+    )._unsafeUnwrap();
     expect(pending.status).toBe("cancelled");
   });
 
   it("invokes runner.cancel on running non-coord nodes during reconciliation", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    // Materialise a parent task and force it terminal so the
-    // running task lands in `running` via eager dispatch.
-    const { nodeId: parentTaskId } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "p" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    setNodeLifecycle(f, {
-      id: parentTaskId,
-      status: "succeeded",
-      endedAt: "2026-06-07T01:00:00.000Z",
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "running", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-next" },
     });
-    const { nodeId: runningTask } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [parentTaskId],
-      })
-    )._unsafeUnwrap();
-    await f.module.engine.drain();
-    expect((await f.module.getNode.execute({ nodeId: runningTask }))._unsafeUnwrap().status).toBe(
-      "running",
-    );
+    const runningTask = workerIds.running!;
+    setNodeLifecycle(f, {
+      id: runningTask,
+      status: "running",
+      runningAt: "2026-06-07T01:00:00.000Z",
+    });
+    expect(
+      (await f.module.getNode.execute({ workflowId, nodeId: runningTask }))._unsafeUnwrap().status,
+    ).toBe("running");
 
     (
       await f.module.finishWorkflow.execute({
@@ -105,9 +97,9 @@ describe("WorkflowService.finishWorkflow", () => {
     )._unsafeUnwrap();
 
     expect(f.workerRunner.cancelCalls).toContain(runningTask);
-    expect((await f.module.getNode.execute({ nodeId: runningTask }))._unsafeUnwrap().status).toBe(
-      "cancelled",
-    );
+    expect(
+      (await f.module.getNode.execute({ workflowId, nodeId: runningTask }))._unsafeUnwrap().status,
+    ).toBe("cancelled");
   });
 
   it("REJECTS an invalid outcome value", async () => {

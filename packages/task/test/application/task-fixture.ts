@@ -32,8 +32,7 @@ import { type TaskId, TaskIdSchema } from "../../src/domain/task-id.js";
 import { TERMINAL_TASK_STATUSES } from "../../src/domain/task-status.js";
 import { openDb } from "../../src/infrastructure/drizzle/task-db.js";
 import { DrizzleTaskRepository } from "../../src/infrastructure/drizzle/task-repository.js";
-import { LocalTaskSandbox } from "../../src/infrastructure/file/local-task-sandbox.js";
-import { tasksRoot } from "../../src/task-paths.js";
+import { LocalTaskSandbox, tasksRoot } from "../../src/infrastructure/file/local-task-sandbox.js";
 
 export const RESOLVED: ResolvedAgent = { agent: { fqn: "demo" }, skills: [], mcps: [] };
 

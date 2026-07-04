@@ -6,6 +6,7 @@ import type { TaskOrigin } from "../../domain/task-origin.js";
 import type { DatabaseUnavailable } from "../../domain/task-repository.js";
 import type { TaskStatus } from "../../domain/task-status.js";
 import type { TaskSuccess } from "../../domain/task-success.js";
+import { TASK_ARTIFACT_SUBDIR } from "../file/local-task-sandbox.js";
 import type { Db } from "./task-db.js";
 import { type TaskRow, tasks } from "./task-schema.js";
 
@@ -42,6 +43,32 @@ export class DrizzleTaskQueries implements TaskQueries {
 }
 
 /**
+ * Normalize a stored `success.artifacts` entry to its wire identity — the
+ * artifact's POSIX path relative to the task's `artifact/` dir. New rows
+ * already store this relative form, so it passes straight through. Rows
+ * written before the switch to relative storage hold an absolute path; we
+ * strip the `/<id>/artifact/` prefix (the id is a unique per-task segment,
+ * an unambiguous anchor) to recover the same identity. A migration shim for
+ * pre-existing rows, not a permanent transform.
+ */
+export function normalizeArtifactRel(entry: string, id: string): string {
+  const posix = entry.replace(/\\/g, "/");
+  const needle = `/${id}/${TASK_ARTIFACT_SUBDIR}/`;
+  const idx = posix.indexOf(needle);
+  return idx === -1 ? posix : posix.slice(idx + needle.length);
+}
+
+/**
+ * Normalize a stored `TaskSuccess`'s `artifacts` to their relative wire
+ * identity. New rows already store relative paths (no-op); pre-existing
+ * absolute rows are converted, so consumers see one uniform shape.
+ */
+function relativizeArtifacts(success: TaskSuccess, id: string): TaskSuccess {
+  if (success.artifacts === undefined) return success;
+  return { ...success, artifacts: success.artifacts.map((a) => normalizeArtifactRel(a, id)) };
+}
+
+/**
  * Read-side projection: map a stored row straight to the wire task view.
  * Unlike the domain's `TaskEntity.rehydrate` (write path), this does NOT
  * validate field shapes — the read model trusts rows our own mapper wrote and
@@ -64,7 +91,9 @@ export function projectTaskRow(row: TaskRow) {
     createdAt: row.createdAt,
     startedAt: row.startedAt,
     ...(row.endedAt !== null ? { endedAt: row.endedAt } : {}),
-    ...(row.success !== null ? { success: JSON.parse(row.success) as TaskSuccess } : {}),
+    ...(row.success !== null
+      ? { success: relativizeArtifacts(JSON.parse(row.success) as TaskSuccess, row.id) }
+      : {}),
     ...(row.failure !== null ? { failure: JSON.parse(row.failure) as TaskFailure } : {}),
     ...(row.cancellation !== null
       ? { cancellation: JSON.parse(row.cancellation) as TaskCancellation }

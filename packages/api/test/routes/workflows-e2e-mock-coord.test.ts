@@ -26,7 +26,7 @@
  * change — same test runner, no port allocation, no subprocess.
  */
 
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { TaskModule } from "@glyphs-ai/task";
@@ -97,6 +97,12 @@ function makeAutoSucceedRunner(
       return false;
     },
     async cancel() {},
+    async listArtifacts() {
+      return null;
+    },
+    async resolveArtifactPath() {
+      return null;
+    },
   };
   return runner;
 }
@@ -114,9 +120,6 @@ async function makeHarness(): Promise<Harness> {
   const worker = makeAutoSucceedRunner("worker", { gated: false });
   const dbHandle = openTestWorkflowDb();
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-e2e-coord-"));
-  // Mirror @glyphs-ai/workspace's provisioner: createWorkflow now
-  // requires `workflows/` to exist (mkdir leaf is `{recursive:false}`).
-  mkdirSync(path.join(workspaceDir, "workflows"));
   const module = await composeWorkflowModule({
     db: dbHandle.db,
     workspaceDir,
@@ -128,6 +131,8 @@ async function makeHarness(): Promise<Harness> {
         dispatch: async () => {},
         hasInFlightForNode: async () => false,
         cancel: async () => {},
+        listArtifacts: async () => null,
+        resolveArtifactPath: async () => null,
       } as import("@glyphs-ai/workflow").WorkflowNodeRunner,
     },
     logger: silentLogger,
@@ -194,11 +199,9 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     const created = (await createRes.json()) as {
       id: string;
       status: string;
-      iterationCount: number;
     };
     const wfid = created.id;
     expect(created.status).toBe("running");
-    expect(created.iterationCount).toBe(1);
 
     // 2. Wait for the initial coord to auto-succeed. The substrate's
     //    stuck-coord detector then inserts a retry coord and the
@@ -210,9 +213,9 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
       async () => {
         const dagRes = await h.app.request(`/${wfid}/dag`);
         const dag = (await dagRes.json()) as {
-          nodes: Array<{ spec: { kind: string }; status: string }>;
+          nodes: Array<{ kind: string; status: string }>;
         };
-        const initial = dag.nodes.find((n) => n.spec.kind === "coordinator");
+        const initial = dag.nodes.find((n) => n.kind === "coordinator");
         return initial?.status === "succeeded";
       },
       5000,
@@ -220,8 +223,8 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     );
 
     // 3. Add a worker via the addSubgraph HTTP surface (exercising the
-    //    most complex mutation primitive in one call: temp-id alloc,
-    //    intra-batch edge translation, WorkflowNodeRef→NodeRef boundary).
+    //    most complex mutation primitive in one call: temp-id alloc
+    //    plus tagged NodeRef edges).
     //    The batch attaches the worker to the (now-succeeded) initial
     //    coord (worker's "all parents succeeded" readiness rule), and
     //    attaches a trailing coord cend to BOTH the detector-inserted
@@ -232,9 +235,9 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     //    OrphanCoordInsertError check passes.
     const dagBeforeRes = await h.app.request(`/${wfid}/dag`);
     const dagBefore = (await dagBeforeRes.json()) as {
-      nodes: Array<{ id: string; spec: { kind: string }; status: string }>;
+      nodes: Array<{ id: string; kind: string; status: string }>;
     };
-    const coordNodes = dagBefore.nodes.filter((n) => n.spec.kind === "coordinator");
+    const coordNodes = dagBefore.nodes.filter((n) => n.kind === "coordinator");
     const initialCoord = coordNodes.find((n) => n.status === "succeeded");
     const retryCoord = coordNodes.find((n) => n.status !== "succeeded");
     expect(initialCoord).toBeDefined();
@@ -263,7 +266,7 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
             existingParents: [retryCoordId],
           },
         ],
-        edges: [{ from: { tempId: "w1" }, to: { tempId: "cend" } }],
+        edges: [{ from: { kind: "temp", tempId: "w1" }, to: { kind: "temp", tempId: "cend" } }],
       }),
     });
     expect(subgraphRes.status).toBe(200);
@@ -294,7 +297,7 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     const finishRes = await h.app.request(`/${wfid}/finish`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "succeeded" }),
+      body: JSON.stringify({ outcome: "succeeded" }),
     });
     expect(finishRes.status).toBe(200);
 
@@ -305,7 +308,7 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     const cancelRes = await h.app.request(`/${wfid}/cancel`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ cancellation: { message: "e2e test stop" } }),
+      body: JSON.stringify({ cancellation: { kind: "user", message: "e2e test stop" } }),
     });
     expect(cancelRes.status).toBe(409);
     const cancelErr = (await cancelRes.json()) as { code?: string };
@@ -319,116 +322,5 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     //    terminal. Worker dispatches: just w1 = 1.
     expect(h.coord.dispatchCalls).toHaveLength(2);
     expect(h.worker.dispatchCalls).toHaveLength(1);
-  }, 15000);
-
-  it("HTTP addNode + addEdge wire round-trip lands real DB rows", async () => {
-    // Seed.
-    const createRes = await h.app.request("/", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ brief: "addnode flow", coordinatorAgent: "mock-coord" }),
-    });
-    expect(createRes.status).toBe(201);
-    const wfid = ((await createRes.json()) as { id: string }).id;
-
-    // Wait for the initial coord to terminate. The substrate's
-    // stuck-coord detector then inserts a retry coord that the gated
-    // runner leaves in `running`; narrow the predicate to the
-    // initial coord rather than "every node succeeded".
-    await waitUntil(
-      async () => {
-        const dag = (await (await h.app.request(`/${wfid}/dag`)).json()) as {
-          nodes: Array<{ spec: { kind: string }; status: string }>;
-        };
-        return dag.nodes.find((n) => n.spec.kind === "coordinator")?.status === "succeeded";
-      },
-      5000,
-      "initial coord auto-succeeds",
-    );
-    const dagBefore = (await (await h.app.request(`/${wfid}/dag`)).json()) as {
-      nodes: Array<{ id: string; spec: { kind: string }; status: string }>;
-    };
-    const coordId = dagBefore.nodes.find(
-      (n) => n.spec.kind === "coordinator" && n.status === "succeeded",
-    )?.id as string;
-
-    // addNode — single worker A attached to the coord.
-    const addARes = await h.app.request(`/${wfid}/nodes`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        kind: "worker",
-        spec: { agent: "mock-worker", brief: "A" },
-        parents: [coordId],
-      }),
-    });
-    expect(addARes.status).toBe(200);
-    const { nodeId: aId } = (await addARes.json()) as { nodeId: string; phase: number };
-
-    // The worker auto-succeeds via the mock runner. Wait for it before
-    // adding B (B will depend on A — addEdge requires the target to be
-    // not_started, so we make B first then edge A → B... but A is
-    // already terminal). Use a fresh worker C as the second node.
-    await waitUntil(
-      async () => {
-        const dag = (await (await h.app.request(`/${wfid}/dag`)).json()) as {
-          nodes: Array<{ id: string; status: string }>;
-        };
-        return dag.nodes.find((n) => n.id === aId)?.status === "succeeded";
-      },
-      5000,
-      "worker A auto-succeeds",
-    );
-
-    // addNode — worker B attached to coord (not A; we'll wire A→B via
-    // addEdge once B is in but BEFORE its dispatch).
-    // Note: in mock-runner land B auto-dispatches as soon as it has a
-    // terminal parent. To prove addEdge wire shape, we have to attach
-    // B to coord (so it's not blocked) but also confirm `addEdge`
-    // returns 409 with `WorkflowNodeNotMutableError` once B's
-    // not_started gate has flipped. This proves the gate fires on
-    // the live substrate via the HTTP path.
-    const addBRes = await h.app.request(`/${wfid}/nodes`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        kind: "worker",
-        spec: { agent: "mock-worker", brief: "B" },
-        parents: [coordId],
-      }),
-    });
-    expect(addBRes.status).toBe(200);
-    const { nodeId: bId } = (await addBRes.json()) as { nodeId: string; phase: number };
-
-    // Wait for B to terminate too.
-    await waitUntil(
-      async () => {
-        const dag = (await (await h.app.request(`/${wfid}/dag`)).json()) as {
-          nodes: Array<{ id: string; status: string }>;
-        };
-        return dag.nodes.find((n) => n.id === bId)?.status === "succeeded";
-      },
-      5000,
-      "worker B auto-succeeds",
-    );
-
-    // Now addEdge A → B fails with 409 because B is no longer
-    // not_started. Proves the live substrate's structural rule fires
-    // through the HTTP→error policy pipeline.
-    const edgeRes = await h.app.request(`/${wfid}/edges`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ fromNodeId: aId, toNodeId: bId }),
-    });
-    expect(edgeRes.status).toBe(409);
-    const errBody = (await edgeRes.json()) as { code?: string };
-    expect(errBody.code).toBe("WorkflowNodeNotMutable");
-
-    // Clean termination.
-    await h.app.request(`/${wfid}/cancel`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ cancellation: { message: "" } }),
-    });
   }, 15000);
 });

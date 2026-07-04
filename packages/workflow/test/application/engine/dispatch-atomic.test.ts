@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  addIteration,
   bootstrap,
   buildWorkflowFixture,
   fixedRandomUUID,
@@ -34,44 +35,45 @@ describe("WorkflowService.dispatchAtomic", () => {
 
   it("task: dispatches when ALL parents are succeeded", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: a } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "a" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId: a }))._unsafeUnwrap().status).toBe(
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "a", spec: { agent: "w", brief: "a" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const a = workerIds.a!;
+    expect((await f.module.getNode.execute({ workflowId, nodeId: a }))._unsafeUnwrap().status).toBe(
       "not_started",
     );
-    // Mark the coord parent succeeded by hand; manual dispatchAtomic now
-    // observes a satisfied predicate.
     setNodeLifecycle(f, {
       id: initialCoordNodeId,
       status: "succeeded",
       endedAt: "2026-06-07T01:00:00.000Z",
     });
     const before = f.workerRunner.dispatchCalls.length;
+
     (await f.module.engine.dispatch(workflowId, a))._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId: a }))._unsafeUnwrap().status).toBe("running");
+
+    expect((await f.module.getNode.execute({ workflowId, nodeId: a }))._unsafeUnwrap().status).toBe(
+      "running",
+    );
     expect(f.workerRunner.dispatchCalls.length).toBe(before + 1);
   });
 
   it("task: does NOT dispatch when a parent is not yet succeeded", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: a } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "a" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    // Coord parent is still 'running' — predicate fails.
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "a", spec: { agent: "w", brief: "a" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const a = workerIds.a!;
     const before = f.workerRunner.dispatchCalls.length;
+
     (await f.module.engine.dispatch(workflowId, a))._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId: a }))._unsafeUnwrap().status).toBe(
+
+    expect((await f.module.getNode.execute({ workflowId, nodeId: a }))._unsafeUnwrap().status).toBe(
       "not_started",
     );
     expect(f.workerRunner.dispatchCalls.length).toBe(before);
@@ -79,26 +81,13 @@ describe("WorkflowService.dispatchAtomic", () => {
 
   it("coordinator: dispatches when ALL parents are terminal (succeeded OR failed OR cancelled)", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: parentTask } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    // childCoord must list its caller (initialCoord) as a parent.
-    const { nodeId: childCoord } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "coordinator",
-        spec: { agent: "coord-b" },
-        parents: [initialCoordNodeId, parentTask],
-      })
-    )._unsafeUnwrap();
-    // Mark both parents terminal: parentTask FAILED, initialCoord
-    // SUCCEEDED. A worker-kind child would NOT dispatch (failed
-    // parent) but a coord-kind child WILL.
+    const { workerIds, coordId } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "parent", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-b" },
+    });
+    const parentTask = workerIds.parent!;
     setNodeLifecycle(f, {
       id: parentTask,
       status: "failed",
@@ -110,113 +99,107 @@ describe("WorkflowService.dispatchAtomic", () => {
       endedAt: "2026-06-07T01:00:00.000Z",
     });
     const before = f.coordRunner.dispatchCalls.length;
-    (await f.module.engine.dispatch(workflowId, childCoord))._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId: childCoord }))._unsafeUnwrap().status).toBe(
-      "running",
-    );
+
+    (await f.module.engine.dispatch(workflowId, coordId))._unsafeUnwrap();
+
+    expect(
+      (await f.module.getNode.execute({ workflowId, nodeId: coordId }))._unsafeUnwrap().status,
+    ).toBe("running");
     expect(f.coordRunner.dispatchCalls.length).toBe(before + 1);
   });
 
   it("silently no-ops when the node is already running", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
     const before = f.coordRunner.dispatchCalls.length;
+
     (await f.module.engine.dispatch(workflowId, initialCoordNodeId))._unsafeUnwrap();
+
     expect(
-      (await f.module.getNode.execute({ nodeId: initialCoordNodeId }))._unsafeUnwrap().status,
+      (await f.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId }))._unsafeUnwrap()
+        .status,
     ).toBe("running");
     expect(f.coordRunner.dispatchCalls.length).toBe(before);
   });
 
   it("silently no-ops when the workflow is already cancelled", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "w", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const nodeId = workerIds.w!;
     (
       await f.module.cancelWorkflow.execute({
         workflowId,
         cancellation: { kind: "user", message: "" },
       })
     )._unsafeUnwrap();
-    // Cancel reconciliation already flipped the task. dispatchAtomic
-    // is a no-op for terminal nodes.
     const before = f.workerRunner.dispatchCalls.length;
+
     (await f.module.engine.dispatch(workflowId, nodeId))._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId }))._unsafeUnwrap().status).toBe("cancelled");
+
+    expect((await f.module.getNode.execute({ workflowId, nodeId }))._unsafeUnwrap().status).toBe(
+      "cancelled",
+    );
     expect(f.workerRunner.dispatchCalls.length).toBe(before);
   });
 
   it("on runner.dispatch throw, marks the node failed via a separate tx", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    // Materialise a parent task and force it terminal so the new
-    // task's parent-readiness predicate fires eager dispatch on insert.
-    const { nodeId: parentTaskId } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "p" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
     setNodeLifecycle(f, {
-      id: parentTaskId,
+      id: initialCoordNodeId,
       status: "succeeded",
       endedAt: "2026-06-07T01:00:00.000Z",
     });
     f.workerRunner.dispatchShouldThrow = true;
-    const { nodeId } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [parentTaskId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "w", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const nodeId = workerIds.w!;
+
     await waitUntil(
-      async () => (await f.module.getNode.execute({ nodeId }))._unsafeUnwrap().status === "failed",
+      async () =>
+        (await f.module.getNode.execute({ workflowId, nodeId }))._unsafeUnwrap().status ===
+        "failed",
       2000,
       "node marked failed",
     );
-    const n = (await f.module.getNode.execute({ nodeId }))._unsafeUnwrap();
+    const n = (await f.module.getNode.execute({ workflowId, nodeId }))._unsafeUnwrap();
     expect(n.status).toBe("failed");
     expect(n.endedAt).toBeDefined();
   });
 
-  it("eager dispatch reaction from addNode commits then dispatches once", async () => {
+  it("eager dispatch reaction from addSubgraph commits then dispatches once", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: parentTaskId } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "p" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
     setNodeLifecycle(f, {
-      id: parentTaskId,
+      id: initialCoordNodeId,
       status: "succeeded",
       endedAt: "2026-06-07T01:00:00.000Z",
     });
     const before = f.workerRunner.dispatchCalls.length;
-    const { nodeId } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "y" },
-        parents: [parentTaskId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "w", spec: { agent: "w", brief: "y" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const nodeId = workerIds.w!;
+
     await waitUntil(
-      async () => (await f.module.getNode.execute({ nodeId }))._unsafeUnwrap().status === "running",
+      async () =>
+        (await f.module.getNode.execute({ workflowId, nodeId }))._unsafeUnwrap().status ===
+        "running",
       2000,
       "node becomes running",
     );
-    expect((await f.module.getNode.execute({ nodeId }))._unsafeUnwrap().status).toBe("running");
+    expect((await f.module.getNode.execute({ workflowId, nodeId }))._unsafeUnwrap().status).toBe(
+      "running",
+    );
     expect(f.workerRunner.dispatchCalls.length).toBe(before + 1);
   });
 });

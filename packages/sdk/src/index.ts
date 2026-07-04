@@ -28,7 +28,3 @@ export * as sdk from "./generated/sdk.gen.js";
 // Result helpers that turn a generated call's `{ data, error, response }`
 // tuple into a payload or a thrown `GlyphError`.
 export { unwrap, unwrapOr } from "./unwrap.js";
-// Named wire-DTO shapes (`AgentEntry`, `WorkflowHeader`, request bodies,
-// …) the generated operation envelopes don't expose by name. Type-only,
-// so the runtime surface stays unchanged. See `./wire.ts`.
-export type * from "./wire.js";

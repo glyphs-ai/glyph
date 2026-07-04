@@ -57,6 +57,8 @@ describe("@glyphs-ai/workflow public API guard", () => {
     expectTypeOf<WorkflowNodeRunner>().toHaveProperty("dispatch");
     expectTypeOf<WorkflowNodeRunner>().toHaveProperty("hasInFlightForNode");
     expectTypeOf<WorkflowNodeRunner>().toHaveProperty("cancel");
+    expectTypeOf<WorkflowNodeRunner>().toHaveProperty("listArtifacts");
+    expectTypeOf<WorkflowNodeRunner>().toHaveProperty("resolveArtifactPath");
 
     expectTypeOf<WorkflowNodeValidateCtx>().toHaveProperty("workflowId");
     expectTypeOf<WorkflowNodeValidateCtx>().toHaveProperty("workflowStatus");
@@ -153,15 +155,9 @@ describe("@glyphs-ai/workflow public API guard", () => {
     for (const key of [
       "createWorkflow",
       "deleteWorkflow",
-      "purgeWorkflow",
-      "addNode",
-      "addEdge",
       "cancelNode",
       "finishWorkflow",
       "cancelWorkflow",
-      "removeNode",
-      "removeEdge",
-      "replaceNodeSpec",
       "addSubgraph",
       "respondHumanNode",
       "getWorkflow",

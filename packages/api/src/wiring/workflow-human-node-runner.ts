@@ -21,6 +21,7 @@ import {
   HUMAN_PROMPT_STYLES,
   type HumanNodePromptStyle,
   type HumanNodeSpec,
+  type WorkflowId,
   type WorkflowModule,
   type WorkflowNodeDispatchOpts,
   type WorkflowNodeId,
@@ -44,6 +45,7 @@ export interface HumanNodeRunnerOpts {
 
 export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunner {
   const getModule = opts.getModule ?? opts.getService;
+  const workflowIdsByNodeId = new Map<string, string>();
 
   return {
     async validate(spec: unknown, _ctx: WorkflowNodeValidateCtx): Promise<unknown> {
@@ -123,7 +125,8 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
       return validated;
     },
 
-    async dispatch(_opts: WorkflowNodeDispatchOpts): Promise<void> {
+    async dispatch(opts: WorkflowNodeDispatchOpts): Promise<void> {
+      workflowIdsByNodeId.set(opts.nodeId, opts.workflowId);
       // No-op: the human node simply sits in `running` status until
       // the respond API is called. No subprocess, no polling.
     },
@@ -131,7 +134,14 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
     async hasInFlightForNode(nodeId: string): Promise<boolean> {
       const module = getModule?.();
       if (module === undefined) throw new Error("workflow-human-node-runner: missing module");
-      const nodeResult = await module.getNode.execute({ nodeId: nodeId as WorkflowNodeId });
+      const workflowId = workflowIdsByNodeId.get(nodeId);
+      if (workflowId === undefined) {
+        throw new Error(`workflow-human-node-runner: missing workflow id for node ${nodeId}`);
+      }
+      const nodeResult = await module.getNode.execute({
+        workflowId: workflowId as WorkflowId,
+        nodeId: nodeId as WorkflowNodeId,
+      });
       if (nodeResult.isErr()) throw new Error(nodeResult.error.type);
       const node = nodeResult.value;
       return node.status === "running";
@@ -140,6 +150,14 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
     async cancel(_nodeId: string): Promise<void> {
       // No-op: nothing to kill. The substrate's reconcileCancel marks
       // the node cancelled directly.
+    },
+
+    async listArtifacts() {
+      return null;
+    },
+
+    async resolveArtifactPath() {
+      return null;
     },
   };
 }

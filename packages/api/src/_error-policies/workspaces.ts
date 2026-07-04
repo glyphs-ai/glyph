@@ -15,7 +15,6 @@ import type {
   DatabaseUnavailable,
   ProvisioningFailed,
   WorkspaceError,
-  WorkspaceIdConflict,
   WorkspaceNotFound,
   WorkspacePathConflict,
 } from "@glyphs-ai/workspace";
@@ -33,7 +32,6 @@ export type WorkspaceRouteError = WorkspaceError | ProvisioningFailed | Workspac
 
 const STATUS_BY_TYPE: Readonly<
   Record<
-    | WorkspaceIdConflict["type"]
     | WorkspacePathConflict["type"]
     | WorkspaceNotFound["type"]
     | DatabaseUnavailable["type"]
@@ -42,7 +40,6 @@ const STATUS_BY_TYPE: Readonly<
   >
 > = {
   WorkspaceNotFound: 404,
-  WorkspaceIdConflict: 409,
   WorkspacePathConflict: 409,
   DatabaseUnavailable: 500,
   ProvisioningFailed: 500,
@@ -50,7 +47,6 @@ const STATUS_BY_TYPE: Readonly<
 
 const MESSAGE_BY_TYPE: Readonly<
   Record<
-    | WorkspaceIdConflict["type"]
     | WorkspacePathConflict["type"]
     | WorkspaceNotFound["type"]
     | DatabaseUnavailable["type"]
@@ -59,7 +55,6 @@ const MESSAGE_BY_TYPE: Readonly<
   >
 > = {
   WorkspaceNotFound: "workspace not found",
-  WorkspaceIdConflict: "workspace id already registered",
   WorkspacePathConflict: "workspace directory already registered",
   DatabaseUnavailable: "internal error",
   ProvisioningFailed: "internal error",

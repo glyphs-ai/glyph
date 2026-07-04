@@ -118,14 +118,6 @@ describe("CreateSessionUseCase — error channel + rollback", () => {
     expect(sandbox.remove).toHaveBeenCalledWith(ID);
     expect(repo.save).not.toHaveBeenCalled();
   });
-
-  it("rolls back sandbox + runtime state when insert conflicts", async () => {
-    repo.save.mockReturnValue(errAsync({ type: "SessionIdConflict", id: ID as never }));
-    const err = (await useCase.execute({ agent: "public/demo" }))._unsafeUnwrapErr();
-    expect(err.type).toBe("SessionIdConflict");
-    expect(sandbox.remove).toHaveBeenCalledWith(ID);
-    expect(runtime.deleteState).toHaveBeenCalledWith("rsid-1");
-  });
 });
 
 describe("generateSessionId", () => {

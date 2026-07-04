@@ -20,20 +20,6 @@
 
 // ─── Application: per-use-case wire contracts ──────────────────────
 export {
-  type AddWorkflowEdgeError,
-  type AddWorkflowEdgeRequest,
-  AddWorkflowEdgeRequestSchema,
-  type AddWorkflowEdgeResponse,
-  AddWorkflowEdgeResponseSchema,
-} from "./application/add-workflow-edge.js";
-export {
-  type AddWorkflowNodeError,
-  type AddWorkflowNodeRequest,
-  AddWorkflowNodeRequestSchema,
-  type AddWorkflowNodeResponse,
-  AddWorkflowNodeResponseSchema,
-} from "./application/add-workflow-node.js";
-export {
   type AddWorkflowSubgraphError,
   type AddWorkflowSubgraphRequest,
   AddWorkflowSubgraphRequestSchema,
@@ -52,12 +38,14 @@ export {
   type CancelWorkflowRequest,
   CancelWorkflowRequestSchema,
   type CancelWorkflowResponse,
+  CancelWorkflowResponseSchema,
 } from "./application/cancel-workflow.js";
 export {
   type CancelWorkflowNodeError,
   type CancelWorkflowNodeRequest,
   CancelWorkflowNodeRequestSchema,
   type CancelWorkflowNodeResponse,
+  CancelWorkflowNodeResponseSchema,
 } from "./application/cancel-workflow-node.js";
 export {
   type CountAwaitingHumanError,
@@ -79,6 +67,7 @@ export {
   type DeleteWorkflowRequest,
   DeleteWorkflowRequestSchema,
   type DeleteWorkflowResponse,
+  DeleteWorkflowResponseSchema,
   type WorkflowDeleteRequiresTerminal,
 } from "./application/delete-workflow.js";
 // ─── Application: engine and ports ─────────────────────────────────
@@ -92,6 +81,7 @@ export {
   type FinishWorkflowRequest,
   FinishWorkflowRequestSchema,
   type FinishWorkflowResponse,
+  FinishWorkflowResponseSchema,
 } from "./application/finish-workflow.js";
 export {
   type GetWorkflowError,
@@ -117,6 +107,14 @@ export {
   GetWorkflowNodeResponseSchema,
 } from "./application/get-workflow-node.js";
 export {
+  type ListWorkflowArtifactsError,
+  type ListWorkflowArtifactsRequest,
+  ListWorkflowArtifactsRequestSchema,
+  type ListWorkflowArtifactsResponse,
+  ListWorkflowArtifactsResponseSchema,
+  type WorkflowArtifactEntry,
+} from "./application/list-workflow-artifacts.js";
+export {
   type ListWorkflowsError,
   type ListWorkflowsRequest,
   ListWorkflowsRequestSchema,
@@ -125,6 +123,7 @@ export {
 } from "./application/list-workflows.js";
 export {
   runnerFor,
+  type WorkflowNodeArtifactListing,
   type WorkflowNodeDispatchOpts,
   type WorkflowNodeRunner,
   type WorkflowNodeTerminalResult,
@@ -132,29 +131,13 @@ export {
   type WorkflowRunners,
 } from "./application/ports/workflow-node-runner.js";
 export {
-  type PurgeWorkflowError,
-  type PurgeWorkflowRequest,
-  PurgeWorkflowRequestSchema,
-  type PurgeWorkflowResponse,
-} from "./application/purge-workflow.js";
-export {
-  type RemoveWorkflowEdgeError,
-  type RemoveWorkflowEdgeRequest,
-  RemoveWorkflowEdgeRequestSchema,
-  type RemoveWorkflowEdgeResponse,
-} from "./application/remove-workflow-edge.js";
-export {
-  type RemoveWorkflowNodeError,
-  type RemoveWorkflowNodeRequest,
-  RemoveWorkflowNodeRequestSchema,
-  type RemoveWorkflowNodeResponse,
-} from "./application/remove-workflow-node.js";
-export {
-  type ReplaceWorkflowNodeSpecError,
-  type ReplaceWorkflowNodeSpecRequest,
-  ReplaceWorkflowNodeSpecRequestSchema,
-  type ReplaceWorkflowNodeSpecResponse,
-} from "./application/replace-workflow-node-spec.js";
+  type ResolveWorkflowArtifactPathError,
+  type ResolveWorkflowArtifactPathRequest,
+  ResolveWorkflowArtifactPathRequestSchema,
+  type ResolveWorkflowArtifactPathResponse,
+  ResolveWorkflowArtifactPathResponseSchema,
+  type WorkflowArtifactRef,
+} from "./application/resolve-workflow-artifact-path.js";
 export {
   type RespondToHumanNodeError,
   type RespondToHumanNodeRequest,

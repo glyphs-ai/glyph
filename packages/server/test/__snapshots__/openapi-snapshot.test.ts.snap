@@ -397,14 +397,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "type": "string",
             },
           },
-          {
-            "in": "query",
-            "name": "purge",
-            "required": false,
-            "schema": {
-              "type": "string",
-            },
-          },
         ],
         "responses": {
           "204": {
@@ -6511,9 +6503,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 "schema": {
                   "items": {
                     "properties": {
-                      "awaitingHumanCount": {
-                        "type": "number",
-                      },
                       "brief": {
                         "type": "string",
                       },
@@ -6595,20 +6584,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         ],
                       },
                       "id": {
+                        "pattern": "^\\d{8}-[0-9a-f]{8}$",
                         "type": "string",
-                      },
-                      "iterationCount": {
-                        "type": "number",
                       },
                       "metadata": {
                         "additionalProperties": {},
                         "type": "object",
                       },
                       "origin": {
-                        "enum": [
-                          "standalone",
-                          "schedule",
-                        ],
                         "type": "string",
                       },
                       "originId": {
@@ -6648,7 +6631,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "status",
                       "origin",
                       "metadata",
-                      "awaitingHumanCount",
                       "createdAt",
                     ],
                     "type": "object",
@@ -6669,199 +6651,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/schedules": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "query",
-            "name": "agent",
-            "required": false,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "query",
-            "name": "enabled",
-            "required": false,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "properties": {
-                      "createdAt": {
-                        "type": "string",
-                      },
-                      "enabled": {
-                        "type": "boolean",
-                      },
-                      "fireStats": {
-                        "properties": {
-                          "awaitingCount": {
-                            "type": "number",
-                          },
-                          "runningCount": {
-                            "type": "number",
-                          },
-                        },
-                        "required": [
-                          "awaitingCount",
-                          "runningCount",
-                        ],
-                        "type": "object",
-                      },
-                      "id": {
-                        "type": "string",
-                      },
-                      "lastFiredAt": {
-                        "type": "string",
-                      },
-                      "name": {
-                        "type": "string",
-                      },
-                      "nextFireAt": {
-                        "type": "string",
-                      },
-                      "target": {
-                        "anyOf": [
-                          {
-                            "properties": {
-                              "agent": {
-                                "type": "string",
-                              },
-                              "brief": {
-                                "type": "string",
-                              },
-                              "details": {
-                                "type": "string",
-                              },
-                              "kind": {
-                                "enum": [
-                                  "task",
-                                ],
-                                "type": "string",
-                              },
-                              "runtime": {
-                                "type": "string",
-                              },
-                            },
-                            "required": [
-                              "agent",
-                              "brief",
-                              "kind",
-                            ],
-                            "type": "object",
-                          },
-                          {
-                            "properties": {
-                              "brief": {
-                                "type": "string",
-                              },
-                              "coordinatorAgent": {
-                                "type": "string",
-                              },
-                              "details": {
-                                "type": "string",
-                              },
-                              "kind": {
-                                "enum": [
-                                  "workflow",
-                                ],
-                                "type": "string",
-                              },
-                            },
-                            "required": [
-                              "coordinatorAgent",
-                              "brief",
-                              "kind",
-                            ],
-                            "type": "object",
-                          },
-                          {
-                            "properties": {
-                              "data": {},
-                              "kind": {
-                                "type": "string",
-                              },
-                            },
-                            "required": [
-                              "kind",
-                            ],
-                            "type": "object",
-                          },
-                        ],
-                      },
-                      "trigger": {
-                        "properties": {
-                          "expr": {
-                            "type": "string",
-                          },
-                          "kind": {
-                            "enum": [
-                              "cron",
-                            ],
-                            "type": "string",
-                          },
-                          "tz": {
-                            "type": "string",
-                          },
-                        },
-                        "required": [
-                          "kind",
-                          "expr",
-                          "tz",
-                        ],
-                        "type": "object",
-                      },
-                      "updatedAt": {
-                        "type": "string",
-                      },
-                    },
-                    "required": [
-                      "id",
-                      "name",
-                      "trigger",
-                      "enabled",
-                      "createdAt",
-                      "updatedAt",
-                      "target",
-                    ],
-                    "type": "object",
-                  },
-                  "type": "array",
-                },
-              },
-            },
-            "description": "Schedules",
-          },
-          "400": {
-            "description": "Malformed query",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "List schedules",
-        "tags": [
-          "schedules",
-        ],
-      },
-    },
     "/api/workspaces/{id}/schedules/preview-cron": {
       "get": {
         "parameters": [
@@ -6876,16 +6665,18 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           {
             "in": "query",
             "name": "expr",
-            "required": false,
+            "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
           {
             "in": "query",
             "name": "tz",
-            "required": false,
+            "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -6894,7 +6685,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "name": "n",
             "required": false,
             "schema": {
-              "type": "string",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
             },
           },
         ],
@@ -6938,6 +6731,140 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
       },
     },
     "/api/workspaces/{id}/schedules/task": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "agent",
+            "required": false,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "enabled",
+            "required": false,
+            "schema": {
+              "enum": [
+                "true",
+                "false",
+              ],
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "createdAt": {
+                        "type": "string",
+                      },
+                      "enabled": {
+                        "type": "boolean",
+                      },
+                      "id": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                        "type": "string",
+                      },
+                      "lastFiredAt": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "nextFireAt": {
+                        "type": "string",
+                      },
+                      "target": {
+                        "properties": {
+                          "agent": {
+                            "type": "string",
+                          },
+                          "brief": {
+                            "type": "string",
+                          },
+                          "details": {
+                            "type": "string",
+                          },
+                          "runtime": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "agent",
+                          "brief",
+                        ],
+                        "type": "object",
+                      },
+                      "trigger": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "expr": {
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "cron",
+                            ],
+                            "type": "string",
+                          },
+                          "tz": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "expr",
+                          "tz",
+                        ],
+                        "type": "object",
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "trigger",
+                      "target",
+                      "enabled",
+                      "createdAt",
+                      "updatedAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Task schedules",
+          },
+          "400": {
+            "description": "Malformed query",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "List task schedules",
+        "tags": [
+          "schedules",
+        ],
+      },
       "post": {
         "parameters": [
           {
@@ -7009,8 +6936,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
                 "required": [
                   "name",
-                  "target",
                   "trigger",
+                  "target",
                 ],
                 "type": "object",
               },
@@ -7030,22 +6957,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "enabled": {
                       "type": "boolean",
                     },
-                    "fireStats": {
-                      "properties": {
-                        "awaitingCount": {
-                          "type": "number",
-                        },
-                        "runningCount": {
-                          "type": "number",
-                        },
-                      },
-                      "required": [
-                        "awaitingCount",
-                        "runningCount",
-                      ],
-                      "type": "object",
-                    },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
                       "type": "string",
                     },
                     "lastFiredAt": {
@@ -7058,75 +6971,28 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "target": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "task",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
+                      "properties": {
+                        "agent": {
+                          "type": "string",
                         },
-                        {
-                          "properties": {
-                            "brief": {
-                              "type": "string",
-                            },
-                            "coordinatorAgent": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "workflow",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "coordinatorAgent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
+                        "brief": {
+                          "type": "string",
                         },
-                        {
-                          "properties": {
-                            "data": {},
-                            "kind": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
+                        "details": {
+                          "type": "string",
                         },
+                        "runtime": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "agent",
+                        "brief",
                       ],
+                      "type": "object",
                     },
                     "trigger": {
+                      "additionalProperties": false,
                       "properties": {
                         "expr": {
                           "type": "string",
@@ -7156,10 +7022,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "id",
                     "name",
                     "trigger",
+                    "target",
                     "enabled",
                     "createdAt",
                     "updatedAt",
-                    "target",
                   ],
                   "type": "object",
                 },
@@ -7177,13 +7043,196 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Internal error",
           },
         },
-        "summary": "Create a task-kind schedule",
+        "summary": "Create a task schedule",
         "tags": [
           "schedules",
         ],
       },
     },
     "/api/workspaces/{id}/schedules/task/{sid}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "deletedDispatchCount": {
+                      "type": "number",
+                    },
+                    "ok": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "deletedDispatchCount",
+                    "ok",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Delete outcome",
+          },
+          "404": {
+            "description": "Schedule not found",
+          },
+          "409": {
+            "description": "Schedule enabled or has in-flight dispatch",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "Delete a task schedule",
+        "tags": [
+          "schedules",
+        ],
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": {
+                      "type": "string",
+                    },
+                    "describe": {
+                      "type": "string",
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                    },
+                    "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                      "type": "string",
+                    },
+                    "lastFiredAt": {
+                      "type": "string",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "nextFireAt": {
+                      "type": "string",
+                    },
+                    "target": {
+                      "properties": {
+                        "agent": {
+                          "type": "string",
+                        },
+                        "brief": {
+                          "type": "string",
+                        },
+                        "details": {
+                          "type": "string",
+                        },
+                        "runtime": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "agent",
+                        "brief",
+                      ],
+                      "type": "object",
+                    },
+                    "trigger": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "expr": {
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "cron",
+                          ],
+                          "type": "string",
+                        },
+                        "tz": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "expr",
+                        "tz",
+                      ],
+                      "type": "object",
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "trigger",
+                    "target",
+                    "enabled",
+                    "createdAt",
+                    "updatedAt",
+                    "describe",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Task schedule",
+          },
+          "404": {
+            "description": "Schedule not found",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "Get a task schedule",
+        "tags": [
+          "schedules",
+        ],
+      },
       "patch": {
         "parameters": [
           {
@@ -7281,22 +7330,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "enabled": {
                       "type": "boolean",
                     },
-                    "fireStats": {
-                      "properties": {
-                        "awaitingCount": {
-                          "type": "number",
-                        },
-                        "runningCount": {
-                          "type": "number",
-                        },
-                      },
-                      "required": [
-                        "awaitingCount",
-                        "runningCount",
-                      ],
-                      "type": "object",
-                    },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
                       "type": "string",
                     },
                     "lastFiredAt": {
@@ -7309,75 +7344,28 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "target": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "task",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
+                      "properties": {
+                        "agent": {
+                          "type": "string",
                         },
-                        {
-                          "properties": {
-                            "brief": {
-                              "type": "string",
-                            },
-                            "coordinatorAgent": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "workflow",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "coordinatorAgent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
+                        "brief": {
+                          "type": "string",
                         },
-                        {
-                          "properties": {
-                            "data": {},
-                            "kind": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
+                        "details": {
+                          "type": "string",
                         },
+                        "runtime": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "agent",
+                        "brief",
                       ],
+                      "type": "object",
                     },
                     "trigger": {
+                      "additionalProperties": false,
                       "properties": {
                         "expr": {
                           "type": "string",
@@ -7407,10 +7395,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "id",
                     "name",
                     "trigger",
+                    "target",
                     "enabled",
                     "createdAt",
                     "updatedAt",
-                    "target",
                   ],
                   "type": "object",
                 },
@@ -7428,13 +7416,284 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Internal error",
           },
         },
-        "summary": "Patch a task-kind schedule",
+        "summary": "Patch a task schedule",
+        "tags": [
+          "schedules",
+        ],
+      },
+    },
+    "/api/workspaces/{id}/schedules/task/{sid}/preview": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "n",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "describe": {
+                      "type": "string",
+                    },
+                    "nextRuns": {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "describe",
+                    "nextRuns",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Schedule preview",
+          },
+          "400": {
+            "description": "Malformed query",
+          },
+          "404": {
+            "description": "Schedule not found",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "Preview a task schedule's upcoming fires",
+        "tags": [
+          "schedules",
+        ],
+      },
+    },
+    "/api/workspaces/{id}/schedules/task/{sid}/run": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "dispatchId": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "dispatchId",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Dispatch id",
+          },
+          "404": {
+            "description": "Schedule not found",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "Manually fire a task schedule",
         "tags": [
           "schedules",
         ],
       },
     },
     "/api/workspaces/{id}/schedules/workflow": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "coordinatorAgent",
+            "required": false,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "enabled",
+            "required": false,
+            "schema": {
+              "enum": [
+                "true",
+                "false",
+              ],
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "createdAt": {
+                        "type": "string",
+                      },
+                      "enabled": {
+                        "type": "boolean",
+                      },
+                      "fireStats": {
+                        "properties": {
+                          "awaitingCount": {
+                            "type": "number",
+                          },
+                          "runningCount": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "awaitingCount",
+                          "runningCount",
+                        ],
+                        "type": "object",
+                      },
+                      "id": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                        "type": "string",
+                      },
+                      "lastFiredAt": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "nextFireAt": {
+                        "type": "string",
+                      },
+                      "target": {
+                        "properties": {
+                          "brief": {
+                            "type": "string",
+                          },
+                          "coordinatorAgent": {
+                            "type": "string",
+                          },
+                          "details": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "coordinatorAgent",
+                          "brief",
+                        ],
+                        "type": "object",
+                      },
+                      "trigger": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "expr": {
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "cron",
+                            ],
+                            "type": "string",
+                          },
+                          "tz": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "expr",
+                          "tz",
+                        ],
+                        "type": "object",
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "trigger",
+                      "target",
+                      "enabled",
+                      "createdAt",
+                      "updatedAt",
+                      "fireStats",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Workflow schedules",
+          },
+          "400": {
+            "description": "Malformed query",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "List workflow schedules",
+        "tags": [
+          "schedules",
+        ],
+      },
       "post": {
         "parameters": [
           {
@@ -7503,8 +7762,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
                 "required": [
                   "name",
-                  "target",
                   "trigger",
+                  "target",
                 ],
                 "type": "object",
               },
@@ -7540,6 +7799,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
                       "type": "string",
                     },
                     "lastFiredAt": {
@@ -7552,75 +7812,25 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "target": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "task",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
+                      "properties": {
+                        "brief": {
+                          "type": "string",
                         },
-                        {
-                          "properties": {
-                            "brief": {
-                              "type": "string",
-                            },
-                            "coordinatorAgent": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "workflow",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "coordinatorAgent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
+                        "coordinatorAgent": {
+                          "type": "string",
                         },
-                        {
-                          "properties": {
-                            "data": {},
-                            "kind": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
+                        "details": {
+                          "type": "string",
                         },
+                      },
+                      "required": [
+                        "coordinatorAgent",
+                        "brief",
                       ],
+                      "type": "object",
                     },
                     "trigger": {
+                      "additionalProperties": false,
                       "properties": {
                         "expr": {
                           "type": "string",
@@ -7650,10 +7860,11 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "id",
                     "name",
                     "trigger",
+                    "target",
                     "enabled",
                     "createdAt",
                     "updatedAt",
-                    "target",
+                    "fireStats",
                   ],
                   "type": "object",
                 },
@@ -7671,13 +7882,209 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Internal error",
           },
         },
-        "summary": "Create a workflow-kind schedule",
+        "summary": "Create a workflow schedule",
         "tags": [
           "schedules",
         ],
       },
     },
     "/api/workspaces/{id}/schedules/workflow/{sid}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "deletedDispatchCount": {
+                      "type": "number",
+                    },
+                    "ok": {
+                      "enum": [
+                        true,
+                      ],
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "deletedDispatchCount",
+                    "ok",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Delete outcome",
+          },
+          "404": {
+            "description": "Schedule not found",
+          },
+          "409": {
+            "description": "Schedule enabled or has in-flight dispatch",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "Delete a workflow schedule",
+        "tags": [
+          "schedules",
+        ],
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": {
+                      "type": "string",
+                    },
+                    "describe": {
+                      "type": "string",
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                    },
+                    "fireStats": {
+                      "properties": {
+                        "awaitingCount": {
+                          "type": "number",
+                        },
+                        "runningCount": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "awaitingCount",
+                        "runningCount",
+                      ],
+                      "type": "object",
+                    },
+                    "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                      "type": "string",
+                    },
+                    "lastFiredAt": {
+                      "type": "string",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "nextFireAt": {
+                      "type": "string",
+                    },
+                    "target": {
+                      "properties": {
+                        "brief": {
+                          "type": "string",
+                        },
+                        "coordinatorAgent": {
+                          "type": "string",
+                        },
+                        "details": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "coordinatorAgent",
+                        "brief",
+                      ],
+                      "type": "object",
+                    },
+                    "trigger": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "expr": {
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "cron",
+                          ],
+                          "type": "string",
+                        },
+                        "tz": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "expr",
+                        "tz",
+                      ],
+                      "type": "object",
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "trigger",
+                    "target",
+                    "enabled",
+                    "createdAt",
+                    "updatedAt",
+                    "fireStats",
+                    "describe",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Workflow schedule",
+          },
+          "404": {
+            "description": "Schedule not found",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "Get a workflow schedule",
+        "tags": [
+          "schedules",
+        ],
+      },
       "patch": {
         "parameters": [
           {
@@ -7785,6 +8192,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "object",
                     },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
                       "type": "string",
                     },
                     "lastFiredAt": {
@@ -7797,75 +8205,25 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "target": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "task",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
+                      "properties": {
+                        "brief": {
+                          "type": "string",
                         },
-                        {
-                          "properties": {
-                            "brief": {
-                              "type": "string",
-                            },
-                            "coordinatorAgent": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "workflow",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "coordinatorAgent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
+                        "coordinatorAgent": {
+                          "type": "string",
                         },
-                        {
-                          "properties": {
-                            "data": {},
-                            "kind": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
+                        "details": {
+                          "type": "string",
                         },
+                      },
+                      "required": [
+                        "coordinatorAgent",
+                        "brief",
                       ],
+                      "type": "object",
                     },
                     "trigger": {
+                      "additionalProperties": false,
                       "properties": {
                         "expr": {
                           "type": "string",
@@ -7895,10 +8253,11 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "id",
                     "name",
                     "trigger",
+                    "target",
                     "enabled",
                     "createdAt",
                     "updatedAt",
-                    "target",
+                    "fireStats",
                   ],
                   "type": "object",
                 },
@@ -7916,244 +8275,13 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Internal error",
           },
         },
-        "summary": "Patch a workflow-kind schedule",
+        "summary": "Patch a workflow schedule",
         "tags": [
           "schedules",
         ],
       },
     },
-    "/api/workspaces/{id}/schedules/{sid}": {
-      "delete": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "sid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "deletedDispatchCount": {
-                      "type": "number",
-                    },
-                    "ok": {
-                      "enum": [
-                        true,
-                      ],
-                      "type": "boolean",
-                    },
-                  },
-                  "required": [
-                    "ok",
-                    "deletedDispatchCount",
-                  ],
-                  "type": "object",
-                },
-              },
-            },
-            "description": "Delete outcome",
-          },
-          "404": {
-            "description": "Schedule not found",
-          },
-          "409": {
-            "description": "Schedule has in-flight dispatch",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "Delete a schedule",
-        "tags": [
-          "schedules",
-        ],
-      },
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "sid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "createdAt": {
-                      "type": "string",
-                    },
-                    "describe": {
-                      "type": "string",
-                    },
-                    "enabled": {
-                      "type": "boolean",
-                    },
-                    "id": {
-                      "type": "string",
-                    },
-                    "lastFiredAt": {
-                      "type": "string",
-                    },
-                    "name": {
-                      "type": "string",
-                    },
-                    "nextFireAt": {
-                      "type": "string",
-                    },
-                    "target": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "task",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "brief": {
-                              "type": "string",
-                            },
-                            "coordinatorAgent": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "workflow",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "coordinatorAgent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "data": {},
-                            "kind": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                      ],
-                    },
-                    "trigger": {
-                      "properties": {
-                        "expr": {
-                          "type": "string",
-                        },
-                        "kind": {
-                          "enum": [
-                            "cron",
-                          ],
-                          "type": "string",
-                        },
-                        "tz": {
-                          "type": "string",
-                        },
-                      },
-                      "required": [
-                        "kind",
-                        "expr",
-                        "tz",
-                      ],
-                      "type": "object",
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "trigger",
-                    "enabled",
-                    "createdAt",
-                    "updatedAt",
-                    "target",
-                    "describe",
-                  ],
-                  "type": "object",
-                },
-              },
-            },
-            "description": "Schedule",
-          },
-          "404": {
-            "description": "Schedule not found",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "Get a schedule",
-        "tags": [
-          "schedules",
-        ],
-      },
-    },
-    "/api/workspaces/{id}/schedules/{sid}/preview": {
+    "/api/workspaces/{id}/schedules/workflow/{sid}/preview": {
       "get": {
         "parameters": [
           {
@@ -8177,7 +8305,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "name": "n",
             "required": false,
             "schema": {
-              "type": "string",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
             },
           },
         ],
@@ -8217,13 +8347,13 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Internal error",
           },
         },
-        "summary": "Preview a schedule's upcoming fires",
+        "summary": "Preview a workflow schedule's upcoming fires",
         "tags": [
           "schedules",
         ],
       },
     },
-    "/api/workspaces/{id}/schedules/{sid}/run": {
+    "/api/workspaces/{id}/schedules/workflow/{sid}/run": {
       "post": {
         "parameters": [
           {
@@ -8269,7 +8399,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Internal error",
           },
         },
-        "summary": "Manually fire a schedule",
+        "summary": "Manually fire a workflow schedule",
         "tags": [
           "schedules",
         ],
@@ -10057,7 +10187,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/tasks/{tid}/artifact/{name}": {
+    "/api/workspaces/{id}/tasks/{tid}/artifact": {
       "get": {
         "parameters": [
           {
@@ -10077,10 +10207,11 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
           },
           {
-            "in": "path",
-            "name": "name",
+            "in": "query",
+            "name": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -10375,9 +10506,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 "schema": {
                   "items": {
                     "properties": {
-                      "awaitingHumanCount": {
-                        "type": "number",
-                      },
                       "brief": {
                         "type": "string",
                       },
@@ -10459,20 +10587,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         ],
                       },
                       "id": {
+                        "pattern": "^\\d{8}-[0-9a-f]{8}$",
                         "type": "string",
-                      },
-                      "iterationCount": {
-                        "type": "number",
                       },
                       "metadata": {
                         "additionalProperties": {},
                         "type": "object",
                       },
                       "origin": {
-                        "enum": [
-                          "standalone",
-                          "schedule",
-                        ],
                         "type": "string",
                       },
                       "originId": {
@@ -10512,7 +10634,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "status",
                       "origin",
                       "metadata",
-                      "awaitingHumanCount",
                       "createdAt",
                     ],
                     "type": "object",
@@ -10556,6 +10677,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "type": "string",
                   },
                   "coordinatorAgent": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "details": {
@@ -10578,9 +10700,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "application/json": {
                 "schema": {
                   "properties": {
-                    "awaitingHumanCount": {
-                      "type": "number",
-                    },
                     "brief": {
                       "type": "string",
                     },
@@ -10662,20 +10781,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
-                    },
-                    "iterationCount": {
-                      "type": "number",
                     },
                     "metadata": {
                       "additionalProperties": {},
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "schedule",
-                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -10715,7 +10828,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "status",
                     "origin",
                     "metadata",
-                    "awaitingHumanCount",
                     "createdAt",
                   ],
                   "type": "object",
@@ -10815,9 +10927,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "application/json": {
                 "schema": {
                   "properties": {
-                    "awaitingHumanCount": {
-                      "type": "number",
-                    },
                     "brief": {
                       "type": "string",
                     },
@@ -10899,20 +11008,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
-                    },
-                    "iterationCount": {
-                      "type": "number",
                     },
                     "metadata": {
                       "additionalProperties": {},
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "schedule",
-                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -10952,7 +11055,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "status",
                     "origin",
                     "metadata",
-                    "awaitingHumanCount",
                     "createdAt",
                   ],
                   "type": "object",
@@ -11004,6 +11106,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "items": {
                         "oneOf": [
                           {
+                            "additionalProperties": false,
                             "properties": {
                               "kind": {
                                 "enum": [
@@ -11011,19 +11114,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                                 ],
                                 "type": "string",
                               },
-                              "mimeBucket": {
-                                "enum": [
-                                  "text",
-                                  "image",
-                                  "archive",
-                                  "generic",
-                                ],
-                                "type": "string",
-                              },
                               "modifiedAt": {
                                 "type": "string",
                               },
-                              "path": {
+                              "relPath": {
                                 "type": "string",
                               },
                               "size": {
@@ -11032,27 +11126,18 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                             },
                             "required": [
                               "kind",
-                              "path",
+                              "relPath",
                               "size",
                               "modifiedAt",
-                              "mimeBucket",
                             ],
                             "type": "object",
                           },
                           {
+                            "additionalProperties": false,
                             "properties": {
                               "kind": {
                                 "enum": [
                                   "node",
-                                ],
-                                "type": "string",
-                              },
-                              "mimeBucket": {
-                                "enum": [
-                                  "text",
-                                  "image",
-                                  "archive",
-                                  "generic",
                                 ],
                                 "type": "string",
                               },
@@ -11062,24 +11147,19 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                               "nodeId": {
                                 "type": "string",
                               },
-                              "path": {
+                              "relPath": {
                                 "type": "string",
                               },
                               "size": {
                                 "type": "number",
                               },
-                              "taskId": {
-                                "type": "string",
-                              },
                             },
                             "required": [
                               "kind",
                               "nodeId",
-                              "taskId",
-                              "path",
+                              "relPath",
                               "size",
                               "modifiedAt",
-                              "mimeBucket",
                             ],
                             "type": "object",
                           },
@@ -11185,10 +11265,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 "additionalProperties": false,
                 "properties": {
                   "cancellation": {
-                    "additionalProperties": false,
                     "properties": {
                       "kind": {
-                        "default": "user",
                         "enum": [
                           "user",
                         ],
@@ -11199,6 +11277,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       },
                     },
                     "required": [
+                      "kind",
                       "message",
                     ],
                     "type": "object",
@@ -11219,9 +11298,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "application/json": {
                 "schema": {
                   "properties": {
-                    "awaitingHumanCount": {
-                      "type": "number",
-                    },
                     "brief": {
                       "type": "string",
                     },
@@ -11303,20 +11379,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
-                    },
-                    "iterationCount": {
-                      "type": "number",
                     },
                     "metadata": {
                       "additionalProperties": {},
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "schedule",
-                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -11356,7 +11426,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "status",
                     "origin",
                     "metadata",
-                    "awaitingHumanCount",
                     "createdAt",
                   ],
                   "type": "object",
@@ -11414,13 +11483,20 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "items": {
                         "properties": {
                           "from": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
                             "type": "string",
                           },
                           "to": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                            "type": "string",
+                          },
+                          "workflowId": {
+                            "pattern": "^\\d{8}-[0-9a-f]{8}$",
                             "type": "string",
                           },
                         },
                         "required": [
+                          "workflowId",
                           "from",
                           "to",
                         ],
@@ -11438,6 +11514,15 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                             "type": "string",
                           },
                           "id": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "coordinator",
+                              "worker",
+                              "human",
+                            ],
                             "type": "string",
                           },
                           "metadata": {
@@ -11453,112 +11538,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "runningAt": {
                             "type": "string",
                           },
-                          "spec": {
-                            "anyOf": [
-                              {
-                                "properties": {
-                                  "agent": {
-                                    "type": "string",
-                                  },
-                                  "brief": {
-                                    "type": "string",
-                                  },
-                                  "details": {
-                                    "type": "string",
-                                  },
-                                  "kind": {
-                                    "enum": [
-                                      "worker",
-                                    ],
-                                    "type": "string",
-                                  },
-                                  "runtime": {
-                                    "type": "string",
-                                  },
-                                },
-                                "required": [
-                                  "agent",
-                                  "brief",
-                                  "kind",
-                                ],
-                                "type": "object",
-                              },
-                              {
-                                "properties": {
-                                  "agent": {
-                                    "type": "string",
-                                  },
-                                  "kind": {
-                                    "enum": [
-                                      "coordinator",
-                                    ],
-                                    "type": "string",
-                                  },
-                                },
-                                "required": [
-                                  "agent",
-                                  "kind",
-                                ],
-                                "type": "object",
-                              },
-                              {
-                                "properties": {
-                                  "choices": {
-                                    "items": {
-                                      "properties": {
-                                        "id": {
-                                          "type": "string",
-                                        },
-                                        "label": {
-                                          "type": "string",
-                                        },
-                                      },
-                                      "required": [
-                                        "id",
-                                        "label",
-                                      ],
-                                      "type": "object",
-                                    },
-                                    "type": "array",
-                                  },
-                                  "kind": {
-                                    "enum": [
-                                      "human",
-                                    ],
-                                    "type": "string",
-                                  },
-                                  "prompt": {
-                                    "type": "string",
-                                  },
-                                  "promptStyle": {
-                                    "enum": [
-                                      "plain",
-                                      "markdown",
-                                    ],
-                                    "type": "string",
-                                  },
-                                },
-                                "required": [
-                                  "kind",
-                                  "prompt",
-                                  "promptStyle",
-                                ],
-                                "type": "object",
-                              },
-                              {
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                  },
-                                  "spec": {},
-                                },
-                                "required": [
-                                  "kind",
-                                ],
-                                "type": "object",
-                              },
-                            ],
-                          },
+                          "spec": {},
                           "status": {
                             "enum": [
                               "not_started",
@@ -11570,19 +11550,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                             ],
                             "type": "string",
                           },
-                          "taskId": {
-                            "type": "string",
-                          },
                           "workflowId": {
+                            "pattern": "^\\d{8}-[0-9a-f]{8}$",
                             "type": "string",
                           },
                         },
                         "required": [
                           "id",
                           "workflowId",
+                          "kind",
                           "phase",
                           "status",
-                          "spec",
                           "metadata",
                           "createdAt",
                         ],
@@ -11592,9 +11570,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     },
                     "workflow": {
                       "properties": {
-                        "awaitingHumanCount": {
-                          "type": "number",
-                        },
                         "brief": {
                           "type": "string",
                         },
@@ -11676,20 +11651,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           ],
                         },
                         "id": {
+                          "pattern": "^\\d{8}-[0-9a-f]{8}$",
                           "type": "string",
-                        },
-                        "iterationCount": {
-                          "type": "number",
                         },
                         "metadata": {
                           "additionalProperties": {},
                           "type": "object",
                         },
                         "origin": {
-                          "enum": [
-                            "standalone",
-                            "schedule",
-                          ],
                           "type": "string",
                         },
                         "originId": {
@@ -11729,7 +11698,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "status",
                         "origin",
                         "metadata",
-                        "awaitingHumanCount",
                         "createdAt",
                       ],
                       "type": "object",
@@ -11754,153 +11722,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           },
         },
         "summary": "Get the full DAG snapshot",
-        "tags": [
-          "workflows",
-        ],
-      },
-    },
-    "/api/workspaces/{id}/workflows/{wfid}/edges": {
-      "post": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "wfid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "fromNodeId": {
-                    "minLength": 1,
-                    "type": "string",
-                  },
-                  "toNodeId": {
-                    "minLength": 1,
-                    "type": "string",
-                  },
-                },
-                "required": [
-                  "fromNodeId",
-                  "toNodeId",
-                ],
-                "type": "object",
-              },
-            },
-          },
-          "required": true,
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "fromNodeId": {
-                      "type": "string",
-                    },
-                    "toNodeId": {
-                      "type": "string",
-                    },
-                    "toPhase": {
-                      "type": "number",
-                    },
-                  },
-                  "required": [
-                    "fromNodeId",
-                    "toNodeId",
-                    "toPhase",
-                  ],
-                  "type": "object",
-                },
-              },
-            },
-            "description": "Inserted edge",
-          },
-          "400": {
-            "description": "Malformed request body",
-          },
-          "404": {
-            "description": "Workflow not found",
-          },
-          "409": {
-            "description": "Workflow already terminal",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "Add an edge",
-        "tags": [
-          "workflows",
-        ],
-      },
-    },
-    "/api/workspaces/{id}/workflows/{wfid}/edges/{from}/{to}": {
-      "delete": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "wfid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "from",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "to",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "responses": {
-          "204": {
-            "description": "Edge deleted",
-          },
-          "404": {
-            "description": "Workflow or edge not found",
-          },
-          "409": {
-            "description": "Edge not mutable",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "Delete an edge",
         "tags": [
           "workflows",
         ],
@@ -11934,14 +11755,13 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                   {
                     "additionalProperties": false,
                     "properties": {
-                      "kind": {
+                      "outcome": {
                         "enum": [
                           "succeeded",
                         ],
                         "type": "string",
                       },
                       "success": {
-                        "additionalProperties": false,
                         "properties": {
                           "output": {
                             "type": [
@@ -11950,11 +11770,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                             ],
                           },
                         },
+                        "required": [
+                          "output",
+                        ],
                         "type": "object",
                       },
                     },
                     "required": [
-                      "kind",
+                      "outcome",
                     ],
                     "type": "object",
                   },
@@ -11962,10 +11785,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "additionalProperties": false,
                     "properties": {
                       "failure": {
-                        "additionalProperties": false,
                         "properties": {
                           "kind": {
-                            "default": "coordinator",
                             "enum": [
                               "coordinator",
                             ],
@@ -11976,11 +11797,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           },
                         },
                         "required": [
+                          "kind",
                           "message",
                         ],
                         "type": "object",
                       },
-                      "kind": {
+                      "outcome": {
                         "enum": [
                           "failed",
                         ],
@@ -11988,7 +11810,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       },
                     },
                     "required": [
-                      "kind",
+                      "outcome",
                       "failure",
                     ],
                     "type": "object",
@@ -12005,9 +11827,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "application/json": {
                 "schema": {
                   "properties": {
-                    "awaitingHumanCount": {
-                      "type": "number",
-                    },
                     "brief": {
                       "type": "string",
                     },
@@ -12089,20 +11908,14 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                     },
                     "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
-                    },
-                    "iterationCount": {
-                      "type": "number",
                     },
                     "metadata": {
                       "additionalProperties": {},
                       "type": "object",
                     },
                     "origin": {
-                      "enum": [
-                        "standalone",
-                        "schedule",
-                      ],
                       "type": "string",
                     },
                     "originId": {
@@ -12142,7 +11955,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "status",
                     "origin",
                     "metadata",
-                    "awaitingHumanCount",
                     "createdAt",
                   ],
                   "type": "object",
@@ -12170,149 +11982,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
-    "/api/workspaces/{id}/workflows/{wfid}/nodes": {
-      "post": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "wfid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "coordinator",
-                      "worker",
-                      "human",
-                    ],
-                    "type": "string",
-                  },
-                  "parents": {
-                    "items": {
-                      "minLength": 1,
-                      "type": "string",
-                    },
-                    "type": "array",
-                  },
-                  "spec": {},
-                },
-                "required": [
-                  "kind",
-                  "spec",
-                  "parents",
-                ],
-                "type": "object",
-              },
-            },
-          },
-          "required": true,
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "nodeId": {
-                      "type": "string",
-                    },
-                    "phase": {
-                      "type": "number",
-                    },
-                  },
-                  "required": [
-                    "nodeId",
-                    "phase",
-                  ],
-                  "type": "object",
-                },
-              },
-            },
-            "description": "Inserted node",
-          },
-          "400": {
-            "description": "Malformed request body",
-          },
-          "404": {
-            "description": "Workflow not found",
-          },
-          "409": {
-            "description": "Workflow already terminal",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "Add a node",
-        "tags": [
-          "workflows",
-        ],
-      },
-    },
     "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}": {
-      "delete": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "wfid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "nid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "responses": {
-          "204": {
-            "description": "Node deleted",
-          },
-          "404": {
-            "description": "Workflow or node not found",
-          },
-          "409": {
-            "description": "Node not mutable",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "Delete a node",
-        "tags": [
-          "workflows",
-        ],
-      },
       "get": {
         "parameters": [
           {
@@ -12353,6 +12023,15 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                      "type": "string",
+                    },
+                    "kind": {
+                      "enum": [
+                        "coordinator",
+                        "worker",
+                        "human",
+                      ],
                       "type": "string",
                     },
                     "metadata": {
@@ -12368,112 +12047,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "runningAt": {
                       "type": "string",
                     },
-                    "spec": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "worker",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "coordinator",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "choices": {
-                              "items": {
-                                "properties": {
-                                  "id": {
-                                    "type": "string",
-                                  },
-                                  "label": {
-                                    "type": "string",
-                                  },
-                                },
-                                "required": [
-                                  "id",
-                                  "label",
-                                ],
-                                "type": "object",
-                              },
-                              "type": "array",
-                            },
-                            "kind": {
-                              "enum": [
-                                "human",
-                              ],
-                              "type": "string",
-                            },
-                            "prompt": {
-                              "type": "string",
-                            },
-                            "promptStyle": {
-                              "enum": [
-                                "plain",
-                                "markdown",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "prompt",
-                            "promptStyle",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                            },
-                            "spec": {},
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                      ],
-                    },
+                    "spec": {},
                     "status": {
                       "enum": [
                         "not_started",
@@ -12485,19 +12059,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                       "type": "string",
                     },
-                    "taskId": {
-                      "type": "string",
-                    },
                     "workflowId": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
                     },
                   },
                   "required": [
                     "id",
                     "workflowId",
+                    "kind",
                     "phase",
                     "status",
-                    "spec",
                     "metadata",
                     "createdAt",
                   ],
@@ -12561,6 +12133,15 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                      "type": "string",
+                    },
+                    "kind": {
+                      "enum": [
+                        "coordinator",
+                        "worker",
+                        "human",
+                      ],
                       "type": "string",
                     },
                     "metadata": {
@@ -12576,112 +12157,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "runningAt": {
                       "type": "string",
                     },
-                    "spec": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "worker",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "coordinator",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "choices": {
-                              "items": {
-                                "properties": {
-                                  "id": {
-                                    "type": "string",
-                                  },
-                                  "label": {
-                                    "type": "string",
-                                  },
-                                },
-                                "required": [
-                                  "id",
-                                  "label",
-                                ],
-                                "type": "object",
-                              },
-                              "type": "array",
-                            },
-                            "kind": {
-                              "enum": [
-                                "human",
-                              ],
-                              "type": "string",
-                            },
-                            "prompt": {
-                              "type": "string",
-                            },
-                            "promptStyle": {
-                              "enum": [
-                                "plain",
-                                "markdown",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "prompt",
-                            "promptStyle",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                            },
-                            "spec": {},
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                      ],
-                    },
+                    "spec": {},
                     "status": {
                       "enum": [
                         "not_started",
@@ -12693,19 +12169,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                       "type": "string",
                     },
-                    "taskId": {
-                      "type": "string",
-                    },
                     "workflowId": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
                     },
                   },
                   "required": [
                     "id",
                     "workflowId",
+                    "kind",
                     "phase",
                     "status",
-                    "spec",
                     "metadata",
                     "createdAt",
                   ],
@@ -12765,14 +12239,21 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "schema": {
                 "additionalProperties": false,
                 "properties": {
-                  "choiceId": {
-                    "minLength": 1,
-                    "type": "string",
-                  },
-                  "input": {
-                    "type": "string",
+                  "response": {
+                    "properties": {
+                      "choiceId": {
+                        "type": "string",
+                      },
+                      "input": {
+                        "type": "string",
+                      },
+                    },
+                    "type": "object",
                   },
                 },
+                "required": [
+                  "response",
+                ],
                 "type": "object",
               },
             },
@@ -12792,6 +12273,15 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                      "type": "string",
+                    },
+                    "kind": {
+                      "enum": [
+                        "coordinator",
+                        "worker",
+                        "human",
+                      ],
                       "type": "string",
                     },
                     "metadata": {
@@ -12807,112 +12297,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "runningAt": {
                       "type": "string",
                     },
-                    "spec": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "worker",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "coordinator",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "choices": {
-                              "items": {
-                                "properties": {
-                                  "id": {
-                                    "type": "string",
-                                  },
-                                  "label": {
-                                    "type": "string",
-                                  },
-                                },
-                                "required": [
-                                  "id",
-                                  "label",
-                                ],
-                                "type": "object",
-                              },
-                              "type": "array",
-                            },
-                            "kind": {
-                              "enum": [
-                                "human",
-                              ],
-                              "type": "string",
-                            },
-                            "prompt": {
-                              "type": "string",
-                            },
-                            "promptStyle": {
-                              "enum": [
-                                "plain",
-                                "markdown",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "prompt",
-                            "promptStyle",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                            },
-                            "spec": {},
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                      ],
-                    },
+                    "spec": {},
                     "status": {
                       "enum": [
                         "not_started",
@@ -12924,19 +12309,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       ],
                       "type": "string",
                     },
-                    "taskId": {
-                      "type": "string",
-                    },
                     "workflowId": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
                       "type": "string",
                     },
                   },
                   "required": [
                     "id",
                     "workflowId",
+                    "kind",
                     "phase",
                     "status",
-                    "spec",
                     "metadata",
                     "createdAt",
                   ],
@@ -12960,237 +12343,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           },
         },
         "summary": "Respond to a human node",
-        "tags": [
-          "workflows",
-        ],
-      },
-    },
-    "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec": {
-      "patch": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "wfid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-          {
-            "in": "path",
-            "name": "nid",
-            "required": true,
-            "schema": {
-              "type": "string",
-            },
-          },
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "properties": {
-                  "newSpec": {},
-                },
-                "required": [
-                  "newSpec",
-                ],
-                "type": "object",
-              },
-            },
-          },
-          "required": true,
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "createdAt": {
-                      "type": "string",
-                    },
-                    "endedAt": {
-                      "type": "string",
-                    },
-                    "id": {
-                      "type": "string",
-                    },
-                    "metadata": {
-                      "additionalProperties": {},
-                      "type": "object",
-                    },
-                    "phase": {
-                      "type": "number",
-                    },
-                    "readyAt": {
-                      "type": "string",
-                    },
-                    "runningAt": {
-                      "type": "string",
-                    },
-                    "spec": {
-                      "anyOf": [
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "brief": {
-                              "type": "string",
-                            },
-                            "details": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "worker",
-                              ],
-                              "type": "string",
-                            },
-                            "runtime": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "brief",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "agent": {
-                              "type": "string",
-                            },
-                            "kind": {
-                              "enum": [
-                                "coordinator",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agent",
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "choices": {
-                              "items": {
-                                "properties": {
-                                  "id": {
-                                    "type": "string",
-                                  },
-                                  "label": {
-                                    "type": "string",
-                                  },
-                                },
-                                "required": [
-                                  "id",
-                                  "label",
-                                ],
-                                "type": "object",
-                              },
-                              "type": "array",
-                            },
-                            "kind": {
-                              "enum": [
-                                "human",
-                              ],
-                              "type": "string",
-                            },
-                            "prompt": {
-                              "type": "string",
-                            },
-                            "promptStyle": {
-                              "enum": [
-                                "plain",
-                                "markdown",
-                              ],
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "prompt",
-                            "promptStyle",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                            },
-                            "spec": {},
-                          },
-                          "required": [
-                            "kind",
-                          ],
-                          "type": "object",
-                        },
-                      ],
-                    },
-                    "status": {
-                      "enum": [
-                        "not_started",
-                        "ready",
-                        "running",
-                        "succeeded",
-                        "failed",
-                        "cancelled",
-                      ],
-                      "type": "string",
-                    },
-                    "taskId": {
-                      "type": "string",
-                    },
-                    "workflowId": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "id",
-                    "workflowId",
-                    "phase",
-                    "status",
-                    "spec",
-                    "metadata",
-                    "createdAt",
-                  ],
-                  "type": "object",
-                },
-              },
-            },
-            "description": "Updated node",
-          },
-          "400": {
-            "description": "Malformed request body",
-          },
-          "404": {
-            "description": "Workflow or node not found",
-          },
-          "409": {
-            "description": "Node not mutable",
-          },
-          "500": {
-            "description": "Internal error",
-          },
-        },
-        "summary": "Replace a node's spec",
         "tags": [
           "workflows",
         ],
@@ -13227,29 +12379,40 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "additionalProperties": false,
                       "properties": {
                         "from": {
-                          "anyOf": [
+                          "oneOf": [
                             {
-                              "additionalProperties": false,
                               "properties": {
-                                "nodeId": {
-                                  "minLength": 1,
+                                "id": {
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                                  "type": "string",
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "existing",
+                                  ],
                                   "type": "string",
                                 },
                               },
                               "required": [
-                                "nodeId",
+                                "kind",
+                                "id",
                               ],
                               "type": "object",
                             },
                             {
-                              "additionalProperties": false,
                               "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "temp",
+                                  ],
+                                  "type": "string",
+                                },
                                 "tempId": {
-                                  "minLength": 1,
                                   "type": "string",
                                 },
                               },
                               "required": [
+                                "kind",
                                 "tempId",
                               ],
                               "type": "object",
@@ -13257,29 +12420,40 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           ],
                         },
                         "to": {
-                          "anyOf": [
+                          "oneOf": [
                             {
-                              "additionalProperties": false,
                               "properties": {
-                                "nodeId": {
-                                  "minLength": 1,
+                                "id": {
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                                  "type": "string",
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "existing",
+                                  ],
                                   "type": "string",
                                 },
                               },
                               "required": [
-                                "nodeId",
+                                "kind",
+                                "id",
                               ],
                               "type": "object",
                             },
                             {
-                              "additionalProperties": false,
                               "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "temp",
+                                  ],
+                                  "type": "string",
+                                },
                                 "tempId": {
-                                  "minLength": 1,
                                   "type": "string",
                                 },
                               },
                               "required": [
+                                "kind",
                                 "tempId",
                               ],
                               "type": "object",
@@ -13301,7 +12475,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "properties": {
                         "existingParents": {
                           "items": {
-                            "minLength": 1,
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
                             "type": "string",
                           },
                           "type": "array",
@@ -13316,14 +12490,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         },
                         "spec": {},
                         "tempId": {
-                          "minLength": 1,
                           "type": "string",
                         },
                       },
                       "required": [
                         "tempId",
                         "kind",
-                        "spec",
                       ],
                       "type": "object",
                     },
@@ -13350,6 +12522,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "items": {
                         "properties": {
                           "nodeId": {
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
                             "type": "string",
                           },
                           "phase": {

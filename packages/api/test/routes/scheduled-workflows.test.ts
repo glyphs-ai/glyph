@@ -1,21 +1,18 @@
 /**
- * Route-level tests for `routes/scheduled-workflows.ts`. Sibling of
+ * Route-level tests for `routes/schedules/scheduled-workflows.ts`. Sibling of
  * `scheduled-tasks.test.ts` — same stub pattern, same vitest layout.
  * The route is read-only (a single `GET /` handler) so the assertion
  * surface is small; it covers:
  *
  *   - origin pinning (only workflows with `origin === "schedule"`)
  *   - the optional `?scheduleId=` narrow
- *   - createdAt-desc order preserved through the projection
- *   - the view→wire projection: every row carries the REQUIRED
- *     `awaitingHumanCount` field (the regression this route's earlier
- *     raw `c.json(entities)` shape omitted)
+ *   - createdAt-desc order preserved in the direct read-model response
  */
 
 import type { GetWorkflowResponse, WorkflowModule } from "@glyphs-ai/workflow";
 import { okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
-import { scheduledWorkflowsRoutes } from "../../src/routes/scheduled-workflows.js";
+import { scheduledWorkflowsRoutes } from "../../src/routes/schedules/scheduled-workflows.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: transport tests assert on dynamically-shaped JSON bodies
 const jsonBody = (res: Response): Promise<any> => res.json() as Promise<any>;
@@ -44,19 +41,13 @@ function makeWf(
   };
 }
 
-// Stub the two use-cases the route consumes. Each is a `{ execute }`
-// container returning a `ResultAsync`; `listWorkflows` yields views and
-// `countAwaitingHuman` yields the origin→count Record the route folds
-// into a Map. Callers override the `execute` mocks they assert on.
+// Stub the use-cases the route consumes. Each is a `{ execute }`
+// container returning a `ResultAsync`; `listWorkflows` yields views.
 function stubModule(
-  overrides: {
-    listWorkflows?: { execute: ReturnType<typeof vi.fn> };
-    countAwaitingHuman?: { execute: ReturnType<typeof vi.fn> };
-  } = {},
+  overrides: { listWorkflows?: { execute: ReturnType<typeof vi.fn> } } = {},
 ): WorkflowModule {
   const stub = {
     listWorkflows: overrides.listWorkflows ?? { execute: vi.fn(() => okAsync([])) },
-    countAwaitingHuman: overrides.countAwaitingHuman ?? { execute: vi.fn(() => okAsync({})) },
   };
   return stub as unknown as WorkflowModule;
 }
@@ -97,7 +88,7 @@ describe("scheduledWorkflowsRoutes", () => {
     });
   });
 
-  it("projects every row to the wire header — REQUIRED awaitingHumanCount is always present", async () => {
+  it("returns workflow read models without api enrichment", async () => {
     const listWorkflows = {
       execute: vi.fn(() =>
         okAsync([
@@ -106,28 +97,26 @@ describe("scheduledWorkflowsRoutes", () => {
         ]),
       ),
     };
-    const countAwaitingHuman = { execute: vi.fn(() => okAsync({ [WF_A]: 2 })) };
-    const svc = stubModule({ listWorkflows, countAwaitingHuman });
+    const svc = stubModule({ listWorkflows });
     const res = await scheduledWorkflowsRoutes(() => svc).request("/");
     expect(res.status).toBe(200);
     const body = await jsonBody(res);
-    // wf-a got an explicit count; wf-b defaults to 0 — never undefined.
-    expect(body[0].awaitingHumanCount).toBe(2);
-    expect(body[1].awaitingHumanCount).toBe(0);
     for (const row of body) {
-      expect(Object.hasOwn(row, "awaitingHumanCount")).toBe(true);
+      expect(Object.hasOwn(row, "awaitingHumanCount")).toBe(false);
+      expect(Object.hasOwn(row, "iterationCount")).toBe(false);
     }
   });
 
-  it("does NOT leak raw entity-only fields not on the wire header (allowlist projection)", async () => {
+  it("returns the workflow header fields from the read model", async () => {
     const listWorkflows = {
       execute: vi.fn(() => okAsync([makeWf(WF_A, { scheduleId: "sched-abc" })])),
     };
     const svc = stubModule({ listWorkflows });
     const res = await scheduledWorkflowsRoutes(() => svc).request("/");
     const body = await jsonBody(res);
-    // `iterationCount` is intentionally omitted on list rows (O(workflows)).
+    // Enrichment is intentionally deferred to callers.
     expect(Object.hasOwn(body[0], "iterationCount")).toBe(false);
+    expect(Object.hasOwn(body[0], "awaitingHumanCount")).toBe(false);
     // Header essentials present.
     expect(body[0].id).toBe(WF_A);
     expect(body[0].coordinatorAgent).toBe("official/engineer");

@@ -4,7 +4,6 @@ import type { SessionEntity } from "../../domain/session-entity.js";
 import type { SessionId } from "../../domain/session-id.js";
 import type {
   DatabaseUnavailable,
-  SessionIdConflict,
   SessionNotFound,
   SessionRepository,
 } from "../../domain/session-repository.js";
@@ -45,7 +44,7 @@ export class DrizzleSessionRepository implements SessionRepository {
     });
   }
 
-  save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable | SessionIdConflict> {
+  save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable> {
     const snapshot = this.snapshots.get(entity);
     const current = SessionMapper.toRow(entity);
     // Untracked entity ⇒ never loaded ⇒ INSERT (may hit a PRIMARY KEY conflict).
@@ -54,7 +53,7 @@ export class DrizzleSessionRepository implements SessionRepository {
         (async () => {
           this.db.insert(sessions).values(current).run();
         })(),
-        (cause) => this.translateInsertError(cause, entity),
+        DrizzleSessionRepository.asDatabaseUnavailable,
       ).map(() => this.track(entity, current));
     }
     // Tracked entity: UPDATE only the columns that diverged from the snapshot.
@@ -80,18 +79,6 @@ export class DrizzleSessionRepository implements SessionRepository {
   /** Record the persisted row as the entity's tracked snapshot. */
   private track(entity: SessionEntity, row: SessionRow): void {
     this.snapshots.set(entity, row);
-  }
-
-  /** Translate a SQLite PRIMARY KEY violation into `SessionIdConflict`. */
-  private translateInsertError(
-    cause: unknown,
-    entity: SessionEntity,
-  ): DatabaseUnavailable | SessionIdConflict {
-    const e = cause as { code?: string };
-    if (typeof e.code === "string" && e.code.startsWith("SQLITE_CONSTRAINT")) {
-      return { type: "SessionIdConflict", id: entity.id };
-    }
-    return DrizzleSessionRepository.asDatabaseUnavailable(cause);
   }
 }
 

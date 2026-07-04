@@ -44,6 +44,17 @@ describe("RunScheduleUseCase", () => {
     expect(call.data).toEqual({ agent: "report-bot", brief: "Run the daily report" });
   });
 
+  it("run with mismatched expectedKind reads as ScheduleNotFound (no dispatch)", async () => {
+    (await h.module.createSchedule.execute(baseCreateOpts()))._unsafeUnwrap();
+    const result = await h.module.runSchedule.execute({
+      id: VALID_UUIDS[0],
+      expectedKind: "workflow",
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().type).toBe("ScheduleNotFound");
+    expect(h.taskHandler.dispatchCalls).toHaveLength(0);
+  });
+
   it("is always allowed even when disabled (bypasses the enabled gate)", async () => {
     (await h.module.createSchedule.execute(baseCreateOpts({ enabled: false })))._unsafeUnwrap();
     (await h.module.runSchedule.execute({ id: VALID_UUIDS[0] }))._unsafeUnwrap();

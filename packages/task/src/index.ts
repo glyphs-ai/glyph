@@ -106,6 +106,12 @@ export {
   type HasInFlightByOriginResponse,
 } from "./application/has-in-flight-by-origin.js";
 export {
+  type ListArtifactsError,
+  type ListArtifactsRequest,
+  ListArtifactsRequestSchema,
+  type ListArtifactsResponse,
+} from "./application/list-artifacts.js";
+export {
   type ListInFlightByOriginError,
   type ListInFlightByOriginRequest,
   ListInFlightByOriginRequestSchema,
@@ -149,10 +155,10 @@ export type {
 export * from "./application/task-public.js";
 // ─── use-case contract ─────────────────────────────────────────────
 export type { UseCase, UseCaseResult } from "./application/use-case.js";
+// ─── on-disk task layout contract (host artifact-path resolution) ──
+export { TASK_ARTIFACT_SUBDIR, tasksRoot } from "./infrastructure/file/local-task-sandbox.js";
 export {
   composeTaskModule,
   type TaskModule,
   type TaskModuleOptions,
 } from "./task-module.js";
-// ─── on-disk task layout contract (host artifact-path resolution) ──
-export { TASK_ARTIFACT_SUBDIR, tasksRoot } from "./task-paths.js";

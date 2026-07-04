@@ -1,19 +1,18 @@
 /**
- * Per-workflow shared dir lifecycle across the create / finish / cancel / purge
+ * Per-workflow shared dir lifecycle across the create / finish / cancel / delete
  * use-cases.
  *
  * The substrate manages `<workspaceDir>/workflows/<workflowId>/` on behalf of
  * the coordinator: created (empty) on `createWorkflow`, preserved across
- * terminal status transitions for audit, and torn down explicitly via
- * `purgeWorkflow`. The coord owns the internal layout; the substrate only owns
- * the wrapping directory's existence.
+ * terminal status transitions for audit, and optionally torn down by
+ * `deleteWorkflow({ purgeDir: true })`. The coord owns the internal layout; the
+ * substrate only owns the wrapping directory's existence.
  */
 
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type WorkflowId, WorkflowIdSchema } from "../../src/domain/workflow/workflow-id.js";
 import { workflowDir } from "../../src/infrastructure/file/workflow-sandbox.js";
 import {
   bootstrap,
@@ -181,70 +180,11 @@ describe("workflowDir lifecycle", () => {
     expect(existsSync(path.join(wfDir, "sentinel.txt"))).toBe(true);
   });
 
-  // ─── purge ───────────────────────────────────────────────────
-
-  it("purge removes the workflowDir from disk", async () => {
+  it("deleteWorkflow with purgeDir removes the workflowDir after terminal status", async () => {
     const { workflowId } = await bootstrap(f);
     const wfDir = workflowDir(f.workspaceDir, workflowId);
     await mkdir(path.join(wfDir, "decisions"), { recursive: true });
     await writeFile(path.join(wfDir, "decisions", "wake-1.md"), "first decision");
-
-    (await f.module.purgeWorkflow.execute({ workflowId }))._unsafeUnwrap();
-
-    expect(existsSync(wfDir)).toBe(false);
-  });
-
-  it("purge is idempotent — second call on an already-purged workflow is a no-op", async () => {
-    const { workflowId } = await bootstrap(f);
-    const wfDir = workflowDir(f.workspaceDir, workflowId);
-
-    (await f.module.purgeWorkflow.execute({ workflowId }))._unsafeUnwrap();
-    expect(existsSync(wfDir)).toBe(false);
-
-    // Second call: must not error.
-    expect((await f.module.purgeWorkflow.execute({ workflowId }))._unsafeUnwrap()).toBeUndefined();
-    expect(existsSync(wfDir)).toBe(false);
-  });
-
-  it("purge does NOT remove the workflow row (only the fs dir)", async () => {
-    const { workflowId } = await bootstrap(f);
-
-    (await f.module.purgeWorkflow.execute({ workflowId }))._unsafeUnwrap();
-
-    // The workflow row is still readable.
-    const wf = (await f.module.getWorkflow.execute({ workflowId }))._unsafeUnwrap();
-    expect(wf.id).toBe(workflowId);
-    expect(wf.status).toBe("running");
-  });
-
-  it("purge can be called on a non-existent workflow id (silent no-op)", async () => {
-    // No row created — but `purge` is best-effort cleanup so it tolerates an
-    // unknown id rather than erroring.
-    expect(
-      (
-        await f.module.purgeWorkflow.execute({
-          workflowId: WorkflowIdSchema.parse("20990101-deadbeef"),
-        })
-      )._unsafeUnwrap(),
-    ).toBeUndefined();
-  });
-
-  it("purge validates workflow id shape (rejects malformed input)", () => {
-    // Deliberately-malformed ids; cast past the branded type to exercise the
-    // use-case's runtime id-shape rejection.
-    expect(() =>
-      f.module.purgeWorkflow.execute({ workflowId: "not-a-valid-id" as WorkflowId }),
-    ).toThrow();
-    // Path-traversal attempt — the id-shape schema rejects it before the
-    // sandbox's own path guard would.
-    expect(() =>
-      f.module.purgeWorkflow.execute({ workflowId: "../escape" as WorkflowId }),
-    ).toThrow();
-  });
-
-  it("purge after workflow terminal status still works (cancel + purge round-trip)", async () => {
-    const { workflowId } = await bootstrap(f);
-    const wfDir = workflowDir(f.workspaceDir, workflowId);
 
     (
       await f.module.cancelWorkflow.execute({
@@ -255,11 +195,9 @@ describe("workflowDir lifecycle", () => {
     // Status flipped — but the dir still exists.
     expect(existsSync(wfDir)).toBe(true);
 
-    (await f.module.purgeWorkflow.execute({ workflowId }))._unsafeUnwrap();
+    (await f.module.deleteWorkflow.execute({ workflowId, purgeDir: true }))._unsafeUnwrap();
     expect(existsSync(wfDir)).toBe(false);
-    // Row still present even after status terminal + purge.
-    const wf = (await f.module.getWorkflow.execute({ workflowId }))._unsafeUnwrap();
-    expect(wf.status).toBe("cancelled");
+    expect((await f.module.getWorkflow.execute({ workflowId })).isErr()).toBe(true);
   });
 
   it("createWorkflow yields disjoint workflowDirs across two consecutive workflows", async () => {

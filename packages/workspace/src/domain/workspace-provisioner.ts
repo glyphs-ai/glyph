@@ -8,15 +8,13 @@ export type ProvisioningFailed = {
 };
 
 /**
- * Lifecycle port for the workspace skeleton. It creates and removes
- * package-owned parent directories only; per-id contents belong to
- * consumer packages. Methods return `ResultAsync` and adapters map
- * backend failures to `ProvisioningFailed`.
+ * Lifecycle port for the workspace root directory. `provision` ensures
+ * `workspaceDir` exists so a bad path fails fast at registration; the
+ * per-domain subdirs (`sessions/`, `tasks/`, `workflows/`) are created
+ * lazily by their own packages. Adapters map backend failures to
+ * `ProvisioningFailed`.
  */
 export interface WorkspaceProvisioner {
-  /** Materialize the workspace skeleton idempotently. */
+  /** Ensure the workspace root directory exists (idempotent). */
   provision(workspaceDir: string): ResultAsync<void, ProvisioningFailed>;
-
-  /** Remove the managed skeleton idempotently, leaving `workspaceDir` intact. */
-  teardown(workspaceDir: string): ResultAsync<void, ProvisioningFailed>;
 }

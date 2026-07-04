@@ -228,9 +228,7 @@ export type DeleteApiWorkspacesByIdData = {
     path: {
         id: string;
     };
-    query?: {
-        purge?: string;
-    };
+    query?: never;
     url: '/api/workspaces/{id}';
 };
 
@@ -877,18 +875,19 @@ export type PostApiWorkspacesByIdTasksByTidCancelResponses = {
 
 export type PostApiWorkspacesByIdTasksByTidCancelResponse = PostApiWorkspacesByIdTasksByTidCancelResponses[keyof PostApiWorkspacesByIdTasksByTidCancelResponses];
 
-export type GetApiWorkspacesByIdTasksByTidArtifactByNameData = {
+export type GetApiWorkspacesByIdTasksByTidArtifactData = {
     body?: never;
     path: {
         id: string;
         tid: string;
-        name: string;
     };
-    query?: never;
-    url: '/api/workspaces/{id}/tasks/{tid}/artifact/{name}';
+    query: {
+        path: string;
+    };
+    url: '/api/workspaces/{id}/tasks/{tid}/artifact';
 };
 
-export type GetApiWorkspacesByIdTasksByTidArtifactByNameErrors = {
+export type GetApiWorkspacesByIdTasksByTidArtifactErrors = {
     /**
      * Malformed artifact name
      */
@@ -903,7 +902,7 @@ export type GetApiWorkspacesByIdTasksByTidArtifactByNameErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdTasksByTidArtifactByNameResponses = {
+export type GetApiWorkspacesByIdTasksByTidArtifactResponses = {
     /**
      * Artifact file stream
      */
@@ -1175,13 +1174,11 @@ export type GetApiWorkspacesByIdScheduledWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -1205,19 +1202,19 @@ export type GetApiWorkspacesByIdScheduledWorkflowsResponses = {
 
 export type GetApiWorkspacesByIdScheduledWorkflowsResponse = GetApiWorkspacesByIdScheduledWorkflowsResponses[keyof GetApiWorkspacesByIdScheduledWorkflowsResponses];
 
-export type GetApiWorkspacesByIdSchedulesData = {
+export type GetApiWorkspacesByIdSchedulesTaskData = {
     body?: never;
     path: {
         id: string;
     };
     query?: {
         agent?: string;
-        enabled?: string;
+        enabled?: 'true' | 'false';
     };
-    url: '/api/workspaces/{id}/schedules';
+    url: '/api/workspaces/{id}/schedules/task';
 };
 
-export type GetApiWorkspacesByIdSchedulesErrors = {
+export type GetApiWorkspacesByIdSchedulesTaskErrors = {
     /**
      * Malformed query
      */
@@ -1228,9 +1225,9 @@ export type GetApiWorkspacesByIdSchedulesErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdSchedulesResponses = {
+export type GetApiWorkspacesByIdSchedulesTaskResponses = {
     /**
-     * Schedules
+     * Task schedules
      */
     200: Array<{
         id: string;
@@ -1240,48 +1237,35 @@ export type GetApiWorkspacesByIdSchedulesResponses = {
             expr: string;
             tz: string;
         };
+        target: {
+            agent: string;
+            brief: string;
+            details?: string;
+            runtime?: string;
+        };
         enabled: boolean;
         createdAt: string;
         updatedAt: string;
         lastFiredAt?: string;
         nextFireAt?: string;
-        target: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
-        };
-        fireStats?: {
-            awaitingCount: number;
-            runningCount: number;
-        };
     }>;
 };
 
-export type GetApiWorkspacesByIdSchedulesResponse = GetApiWorkspacesByIdSchedulesResponses[keyof GetApiWorkspacesByIdSchedulesResponses];
+export type GetApiWorkspacesByIdSchedulesTaskResponse = GetApiWorkspacesByIdSchedulesTaskResponses[keyof GetApiWorkspacesByIdSchedulesTaskResponses];
 
 export type PostApiWorkspacesByIdSchedulesTaskData = {
     body: {
         name: string;
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
         target: {
             agent: string;
             brief: string;
             details?: string;
             runtime?: string;
-        };
-        trigger: {
-            kind: 'cron';
-            expr: string;
-            tz: string;
         };
         enabled?: boolean;
     };
@@ -1319,88 +1303,39 @@ export type PostApiWorkspacesByIdSchedulesTaskResponses = {
             expr: string;
             tz: string;
         };
-        enabled: boolean;
-        createdAt: string;
-        updatedAt: string;
-        lastFiredAt?: string;
-        nextFireAt?: string;
         target: {
             agent: string;
             brief: string;
             details?: string;
             runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
         };
-        fireStats?: {
-            awaitingCount: number;
-            runningCount: number;
-        };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
     };
 };
 
 export type PostApiWorkspacesByIdSchedulesTaskResponse = PostApiWorkspacesByIdSchedulesTaskResponses[keyof PostApiWorkspacesByIdSchedulesTaskResponses];
 
-export type GetApiWorkspacesByIdSchedulesPreviewCronData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: {
-        expr?: string;
-        tz?: string;
-        n?: string;
-    };
-    url: '/api/workspaces/{id}/schedules/preview-cron';
-};
-
-export type GetApiWorkspacesByIdSchedulesPreviewCronErrors = {
-    /**
-     * Missing or malformed query
-     */
-    400: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type GetApiWorkspacesByIdSchedulesPreviewCronResponses = {
-    /**
-     * Cron preview
-     */
-    200: {
-        describe: string;
-        nextRuns: Array<string>;
-    };
-};
-
-export type GetApiWorkspacesByIdSchedulesPreviewCronResponse = GetApiWorkspacesByIdSchedulesPreviewCronResponses[keyof GetApiWorkspacesByIdSchedulesPreviewCronResponses];
-
-export type DeleteApiWorkspacesByIdSchedulesBySidData = {
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidData = {
     body?: never;
     path: {
         id: string;
         sid: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/schedules/{sid}';
+    url: '/api/workspaces/{id}/schedules/task/{sid}';
 };
 
-export type DeleteApiWorkspacesByIdSchedulesBySidErrors = {
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
      * Schedule not found
      */
     404: unknown;
     /**
-     * Schedule has in-flight dispatch
+     * Schedule enabled or has in-flight dispatch
      */
     409: unknown;
     /**
@@ -1409,29 +1344,29 @@ export type DeleteApiWorkspacesByIdSchedulesBySidErrors = {
     500: unknown;
 };
 
-export type DeleteApiWorkspacesByIdSchedulesBySidResponses = {
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidResponses = {
     /**
      * Delete outcome
      */
     200: {
-        ok: true;
         deletedDispatchCount: number;
+        ok: true;
     };
 };
 
-export type DeleteApiWorkspacesByIdSchedulesBySidResponse = DeleteApiWorkspacesByIdSchedulesBySidResponses[keyof DeleteApiWorkspacesByIdSchedulesBySidResponses];
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidResponse = DeleteApiWorkspacesByIdSchedulesTaskBySidResponses[keyof DeleteApiWorkspacesByIdSchedulesTaskBySidResponses];
 
-export type GetApiWorkspacesByIdSchedulesBySidData = {
+export type GetApiWorkspacesByIdSchedulesTaskBySidData = {
     body?: never;
     path: {
         id: string;
         sid: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/schedules/{sid}';
+    url: '/api/workspaces/{id}/schedules/task/{sid}';
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidErrors = {
+export type GetApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
      * Schedule not found
      */
@@ -1442,9 +1377,9 @@ export type GetApiWorkspacesByIdSchedulesBySidErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidResponses = {
+export type GetApiWorkspacesByIdSchedulesTaskBySidResponses = {
     /**
-     * Schedule
+     * Task schedule
      */
     200: {
         id: string;
@@ -1454,47 +1389,38 @@ export type GetApiWorkspacesByIdSchedulesBySidResponses = {
             expr: string;
             tz: string;
         };
-        enabled: boolean;
-        createdAt: string;
-        updatedAt: string;
-        lastFiredAt?: string;
-        nextFireAt?: string;
         target: {
             agent: string;
             brief: string;
             details?: string;
             runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
         };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
         describe: string;
     };
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidResponse = GetApiWorkspacesByIdSchedulesBySidResponses[keyof GetApiWorkspacesByIdSchedulesBySidResponses];
+export type GetApiWorkspacesByIdSchedulesTaskBySidResponse = GetApiWorkspacesByIdSchedulesTaskBySidResponses[keyof GetApiWorkspacesByIdSchedulesTaskBySidResponses];
 
 export type PatchApiWorkspacesByIdSchedulesTaskBySidData = {
     body: {
         name?: string;
-        target?: {
-            agent?: string;
-            brief?: string;
-            details?: string | null;
-            runtime?: string | null;
-        };
         trigger?: {
             kind: 'cron';
             expr: string;
             tz: string;
         };
         enabled?: boolean;
+        target?: {
+            agent?: string;
+            brief?: string;
+            details?: string | null;
+            runtime?: string | null;
+        };
     };
     path: {
         id: string;
@@ -1531,47 +1457,159 @@ export type PatchApiWorkspacesByIdSchedulesTaskBySidResponses = {
             expr: string;
             tz: string;
         };
-        enabled: boolean;
-        createdAt: string;
-        updatedAt: string;
-        lastFiredAt?: string;
-        nextFireAt?: string;
         target: {
             agent: string;
             brief: string;
             details?: string;
             runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
         };
-        fireStats?: {
-            awaitingCount: number;
-            runningCount: number;
-        };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
     };
 };
 
 export type PatchApiWorkspacesByIdSchedulesTaskBySidResponse = PatchApiWorkspacesByIdSchedulesTaskBySidResponses[keyof PatchApiWorkspacesByIdSchedulesTaskBySidResponses];
 
-export type PostApiWorkspacesByIdSchedulesWorkflowData = {
-    body: {
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunData = {
+    body?: never;
+    path: {
+        id: string;
+        sid: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{id}/schedules/task/{sid}/run';
+};
+
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunErrors = {
+    /**
+     * Schedule not found
+     */
+    404: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunResponses = {
+    /**
+     * Dispatch id
+     */
+    200: {
+        dispatchId: string;
+    };
+};
+
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunResponse = PostApiWorkspacesByIdSchedulesTaskBySidRunResponses[keyof PostApiWorkspacesByIdSchedulesTaskBySidRunResponses];
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewData = {
+    body?: never;
+    path: {
+        id: string;
+        sid: string;
+    };
+    query?: {
+        n?: number;
+    };
+    url: '/api/workspaces/{id}/schedules/task/{sid}/preview';
+};
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewErrors = {
+    /**
+     * Malformed query
+     */
+    400: unknown;
+    /**
+     * Schedule not found
+     */
+    404: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponses = {
+    /**
+     * Schedule preview
+     */
+    200: {
+        describe: string;
+        nextRuns: Array<string>;
+    };
+};
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponse = GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponses[keyof GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponses];
+
+export type GetApiWorkspacesByIdSchedulesWorkflowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        coordinatorAgent?: string;
+        enabled?: 'true' | 'false';
+    };
+    url: '/api/workspaces/{id}/schedules/workflow';
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowErrors = {
+    /**
+     * Malformed query
+     */
+    400: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowResponses = {
+    /**
+     * Workflow schedules
+     */
+    200: Array<{
+        id: string;
         name: string;
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
         target: {
             coordinatorAgent: string;
             brief: string;
             details?: string;
         };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
+        fireStats: {
+            awaitingCount: number;
+            runningCount: number;
+        };
+    }>;
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowResponse = GetApiWorkspacesByIdSchedulesWorkflowResponses[keyof GetApiWorkspacesByIdSchedulesWorkflowResponses];
+
+export type PostApiWorkspacesByIdSchedulesWorkflowData = {
+    body: {
+        name: string;
         trigger: {
             kind: 'cron';
             expr: string;
             tz: string;
+        };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
         };
         enabled?: boolean;
     };
@@ -1609,27 +1647,17 @@ export type PostApiWorkspacesByIdSchedulesWorkflowResponses = {
             expr: string;
             tz: string;
         };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
         enabled: boolean;
         createdAt: string;
         updatedAt: string;
         lastFiredAt?: string;
         nextFireAt?: string;
-        target: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
-        };
-        fireStats?: {
+        fireStats: {
             awaitingCount: number;
             runningCount: number;
         };
@@ -1638,20 +1666,110 @@ export type PostApiWorkspacesByIdSchedulesWorkflowResponses = {
 
 export type PostApiWorkspacesByIdSchedulesWorkflowResponse = PostApiWorkspacesByIdSchedulesWorkflowResponses[keyof PostApiWorkspacesByIdSchedulesWorkflowResponses];
 
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidData = {
+    body?: never;
+    path: {
+        id: string;
+        sid: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}';
+};
+
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
+    /**
+     * Schedule not found
+     */
+    404: unknown;
+    /**
+     * Schedule enabled or has in-flight dispatch
+     */
+    409: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
+    /**
+     * Delete outcome
+     */
+    200: {
+        deletedDispatchCount: number;
+        ok: true;
+    };
+};
+
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponse = DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponses[keyof DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponses];
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidData = {
+    body?: never;
+    path: {
+        id: string;
+        sid: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}';
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
+    /**
+     * Schedule not found
+     */
+    404: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
+    /**
+     * Workflow schedule
+     */
+    200: {
+        id: string;
+        name: string;
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
+        fireStats: {
+            awaitingCount: number;
+            runningCount: number;
+        };
+        describe: string;
+    };
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidResponse = GetApiWorkspacesByIdSchedulesWorkflowBySidResponses[keyof GetApiWorkspacesByIdSchedulesWorkflowBySidResponses];
+
 export type PatchApiWorkspacesByIdSchedulesWorkflowBySidData = {
     body: {
         name?: string;
-        target?: {
-            coordinatorAgent?: string;
-            brief?: string;
-            details?: string | null;
-        };
         trigger?: {
             kind: 'cron';
             expr: string;
             tz: string;
         };
         enabled?: boolean;
+        target?: {
+            coordinatorAgent?: string;
+            brief?: string;
+            details?: string | null;
+        };
     };
     path: {
         id: string;
@@ -1688,27 +1806,17 @@ export type PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
             expr: string;
             tz: string;
         };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
         enabled: boolean;
         createdAt: string;
         updatedAt: string;
         lastFiredAt?: string;
         nextFireAt?: string;
-        target: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
-        };
-        fireStats?: {
+        fireStats: {
             awaitingCount: number;
             runningCount: number;
         };
@@ -1717,17 +1825,17 @@ export type PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
 
 export type PatchApiWorkspacesByIdSchedulesWorkflowBySidResponse = PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses[keyof PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses];
 
-export type PostApiWorkspacesByIdSchedulesBySidRunData = {
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunData = {
     body?: never;
     path: {
         id: string;
         sid: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/schedules/{sid}/run';
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}/run';
 };
 
-export type PostApiWorkspacesByIdSchedulesBySidRunErrors = {
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors = {
     /**
      * Schedule not found
      */
@@ -1738,7 +1846,7 @@ export type PostApiWorkspacesByIdSchedulesBySidRunErrors = {
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdSchedulesBySidRunResponses = {
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponses = {
     /**
      * Dispatch id
      */
@@ -1747,21 +1855,21 @@ export type PostApiWorkspacesByIdSchedulesBySidRunResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdSchedulesBySidRunResponse = PostApiWorkspacesByIdSchedulesBySidRunResponses[keyof PostApiWorkspacesByIdSchedulesBySidRunResponses];
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponse = PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponses[keyof PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponses];
 
-export type GetApiWorkspacesByIdSchedulesBySidPreviewData = {
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewData = {
     body?: never;
     path: {
         id: string;
         sid: string;
     };
     query?: {
-        n?: string;
+        n?: number;
     };
-    url: '/api/workspaces/{id}/schedules/{sid}/preview';
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}/preview';
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidPreviewErrors = {
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewErrors = {
     /**
      * Malformed query
      */
@@ -1776,7 +1884,7 @@ export type GetApiWorkspacesByIdSchedulesBySidPreviewErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidPreviewResponses = {
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponses = {
     /**
      * Schedule preview
      */
@@ -1786,7 +1894,43 @@ export type GetApiWorkspacesByIdSchedulesBySidPreviewResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidPreviewResponse = GetApiWorkspacesByIdSchedulesBySidPreviewResponses[keyof GetApiWorkspacesByIdSchedulesBySidPreviewResponses];
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponse = GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponses[keyof GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponses];
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        expr: string;
+        tz: string;
+        n?: number;
+    };
+    url: '/api/workspaces/{id}/schedules/preview-cron';
+};
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronErrors = {
+    /**
+     * Missing or malformed query
+     */
+    400: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronResponses = {
+    /**
+     * Cron preview
+     */
+    200: {
+        describe: string;
+        nextRuns: Array<string>;
+    };
+};
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronResponse = GetApiWorkspacesByIdSchedulesPreviewCronResponses[keyof GetApiWorkspacesByIdSchedulesPreviewCronResponses];
 
 export type GetApiWorkspacesByIdWorkflowsData = {
     body?: never;
@@ -1822,13 +1966,11 @@ export type GetApiWorkspacesByIdWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -1890,13 +2032,11 @@ export type PostApiWorkspacesByIdWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -1987,13 +2127,11 @@ export type GetApiWorkspacesByIdWorkflowsByWfidResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -2049,13 +2187,11 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
             details?: string;
             coordinatorAgent: string;
             status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-            origin: 'standalone' | 'schedule';
+            origin: string;
             originId?: string;
             metadata: {
                 [key: string]: unknown;
             };
-            iterationCount?: number;
-            awaitingHumanCount: number;
             createdAt: string;
             startedAt?: string;
             endedAt?: string;
@@ -2078,30 +2214,10 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
         nodes: Array<{
             id: string;
             workflowId: string;
+            kind: 'coordinator' | 'worker' | 'human';
+            spec?: unknown;
             phase: number;
             status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-            taskId?: string;
-            spec: {
-                agent: string;
-                brief: string;
-                details?: string;
-                runtime?: string;
-                kind: 'worker';
-            } | {
-                agent: string;
-                kind: 'coordinator';
-            } | {
-                kind: 'human';
-                prompt: string;
-                promptStyle: 'plain' | 'markdown';
-                choices?: Array<{
-                    id: string;
-                    label: string;
-                }>;
-            } | {
-                kind: string;
-                spec?: unknown;
-            };
             metadata: {
                 [key: string]: unknown;
             };
@@ -2111,6 +2227,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
             endedAt?: string;
         }>;
         edges: Array<{
+            workflowId: string;
             from: string;
             to: string;
         }>;
@@ -2118,41 +2235,6 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
 };
 
 export type GetApiWorkspacesByIdWorkflowsByWfidDagResponse = GetApiWorkspacesByIdWorkflowsByWfidDagResponses[keyof GetApiWorkspacesByIdWorkflowsByWfidDagResponses];
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidData = {
-    body?: never;
-    path: {
-        id: string;
-        wfid: string;
-        nid: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}';
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidErrors = {
-    /**
-     * Workflow or node not found
-     */
-    404: unknown;
-    /**
-     * Node not mutable
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses = {
-    /**
-     * Node deleted
-     */
-    204: void;
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponse = DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses[keyof DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses];
 
 export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidData = {
     body?: never;
@@ -2183,30 +2265,10 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses = {
     200: {
         id: string;
         workflowId: string;
+        kind: 'coordinator' | 'worker' | 'human';
+        spec?: unknown;
         phase: number;
         status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-        taskId?: string;
-        spec: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'worker';
-        } | {
-            agent: string;
-            kind: 'coordinator';
-        } | {
-            kind: 'human';
-            prompt: string;
-            promptStyle: 'plain' | 'markdown';
-            choices?: Array<{
-                id: string;
-                label: string;
-            }>;
-        } | {
-            kind: string;
-            spec?: unknown;
-        };
         metadata: {
             [key: string]: unknown;
         };
@@ -2222,7 +2284,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponse = GetApiWorksp
 export type PostApiWorkspacesByIdWorkflowsByWfidCancelData = {
     body: {
         cancellation: {
-            kind?: 'user';
+            kind: 'user';
             message: string;
         };
     };
@@ -2263,13 +2325,11 @@ export type PostApiWorkspacesByIdWorkflowsByWfidCancelResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -2321,18 +2381,15 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponses = {
     200: {
         artifacts: Array<{
             kind: 'workflow-summary';
-            path: string;
+            relPath: string;
             size: number;
             modifiedAt: string;
-            mimeBucket: 'text' | 'image' | 'archive' | 'generic';
         } | {
             kind: 'node';
             nodeId: string;
-            taskId: string;
-            path: string;
+            relPath: string;
             size: number;
             modifiedAt: string;
-            mimeBucket: 'text' | 'image' | 'archive' | 'generic';
         }>;
     };
 };
@@ -2372,113 +2429,27 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathResponses =
     200: unknown;
 };
 
-export type PostApiWorkspacesByIdWorkflowsByWfidNodesData = {
-    body: {
-        kind: 'coordinator' | 'worker' | 'human';
-        spec: unknown;
-        parents: Array<string>;
-    };
-    path: {
-        id: string;
-        wfid: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/nodes';
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidNodesErrors = {
-    /**
-     * Malformed request body
-     */
-    400: unknown;
-    /**
-     * Workflow not found
-     */
-    404: unknown;
-    /**
-     * Workflow already terminal
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidNodesResponses = {
-    /**
-     * Inserted node
-     */
-    200: {
-        nodeId: string;
-        phase: number;
-    };
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidNodesResponse = PostApiWorkspacesByIdWorkflowsByWfidNodesResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesResponses];
-
-export type PostApiWorkspacesByIdWorkflowsByWfidEdgesData = {
-    body: {
-        fromNodeId: string;
-        toNodeId: string;
-    };
-    path: {
-        id: string;
-        wfid: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/edges';
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidEdgesErrors = {
-    /**
-     * Malformed request body
-     */
-    400: unknown;
-    /**
-     * Workflow not found
-     */
-    404: unknown;
-    /**
-     * Workflow already terminal
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses = {
-    /**
-     * Inserted edge
-     */
-    200: {
-        fromNodeId: string;
-        toNodeId: string;
-        toPhase: number;
-    };
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidEdgesResponse = PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses];
-
 export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphData = {
     body: {
         nodes: Array<{
             tempId: string;
             kind: 'coordinator' | 'worker' | 'human';
-            spec: unknown;
+            spec?: unknown;
             existingParents?: Array<string>;
         }>;
         edges: Array<{
             from: {
-                nodeId: string;
+                kind: 'existing';
+                id: string;
             } | {
+                kind: 'temp';
                 tempId: string;
             };
             to: {
-                nodeId: string;
+                kind: 'existing';
+                id: string;
             } | {
+                kind: 'temp';
                 tempId: string;
             };
         }>;
@@ -2558,30 +2529,10 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses = {
     200: {
         id: string;
         workflowId: string;
+        kind: 'coordinator' | 'worker' | 'human';
+        spec?: unknown;
         phase: number;
         status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-        taskId?: string;
-        spec: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'worker';
-        } | {
-            agent: string;
-            kind: 'coordinator';
-        } | {
-            kind: 'human';
-            prompt: string;
-            promptStyle: 'plain' | 'markdown';
-            choices?: Array<{
-                id: string;
-                label: string;
-            }>;
-        } | {
-            kind: string;
-            spec?: unknown;
-        };
         metadata: {
             [key: string]: unknown;
         };
@@ -2596,14 +2547,14 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponse = PostA
 
 export type PostApiWorkspacesByIdWorkflowsByWfidFinishData = {
     body: {
-        kind: 'succeeded';
+        outcome: 'succeeded';
         success?: {
-            output?: string | null;
+            output: string | null;
         };
     } | {
-        kind: 'failed';
+        outcome: 'failed';
         failure: {
-            kind?: 'coordinator';
+            kind: 'coordinator';
             message: string;
         };
     };
@@ -2644,13 +2595,11 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -2674,121 +2623,12 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponses = {
 
 export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponse = PostApiWorkspacesByIdWorkflowsByWfidFinishResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidFinishResponses];
 
-export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToData = {
-    body?: never;
-    path: {
-        id: string;
-        wfid: string;
-        from: string;
-        to: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/edges/{from}/{to}';
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToErrors = {
-    /**
-     * Workflow or edge not found
-     */
-    404: unknown;
-    /**
-     * Edge not mutable
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses = {
-    /**
-     * Edge deleted
-     */
-    204: void;
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponse = DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses[keyof DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses];
-
-export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData = {
-    body: {
-        newSpec: unknown;
-    };
-    path: {
-        id: string;
-        wfid: string;
-        nid: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec';
-};
-
-export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors = {
-    /**
-     * Malformed request body
-     */
-    400: unknown;
-    /**
-     * Workflow or node not found
-     */
-    404: unknown;
-    /**
-     * Node not mutable
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses = {
-    /**
-     * Updated node
-     */
-    200: {
-        id: string;
-        workflowId: string;
-        phase: number;
-        status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-        taskId?: string;
-        spec: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'worker';
-        } | {
-            agent: string;
-            kind: 'coordinator';
-        } | {
-            kind: 'human';
-            prompt: string;
-            promptStyle: 'plain' | 'markdown';
-            choices?: Array<{
-                id: string;
-                label: string;
-            }>;
-        } | {
-            kind: string;
-            spec?: unknown;
-        };
-        metadata: {
-            [key: string]: unknown;
-        };
-        createdAt: string;
-        readyAt?: string;
-        runningAt?: string;
-        endedAt?: string;
-    };
-};
-
-export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponse = PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses[keyof PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses];
-
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData = {
     body: {
-        choiceId?: string;
-        input?: string;
+        response: {
+            choiceId?: string;
+            input?: string;
+        };
     };
     path: {
         id: string;
@@ -2825,30 +2665,10 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses = {
     200: {
         id: string;
         workflowId: string;
+        kind: 'coordinator' | 'worker' | 'human';
+        spec?: unknown;
         phase: number;
         status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-        taskId?: string;
-        spec: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'worker';
-        } | {
-            agent: string;
-            kind: 'coordinator';
-        } | {
-            kind: 'human';
-            prompt: string;
-            promptStyle: 'plain' | 'markdown';
-            choices?: Array<{
-                id: string;
-                label: string;
-            }>;
-        } | {
-            kind: string;
-            spec?: unknown;
-        };
         metadata: {
             [key: string]: unknown;
         };

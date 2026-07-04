@@ -8,11 +8,7 @@ import { err, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import { SessionEntity } from "../domain/session-entity.js";
 import { type SessionId, SessionIdSchema } from "../domain/session-id.js";
-import type {
-  DatabaseUnavailable,
-  SessionIdConflict,
-  SessionRepository,
-} from "../domain/session-repository.js";
+import type { DatabaseUnavailable, SessionRepository } from "../domain/session-repository.js";
 import type { SandboxProvisionFailed, SessionSandbox } from "../domain/session-sandbox.js";
 import type {
   AgentNotFound,
@@ -64,7 +60,6 @@ export type CreateSessionError =
   | SandboxProvisionFailed
   | UnknownRuntime
   | RuntimeProvisionFailed
-  | SessionIdConflict
   | DatabaseUnavailable;
 
 export interface CreateSessionDeps {

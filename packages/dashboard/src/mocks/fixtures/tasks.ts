@@ -1,10 +1,10 @@
 import type { TaskRecord } from "../../api/index.js";
 import { fixtureWorkflowMockIds as WF_IDS } from "./workflows.js";
 
-// Absolute paths are what the server stores in `success.artifacts`; the
-// dashboard's ArtifactsTab extracts the basename (after `/` or `\`) as the
-// segment passed to `/tasks/:taskId/artifact/:name`, so the basenames here must
-// match the keys in `artifactBodies` (see fixtures/index.ts).
+// `success.artifacts` are POSIX paths relative to the task's artifact/ dir.
+// The dashboard's ArtifactsTab uses each relPath as the `?path=` value on
+// `/tasks/:taskId/artifact`, so the relPaths here must match the keys in
+// `artifactBodies` (see fixtures/index.ts). ART_DIR is only the mock workdir.
 const ART_DIR = "/mock/workspaces/designer/tasks";
 
 /**
@@ -51,7 +51,7 @@ export const fixtureTasks: TaskRecord[] = [
     endedAt: "2026-05-26T14:34:11.000Z",
     success: {
       output: "Review posted: 4 nits + 1 blocker.",
-      artifacts: [`${ART_DIR}/single-html/sample.html`],
+      artifacts: ["sample.html"],
     },
   },
   {
@@ -70,7 +70,7 @@ export const fixtureTasks: TaskRecord[] = [
     endedAt: "2026-05-25T09:16:42.000Z",
     success: {
       output: "Drafted CHANGELOG entry under v0.5.7.",
-      artifacts: [`${ART_DIR}/code-markdown/sample.md`, `${ART_DIR}/code-markdown/sample.txt`],
+      artifacts: ["sample.md", "sample.txt"],
     },
   },
   {
@@ -129,7 +129,7 @@ export const fixtureTasks: TaskRecord[] = [
     endedAt: "2026-05-27T02:03:14.000Z",
     success: {
       output: "Nightly diff review complete — 0 blockers.",
-      artifacts: [`${ART_DIR}/schedule-launched/sample.json`],
+      artifacts: ["sample.json"],
     },
   },
   {
@@ -148,10 +148,7 @@ export const fixtureTasks: TaskRecord[] = [
     endedAt: "2026-05-22T08:01:42.000Z",
     success: {
       output: "Rendered preview PNG and supporting notes.",
-      artifacts: [
-        `${ART_DIR}/running-multi-bin/sample.png`,
-        `${ART_DIR}/running-multi-bin/sample.md`,
-      ],
+      artifacts: ["sample.png", "sample.md"],
     },
   },
   // Schedule-launched task fixtures. Each `originId`

@@ -1,32 +1,18 @@
-/**
- * Route-level tests for the workflow-kind verbs on `routes/schedules.ts`
- * (`POST /schedules/workflow`, `PATCH /schedules/workflow/:sid`).
- * Sibling of `schedules.test.ts`, which covers the task-kind verbs; this
- * file isolates the workflow surface added for scheduled workflows.
- *
- * Coverage:
- *   - POST /workflow happy path → 201 with the flat workflow wire shape
- *     + the `{ kind: "workflow", data }` envelope handed to the service
- *   - POST /workflow input validation 400s (name, target.kind in body,
- *     unknown nested key, missing coordinatorAgent, multi-line brief)
- *   - PATCH /workflow/:sid sparse target forward with
- *     `expectedKind: "workflow"`
- *   - PATCH /workflow/:sid clear-details (RFC 7396 null) + reject null
- *     on required coordinatorAgent
- *   - cross-kind guard: `ScheduleKindMismatchError` → 404 with a plain
- *     not-found envelope (no kind leak)
- */
-
-import type { CreateScheduleResponse, ScheduleModule } from "@glyphs-ai/schedule";
+import type {
+  CreateScheduleResponse,
+  PreviewScheduleResponse,
+  ScheduleModule,
+} from "@glyphs-ai/schedule";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { errAsync, okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
-import { schedulesRoutes } from "../../src/routes/schedules.js";
+import { schedulesWorkflowRoutes } from "../../src/routes/schedules/scheduled-workflows.js";
 
-// biome-ignore lint/suspicious/noExplicitAny: transport tests assert on dynamically-shaped JSON bodies
+// biome-ignore lint/suspicious/noExplicitAny: route tests assert dynamic JSON envelopes
 const jsonBody = (res: Response): Promise<any> => res.json() as Promise<any>;
 
-const sampleWorkflowSchedule: CreateScheduleResponse = {
-  id: "sched-wf" as CreateScheduleResponse["id"],
+const sampleSchedule: CreateScheduleResponse = {
+  id: "sched-abc" as CreateScheduleResponse["id"],
   name: "Nightly release workflow",
   target: {
     kind: "workflow",
@@ -42,214 +28,336 @@ const sampleWorkflowSchedule: CreateScheduleResponse = {
   updatedAt: "2026-06-01T00:00:00.000Z",
 };
 
-function stubUseCase<T>(response: T) {
-  return { execute: vi.fn(() => okAsync(response)) };
-}
-
-function stubModule(overrides: Partial<Record<keyof ScheduleModule, unknown>>): ScheduleModule {
-  const stub: Partial<Record<keyof ScheduleModule, unknown>> = {
-    createSchedule: stubUseCase(sampleWorkflowSchedule),
-    patchSchedule: stubUseCase(sampleWorkflowSchedule),
-    ...overrides,
-  };
-  return stub as unknown as ScheduleModule;
-}
-
 const validTarget = {
   coordinatorAgent: "official/engineer",
   brief: "Run the nightly release workflow",
   details: "Coordinate build, test, and publish across worker agents.",
 };
 
-describe("schedulesRoutes — create workflow", () => {
-  it("POST /workflow creates and returns 201 (flat workflow wire shape)", async () => {
-    const create = vi.fn(() => okAsync(sampleWorkflowSchedule));
+// Wire target == the stored data verbatim; `kind` is implied by the URL path.
+const wireTarget = validTarget;
+
+function stubUseCase<T>(response: T) {
+  return { execute: vi.fn(() => okAsync(response)) };
+}
+
+function previewResponse(n: number): PreviewScheduleResponse {
+  return {
+    describe: "every day at 02:00",
+    nextRuns: Array.from({ length: n }, (_, i) => `2026-06-0${i + 1}T18:00:00.000Z`),
+  };
+}
+
+function stubModule(overrides: Partial<Record<keyof ScheduleModule, unknown>>): ScheduleModule {
+  return {
+    listSchedules: stubUseCase([sampleSchedule]),
+    createSchedule: stubUseCase(sampleSchedule),
+    getSchedule: stubUseCase(sampleSchedule),
+    patchSchedule: stubUseCase(sampleSchedule),
+    deleteSchedule: stubUseCase({ deletedDispatchCount: 0 }),
+    runSchedule: stubUseCase({ dispatchId: "workflow-001" }),
+    previewSchedule: {
+      execute: vi.fn(({ n = 3 }: { expr: string; tz: string; n?: number }) =>
+        okAsync(previewResponse(n)),
+      ),
+    },
+    ...overrides,
+  } as unknown as ScheduleModule;
+}
+
+function stubWorkflowModule(
+  overrides: Partial<Record<keyof WorkflowModule, unknown>> = {},
+): WorkflowModule {
+  return {
+    aggregateByOrigin: {
+      execute: vi.fn(() =>
+        okAsync({ "sched-abc": { totalCount: 1, runningCount: 1, awaitingCount: 0 } }),
+      ),
+    },
+    ...overrides,
+  } as unknown as WorkflowModule;
+}
+
+async function expectValidation400(res: Response, needle?: RegExp) {
+  expect(res.status).toBe(400);
+  const body = await jsonBody(res);
+  expect(body.code).toBeDefined();
+  if (needle) expect(JSON.stringify(body)).toMatch(needle);
+  return body;
+}
+
+describe("schedulesWorkflowRoutes — list", () => {
+  it("GET / returns workflow schedules with fireStats", async () => {
+    const svc = stubModule({});
+    const workflow = stubWorkflowModule();
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => workflow,
+    ).request("/");
+    expect(res.status).toBe(200);
+    expect(await jsonBody(res)).toEqual([
+      {
+        ...sampleSchedule,
+        target: wireTarget,
+        fireStats: { runningCount: 1, awaitingCount: 0 },
+      },
+    ]);
+    expect(svc.listSchedules.execute).toHaveBeenCalledWith({ kind: "workflow" });
+    expect(workflow.aggregateByOrigin.execute).toHaveBeenCalledWith({
+      origin: "schedule",
+      originIds: ["sched-abc"],
+      statusIn: ["running"],
+    });
+  });
+
+  it("GET /?coordinatorAgent=x&enabled=false maps workflow filters", async () => {
+    const list = vi.fn(() => okAsync([]));
+    const svc = stubModule({ listSchedules: { execute: list } });
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/?coordinatorAgent=official/engineer&enabled=false");
+    expect(res.status).toBe(200);
+    expect(list).toHaveBeenCalledWith({
+      kind: "workflow",
+      dataEquals: { path: "$.coordinatorAgent", value: "official/engineer" },
+      enabled: false,
+    });
+  });
+});
+
+describe("schedulesWorkflowRoutes — create", () => {
+  it("POST / creates and returns 201 with zero fireStats", async () => {
+    const create = vi.fn(() => okAsync(sampleSchedule));
     const svc = stubModule({ createSchedule: { execute: create } });
-    const res = await schedulesRoutes(() => svc).request("/workflow", {
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: "Nightly release workflow",
+        name: sampleSchedule.name,
         target: validTarget,
-        trigger: sampleWorkflowSchedule.trigger,
+        trigger: sampleSchedule.trigger,
       }),
     });
     expect(res.status).toBe(201);
     const body = await jsonBody(res);
-    expect(body.target).toEqual({ kind: "workflow", ...validTarget });
-    expect(create).toHaveBeenCalledTimes(1);
-    // Service receives the internal `{ kind, data }` envelope.
+    expect(body.target).toEqual(wireTarget);
+    expect(body.fireStats).toEqual({ awaitingCount: 0, runningCount: 0 });
     expect(create).toHaveBeenCalledWith({
-      name: "Nightly release workflow",
+      name: sampleSchedule.name,
       target: { kind: "workflow", data: validTarget },
-      trigger: sampleWorkflowSchedule.trigger,
+      trigger: sampleSchedule.trigger,
     });
   });
 
-  it("POST /workflow with missing name returns 400", async () => {
+  it.each([
+    ["missing name", { target: validTarget, trigger: sampleSchedule.trigger }, /name/],
+    [
+      "missing coordinatorAgent",
+      { name: "x", target: { brief: "do x" }, trigger: sampleSchedule.trigger },
+      /coordinatorAgent/,
+    ],
+    [
+      "empty coordinatorAgent",
+      {
+        name: "x",
+        target: { ...validTarget, coordinatorAgent: "" },
+        trigger: sampleSchedule.trigger,
+      },
+      /coordinatorAgent/,
+    ],
+    [
+      "unknown target key",
+      { name: "x", target: { ...validTarget, extra: 1 }, trigger: sampleSchedule.trigger },
+      /extra|unknown/i,
+    ],
+    [
+      "unknown top-level key",
+      { name: "x", target: validTarget, trigger: sampleSchedule.trigger, extra: 1 },
+      /extra|unknown/i,
+    ],
+  ])("POST / rejects %s", async (_label, body, needle) => {
     const svc = stubModule({});
-    const res = await schedulesRoutes(() => svc).request("/workflow", {
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: validTarget, trigger: sampleWorkflowSchedule.trigger }),
+      body: JSON.stringify(body),
     });
-    expect(res.status).toBe(400);
-    const body = await jsonBody(res);
-    expect(body.code).toBe("ValidationError");
-    expect(JSON.stringify(body.issues)).toMatch(/name/);
+    await expectValidation400(res, needle);
     expect(svc.createSchedule.execute).not.toHaveBeenCalled();
-  });
-
-  it("POST /workflow rejects target.kind in body (URL discriminates)", async () => {
-    const svc = stubModule({});
-    const res = await schedulesRoutes(() => svc).request("/workflow", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "x",
-        target: { kind: "workflow", ...validTarget },
-        trigger: sampleWorkflowSchedule.trigger,
-      }),
-    });
-    expect(res.status).toBe(400);
-    const body = await jsonBody(res);
-    expect(body.code).toBe("ValidationError");
-    expect(JSON.stringify(body.issues)).toMatch(/kind/);
-    expect(svc.createSchedule.execute).not.toHaveBeenCalled();
-  });
-
-  it("POST /workflow with missing coordinatorAgent returns 400", async () => {
-    const svc = stubModule({});
-    const res = await schedulesRoutes(() => svc).request("/workflow", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "x",
-        target: { brief: "do x" },
-        trigger: sampleWorkflowSchedule.trigger,
-      }),
-    });
-    expect(res.status).toBe(400);
-    const body = await jsonBody(res);
-    expect(body.code).toBe("ValidationError");
-    expect(JSON.stringify(body.issues)).toMatch(/coordinatorAgent/);
-    expect(svc.createSchedule.execute).not.toHaveBeenCalled();
-  });
-
-  it("POST /workflow with unknown nested target key returns 400", async () => {
-    const svc = stubModule({});
-    const res = await schedulesRoutes(() => svc).request("/workflow", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "x",
-        target: { ...validTarget, surprise: 1 },
-        trigger: sampleWorkflowSchedule.trigger,
-      }),
-    });
-    expect(res.status).toBe(400);
-    const body = await jsonBody(res);
-    expect(body.code).toBe("ValidationError");
-    expect(JSON.stringify(body.issues)).toMatch(/surprise|unknown key/);
-  });
-
-  it("POST /workflow with a multi-line brief returns 400", async () => {
-    const svc = stubModule({});
-    const res = await schedulesRoutes(() => svc).request("/workflow", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "x",
-        target: { coordinatorAgent: "official/engineer", brief: "line1\nline2" },
-        trigger: sampleWorkflowSchedule.trigger,
-      }),
-    });
-    expect(res.status).toBe(400);
-    const body = await jsonBody(res);
-    expect(body.code).toBe("ValidationError");
-    expect(JSON.stringify(body.issues)).toMatch(/single line/);
   });
 });
 
-describe("schedulesRoutes — patch workflow", () => {
-  it("PATCH /workflow/:sid forwards a sparse target with expectedKind: 'workflow'", async () => {
-    const patch = vi.fn(() => okAsync(sampleWorkflowSchedule));
-    const svc = stubModule({ patchSchedule: { execute: patch } });
-    const res = await schedulesRoutes(() => svc).request("/workflow/sched-wf", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: { coordinatorAgent: "acme/coord" } }),
-    });
-    expect(res.status).toBe(200);
-    expect(patch).toHaveBeenCalledWith({
-      id: "sched-wf",
-      target: { patch: { coordinatorAgent: "acme/coord" } },
-      expectedKind: "workflow",
-    });
-  });
-
-  it("PATCH /workflow/:sid clears details via RFC 7396 null", async () => {
-    const patch = vi.fn(() => okAsync(sampleWorkflowSchedule));
-    const svc = stubModule({ patchSchedule: { execute: patch } });
-    const res = await schedulesRoutes(() => svc).request("/workflow/sched-wf", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: { details: null } }),
-    });
-    expect(res.status).toBe(200);
-    expect(patch).toHaveBeenCalledWith({
-      id: "sched-wf",
-      target: { patch: { details: null } },
-      expectedKind: "workflow",
-    });
-  });
-
-  it("PATCH /workflow/:sid rejects null on the required coordinatorAgent (400)", async () => {
+describe("schedulesWorkflowRoutes — get", () => {
+  it("GET /:sid returns describe and fireStats", async () => {
     const svc = stubModule({});
-    const res = await schedulesRoutes(() => svc).request("/workflow/sched-wf", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: { coordinatorAgent: null } }),
-    });
-    expect(res.status).toBe(400);
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/sched-abc");
+    expect(res.status).toBe(200);
     const body = await jsonBody(res);
-    expect(body.code).toBe("ValidationError");
-    expect(JSON.stringify(body.issues)).toMatch(/coordinatorAgent/);
-    expect(svc.patchSchedule.execute).not.toHaveBeenCalled();
+    expect(body.target).toEqual(wireTarget);
+    expect(body.fireStats).toEqual({ runningCount: 1, awaitingCount: 0 });
+    expect(typeof body.describe).toBe("string");
+    expect(svc.getSchedule.execute).toHaveBeenCalledWith({
+      id: "sched-abc",
+      expectedKind: "workflow",
+    });
   });
 
-  it("PATCH /workflow/:sid maps ScheduleNotFoundError → 404", async () => {
-    const patch = vi.fn(() => errAsync({ type: "ScheduleNotFound", id: "sched-wf" }));
-    const svc = stubModule({ patchSchedule: { execute: patch } });
-    const res = await schedulesRoutes(() => svc).request("/workflow/sched-wf", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "renamed" }),
-    });
+  it("GET /:sid returns 404 when service returns null", async () => {
+    const svc = stubModule({ getSchedule: { execute: vi.fn(() => okAsync(null)) } });
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/missing");
     expect(res.status).toBe(404);
     expect((await jsonBody(res)).code).toBe("ScheduleNotFound");
   });
+});
 
-  it("PATCH /workflow/:sid maps ScheduleKindMismatchError → 404 with a plain not-found envelope (no kind leak)", async () => {
-    // Patching a TASK schedule via the /workflow URL must look like an
-    // ordinary 404 — never reveal the resource's real kind.
+describe("schedulesWorkflowRoutes — patch", () => {
+  it("PATCH /:sid forwards a sparse patch with expectedKind", async () => {
+    const patch = vi.fn(() => okAsync(sampleSchedule));
+    const svc = stubModule({ patchSchedule: { execute: patch } });
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/sched-abc", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { coordinatorAgent: "acme/coord", details: null } }),
+    });
+    expect(res.status).toBe(200);
+    expect((await jsonBody(res)).fireStats).toEqual({ runningCount: 1, awaitingCount: 0 });
+    expect(patch).toHaveBeenCalledWith({
+      id: "sched-abc",
+      expectedKind: "workflow",
+      target: { patch: { coordinatorAgent: "acme/coord", details: null } },
+    });
+  });
+
+  it("PATCH /:sid maps ScheduleKindMismatch to a generic 404", async () => {
     const patch = vi.fn(() =>
       errAsync({
         type: "ScheduleKindMismatch",
-        id: "sched-wf",
+        id: "sched-abc",
         expected: "workflow",
         actual: "task",
       }),
     );
     const svc = stubModule({ patchSchedule: { execute: patch } });
-    const res = await schedulesRoutes(() => svc).request("/workflow/sched-wf", {
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/sched-abc", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "x" }),
+      body: JSON.stringify({ name: "renamed" }),
     });
     expect(res.status).toBe(404);
     const body = await jsonBody(res);
     expect(body.code).toBe("ScheduleNotFound");
-    expect(JSON.stringify(body)).not.toMatch(/SCHEDULE_KIND_MISMATCH|task/i);
+    expect(JSON.stringify(body)).not.toMatch(/task|ScheduleKindMismatch/);
+  });
+});
+
+describe("schedulesWorkflowRoutes — delete", () => {
+  it("DELETE /:sid returns the delete outcome", async () => {
+    const del = vi.fn(() => okAsync({ deletedDispatchCount: 2 }));
+    const svc = stubModule({ deleteSchedule: { execute: del } });
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/sched-abc", { method: "DELETE" });
+    expect(res.status).toBe(200);
+    expect(await jsonBody(res)).toEqual({ ok: true, deletedDispatchCount: 2 });
+    expect(del).toHaveBeenCalledWith({ id: "sched-abc", expectedKind: "workflow" });
+  });
+
+  it.each([
+    ["ScheduleNotFound", 404],
+    ["ScheduleEnabled", 409],
+    ["ScheduleHasInFlight", 409],
+  ])("DELETE /:sid maps %s", async (code, status) => {
+    const svc = stubModule({
+      deleteSchedule: { execute: vi.fn(() => errAsync({ type: code, id: "sched-abc" })) },
+    });
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/sched-abc", { method: "DELETE" });
+    expect(res.status).toBe(status);
+    expect((await jsonBody(res)).code).toBe(code);
+  });
+});
+
+describe("schedulesWorkflowRoutes — run", () => {
+  it("POST /:sid/run returns { dispatchId }", async () => {
+    const run = vi.fn(() => okAsync({ dispatchId: "workflow-fresh" }));
+    const svc = stubModule({ runSchedule: { execute: run } });
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/sched-abc/run", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(await jsonBody(res)).toEqual({ dispatchId: "workflow-fresh" });
+    expect(run).toHaveBeenCalledWith({ id: "sched-abc", expectedKind: "workflow" });
+  });
+
+  it("POST /:sid/run maps ScheduleNotFound to 404", async () => {
+    const svc = stubModule({
+      runSchedule: { execute: vi.fn(() => errAsync({ type: "ScheduleNotFound", id: "ghost" })) },
+    });
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/ghost/run", { method: "POST" });
+    expect(res.status).toBe(404);
+    expect((await jsonBody(res)).code).toBe("ScheduleNotFound");
+  });
+});
+
+describe("schedulesWorkflowRoutes — preview", () => {
+  it("GET /:sid/preview returns describe + nextRuns", async () => {
+    const svc = stubModule({});
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/sched-abc/preview");
+    expect(res.status).toBe(200);
+    expect((await jsonBody(res)).nextRuns).toHaveLength(3);
+    expect(svc.previewSchedule.execute).toHaveBeenCalledWith({
+      expr: sampleSchedule.trigger.expr,
+      tz: sampleSchedule.trigger.tz,
+      n: 3,
+    });
+  });
+
+  it.each(["0", "101"])("GET /:sid/preview?n=%s returns 400", async (n) => {
+    const svc = stubModule({});
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request(`/sched-abc/preview?n=${n}`);
+    await expectValidation400(res, /n|Number/);
+    expect(svc.previewSchedule.execute).not.toHaveBeenCalled();
+  });
+
+  it("GET /:sid/preview returns 404 when the schedule is missing", async () => {
+    const svc = stubModule({ getSchedule: { execute: vi.fn(() => okAsync(null)) } });
+    const res = await schedulesWorkflowRoutes(
+      () => svc,
+      () => stubWorkflowModule(),
+    ).request("/missing/preview");
+    expect(res.status).toBe(404);
+    expect((await jsonBody(res)).code).toBe("ScheduleNotFound");
   });
 });

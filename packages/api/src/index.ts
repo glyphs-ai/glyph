@@ -68,33 +68,26 @@ export {
   type Application,
   composeApplication,
 } from "./application.js";
-export {
-  countAwaitingHuman,
-  iterationCountForNodes,
-  projectWorkflowDag,
-  projectWorkflowHeader,
-  projectWorkflowNodeWithTaskId,
-} from "./routes/_workflow-projection.js";
 // Route factories — each returns an OpenAPIHono sub-app mountable by
 // the server's transport layer.
 export { type CatalogResolver, catalogRoutes } from "./routes/catalog/index.js";
 export { configRoutes } from "./routes/config.js";
 export { healthRoutes } from "./routes/health.js";
 export { runtimesRoutes } from "./routes/runtimes.js";
-export { scheduledTasksRoutes } from "./routes/scheduled-tasks.js";
-export { scheduledWorkflowsRoutes } from "./routes/scheduled-workflows.js";
-export { schedulesRoutes } from "./routes/schedules.js";
+export { scheduledTasksRoutes, schedulesTaskRoutes } from "./routes/schedules/scheduled-tasks.js";
+export {
+  scheduledWorkflowsRoutes,
+  schedulesWorkflowRoutes,
+} from "./routes/schedules/scheduled-workflows.js";
+export { schedulesPreviewCronRoutes } from "./routes/schedules/schedules.js";
 export { sessionsRoutes } from "./routes/sessions.js";
 export { tasksRoutes } from "./routes/tasks.js";
-export { type WorkflowStatus, workflowsRoutes } from "./routes/workflows.js";
+export { workflowsRoutes } from "./routes/workflows.js";
 export { workspacesRoutes } from "./routes/workspaces.js";
-// Transport-agnostic zod schemas mirroring every wire contract. The
-// OpenAPI projection in `@glyphs-ai/server` consumes these; other
-// (non-HTTP) consumers can reuse them without an HTTP round-trip.
+// Re-export the transport-agnostic zod schemas + wire types mirroring every
+// wire contract. The OpenAPI projection in `@glyphs-ai/server` consumes these;
+// other (non-HTTP) consumers can reuse them without an HTTP round-trip.
 export * from "./schemas/index.js";
-// Re-export every wire contract from the `./wire` subtree so server can
-// `import { ... } from "@glyphs-ai/api"` and get both layers in one shot.
-export * from "./wire/index.js";
 export { TaskOperationError } from "./wiring/_task-operation-error.js";
 export { TaskScheduleTargetError } from "./wiring/schedule-task-handler.js";
 export { WorkflowScheduleTargetError } from "./wiring/schedule-workflow-handler.js";

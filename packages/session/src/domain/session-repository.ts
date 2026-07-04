@@ -18,20 +18,15 @@ export type SessionNotFound = {
   readonly id: SessionId;
 };
 
-export type SessionIdConflict = {
-  readonly type: "SessionIdConflict";
-  readonly id: SessionId;
-};
-
 /**
  * Write-side persistence port for the session aggregate. Pure reads
  * (findById / findAll) live on the read-side {@link SessionQueries}. `get`
  * loads the aggregate for mutation (asserting existence); `save` is an
  * upsert keyed on the repository's change-tracker (a freshly `create()`d
- * aggregate INSERTs — surfacing `SessionIdConflict` — a loaded one UPDATEs).
+ * aggregate INSERTs; a loaded one UPDATEs).
  */
 export interface SessionRepository {
   get(id: SessionId): ResultAsync<SessionEntity, SessionNotFound | DatabaseUnavailable>;
-  save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable | SessionIdConflict>;
+  save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable>;
   delete(id: SessionId): ResultAsync<void, DatabaseUnavailable>;
 }

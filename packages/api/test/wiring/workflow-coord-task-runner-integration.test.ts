@@ -18,7 +18,7 @@
  * exists only because `WorkflowRunners` requires both fields.
  */
 
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { TaskModule } from "@glyphs-ai/task";
@@ -105,9 +105,6 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
   // reuse this same dir as the root for
   // `workflowDir(workspaceDir, wfid)`.
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-coord-runner-int-"));
-  // Mirror @glyphs-ai/workspace's provisioner: createWorkflow now
-  // requires `workflows/` to exist (mkdir leaf is `{recursive:false}`).
-  mkdirSync(path.join(workspaceDir, "workflows"));
 
   const coordRunner = makeCoordNodeRunner({
     tasks,
@@ -137,6 +134,12 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
       return false;
     },
     async cancel(_nodeId) {},
+    async listArtifacts() {
+      return null;
+    },
+    async resolveArtifactPath() {
+      return null;
+    },
   };
 
   const dbHandle = openTestWorkflowDb();
@@ -151,6 +154,8 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
         dispatch: async () => {},
         hasInFlightForNode: async () => false,
         cancel: async () => {},
+        listArtifacts: async () => null,
+        resolveArtifactPath: async () => null,
       },
     },
     logger: silentLogger,
@@ -263,11 +268,11 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
       coordinatorAgent: "coord-agent",
     });
     if (created3.isErr()) throw new Error(created3.error.type);
-    const { initialCoordNodeId } = created3.value;
+    const { workflowId, initialCoordNodeId } = created3.value;
 
     await waitUntil(
       async () => {
-        const node = await h.module.getNode.execute({ nodeId: initialCoordNodeId });
+        const node = await h.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId });
         if (node.isErr()) throw new Error(node.error.type);
         return node.value.status === "succeeded";
       },
@@ -275,7 +280,7 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
       "coord node observed succeeded after fake tasks.getTask.execute returns succeeded",
     );
 
-    const node = await h.module.getNode.execute({ nodeId: initialCoordNodeId });
+    const node = await h.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId });
     if (node.isErr()) throw new Error(node.error.type);
     expect(node.value.status).toBe("succeeded");
     // The initial coord succeeded without any children; the

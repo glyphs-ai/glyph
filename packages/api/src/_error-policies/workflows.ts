@@ -1,6 +1,4 @@
 import type {
-  AddWorkflowEdgeError,
-  AddWorkflowNodeError,
   AddWorkflowSubgraphError,
   AggregateWorkflowsByOriginError,
   CancelWorkflowError,
@@ -14,10 +12,6 @@ import type {
   GetWorkflowNodeError,
   ListWorkflowsError,
   NodeSpecError,
-  PurgeWorkflowError,
-  RemoveWorkflowEdgeError,
-  RemoveWorkflowNodeError,
-  ReplaceWorkflowNodeSpecError,
   RespondToHumanNodeError,
   WorkflowDeleteRequiresTerminal,
 } from "@glyphs-ai/workflow";
@@ -41,8 +35,6 @@ import { type TaskRouteError, taskErrorWireBody, taskUnionCodeStatuses } from ".
 type CodeStatusEntry = NonNullable<ErrorPolicy["codeStatuses"]>[number];
 
 export type WorkflowRouteError =
-  | AddWorkflowEdgeError
-  | AddWorkflowNodeError
   | AddWorkflowSubgraphError
   | AggregateWorkflowsByOriginError
   | CancelWorkflowError
@@ -55,10 +47,6 @@ export type WorkflowRouteError =
   | GetWorkflowError
   | GetWorkflowNodeError
   | ListWorkflowsError
-  | PurgeWorkflowError
-  | RemoveWorkflowEdgeError
-  | RemoveWorkflowNodeError
-  | ReplaceWorkflowNodeSpecError
   | RespondToHumanNodeError;
 
 type WorkflowErrorType = WorkflowRouteError["type"];
@@ -66,7 +54,6 @@ type WorkflowErrorType = WorkflowRouteError["type"];
 const STATUS_BY_TYPE: Readonly<Record<WorkflowErrorType, ContentfulStatusCode>> = {
   WorkflowNotFound: 404,
   WorkflowNodeNotFound: 404,
-  WorkflowEdgeNotFound: 404,
   NodeSpecError: 400,
   EmptyParents: 400,
   WorkflowSubgraphEmpty: 400,
@@ -77,12 +64,9 @@ const STATUS_BY_TYPE: Readonly<Record<WorkflowErrorType, ContentfulStatusCode>> 
   WorkflowAlreadyTerminal: 409,
   WorkflowNodeNotMutable: 409,
   WorkflowDeleteRequiresTerminal: 409,
-  EdgeCycle: 409,
   MultipleSuccessorCoords: 409,
   OrphanCoordInsert: 409,
   ParentState: 409,
-  RemoveNodeOrphansChild: 409,
-  RemoveEdgeOrphansChild: 409,
   WorkflowSubgraphCyclic: 409,
   WorkflowSubgraphMultipleCoordTemps: 409,
   DagInvariant: 409,
@@ -100,11 +84,6 @@ function workflowWireBody(err: WorkflowRouteError): Record<string, unknown> {
       return { error: `workflow not found: ${err.workflowId}`, code: err.type };
     case "WorkflowNodeNotFound":
       return { error: `workflow node not found: ${err.nodeId}`, code: err.type };
-    case "WorkflowEdgeNotFound":
-      return {
-        error: `workflow edge not found: ${err.fromNodeId} -> ${err.toNodeId}`,
-        code: err.type,
-      };
     case "NodeSpecError":
       return nodeSpecWireBody(err);
     case "EmptyParents":
@@ -133,8 +112,6 @@ function workflowWireBody(err: WorkflowRouteError): Record<string, unknown> {
       };
     case "WorkflowDeleteRequiresTerminal":
       return workflowDeleteRequiresTerminalBody(err);
-    case "EdgeCycle":
-      return { error: "edge would create a cycle", code: err.type };
     case "MultipleSuccessorCoords":
       return { error: "coordinator node already has a successor coordinator", code: err.type };
     case "OrphanCoordInsert":
@@ -144,10 +121,6 @@ function workflowWireBody(err: WorkflowRouteError): Record<string, unknown> {
         error: `parent ${err.parentNodeId} is ${err.parentStatus}; cannot attach ${err.nodeKind}`,
         code: err.type,
       };
-    case "RemoveNodeOrphansChild":
-      return { error: `removing node would orphan child ${err.orphanedChildId}`, code: err.type };
-    case "RemoveEdgeOrphansChild":
-      return { error: "removing edge would orphan a child", code: err.type };
     case "WorkflowSubgraphCyclic":
       return { error: "subgraph would create a cycle", code: err.type };
     case "WorkflowSubgraphMultipleCoordTemps":

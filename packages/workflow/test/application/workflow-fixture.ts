@@ -24,6 +24,7 @@ import { eq } from "drizzle-orm";
 import type { Logger } from "pino";
 import pino from "pino";
 import type {
+  WorkflowNodeArtifactListing,
   WorkflowNodeDispatchOpts,
   WorkflowNodeRunner,
   WorkflowNodeTerminalResult,
@@ -34,6 +35,7 @@ import {
   type WorkflowNodeId,
   WorkflowNodeIdSchema,
 } from "../../src/domain/node/workflow-node-id.js";
+import type { WorkflowNodeKind } from "../../src/domain/node/workflow-node-kind.js";
 import type { WorkflowNodeStatus } from "../../src/domain/node/workflow-node-status.js";
 import { type WorkflowId, WorkflowIdSchema } from "../../src/domain/workflow/workflow-id.js";
 import { type Db, openDb } from "../../src/infrastructure/drizzle/workflow-db.js";
@@ -58,6 +60,8 @@ export interface StubRunner extends WorkflowNodeRunner {
   readonly validateCalls: ValidateCall[];
   readonly dispatchCalls: DispatchCall[];
   readonly cancelCalls: string[];
+  readonly artifactListings: Map<string, WorkflowNodeArtifactListing | null>;
+  readonly artifactPaths: Map<string, string | null>;
   /** Nodes considered to have in-flight units. */
   readonly inFlightSet: Set<string>;
   /** When true, the next dispatch call throws. */
@@ -74,11 +78,15 @@ export function makeStubRunner(): StubRunner {
   const validateCalls: ValidateCall[] = [];
   const dispatchCalls: DispatchCall[] = [];
   const cancelCalls: string[] = [];
+  const artifactListings = new Map<string, WorkflowNodeArtifactListing | null>();
+  const artifactPaths = new Map<string, string | null>();
   const inFlightSet = new Set<string>();
   const stub: StubRunner = {
     validateCalls,
     dispatchCalls,
     cancelCalls,
+    artifactListings,
+    artifactPaths,
     inFlightSet,
     dispatchShouldThrow: false,
     cancelShouldThrow: false,
@@ -110,6 +118,12 @@ export function makeStubRunner(): StubRunner {
         stub.cancelShouldThrow = false;
         throw new Error("stub cancel failure");
       }
+    },
+    async listArtifacts(nodeId) {
+      return artifactListings.get(nodeId) ?? null;
+    },
+    async resolveArtifactPath(nodeId, name) {
+      return artifactPaths.get(`${nodeId}:${name}`) ?? null;
     },
   };
   return stub;
@@ -257,6 +271,57 @@ export async function bootstrap(
     coordinatorAgent: args.coordinatorAgent ?? "coord-agent",
   });
   return res._unsafeUnwrap();
+}
+
+export async function addIteration(
+  f: WorkflowFixture,
+  args: {
+    readonly workflowId: WorkflowId;
+    readonly parentCoordId: WorkflowNodeId;
+    readonly nodes: readonly {
+      readonly tempId: string;
+      readonly kind?: Exclude<WorkflowNodeKind, "coordinator">;
+      readonly spec: unknown;
+    }[];
+    readonly coordSpec: unknown;
+  },
+): Promise<{
+  readonly nodeIds: Readonly<Record<string, WorkflowNodeId>>;
+  readonly workerIds: Readonly<Record<string, WorkflowNodeId>>;
+  readonly coordId: WorkflowNodeId;
+}> {
+  const coordTempId = "__coord";
+  const res = (
+    await f.module.addSubgraph.execute({
+      workflowId: args.workflowId,
+      nodes: [
+        ...args.nodes.map((node) => ({
+          tempId: node.tempId,
+          kind: node.kind ?? "worker",
+          spec: node.spec,
+          existingParents: [args.parentCoordId],
+        })),
+        {
+          tempId: coordTempId,
+          kind: "coordinator",
+          spec: args.coordSpec,
+          existingParents: [args.parentCoordId],
+        },
+      ],
+      edges: args.nodes.map((node) => ({
+        from: { kind: "temp" as const, tempId: node.tempId },
+        to: { kind: "temp" as const, tempId: coordTempId },
+      })),
+    })
+  )._unsafeUnwrap();
+  const nodeIds: Record<string, WorkflowNodeId> = {};
+  for (const inserted of res.insertedNodes) {
+    if (inserted.tempId === coordTempId) continue;
+    nodeIds[inserted.tempId] = inserted.nodeId;
+  }
+  const coord = res.insertedNodes.find((inserted) => inserted.tempId === coordTempId);
+  if (coord === undefined) throw new Error("addIteration: coordinator not inserted");
+  return { nodeIds, workerIds: nodeIds, coordId: coord.nodeId };
 }
 
 /**

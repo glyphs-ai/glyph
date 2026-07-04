@@ -1,4 +1,4 @@
-import { err, ok, okAsync } from "neverthrow";
+import { ok, okAsync } from "neverthrow";
 import { z } from "zod";
 import {
   type InvalidCronExpr,
@@ -10,17 +10,11 @@ import {
 import { describeCron } from "../infrastructure/cron/describe.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-/** `n` was outside the `[1, 100]` bound (guards against O(n) blow-up). */
-export type PreviewCountOutOfRange = {
-  readonly type: "PreviewCountOutOfRange";
-  readonly n: number;
-};
-
 export const PreviewScheduleRequestSchema = z
   .object({
     expr: z.string(),
     tz: z.string(),
-    n: z.number().optional(),
+    n: z.number().int().min(1).max(100).optional(),
   })
   .strict();
 export type PreviewScheduleRequest = z.infer<typeof PreviewScheduleRequestSchema>;
@@ -31,7 +25,7 @@ export const PreviewScheduleResponseSchema = z.object({
 });
 export type PreviewScheduleResponse = z.infer<typeof PreviewScheduleResponseSchema>;
 
-export type PreviewScheduleError = InvalidCronExpr | InvalidTimezone | PreviewCountOutOfRange;
+export type PreviewScheduleError = InvalidCronExpr | InvalidTimezone;
 
 export interface PreviewScheduleDeps {
   readonly now: () => Date;
@@ -56,9 +50,6 @@ export class PreviewScheduleUseCase
         .andThen(() => validateTimezone(parsed.tz))
         .andThen(() => {
           const n = parsed.n ?? 3;
-          if (!Number.isInteger(n) || n < 1 || n > 100) {
-            return err({ type: "PreviewCountOutOfRange" as const, n });
-          }
           return ok({
             describe: describeCron(parsed.expr),
             nextRuns: nextRuns(parsed.expr, parsed.tz, deps.now(), n),

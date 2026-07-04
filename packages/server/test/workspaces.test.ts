@@ -243,20 +243,6 @@ describe("workspacesRoutes — list / get / current / delete", () => {
     ).toBeNull();
     expect(await fs.readFile(path.join(workspaceDir, "user-file.txt"), "utf8")).toBe("user");
   });
-
-  it("DELETE /:id?purge=1 also removes glyph-owned subdirs", async () => {
-    const { app, workspace } = await makeApp();
-    const workspaceDir = path.join(scratch, "purge");
-    const id = await register(workspace, { name: "Purge", workspaceDir });
-    const fs = await import("node:fs/promises");
-    await fs.writeFile(path.join(workspaceDir, "user-file.txt"), "user", "utf8");
-    await fs.writeFile(path.join(workspaceDir, "sessions", "drop.txt"), "agent", "utf8");
-
-    const res = await app.request(`/${id}?purge=1`, { method: "DELETE" });
-    expect(res.status).toBe(204);
-    await expect(fs.stat(path.join(workspaceDir, "sessions"))).rejects.toThrow();
-    expect(await fs.readFile(path.join(workspaceDir, "user-file.txt"), "utf8")).toBe("user");
-  });
 });
 
 describe("workspacesRoutes — PATCH /:id", () => {

@@ -3,7 +3,6 @@ import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { __Entity__Entity } from "../../domain/__entity-kebab__-entity.js";
 import type { __Entity__Id } from "../../domain/__entity-kebab__-id.js";
 import type {
-  __Entity__IdConflict,
   __Entity__NotFound,
   __Entity__Repository,
   DatabaseUnavailable,
@@ -45,12 +44,12 @@ export class Drizzle__Entity__Repository implements __Entity__Repository {
     ).map((rows) => rows.map((row) => __Entity__Mapper.toDomain(row)));
   }
 
-  insert(entity: __Entity__Entity): ResultAsync<void, DatabaseUnavailable | __Entity__IdConflict> {
+  insert(entity: __Entity__Entity): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => {
         this.db.insert(__entities__).values(__Entity__Mapper.toRow(entity)).run();
       })(),
-      (cause) => this.translateInsertError(cause, entity),
+      Drizzle__Entity__Repository.asDatabaseUnavailable,
     );
   }
 
@@ -74,17 +73,5 @@ export class Drizzle__Entity__Repository implements __Entity__Repository {
       })(),
       Drizzle__Entity__Repository.asDatabaseUnavailable,
     );
-  }
-
-  /** Translate a SQLite PRIMARY KEY violation into `__Entity__IdConflict`. */
-  private translateInsertError(
-    cause: unknown,
-    entity: __Entity__Entity,
-  ): DatabaseUnavailable | __Entity__IdConflict {
-    const e = cause as { code?: string };
-    if (typeof e.code === "string" && e.code.startsWith("SQLITE_CONSTRAINT")) {
-      return { type: "__Entity__IdConflict", id: entity.id };
-    }
-    return Drizzle__Entity__Repository.asDatabaseUnavailable(cause);
   }
 }

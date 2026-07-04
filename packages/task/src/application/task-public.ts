@@ -7,6 +7,8 @@
  * mapper / row types, and the concrete adapters stay package-internal.
  */
 
+// ─── artifact listing value object ───────────────────────────────────
+export type { TaskArtifactFile } from "../domain/task-artifact.js";
 // ─── task value objects (schemas + inferred types) ───────────────────
 export { type TaskBrief, TaskBriefSchema } from "../domain/task-brief.js";
 export { type TaskCancellation, TaskCancellationSchema } from "../domain/task-cancellation.js";

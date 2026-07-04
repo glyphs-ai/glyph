@@ -171,12 +171,12 @@ export const getTask = (taskId: string): Promise<TaskRecord> =>
   fetchJson<TaskRecord>(`${workspacePrefix()}/tasks/${encodeURIComponent(taskId)}`, "task");
 
 /**
- * Build the URL the browser should hit to download a task artifact by
- * name. : artifacts are served from the workspace-scoped
+ * Build the URL the browser should hit to download a task artifact by its
+ * relative-path identity. Artifacts are served from the workspace-scoped
  * task route, gated by a whitelist on `success.artifacts`.
  */
-export const taskArtifactUrl = (taskId: string, name: string): string =>
-  `${workspacePrefix()}/tasks/${encodeURIComponent(taskId)}/artifact/${encodeURIComponent(name)}`;
+export const taskArtifactUrl = (taskId: string, relPath: string): string =>
+  `${workspacePrefix()}/tasks/${encodeURIComponent(taskId)}/artifact?path=${encodeURIComponent(relPath)}`;
 
 export interface DispatchTaskOpts {
   agent: string;

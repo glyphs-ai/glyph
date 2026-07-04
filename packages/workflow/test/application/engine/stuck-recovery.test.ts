@@ -7,10 +7,7 @@
  *     when a workflow is in a quiescent stuck state (status=running,
  *     every node terminal, leaves form one of the stuck shapes) the
  *     detector inserts a retry coord node and the wrapping write
- *     post-commit dispatches it. The detector is hooked at all 8
- *     structural mutation sites (markNodeTerminal, cancelNode,
- *     addNode, addEdge, removeNode, removeEdge, replaceSpec,
- *     addSubgraph) — see design §13.
+ *     post-commit dispatches it.
  *  2. `addSubgraph` rejects batches whose final leaf frontier is not
  *     exactly `{1 coordinator}` with `WorkflowDagInvariantError` so
  *     callers can never push a workflow into a structurally-stuck
@@ -27,6 +24,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { extractWorkflowNodeRetryMetadata } from "../../../src/domain/node/workflow-node-retry.js";
 import { STUCK_RETRY_MAX_ATTEMPTS } from "../../../src/domain/workflow/workflow-stuck-recovery.js";
 import {
+  addIteration,
   bootstrap,
   buildWorkflowFixture,
   fixedRandomUUID,
@@ -177,46 +175,30 @@ describe("WorkflowService — stuck-coord recovery", () => {
 
   // ─── 15.3 — Stuck detector Case (b) workers_finished_without_coord ─
 
-  it("§15.3 detector inserts retry coord (reason=workers_finished_without_coord) with prev_coord in parents", async () => {
+  it("§15.3 valid worker completion does not trigger workers_finished_without_coord", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
     await quietEngine(f);
-    // Coord adds two workers, then terminates without scheduling a
-    // successor coord.
-    const { nodeId: w1 } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "w1" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    const { nodeId: w2 } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "w2" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds, coordId } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [
+        { tempId: "w1", spec: { agent: "w", brief: "w1" } },
+        { tempId: "w2", spec: { agent: "w", brief: "w2" } },
+      ],
+      coordSpec: { agent: "coord-next" },
+    });
+    const w1 = workerIds.w1!;
+    const w2 = workerIds.w2!;
     await markNodeTerminal(f, { workflowId, nodeId: initialCoordNodeId, status: "succeeded" });
     await markNodeTerminal(f, { workflowId, nodeId: w1, status: "succeeded" });
-    // After w2 terminates, leaves = {w1, w2} (both workers) → reason
-    // is workers_finished_without_coord. The detector inserts a
-    // retry coord with parents = uniqueOrdered([prevCoord, w1, w2]) —
-    // prevCoord MUST be first so OrphanCoordInsertError invariant is
-    // satisfied even when leaves are all workers.
     await markNodeTerminal(f, { workflowId, nodeId: w2, status: "succeeded" });
     const dag = (await f.module.getDag.execute({ workflowId }))._unsafeUnwrap();
-    const retry = dag.nodes.find((n) => n.kind === "coordinator" && n.id !== initialCoordNodeId);
-    expect(retry).toBeDefined();
-    const meta = extractWorkflowNodeRetryMetadata(retry!.metadata);
-    expect(meta).toEqual({
-      of: initialCoordNodeId,
-      reason: "workers_finished_without_coord",
-      attempt: 1,
-    });
-    const retryParents = dag.edges.filter((e) => e.to === retry?.id).map((e) => e.from);
-    expect(retryParents.sort()).toEqual([initialCoordNodeId, w1, w2].sort());
+    expect(
+      dag.nodes
+        .filter((n) => n.kind === "coordinator")
+        .map((n) => n.id)
+        .sort(),
+    ).toEqual([initialCoordNodeId, coordId].sort());
   });
 
   // ─── 15.4 — Attempt counter ratchets across recoveries ─────────────
@@ -245,26 +227,17 @@ describe("WorkflowService — stuck-coord recovery", () => {
 
   // ─── 15.5 — Detector is a no-op when the workflow still has live work ─
 
-  it("§15.5 addNode fires the detector on a fresh workflow with a running coord and inserts no retry", async () => {
+  it("§15.5 addSubgraph fires the detector on a fresh workflow with a running coord and inserts no retry", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    // addNode is a §13 detector trigger site. Inside its tx the
-    // detector sees: workflow=running, but the running initial coord
-    // is non-terminal — the all-terminal precondition fails, so the
-    // detector returns inserted=false without any write.
-    (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "noise" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "noise", spec: { agent: "w", brief: "noise" } }],
+      coordSpec: { agent: "coord-next" },
+    });
     const dag = (await f.module.getDag.execute({ workflowId }))._unsafeUnwrap();
-    // No retry coord was inserted: only the initial coord + the new
-    // worker. The detector's existence is verified by the absence of
-    // a second coordinator-kind node.
-    expect(dag.nodes.length).toBe(2);
-    expect(dag.nodes.filter((n) => n.kind === "coordinator").length).toBe(1);
+    expect(dag.nodes.length).toBe(3);
+    expect(dag.nodes.filter((n) => n.kind === "coordinator").length).toBe(2);
   });
 
   // ─── 15.6 — cancelWorkflow is not a detector trigger site ──────────
@@ -297,24 +270,15 @@ describe("WorkflowService — stuck-coord recovery", () => {
 
   it("§15.7 detector skips when any node is still not_started / ready / running", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    // addNode (a §13 trigger site) inserts a not_started worker; the
-    // detector fires inside the addNode tx. The detector requires
-    // ALL nodes terminal before considering recovery — a pending
-    // worker plus a still-running coord is not a stuck shape, so the
-    // detector returns inserted=false.
-    (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "pending" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "pending", spec: { agent: "w", brief: "pending" } }],
+      coordSpec: { agent: "coord-next" },
+    });
     const dag = (await f.module.getDag.execute({ workflowId }))._unsafeUnwrap();
-    // No retry coord was inserted: initial coord + the not_started
-    // worker = 2 nodes, exactly one coordinator.
-    expect(dag.nodes.length).toBe(2);
-    expect(dag.nodes.filter((n) => n.kind === "coordinator").length).toBe(1);
+    expect(dag.nodes.length).toBe(3);
+    expect(dag.nodes.filter((n) => n.kind === "coordinator").length).toBe(2);
   });
 
   // ─── 15.8 — Detector is idempotent under repeated mutation firings ─
@@ -330,24 +294,15 @@ describe("WorkflowService — stuck-coord recovery", () => {
     const retry = dag1.nodes.find((n) => n.id !== initialCoordNodeId);
     expect(retry).toBeDefined();
     expect(retry?.kind).toBe("coordinator");
-    // 2nd firing — addNode (also a §13 trigger site) adds a worker
-    // parented to the now-`succeeded` initial coord. The detector
-    // fires inside this addNode tx; the retry coord is still
-    // non-terminal so the all-terminal check fails and no duplicate
-    // retry is inserted.
-    (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "post-retry" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    await addIteration(f, {
+      workflowId,
+      parentCoordId: retry!.id,
+      nodes: [{ tempId: "post-retry", spec: { agent: "w", brief: "post-retry" } }],
+      coordSpec: { agent: "coord-next" },
+    });
     const dag2 = (await f.module.getDag.execute({ workflowId }))._unsafeUnwrap();
-    // Still exactly 2 coords (initial + retry); the new worker is the
-    // only added node, so the total is 3.
-    expect(dag2.nodes.length).toBe(3);
-    expect(dag2.nodes.filter((n) => n.kind === "coordinator").length).toBe(2);
+    expect(dag2.nodes.length).toBe(4);
+    expect(dag2.nodes.filter((n) => n.kind === "coordinator").length).toBe(3);
   });
 
   // ─── 15.10 — Workflow denorm `coordinator_agent` mirrors retry coord ─

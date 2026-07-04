@@ -26,18 +26,24 @@
  * cross-cutting safety net.
  */
 
-import type { AgentNotFound, AgentResolutionFailed, TaskModule } from "@glyphs-ai/task";
+import type {
+  AgentNotFound,
+  AgentResolutionFailed,
+  DispatchTaskResponse as Task,
+  TaskModule,
+} from "@glyphs-ai/task";
 import { RegisterWorkspaceRequestSchema } from "@glyphs-ai/workspace";
 import { Hono } from "hono";
 import { errAsync, okAsync } from "neverthrow";
 import type { Logger } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { catalogRoutes } from "../src/routes/catalog/index.js";
-import { scheduledTasksRoutes } from "../src/routes/scheduled-tasks.js";
-import { schedulesRoutes } from "../src/routes/schedules.js";
+import {
+  scheduledTasksRoutes,
+  schedulesTaskRoutes,
+} from "../src/routes/schedules/scheduled-tasks.js";
 import { tasksRoutes } from "../src/routes/tasks.js";
 import { workspacesRoutes } from "../src/routes/workspaces.js";
-import type { Task } from "../src/wire/domain.js";
 import { TaskOperationError } from "../src/wiring/_task-operation-error.js";
 import { captureLogger } from "./_capture-logger.js";
 
@@ -127,7 +133,7 @@ describe("respondError contract — cross-domain status preservation", () => {
       errAsync(new TaskOperationError({ type: "AgentNotFound", agent: "ghost" } as AgentNotFound)),
     );
     const stub = { createSchedule: { execute: create } } as never;
-    const res = await schedulesRoutes(() => stub).request("/task", {
+    const res = await schedulesTaskRoutes(() => stub).request("/", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -393,10 +399,10 @@ describe("respondError contract — AgentResolutionFailed 500 path", () => {
     const { app, cap } = await buildAppWithLogger((a) => {
       a.route(
         "/",
-        schedulesRoutes(() => stub),
+        schedulesTaskRoutes(() => stub),
       );
     });
-    const res = await app.request("/task", {
+    const res = await app.request("/", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -435,7 +441,7 @@ describe("respondError contract — AgentResolutionFailed 500 path", () => {
     const { app, cap } = await buildAppWithLogger((a) => {
       a.route(
         "/",
-        schedulesRoutes(() => stub),
+        schedulesTaskRoutes(() => stub),
       );
     });
     const res = await app.request(`/${sid}/run`, { method: "POST" });

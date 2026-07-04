@@ -31,6 +31,14 @@ describe("LocalTaskSandbox.reserve", () => {
     const again = await sandbox.reserve(ID);
     expect(again._unsafeUnwrapErr().type).toBe("WorkdirReservationFailed");
   });
+
+  it("creates the sandbox root lazily when it does not exist", async () => {
+    const nestedRoot = join(root, "nested", "tasks");
+    const nested = new LocalTaskSandbox({ root: nestedRoot });
+    const dir = (await nested.reserve(ID))._unsafeUnwrap();
+    expect(dir).toBe(join(nestedRoot, ID));
+    expect(existsSync(dir)).toBe(true);
+  });
 });
 
 describe("LocalTaskSandbox.materialize", () => {
@@ -59,16 +67,15 @@ describe("LocalTaskSandbox.materialize", () => {
 });
 
 describe("LocalTaskSandbox.listArtifacts", () => {
-  it("returns absolute artifact paths sorted by name", async () => {
+  it("returns artifact paths relative to artifact/, sorted", async () => {
     const workdir = (await sandbox.reserve(ID))._unsafeUnwrap();
     await sandbox.materialize({ workdir, brief: "b", details: undefined });
     writeFileSync(join(workdir, "artifact", "b.html"), "b");
     writeFileSync(join(workdir, "artifact", "a.html"), "a");
-    const r = await sandbox.listArtifacts(workdir);
-    expect(r._unsafeUnwrap()).toEqual([
-      join(workdir, "artifact", "a.html"),
-      join(workdir, "artifact", "b.html"),
-    ]);
+    const files = (await sandbox.listArtifacts(workdir))._unsafeUnwrap();
+    expect(files.map((f) => f.relPath)).toEqual(["a.html", "b.html"]);
+    expect(files[0]).toMatchObject({ relPath: "a.html", size: 1 });
+    expect(typeof files[0]!.modifiedAt).toBe("string");
   });
 
   it("resolves to [] when the artifact dir does not exist", async () => {
@@ -77,7 +84,7 @@ describe("LocalTaskSandbox.listArtifacts", () => {
     expect(r._unsafeUnwrap()).toEqual([]);
   });
 
-  it("recursively lists files at any depth, sorted by path", async () => {
+  it("recursively lists files at any depth as POSIX relPaths, sorted", async () => {
     const workdir = (await sandbox.reserve(ID))._unsafeUnwrap();
     await sandbox.materialize({ workdir, brief: "b", details: undefined });
     const art = join(workdir, "artifact");
@@ -85,13 +92,22 @@ describe("LocalTaskSandbox.listArtifacts", () => {
     writeFileSync(join(art, "top.txt"), "t");
     writeFileSync(join(art, "sub", "mid.txt"), "m");
     writeFileSync(join(art, "sub", "deep", "leaf.txt"), "l");
-    const r = await sandbox.listArtifacts(workdir);
-    const expected = [
-      join(art, "top.txt"),
-      join(art, "sub", "mid.txt"),
-      join(art, "sub", "deep", "leaf.txt"),
-    ].sort((a, b) => a.localeCompare(b));
-    expect(r._unsafeUnwrap()).toEqual(expected);
+    const files = (await sandbox.listArtifacts(workdir))._unsafeUnwrap();
+    expect(files.map((f) => f.relPath)).toEqual(["sub/deep/leaf.txt", "sub/mid.txt", "top.txt"]);
+  });
+});
+
+describe("LocalTaskSandbox.resolveArtifactPath", () => {
+  it("joins a relPath under the task's artifact/ root", () => {
+    const workdir = sandbox.resolve(ID);
+    expect(sandbox.resolveArtifactPath(ID, "ref/test.md")).toBe(
+      join(workdir, "artifact", "ref", "test.md"),
+    );
+  });
+
+  it("returns null for an escaping or empty relPath", () => {
+    expect(sandbox.resolveArtifactPath(ID, "../../etc/passwd")).toBeNull();
+    expect(sandbox.resolveArtifactPath(ID, "")).toBeNull();
   });
 });
 

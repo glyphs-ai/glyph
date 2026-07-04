@@ -36,6 +36,7 @@ export class LocalSessionSandbox implements SessionSandbox {
     const dir = this.resolve(id);
     return ResultAsync.fromPromise(
       (async () => {
+        await mkdir(this.root, { recursive: true });
         await mkdir(dir, { recursive: false });
         return dir;
       })(),

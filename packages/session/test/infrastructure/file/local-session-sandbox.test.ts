@@ -63,12 +63,13 @@ describe("LocalSessionSandbox", () => {
       expect(await exists(dir)).toBe(true);
     });
 
-    it("fails with SandboxProvisionFailed when the sandbox root is missing", async () => {
-      // `root` is not created — mkdir with recursive:false cannot make the parent.
+    it("creates the sandbox root lazily when it does not exist", async () => {
+      // `root` is not pre-created; create() self-heals it (recursive mkdir).
       const sandbox = new LocalSessionSandbox({ root });
-      const err = (await sandbox.create(ID))._unsafeUnwrapErr();
-      expect(err.type).toBe("SandboxProvisionFailed");
-      expect(err.cause).toBeInstanceOf(Error);
+      const dir = (await sandbox.create(ID))._unsafeUnwrap();
+      expect(dir).toBe(sandbox.resolve(ID));
+      expect(await exists(dir)).toBe(true);
+      expect(await exists(root)).toBe(true);
     });
 
     it("fails with SandboxProvisionFailed when the sandbox already exists", async () => {

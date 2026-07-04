@@ -43,7 +43,7 @@ describe("Drizzle__Entity__Repository", () => {
     expect((await repo.get(ID_A))._unsafeUnwrapErr().type).toBe("__Entity__NotFound");
   });
 
-  it("rejects a duplicate id with __Entity__IdConflict", async () => {
+  it("rejects a duplicate id with DatabaseUnavailable", async () => {
     await repo.insert(entityA());
     const dup = new __Entity__Entity({
       id: ID_A,
@@ -51,7 +51,7 @@ describe("Drizzle__Entity__Repository", () => {
       createdAt: "2025-02-01T00:00:00.000Z",
       archived: false,
     });
-    expect((await repo.insert(dup))._unsafeUnwrapErr().type).toBe("__Entity__IdConflict");
+    expect((await repo.insert(dup))._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
   });
 
   it("save persists a mutated aggregate", async () => {

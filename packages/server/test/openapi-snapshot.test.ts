@@ -23,7 +23,9 @@ import {
   runtimesRoutes,
   scheduledTasksRoutes,
   scheduledWorkflowsRoutes,
-  schedulesRoutes,
+  schedulesPreviewCronRoutes,
+  schedulesTaskRoutes,
+  schedulesWorkflowRoutes,
   sessionsRoutes,
   tasksRoutes,
   workflowsRoutes,
@@ -99,11 +101,19 @@ function buildOpenApiAppForTest(): OpenAPIHono {
 
   const schedulesApp = createApiApp();
   schedulesApp.route(
-    "/:id/schedules",
-    schedulesRoutes(
+    "/:id/schedules/task",
+    schedulesTaskRoutes(() => stubScheduleService()),
+  );
+  schedulesApp.route(
+    "/:id/schedules/workflow",
+    schedulesWorkflowRoutes(
       () => stubScheduleService(),
       () => stubWorkflowService(),
     ),
+  );
+  schedulesApp.route(
+    "/:id/schedules/preview-cron",
+    schedulesPreviewCronRoutes(() => stubScheduleService()),
   );
   app.route("/api/workspaces", schedulesApp);
 

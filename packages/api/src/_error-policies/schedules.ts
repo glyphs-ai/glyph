@@ -55,9 +55,7 @@ const STATUS_BY_TYPE: Readonly<Record<ScheduleErrorType, ContentfulStatusCode>> 
   InvalidScheduleId: 400,
   InvalidCronExpr: 400,
   InvalidTimezone: 400,
-  InvalidJsonPath: 400,
   InvalidScheduleName: 400,
-  PreviewCountOutOfRange: 400,
   TargetKindImmutable: 400,
   ScheduleNotFound: 404,
   ScheduleKindMismatch: 404,
@@ -78,12 +76,8 @@ function scheduleWireBody(err: ScheduleRouteAtom): Record<string, unknown> {
       return { error: `invalid cron expression "${err.expr}": ${err.reason}`, code: err.type };
     case "InvalidTimezone":
       return { error: `invalid IANA timezone: "${err.tz}"`, code: err.type };
-    case "InvalidJsonPath":
-      return { error: `invalid JSON path "${err.path}"`, code: err.type };
     case "InvalidScheduleName":
       return { error: "schedule name must be a non-empty string", code: err.type };
-    case "PreviewCountOutOfRange":
-      return { error: `preview n must be an integer in [1, 100], got ${err.n}`, code: err.type };
     case "TargetKindImmutable":
       return {
         error: `cannot change target.kind on schedule "${err.id}" (current="${err.current}", attempted="${err.attempted}")`,

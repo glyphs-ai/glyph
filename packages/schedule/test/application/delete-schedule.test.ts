@@ -37,6 +37,20 @@ describe("DeleteScheduleUseCase", () => {
     expect(result._unsafeUnwrapErr().type).toBe("ScheduleEnabled");
   });
 
+  it("delete with mismatched expectedKind reads as ScheduleNotFound", async () => {
+    (await h.module.createSchedule.execute(baseCreateOpts({ enabled: false })))._unsafeUnwrap();
+    const result = await h.module.deleteSchedule.execute({
+      id: VALID_UUIDS[0],
+      expectedKind: "workflow",
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().type).toBe("ScheduleNotFound");
+    // The row survives — a wrong-kind delete is a no-op.
+    expect(
+      (await h.module.getSchedule.execute({ id: VALID_UUIDS[0] }))._unsafeUnwrap(),
+    ).not.toBeNull();
+  });
+
   it("delete errs ScheduleHasInFlight when handler reports in-flight", async () => {
     (await h.module.createSchedule.execute(baseCreateOpts({ enabled: false })))._unsafeUnwrap();
     h.taskHandler.inFlightSet.add(VALID_UUIDS[0]);

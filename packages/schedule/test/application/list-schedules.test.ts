@@ -62,12 +62,12 @@ describe("ListSchedulesUseCase", () => {
     expect(filtered.map((s) => s.name)).toEqual(["a"]);
   });
 
-  it("list errs InvalidJsonPath for an SQL-injection-shaped path", async () => {
-    const result = await h.module.listSchedules.execute({
-      kind: "task",
-      dataEquals: { path: "'; DROP TABLE schedules; --", value: "writer" },
-    });
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().type).toBe("InvalidJsonPath");
+  it("throws on an SQL-injection-shaped path (schema grammar guard)", () => {
+    expect(() =>
+      h.module.listSchedules.execute({
+        kind: "task",
+        dataEquals: { path: "'; DROP TABLE schedules; --", value: "writer" },
+      }),
+    ).toThrow();
   });
 });

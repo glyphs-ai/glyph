@@ -21,11 +21,11 @@ const NODE_UUIDS = [
 function wfId(n: number): WorkflowId {
   return WorkflowIdSchema.parse(`20260607-${n.toString(16).padStart(8, "0")}`);
 }
+
 function nodeId(i: number): WorkflowNodeId {
   return WorkflowNodeIdSchema.parse(NODE_UUIDS[i]);
 }
 
-/** A running workflow with its initial coordinator node (no persistence yet). */
 function makeWorkflow(id: WorkflowId): WorkflowEntity {
   const wf = WorkflowEntity.create({
     id,
@@ -41,6 +41,28 @@ function makeWorkflow(id: WorkflowId): WorkflowEntity {
     nowIso: NOW,
   })._unsafeUnwrap();
   return wf;
+}
+
+function addIteration(wf: WorkflowEntity): void {
+  wf.addSubgraph({
+    nodes: [
+      {
+        tempId: "w",
+        kind: "worker",
+        validatedSpec: { agent: "w", brief: "x" },
+        existingParents: [nodeId(0)],
+      },
+      {
+        tempId: "c",
+        kind: "coordinator",
+        validatedSpec: { agent: "coord-b" },
+        existingParents: [nodeId(0)],
+      },
+    ],
+    edges: [{ from: { kind: "temp", tempId: "w" }, to: { kind: "temp", tempId: "c" } }],
+    mintId: (tempId) => (tempId === "w" ? nodeId(1) : nodeId(2)),
+    nowIso: NOW,
+  })._unsafeUnwrap();
 }
 
 let db: Db;
@@ -69,21 +91,16 @@ describe("DrizzleWorkflowRepository — insert / get round-trip", () => {
     expect(got.edges).toEqual([]);
   });
 
-  it("round-trips nodes + edges (coord → worker)", async () => {
+  it("round-trips nodes + edges for a frontier-valid iteration", async () => {
     const wf = makeWorkflow(wfId(1));
-    wf.addNode({
-      nodeId: nodeId(1),
-      kind: "worker",
-      validatedSpec: { agent: "w", brief: "x" },
-      parents: [nodeId(0)],
-      nowIso: NOW,
-    })._unsafeUnwrap();
+    addIteration(wf);
     (await repo.insert(wf))._unsafeUnwrap();
     const got = (await repo.get(wfId(1)))._unsafeUnwrap();
-    expect(got.nodes.map((n) => n.id).sort()).toEqual([nodeId(0), nodeId(1)].sort());
-    expect(got.edges).toHaveLength(1);
-    expect(got.edges[0]?.from).toBe(nodeId(0));
-    expect(got.edges[0]?.to).toBe(nodeId(1));
+    expect(got.nodes.map((n) => n.id).sort()).toEqual([nodeId(0), nodeId(1), nodeId(2)].sort());
+    expect(got.edges).toHaveLength(3);
+    expect(got.edges.some((e) => e.from === nodeId(0) && e.to === nodeId(1))).toBe(true);
+    expect(got.edges.some((e) => e.from === nodeId(0) && e.to === nodeId(2))).toBe(true);
+    expect(got.edges.some((e) => e.from === nodeId(1) && e.to === nodeId(2))).toBe(true);
   });
 
   it("get returns WorkflowNotFound for a missing workflow id", async () => {
@@ -94,7 +111,6 @@ describe("DrizzleWorkflowRepository — insert / get round-trip", () => {
 
   it("get surfaces WorkflowEntityCorruption for a row with an invalid status enum", async () => {
     (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
-    // Corrupt the persisted status out-of-band; the mapper must reject it.
     db.update(workflows)
       .set({ status: "bogus" })
       .where(eq(workflows.id, "20260607-00000001"))
@@ -117,92 +133,40 @@ describe("DrizzleWorkflowRepository — save (snapshot diff)", () => {
     expect(got.cancellation).toEqual({ kind: "user", message: "stop" });
   });
 
-  it("inserts a newly added node on save", async () => {
+  it("inserts newly added subgraph nodes on save", async () => {
     (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
     const wf = (await repo.get(wfId(1)))._unsafeUnwrap();
-    wf.addNode({
-      nodeId: nodeId(1),
-      kind: "worker",
-      validatedSpec: { agent: "w", brief: "x" },
-      parents: [nodeId(0)],
-      nowIso: NOW,
-    })._unsafeUnwrap();
+    addIteration(wf);
     (await repo.save(wf))._unsafeUnwrap();
     const got = (await repo.get(wfId(1)))._unsafeUnwrap();
-    expect(got.nodes.map((n) => n.id).sort()).toEqual([nodeId(0), nodeId(1)].sort());
-    expect(got.edges).toHaveLength(1);
-  });
-
-  it("deletes a removed node (and its edges) on save", async () => {
-    const wf = makeWorkflow(wfId(1));
-    wf.addNode({
-      nodeId: nodeId(1),
-      kind: "worker",
-      validatedSpec: { agent: "w", brief: "x" },
-      parents: [nodeId(0)],
-      nowIso: NOW,
-    })._unsafeUnwrap();
-    (await repo.insert(wf))._unsafeUnwrap();
-
-    const loaded = (await repo.get(wfId(1)))._unsafeUnwrap();
-    loaded.removeNode(nodeId(1))._unsafeUnwrap();
-    (await repo.save(loaded))._unsafeUnwrap();
-
-    const got = (await repo.get(wfId(1)))._unsafeUnwrap();
-    expect(got.nodes.map((n) => n.id)).toEqual([nodeId(0)]);
-    expect(got.edges).toEqual([]);
+    expect(got.nodes.map((n) => n.id).sort()).toEqual([nodeId(0), nodeId(1), nodeId(2)].sort());
+    expect(got.edges).toHaveLength(3);
   });
 
   it("updates a node's lifecycle columns on save", async () => {
     const wf = makeWorkflow(wfId(1));
-    wf.addNode({
-      nodeId: nodeId(1),
-      kind: "worker",
-      validatedSpec: { agent: "w", brief: "x" },
-      parents: [nodeId(0)],
-      nowIso: NOW,
-    })._unsafeUnwrap();
+    addIteration(wf);
     (await repo.insert(wf))._unsafeUnwrap();
-
-    // Drive the coord terminal so the worker becomes runnable, then run it.
     const loaded = (await repo.get(wfId(1)))._unsafeUnwrap();
     loaded.markNodeTerminal(nodeId(0), "succeeded", undefined, NOW)._unsafeUnwrap();
     loaded.markNodeRunning(nodeId(1), "2026-06-07T01:00:00.000Z")._unsafeUnwrap();
     (await repo.save(loaded))._unsafeUnwrap();
-
     const got = (await repo.get(wfId(1)))._unsafeUnwrap();
     const worker = got.nodes.find((n) => n.id === nodeId(1));
     expect(worker?.status).toBe("running");
     expect(worker?.runningAt).toBe("2026-06-07T01:00:00.000Z");
   });
 
-  it("adds and removes edges on save", async () => {
-    const wf = makeWorkflow(wfId(1));
-    wf.addNode({
-      nodeId: nodeId(1),
-      kind: "worker",
-      validatedSpec: { agent: "w", brief: "a" },
-      parents: [nodeId(0)],
-      nowIso: NOW,
-    })._unsafeUnwrap();
-    wf.addNode({
-      nodeId: nodeId(2),
-      kind: "worker",
-      validatedSpec: { agent: "w", brief: "b" },
-      parents: [nodeId(0), nodeId(1)],
-      nowIso: NOW,
-    })._unsafeUnwrap();
-    (await repo.insert(wf))._unsafeUnwrap();
-    expect((await repo.get(wfId(1)))._unsafeUnwrap().edges).toHaveLength(3);
-
-    // Remove the coord→node2 edge; node2 keeps node1 as parent.
+  it("adds subgraph edges on save", async () => {
+    (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
     const loaded = (await repo.get(wfId(1)))._unsafeUnwrap();
-    loaded.removeEdge(nodeId(0), nodeId(2))._unsafeUnwrap();
+    addIteration(loaded);
     (await repo.save(loaded))._unsafeUnwrap();
-
     const edges = (await repo.get(wfId(1)))._unsafeUnwrap().edges;
-    expect(edges.some((e) => e.from === nodeId(0) && e.to === nodeId(2))).toBe(false);
-    expect(edges).toHaveLength(2);
+    expect(edges.some((e) => e.from === nodeId(0) && e.to === nodeId(1))).toBe(true);
+    expect(edges.some((e) => e.from === nodeId(0) && e.to === nodeId(2))).toBe(true);
+    expect(edges.some((e) => e.from === nodeId(1) && e.to === nodeId(2))).toBe(true);
+    expect(edges).toHaveLength(3);
   });
 
   it("cascade-deletes the workflow + nodes + edges when the aggregate is marked deleted", async () => {

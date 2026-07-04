@@ -1,8 +1,7 @@
-import type { TaskModule } from "@glyphs-ai/task";
+import type { DispatchTaskResponse as Task, TaskModule } from "@glyphs-ai/task";
 import { err, ok } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { tasksRoutes } from "../../src/routes/tasks.js";
-import type { Task } from "../../src/wire/domain.js";
 
 /**
  * Local Error subclasses drive stub failures; `wrapOk` maps them to task
@@ -881,9 +880,9 @@ describe("tasksRoutes", () => {
     });
   });
 
-  // ─── : GET /:tid/artifact/:name ─────────────────
-  describe("GET /:tid/artifact/:name", () => {
-    it("happy path: returns file bytes with content type", async () => {
+  // ─── GET /:tid/artifact?path= ────────────────────
+  describe("GET /:tid/artifact", () => {
+    it("happy path: resolves a nested relPath and returns file bytes", async () => {
       const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
       const { tmpdir } = await import("node:os");
       const nodePath = await import("node:path");
@@ -891,11 +890,13 @@ describe("tasksRoutes", () => {
       const abs = nodePath.join(tmp, "report.html");
       await writeFile(abs, "<html><body>ok</body></html>");
       const m = stubManager({
-        resolveArtifactPath: vi.fn(async (req: { name: string }) =>
-          req.name === "report.html" ? abs : null,
+        resolveArtifactPath: vi.fn(async (req: { relPath: string }) =>
+          req.relPath === "ref/report.html" ? abs : null,
         ),
       });
-      const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/artifact/report.html`);
+      const res = await tasksRoutes(() => m).request(
+        `/${sampleTask.id}/artifact?path=${encodeURIComponent("ref/report.html")}`,
+      );
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toContain("text/html");
       const text = await res.text();
@@ -903,31 +904,31 @@ describe("tasksRoutes", () => {
       await rm(tmp, { recursive: true, force: true });
     });
 
-    it("returns 404 when the manager rejects the name (whitelist)", async () => {
+    it("returns 404 when the manager rejects the path (whitelist)", async () => {
       const m = stubManager({
         resolveArtifactPath: vi.fn(async () => null),
       });
-      const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/artifact/secret.txt`);
+      const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/artifact?path=secret.txt`);
       expect(res.status).toBe(404);
     });
 
-    it("returns 400 when name contains a path separator", async () => {
+    it("returns 400 when path contains a .. traversal segment", async () => {
       const m = stubManager({
         resolveArtifactPath: vi.fn(),
       });
       const res = await tasksRoutes(() => m).request(
-        `/${sampleTask.id}/artifact/${encodeURIComponent("../etc/passwd")}`,
+        `/${sampleTask.id}/artifact?path=${encodeURIComponent("../etc/passwd")}`,
       );
       expect(res.status).toBe(400);
       expect(m.resolveArtifactPath).not.toHaveBeenCalled();
     });
 
-    it("returns 400 when name contains a backslash separator", async () => {
+    it("returns 400 when path contains a backslash separator", async () => {
       const m = stubManager({
         resolveArtifactPath: vi.fn(),
       });
       const res = await tasksRoutes(() => m).request(
-        `/${sampleTask.id}/artifact/${encodeURIComponent("foo\\bar")}`,
+        `/${sampleTask.id}/artifact?path=${encodeURIComponent("foo\\bar")}`,
       );
       expect(res.status).toBe(400);
       expect(m.resolveArtifactPath).not.toHaveBeenCalled();
@@ -1115,7 +1116,7 @@ describe("tasksRoutes", () => {
       expect(fault?.taskId).toBe(sampleTask.id);
     });
 
-    it("GET /:tid/artifact/:name: logs unmapped error with taskId + artifact name", async () => {
+    it("GET /:tid/artifact: logs unmapped error with taskId + artifact path", async () => {
       // The artifact resolver throws a bare Error (e.g. permission
       // failure while reading the success.json index). Outer catch
       // around `resolveArtifactPath` gained the new pattern.
@@ -1125,7 +1126,7 @@ describe("tasksRoutes", () => {
         }),
       });
       const { app, cap } = await buildAppWithLogger(m);
-      const res = await app.request(`/${sampleTask.id}/artifact/out.txt`);
+      const res = await app.request(`/${sampleTask.id}/artifact?path=out.txt`);
       expect(res.status).toBe(500);
       const body = await jsonBody(res);
       expect(body.error).toBe("internal error");

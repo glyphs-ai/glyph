@@ -105,24 +105,6 @@ describe("RegisterWorkspaceUseCase — error channel", () => {
     expect(repo.save).not.toHaveBeenCalled();
   });
 
-  it("WorkspaceIdConflict propagated from repo.save (PRIMARY KEY race)", async () => {
-    repo.save.mockReturnValue(errAsync({ type: "WorkspaceIdConflict", id: "X" as WorkspaceId }));
-    const res = await useCase.execute(req("Demo", ABS_DIR));
-    expect(res._unsafeUnwrapErr().type).toBe("WorkspaceIdConflict");
-  });
-
-  it("WorkspacePathConflict propagated from repo.save (UNIQUE race)", async () => {
-    repo.save.mockReturnValue(
-      errAsync({
-        type: "WorkspacePathConflict",
-        workspaceDir: path.resolve(ABS_DIR),
-        existingId: OTHER_ID,
-      }),
-    );
-    const res = await useCase.execute(req("Demo", ABS_DIR));
-    expect(res._unsafeUnwrapErr().type).toBe("WorkspacePathConflict");
-  });
-
   it("ProvisioningFailed propagated from provisioner", async () => {
     provisioner.provision.mockReturnValue(
       errAsync({

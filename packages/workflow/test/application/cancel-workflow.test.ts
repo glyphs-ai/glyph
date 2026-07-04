@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  addIteration,
   bootstrap,
   buildWorkflowFixture,
   fixedRandomUUID,
@@ -22,38 +23,22 @@ describe("WorkflowService.cancelWorkflow", () => {
 
   it("flips the workflow to cancelled and ends every non-terminal node", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: pending } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    // Materialise a parent task and force it terminal so the
-    // `running` task lands in `running` via eager dispatch — needed
-    // so the cancel reconciliation invokes runner.cancel for it.
-    const { nodeId: parentTaskId } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "p" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    setNodeLifecycle(f, {
-      id: parentTaskId,
-      status: "succeeded",
-      endedAt: "2026-06-07T01:00:00.000Z",
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [
+        { tempId: "pending", spec: { agent: "w", brief: "x" } },
+        { tempId: "running", spec: { agent: "w", brief: "y" } },
+      ],
+      coordSpec: { agent: "coord-next" },
     });
-    const { nodeId: running } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "y" },
-        parents: [parentTaskId],
-      })
-    )._unsafeUnwrap();
+    const pending = workerIds.pending!;
+    const running = workerIds.running!;
+    setNodeLifecycle(f, {
+      id: running,
+      status: "running",
+      runningAt: "2026-06-07T01:00:00.000Z",
+    });
     (
       await f.module.cancelWorkflow.execute({
         workflowId,
@@ -63,14 +48,16 @@ describe("WorkflowService.cancelWorkflow", () => {
     const wf = (await f.module.getWorkflow.execute({ workflowId }))._unsafeUnwrap();
     expect(wf.status).toBe("cancelled");
     // Every non-terminal node, INCLUDING the initial coord, is cancelled.
-    const coord = (await f.module.getNode.execute({ nodeId: initialCoordNodeId }))._unsafeUnwrap();
+    const coord = (
+      await f.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })
+    )._unsafeUnwrap();
     expect(coord.status).toBe("cancelled");
-    expect((await f.module.getNode.execute({ nodeId: pending }))._unsafeUnwrap().status).toBe(
-      "cancelled",
-    );
-    expect((await f.module.getNode.execute({ nodeId: running }))._unsafeUnwrap().status).toBe(
-      "cancelled",
-    );
+    expect(
+      (await f.module.getNode.execute({ workflowId, nodeId: pending }))._unsafeUnwrap().status,
+    ).toBe("cancelled");
+    expect(
+      (await f.module.getNode.execute({ workflowId, nodeId: running }))._unsafeUnwrap().status,
+    ).toBe("cancelled");
     expect(f.workerRunner.cancelCalls).toContain(running);
     // Cancellation payload is persisted in the same tx as the
     // status flip — the next read sees both.
@@ -104,17 +91,16 @@ describe("WorkflowService.cancelWorkflow", () => {
 
   it("does NOT call runner.cancel for not_started / not-yet-running nodes", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: pending } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId: pending }))._unsafeUnwrap().status).toBe(
-      "not_started",
-    );
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "pending", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const pending = workerIds.pending!;
+    expect(
+      (await f.module.getNode.execute({ workflowId, nodeId: pending }))._unsafeUnwrap().status,
+    ).toBe("not_started");
     (
       await f.module.cancelWorkflow.execute({
         workflowId,

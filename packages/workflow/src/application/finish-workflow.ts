@@ -30,7 +30,8 @@ export const FinishWorkflowRequestSchema = z.discriminatedUnion("outcome", [
     .strict(),
 ]);
 export type FinishWorkflowRequest = z.infer<typeof FinishWorkflowRequestSchema>;
-export type FinishWorkflowResponse = undefined;
+export const FinishWorkflowResponseSchema = z.undefined();
+export type FinishWorkflowResponse = z.infer<typeof FinishWorkflowResponseSchema>;
 export type FinishWorkflowError =
   | WorkflowNotFound
   | WorkflowAlreadyTerminal

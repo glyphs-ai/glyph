@@ -1,5 +1,4 @@
 import { and, eq, type SQL, sql } from "drizzle-orm";
-import { errAsync } from "neverthrow";
 import { z } from "zod";
 import { type ScheduleId, ScheduleIdSchema } from "../domain/schedule/schedule-id.js";
 import type { DatabaseUnavailable } from "../domain/schedule/schedule-repository.js";
@@ -18,19 +17,13 @@ import type { UseCase, UseCaseResult } from "./use-case.js";
  */
 const JSON_PATH_RE = /^\$(\.[a-zA-Z_][a-zA-Z0-9_]*)+$/;
 
-/** `dataEquals.path` failed the `^\$(\.[a-zA-Z_][a-zA-Z0-9_]*)+$` grammar guard. */
-export type InvalidJsonPath = {
-  readonly type: "InvalidJsonPath";
-  readonly path: string;
-};
-
 export const ListSchedulesRequestSchema = z
   .object({
     enabled: z.boolean().optional(),
     kind: z.string().optional(),
     dataEquals: z
       .object({
-        path: z.string(),
+        path: z.string().regex(JSON_PATH_RE),
         value: z.union([z.string(), z.number(), z.boolean()]),
       })
       .optional(),
@@ -56,7 +49,7 @@ export const ListSchedulesResponseSchema = z
   .readonly();
 export type ListSchedulesResponse = z.infer<typeof ListSchedulesResponseSchema>;
 
-export type ListSchedulesError = InvalidJsonPath | DatabaseUnavailable;
+export type ListSchedulesError = DatabaseUnavailable;
 
 export interface ListSchedulesDeps {
   readonly query: ScheduleQueries;
@@ -80,9 +73,6 @@ export class ListSchedulesUseCase
     request: ListSchedulesRequest | undefined = {},
   ): UseCaseResult<ListSchedulesResponse, ListSchedulesError> {
     const parsed = ListSchedulesRequestSchema.parse(request);
-    if (parsed.dataEquals !== undefined && !JSON_PATH_RE.test(parsed.dataEquals.path)) {
-      return errAsync({ type: "InvalidJsonPath", path: parsed.dataEquals.path });
-    }
     const q = this.deps.query;
     return q.query((db) => {
       const conditions: SQL[] = [];

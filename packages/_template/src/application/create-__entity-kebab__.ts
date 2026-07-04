@@ -3,7 +3,6 @@ import { z } from "zod";
 import { __Entity__Entity } from "../domain/__entity-kebab__-entity.js";
 import { type __Entity__Id, __Entity__IdSchema } from "../domain/__entity-kebab__-id.js";
 import type {
-  __Entity__IdConflict,
   __Entity__Repository,
   DatabaseUnavailable,
 } from "../domain/__entity-kebab__-repository.js";
@@ -20,7 +19,7 @@ export const Create__Entity__ResponseSchema = z.object({
 });
 export type Create__Entity__Response = z.infer<typeof Create__Entity__ResponseSchema>;
 
-export type Create__Entity__Error = __Entity__IdConflict | DatabaseUnavailable;
+export type Create__Entity__Error = DatabaseUnavailable;
 
 export interface Create__Entity__Deps {
   readonly repo: __Entity__Repository;

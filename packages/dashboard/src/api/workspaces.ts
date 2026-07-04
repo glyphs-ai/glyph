@@ -52,21 +52,12 @@ export const addWorkspace = async (opts: {
 /**
  * Remove a workspace from the registry.
  *
- * Default behaviour: metadata-only — the registry row in `global.db`
- * is deleted but the user's directory contents (their files, plus any
- * agent-produced sessions/, tasks/) stay on disk untouched.
- *
- * Pass `{ purge: true }` to also rm every glyph-owned subdirectory under
- * the workspace's workspaceDir. The workspaceDir itself is never removed —
- * that's user-owned and outside the manager's purview.
+ * Metadata-only: the registry row in `global.db` is deleted but the
+ * workspace's directory contents (the user's files plus any
+ * agent-produced `sessions/`, `tasks/`, `workflows/`) stay on disk.
  */
-export const removeWorkspace = async (
-  workspaceId: string,
-  opts?: { purge?: boolean },
-): Promise<void> => {
-  const query: { purge?: "1" } = {};
-  if (opts?.purge) query.purge = "1";
-  unwrap(await deleteApiWorkspacesById({ path: { id: workspaceId }, query }));
+export const removeWorkspace = async (workspaceId: string): Promise<void> => {
+  unwrap(await deleteApiWorkspacesById({ path: { id: workspaceId } }));
 };
 
 export const updateWorkspaceMetadata = async (

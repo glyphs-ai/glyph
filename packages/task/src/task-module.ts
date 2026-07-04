@@ -11,6 +11,7 @@ import { GetTaskUseCase } from "./application/get-task.js";
 import { GetTaskActivityUseCase } from "./application/get-task-activity.js";
 import { GetTaskActivityStreamUseCase } from "./application/get-task-activity-stream.js";
 import { HasInFlightByOriginUseCase } from "./application/has-in-flight-by-origin.js";
+import { ListArtifactsUseCase } from "./application/list-artifacts.js";
 import { ListInFlightByOriginUseCase } from "./application/list-in-flight-by-origin.js";
 import { ListTasksUseCase } from "./application/list-tasks.js";
 import type { AgentResolver } from "./application/ports/agent-resolver.js";
@@ -21,8 +22,7 @@ import { TaskSupervisor } from "./application/supervision/task-supervisor.js";
 import { openDb } from "./infrastructure/drizzle/task-db.js";
 import { DrizzleTaskQueries } from "./infrastructure/drizzle/task-queries.js";
 import { DrizzleTaskRepository } from "./infrastructure/drizzle/task-repository.js";
-import { LocalTaskSandbox } from "./infrastructure/file/local-task-sandbox.js";
-import { tasksRoot } from "./task-paths.js";
+import { LocalTaskSandbox, tasksRoot } from "./infrastructure/file/local-task-sandbox.js";
 
 /**
  * Public surface of `@glyphs-ai/task`: a DI container of use-case
@@ -35,6 +35,7 @@ export interface TaskModule {
   readonly deleteTask: DeleteTaskUseCase;
   readonly getTask: GetTaskUseCase;
   readonly listTasks: ListTasksUseCase;
+  readonly listArtifacts: ListArtifactsUseCase;
   readonly getTaskActivity: GetTaskActivityUseCase;
   readonly getTaskActivityStream: GetTaskActivityStreamUseCase;
   readonly recoverOrphanedTasks: RecoverOrphanedTasksUseCase;
@@ -111,6 +112,7 @@ export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskMo
     deleteTask: new DeleteTaskUseCase({ repository, supervisor }),
     getTask: new GetTaskUseCase({ query, runtimeRegistry: opts.runtimeRegistry }),
     listTasks: new ListTasksUseCase({ query }),
+    listArtifacts: new ListArtifactsUseCase({ query, sandbox }),
     getTaskActivity: new GetTaskActivityUseCase({
       query,
       runtimeRegistry: opts.runtimeRegistry,
@@ -120,7 +122,7 @@ export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskMo
       runtimeRegistry: opts.runtimeRegistry,
     }),
     recoverOrphanedTasks: new RecoverOrphanedTasksUseCase({ repository, query, now, logger }),
-    resolveArtifactPath: new ResolveArtifactPathUseCase({ query }),
+    resolveArtifactPath: new ResolveArtifactPathUseCase({ query, sandbox }),
     hasInFlightByOrigin: new HasInFlightByOriginUseCase({ query }),
     listInFlightByOrigin: new ListInFlightByOriginUseCase({ query }),
     findLatestByOrigin: new FindLatestByOriginUseCase({ query }),

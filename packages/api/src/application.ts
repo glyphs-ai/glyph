@@ -5,7 +5,6 @@ import {
   type DatabaseUnavailable,
   type GetWorkspaceResponse,
   openWorkspaceDb,
-  type ProvisioningFailed,
   type WorkspaceId,
   type WorkspaceModule,
   type WorkspaceName,
@@ -58,10 +57,7 @@ export interface Application {
    * Unregister a workspace. Idempotent (no error if the workspaceId is
    * unknown). Invalidates the per-workspace context afterwards.
    */
-  unregisterWorkspace(
-    workspaceId: string,
-    opts?: { readonly purge?: boolean },
-  ): ResultAsync<void, ProvisioningFailed | DatabaseUnavailable>;
+  unregisterWorkspace(workspaceId: string): ResultAsync<void, DatabaseUnavailable>;
 
   /**
    * Force-rebuild the cached per-workspace container. Throws
@@ -154,10 +150,10 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
         );
     },
 
-    unregisterWorkspace(workspaceId, opts = {}) {
+    unregisterWorkspace(workspaceId) {
       const id = workspaceId as WorkspaceId;
       return workspace.unregisterWorkspace
-        .execute({ id, ...(opts.purge !== undefined ? { purge: opts.purge } : {}) })
+        .execute({ id })
         .andThen(() => ResultAsync.fromSafePromise(registry.invalidate(workspaceId)));
     },
 

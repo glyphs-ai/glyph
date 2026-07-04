@@ -233,8 +233,9 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
     },
   );
 
-  // Remove a workspace (idempotent). Default removes only metadata;
-  // `?purge=1` also deletes glyph-owned subdirs (sessions/, tasks/, workflows/).
+  // Remove a workspace from the registry (idempotent, metadata-only).
+  // On-disk files under workspaceDir are left untouched — each package
+  // owns the lifecycle of its own subdir.
   app.openapi(
     createRoute({
       method: "delete",
@@ -243,7 +244,6 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       summary: "Delete a workspace",
       request: {
         params: WorkspacePathParamsSchema,
-        query: z.object({ purge: z.string().optional() }),
       },
       responses: {
         204: errorResponse("Deleted (no content)"),
@@ -252,17 +252,16 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
     }),
     async (c) => {
       const id = c.req.param("id");
-      const purge = c.req.query("purge") === "1";
-      const res = await application.unregisterWorkspace(id, { purge });
+      const res = await application.unregisterWorkspace(id);
       return res.match(
         () => {
-          logEvent(c, "workspace deleted", { workspaceId: id, purge });
+          logEvent(c, "workspace deleted", { workspaceId: id });
           return c.body(null, 204);
         },
         (err) =>
           respondWorkspaceError(c, err, {
             route: "workspaces.delete",
-            meta: { workspaceId: id, purge },
+            meta: { workspaceId: id },
           }),
       );
     },

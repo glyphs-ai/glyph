@@ -98,20 +98,6 @@ describe("ScheduleRepository.findAll({ kind, dataEquals }) — generic JSON-extr
     expect(planText).toMatch(/USING (COVERING )?INDEX schedules_target_agent_idx/);
   });
 
-  it("rejects an SQL-injection-shaped path with InvalidJsonPathError", async () => {
-    await insert("550e8400-e29b-41d4-a716-446655440000", createOpts("a", "writer"));
-    const result = await queries.query(() => {
-      const path = "'; DROP TABLE schedules; --";
-      if (!/^\$(\.[a-zA-Z_][a-zA-Z0-9_]*)+$/.test(path))
-        return { type: "InvalidJsonPath" as const, path };
-      return { type: "unexpected" as const };
-    });
-    expect(result._unsafeUnwrap()).toEqual({
-      type: "InvalidJsonPath",
-      path: "'; DROP TABLE schedules; --",
-    });
-  });
-
   it("accepts a nested $.workflow.id path (grammar allows multi-segment field reads)", async () => {
     await insert("550e8400-e29b-41d4-a716-446655440000", {
       name: "n",

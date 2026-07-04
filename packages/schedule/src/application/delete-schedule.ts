@@ -16,7 +16,9 @@ import type { ScheduleKindNotRegistered } from "./ports/schedule-kind-handler.js
 import type { ScheduleKindRegistry } from "./ports/schedule-kind-registry.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-export const DeleteScheduleRequestSchema = z.object({ id: z.string() }).strict();
+export const DeleteScheduleRequestSchema = z
+  .object({ id: z.string(), expectedKind: z.string().optional() })
+  .strict();
 export type DeleteScheduleRequest = z.infer<typeof DeleteScheduleRequestSchema>;
 
 export const DeleteScheduleResponseSchema = z.object({ deletedDispatchCount: z.number() });
@@ -60,6 +62,11 @@ export class DeleteScheduleUseCase
     return safeTry<DeleteScheduleResponse, DeleteScheduleError>(async function* () {
       const id = yield* parseScheduleId(parsed.id);
       const existing = yield* deps.repo.get(id);
+      // A kind-scoped delete (e.g. DELETE /schedules/task/:sid) treats a row of
+      // a different kind as absent — the wire must not leak the actual kind.
+      if (parsed.expectedKind !== undefined && existing.target.kind !== parsed.expectedKind) {
+        return err({ type: "ScheduleNotFound" as const, id });
+      }
       if (existing.enabled) return err({ type: "ScheduleEnabled" as const, id });
       const handler = yield* deps.registry.handlerFor(existing.target.kind);
 

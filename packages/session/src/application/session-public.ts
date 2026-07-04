@@ -9,7 +9,6 @@
 export { type SessionId, SessionIdSchema } from "../domain/session-id.js";
 export type {
   DatabaseUnavailable,
-  SessionIdConflict,
   SessionNotFound,
 } from "../domain/session-repository.js";
 export type {

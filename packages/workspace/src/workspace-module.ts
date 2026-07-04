@@ -61,7 +61,7 @@ export async function composeWorkspaceModule(
     }),
     openWorkspace: new OpenWorkspaceUseCase({ repo, ...loggerDep }),
     renameWorkspace: new RenameWorkspaceUseCase({ repo, ...loggerDep }),
-    unregisterWorkspace: new UnregisterWorkspaceUseCase({ repo, provisioner, ...loggerDep }),
+    unregisterWorkspace: new UnregisterWorkspaceUseCase({ repo, ...loggerDep }),
     getWorkspace: new GetWorkspaceUseCase({ query, ...loggerDep }),
     listWorkspaces: new ListWorkspacesUseCase({ query, ...loggerDep }),
     getLastOpenedWorkspace: new GetLastOpenedWorkspaceUseCase({ query, ...loggerDep }),

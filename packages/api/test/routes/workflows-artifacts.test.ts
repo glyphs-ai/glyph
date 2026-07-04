@@ -1,163 +1,36 @@
-/**
- * Route-level tests for the workflow artifact endpoints in
- * `routes/workflows.ts`:
- *   - `GET /:wfid/artifacts`             — list
- *   - `GET /:wfid/artifacts/:encodedPath` — static bytes
- *
- * Disk fixtures live in an OS tempdir per `it()` (the listFilesRecursive
- * walk reads real `readdir`/`stat`; mocking the fs module would be more
- * fragile than just touching a few files).
- *
- * `findLatestByOrigin` is stubbed at the resolver boundary so we
- * don't have to spin up the task-service db; the byte handler needs
- * `{ id, status }` so it can switch `Cache-Control` based on whether
- * the owning task is terminal.
- *
- * Coverage:
- *  1. list returns workflow-summary entries with `kind: "workflow-summary"`
- *  2. list returns per-node entries with kind/nodeId/taskId/mimeBucket
- *  3. list returns `{ artifacts: [] }` when both namespaces are empty
- *  4. list 404s when getDag rejects with WorkflowNotFound
- *  5. list 500s when a node task lookup faults (not a silent skip)
- *  6. GET summary/<name> streams bytes with `Cache-Control: no-store`
- *  7. GET nodes/<nid>/<name> with terminal task → `Cache-Control: max-age=300`
- *  8. GET nodes/<nid>/<name> with running task  → `Cache-Control: no-store`
- *  9. GET nodes/<nid>/<name> 404s when no task is dispatched
- * 10. GET nodes/<nid>/<name> 404s when the node is not in the addressed workflow
- * 11. GET …/..%2F… (traversal) rejects with 400
- */
-
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { TaskModule } from "@glyphs-ai/task";
-import type {
-  GetWorkflowNodeResponse,
-  GetWorkflowResponse,
-  WorkflowDagSnapshot,
-  WorkflowEdgeView,
-  WorkflowId,
-  WorkflowModule,
-} from "@glyphs-ai/workflow";
+import type { WorkflowId, WorkflowModule } from "@glyphs-ai/workflow";
 import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { workflowsRoutes } from "../../src/routes/workflows.js";
 
 const WID = "20260607-aabbccdd";
-const COORD_NID = "550e8400-e29b-41d4-a716-446655440001";
 const WORKER_NID = "550e8400-e29b-41d4-a716-446655440002";
-const WORKER_TID = "20260607-aaaa1111";
+const OTHER_NID = "550e8400-e29b-41d4-a716-446655440003";
 
-function makeHeader(): GetWorkflowResponse {
+function stubModule(
+  overrides: {
+    listWorkflowArtifacts?: { execute: ReturnType<typeof vi.fn> };
+    resolveWorkflowArtifactPath?: { execute: ReturnType<typeof vi.fn> };
+  } = {},
+): WorkflowModule {
   return {
-    id: WID,
-    brief: "ship feature X",
-    coordinatorAgent: "coord-agent",
-    status: "running",
-    origin: "standalone",
-    metadata: {},
-    createdAt: "2026-06-07T00:00:00.000Z",
-    startedAt: "2026-06-07T00:00:00.000Z",
-  } as GetWorkflowResponse;
-}
-
-function makeCoord(): GetWorkflowNodeResponse {
-  return {
-    id: COORD_NID,
-    workflowId: WID,
-    kind: "coordinator",
-    spec: { agent: "coord-agent" },
-    phase: 0,
-    status: "running",
-    metadata: {},
-    createdAt: "2026-06-07T00:00:00.000Z",
-    readyAt: "2026-06-07T00:00:00.000Z",
-    runningAt: "2026-06-07T00:00:00.000Z",
-  } as GetWorkflowNodeResponse;
-}
-
-function makeWorker(): GetWorkflowNodeResponse {
-  return {
-    id: WORKER_NID,
-    workflowId: WID,
-    kind: "worker",
-    spec: { agent: "writer", brief: "draft" },
-    phase: 1,
-    status: "succeeded",
-    metadata: {},
-    createdAt: "2026-06-07T00:00:01.000Z",
-    readyAt: "2026-06-07T00:00:01.000Z",
-    runningAt: "2026-06-07T00:00:02.000Z",
-    endedAt: "2026-06-07T00:00:03.000Z",
-  } as GetWorkflowNodeResponse;
-}
-
-function makeDag(): WorkflowDagSnapshot {
-  return {
-    workflow: makeHeader(),
-    nodes: [makeCoord(), makeWorker()],
-    edges: [{ workflowId: WID, from: COORD_NID, to: WORKER_NID } as WorkflowEdgeView],
-  };
-}
-
-function stubModule(overrides: { getDag?: { execute: ReturnType<typeof vi.fn> } }): WorkflowModule {
-  const stub = {
-    getDag: overrides.getDag ?? { execute: vi.fn(() => okAsync(makeDag())) },
-  };
-  return stub as unknown as WorkflowModule;
-}
-
-interface TaskStub {
-  findLatestByOrigin: { execute: TaskModule["findLatestByOrigin"]["execute"] };
-}
-
-type TaskStubValue =
-  | string
-  | { readonly id: string; readonly status: "running" | "succeeded" | "failed" | "cancelled" }
-  | null;
-
-function stubTasks(map: Record<string, TaskStubValue>): TaskStub {
-  return {
-    findLatestByOrigin: {
-      execute: vi.fn((req: { readonly origin: string; readonly originId: string }) => {
-        expect(req.origin).toBe("workflow");
-        const v = map[req.originId];
-        if (v === undefined || v === null) return okAsync(null);
-        if (typeof v === "string") {
-          // Bare task-id form defaults to terminal status; the
-          // byte handler treats terminal tasks as immutable bytes
-          // and caches the response.
-          return okAsync({
-            id: v,
-            agent: "writer",
-            brief: "draft",
-            origin: "workflow",
-            originId: req.originId,
-            status: "succeeded",
-            metadata: {},
-            createdAt: "2026-06-07T00:00:00.000Z",
-            startedAt: "2026-06-07T00:00:00.000Z",
-          });
-        }
-        return okAsync({
-          agent: "writer",
-          brief: "draft",
-          origin: "workflow",
-          originId: req.originId,
-          metadata: {},
-          createdAt: "2026-06-07T00:00:00.000Z",
-          startedAt: "2026-06-07T00:00:00.000Z",
-          ...v,
-        });
-      }) as unknown as TaskModule["findLatestByOrigin"]["execute"],
+    listWorkflowArtifacts: overrides.listWorkflowArtifacts ?? {
+      execute: vi.fn(() => okAsync({ artifacts: [] })),
     },
-  };
+    resolveWorkflowArtifactPath: overrides.resolveWorkflowArtifactPath ?? {
+      execute: vi.fn(() => okAsync(null)),
+    },
+  } as unknown as WorkflowModule;
 }
 
-function mountRoutes(svc: WorkflowModule, tasks: TaskStub, workspaceDir: string) {
+function mountRoutes(svc: WorkflowModule) {
   return workflowsRoutes(
     () => svc,
-    () => tasks as unknown as TaskModule,
+    () => ({}) as TaskModule,
     () => workspaceDir,
   );
 }
@@ -172,180 +45,153 @@ afterEach(async () => {
   await rm(workspaceDir, { recursive: true, force: true });
 });
 
-async function writeFileAt(dir: string, name: string, body: string) {
+async function writeFileAt(dir: string, name: string, body: string): Promise<string> {
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, name), body, "utf8");
+  const file = path.join(dir, name);
+  await writeFile(file, body, "utf8");
+  return file;
 }
 
 describe("workflowsRoutes — artifacts list", () => {
-  it("returns workflow-summary entries with mimeBucket", async () => {
-    await writeFileAt(path.join(workspaceDir, "workflows", WID, "artifact"), "report.md", "# hi");
-    await writeFileAt(
-      path.join(workspaceDir, "workflows", WID, "artifact"),
-      "chart.png",
-      "fake-png",
-    );
+  it("forwards workflow-summary entries verbatim", async () => {
+    const artifacts = [
+      {
+        kind: "workflow-summary",
+        relPath: "report.md",
+        size: 4,
+        modifiedAt: "2026-06-07T00:00:00.000Z",
+      },
+      {
+        kind: "workflow-summary",
+        relPath: "chart.png",
+        size: 8,
+        modifiedAt: "2026-06-07T00:00:01.000Z",
+      },
+    ];
+    const svc = stubModule({
+      listWorkflowArtifacts: { execute: vi.fn(() => okAsync({ artifacts })) },
+    });
 
-    const svc = stubModule({});
-    const tasks = stubTasks({});
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
+    const res = await mountRoutes(svc).request(`/${WID}/artifacts`);
+
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { artifacts: Array<Record<string, unknown>> };
-    const summaries = body.artifacts.filter((a) => a.kind === "workflow-summary");
-    expect(summaries).toHaveLength(2);
-    const reportEntry = summaries.find((a) => a.path === "report.md");
-    expect(reportEntry?.mimeBucket).toBe("text");
-    const chartEntry = summaries.find((a) => a.path === "chart.png");
-    expect(chartEntry?.mimeBucket).toBe("image");
+    expect((await res.json()) as { artifacts: unknown[] }).toEqual({ artifacts });
   });
 
-  it("returns per-node entries enriched with taskId + nodeId", async () => {
-    await writeFileAt(
-      path.join(workspaceDir, "tasks", WORKER_TID, "artifact"),
-      "result.json",
-      "{}",
-    );
-    const svc = stubModule({});
-    const tasks = stubTasks({ [WORKER_NID]: WORKER_TID });
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
+  it("forwards worker-node entries verbatim", async () => {
+    const artifacts = [
+      {
+        kind: "node",
+        nodeId: WORKER_NID,
+        relPath: "result.json",
+        size: 2,
+        modifiedAt: "2026-06-07T00:00:00.000Z",
+      },
+    ];
+    const svc = stubModule({
+      listWorkflowArtifacts: { execute: vi.fn(() => okAsync({ artifacts })) },
+    });
+
+    const res = await mountRoutes(svc).request(`/${WID}/artifacts`);
+
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { artifacts: Array<Record<string, unknown>> };
-    const nodeEntries = body.artifacts.filter((a) => a.kind === "node");
-    expect(nodeEntries).toHaveLength(1);
-    expect(nodeEntries[0]?.nodeId).toBe(WORKER_NID);
-    expect(nodeEntries[0]?.taskId).toBe(WORKER_TID);
-    expect(nodeEntries[0]?.path).toBe("result.json");
-    expect(nodeEntries[0]?.mimeBucket).toBe("text");
+    expect((await res.json()) as { artifacts: unknown[] }).toEqual({ artifacts });
   });
 
-  it("returns an empty array when both namespaces are empty", async () => {
-    const svc = stubModule({});
-    const tasks = stubTasks({});
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
+  it("returns an empty array when the workflow use-case has no entries", async () => {
+    const res = await mountRoutes(stubModule()).request(`/${WID}/artifacts`);
+
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { artifacts: unknown[] };
-    expect(body.artifacts).toEqual([]);
+    expect((await res.json()) as { artifacts: unknown[] }).toEqual({ artifacts: [] });
   });
 
   it("404s when the workflow id is unknown", async () => {
     const svc = stubModule({
-      getDag: {
+      listWorkflowArtifacts: {
         execute: vi.fn(() => errAsync({ type: "WorkflowNotFound", workflowId: WID as WorkflowId })),
       },
     });
-    const tasks = stubTasks({});
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
+
+    const res = await mountRoutes(svc).request(`/${WID}/artifacts`);
+
     expect(res.status).toBe(404);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("WorkflowNotFound");
+    expect(((await res.json()) as Record<string, unknown>).code).toBe("WorkflowNotFound");
   });
 
-  it("500s when a node task lookup faults (not a silent skip)", async () => {
-    // A `findLatestByOrigin` fault (e.g. the task DB is unavailable) must
-    // surface as a 5xx, not be folded into "no task" — otherwise the list
-    // would 200 with entries missing and mask the outage.
-    const svc = stubModule({});
-    const tasks: TaskStub = {
-      findLatestByOrigin: {
+  it("500s when artifact listing faults", async () => {
+    const svc = stubModule({
+      listWorkflowArtifacts: {
         execute: vi.fn(() =>
-          errAsync({ type: "DatabaseUnavailable", cause: new Error("db down") }),
-        ) as unknown as TaskModule["findLatestByOrigin"]["execute"],
+          errAsync({ type: "WorkflowArtifactListingFailed", cause: new Error("db down") }),
+        ),
       },
-    };
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts`);
+    });
+
+    const res = await mountRoutes(svc).request(`/${WID}/artifacts`);
+
     expect(res.status).toBe(500);
   });
 });
 
 describe("workflowsRoutes — artifacts bytes", () => {
   it("streams summary bytes with Cache-Control: no-store", async () => {
-    await writeFileAt(
-      path.join(workspaceDir, "workflows", WID, "artifact"),
-      "report.md",
-      "# hello world",
-    );
-    const svc = stubModule({});
-    const tasks = stubTasks({});
+    const abs = await writeFileAt(workspaceDir, "report.md", "# hello world");
+    const svc = stubModule({
+      resolveWorkflowArtifactPath: {
+        execute: vi.fn(() => okAsync(abs)),
+      },
+    });
     const encoded = encodeURIComponent("summary/report.md");
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
+
+    const res = await mountRoutes(svc).request(`/${WID}/artifacts/${encoded}`);
+
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("Content-Type")).toMatch(/text\/markdown/);
-    const text = await res.text();
-    expect(text).toBe("# hello world");
+    expect(await res.text()).toBe("# hello world");
   });
 
-  it("streams node bytes with Cache-Control: max-age=300 when task is terminal", async () => {
-    await writeFileAt(
-      path.join(workspaceDir, "tasks", WORKER_TID, "artifact"),
-      "out.txt",
-      "result",
-    );
-    const svc = stubModule({});
-    const tasks = stubTasks({ [WORKER_NID]: { id: WORKER_TID, status: "succeeded" } });
+  it("streams node bytes with Cache-Control: max-age=300", async () => {
+    const abs = await writeFileAt(workspaceDir, "out.txt", "result");
+    const svc = stubModule({
+      resolveWorkflowArtifactPath: {
+        execute: vi.fn((req: { ref: { kind: string; nodeId?: string; relPath: string } }) => {
+          expect(req.ref).toEqual({ kind: "node", nodeId: WORKER_NID, relPath: "out.txt" });
+          return okAsync(abs);
+        }),
+      },
+    });
     const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
+
+    const res = await mountRoutes(svc).request(`/${WID}/artifacts/${encoded}`);
+
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("max-age=300");
-    const text = await res.text();
-    expect(text).toBe("result");
+    expect(await res.text()).toBe("result");
   });
 
-  it("streams node bytes with Cache-Control: no-store while task is still running", async () => {
-    // A node artifact that the worker is still appending to (running
-    // task) must NOT be cached; otherwise the dashboard would serve
-    // stale mid-stream bytes on subsequent polls.
-    await writeFileAt(
-      path.join(workspaceDir, "tasks", WORKER_TID, "artifact"),
-      "out.txt",
-      "partial",
-    );
-    const svc = stubModule({});
-    const tasks = stubTasks({ [WORKER_NID]: { id: WORKER_TID, status: "running" } });
+  it("404s when the use-case returns null for a missing node artifact", async () => {
     const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toBe("no-store");
-    const text = await res.text();
-    expect(text).toBe("partial");
-  });
 
-  it("streams node bytes with Cache-Control: max-age=300 when task is failed (terminal)", async () => {
-    await writeFileAt(path.join(workspaceDir, "tasks", WORKER_TID, "artifact"), "out.txt", "boom");
-    const svc = stubModule({});
-    const tasks = stubTasks({ [WORKER_NID]: { id: WORKER_TID, status: "failed" } });
-    const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toBe("max-age=300");
-  });
+    const res = await mountRoutes(stubModule()).request(`/${WID}/artifacts/${encoded}`);
 
-  it("404s when no task is dispatched for the node", async () => {
-    const svc = stubModule({});
-    const tasks = stubTasks({}); // empty map → null lookup
-    const encoded = encodeURIComponent(`nodes/${WORKER_NID}/out.txt`);
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
     expect(res.status).toBe(404);
   });
 
-  it("404s when the node is not in the addressed workflow (wfid scoping)", async () => {
-    // A task exists for `unknown-node`, but that node is NOT in `WID`'s DAG
-    // (it belongs to some other workflow). The stream route must refuse to
-    // serve it under this `wfid`, so a node id alone can't reach another
-    // workflow's task artifacts.
-    const svc = stubModule({});
-    const tasks = stubTasks({ "unknown-node": { id: WORKER_TID, status: "succeeded" } });
-    const encoded = encodeURIComponent("nodes/unknown-node/out.txt");
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
+  it("404s when the node is not in the addressed workflow", async () => {
+    const encoded = encodeURIComponent(`nodes/${OTHER_NID}/out.txt`);
+
+    const res = await mountRoutes(stubModule()).request(`/${WID}/artifacts/${encoded}`);
+
     expect(res.status).toBe(404);
     expect(((await res.json()) as { error: string }).error).toBe("no such node in workflow");
   });
 
   it("rejects traversal attempts in the artifact path with 400", async () => {
-    const svc = stubModule({});
-    const tasks = stubTasks({});
     const encoded = encodeURIComponent("summary/../../escape.md");
-    const res = await mountRoutes(svc, tasks, workspaceDir).request(`/${WID}/artifacts/${encoded}`);
+
+    const res = await mountRoutes(stubModule()).request(`/${WID}/artifacts/${encoded}`);
+
     expect(res.status).toBe(400);
   });
 });

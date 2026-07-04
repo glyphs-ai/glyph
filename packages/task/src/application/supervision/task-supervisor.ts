@@ -520,7 +520,7 @@ export class TaskSupervisor {
       );
       return [];
     }
-    return listed.value;
+    return listed.value.map((f) => f.relPath);
   }
 
   private async rollback(id: TaskId, workdir: string): Promise<void> {

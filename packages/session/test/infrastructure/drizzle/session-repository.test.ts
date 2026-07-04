@@ -89,14 +89,12 @@ describe("DrizzleSessionRepository", () => {
     });
   });
 
-  describe("constraint violations translate to typed errors", () => {
-    it("rejects duplicate id with SessionIdConflict", async () => {
+  describe("constraint violations", () => {
+    it("rejects duplicate id with DatabaseUnavailable", async () => {
       await repo.save(fresh(STATE_A));
       const dup = SessionEntity.create({ ...STATE_A, agent: "public/other" });
       const res = await repo.save(dup);
-      const err = res._unsafeUnwrapErr();
-      expect(err.type).toBe("SessionIdConflict");
-      if (err.type === "SessionIdConflict") expect(err.id).toBe(STATE_A.id);
+      expect(res._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
     });
   });
 });

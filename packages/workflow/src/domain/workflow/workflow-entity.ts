@@ -18,15 +18,11 @@ import { computePhaseFromParents, structuralLeaves, wouldCreateCycle } from "./w
 import { parentsReadyForKind } from "./workflow-dispatch-readiness.js";
 import type {
   DagInvariant,
-  EdgeCycle,
   EmptyParents,
   MultipleSuccessorCoords,
   OrphanCoordInsert,
   ParentState,
-  RemoveEdgeOrphansChild,
-  RemoveNodeOrphansChild,
   SubgraphError,
-  WorkflowEdgeNotFound,
   WorkflowNodeNotFound,
   WorkflowNodeNotMutable,
 } from "./workflow-entity-errors.js";
@@ -289,45 +285,6 @@ export class WorkflowEntity {
     return ok({ nodeId: args.nodeId, phase });
   }
 
-  addEdge(
-    from: WorkflowNodeId,
-    to: WorkflowNodeId,
-  ): Result<
-    void,
-    | WorkflowAlreadyTerminal
-    | EdgeCycle
-    | ParentState
-    | WorkflowNodeNotFound
-    | WorkflowNodeNotMutable
-    | MultipleSuccessorCoords
-    | OrphanCoordInsert
-  > {
-    const running = this.requireRunning();
-    if (running.isErr()) return err(running.error);
-    const fromNode = this.nodeById(from);
-    if (fromNode === undefined || fromNode.workflowId !== this.id)
-      return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId: from });
-    const toNode = this.nodeById(to);
-    if (toNode === undefined || toNode.workflowId !== this.id)
-      return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId: to });
-    if (toNode.status !== "not_started")
-      return err(workflowNodeNotMutable(this.id, to, toNode.status, "addEdge"));
-    const parentState = this.rejectBadParentsForKind(toNode.kind, [fromNode]);
-    if (parentState.isErr()) return err(parentState.error);
-    if (toNode.kind === COORDINATOR_KIND) {
-      const currentParents = this.parents(to)
-        .map((id) => this.nodeById(id))
-        .filter(isNode);
-      const coordInvariant = this.enforceCoordChainInvariants([...currentParents, fromNode]);
-      if (coordInvariant.isErr()) return err(coordInvariant.error);
-    }
-    if (this.wouldCreateCycle({ from, to }))
-      return err({ type: "EdgeCycle", workflowId: this.id, from, to });
-    this._edges.push(WorkflowEdgeEntity.create({ workflowId: this.id, from, to }));
-    this.applyPhaseUpdates(this.recomputePhases([to], [], [{ from, to }]));
-    return ok(undefined);
-  }
-
   addSubgraph(args: {
     readonly nodes: readonly SubgraphNodeInput[];
     readonly edges: readonly SubgraphEdgeShape[];
@@ -459,96 +416,6 @@ export class WorkflowEntity {
     if (coordNode !== undefined)
       this.patchCoordinatorAgent(inputByTemp.get(coordNode.tempId)?.validatedSpec);
     return ok({ insertedNodes: insertedResponse });
-  }
-
-  removeNode(
-    nodeId: WorkflowNodeId,
-  ): Result<
-    void,
-    WorkflowAlreadyTerminal | WorkflowNodeNotFound | WorkflowNodeNotMutable | RemoveNodeOrphansChild
-  > {
-    const running = this.requireRunning();
-    if (running.isErr()) return err(running.error);
-    const node = this.nodeById(nodeId);
-    if (node === undefined || node.workflowId !== this.id)
-      return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId });
-    if (node.status !== "not_started")
-      return err(workflowNodeNotMutable(this.id, nodeId, node.status, "removeNode"));
-    const childIds = this.children(nodeId);
-    for (const child of childIds)
-      if (this.parents(child).filter((parent) => parent !== nodeId).length === 0)
-        return err({
-          type: "RemoveNodeOrphansChild",
-          workflowId: this.id,
-          nodeId,
-          orphanedChildId: child,
-        });
-    const phaseUpdates = this.recomputePhases(childIds, [], [], [nodeId]);
-    this._nodes = this._nodes.filter((candidate) => candidate.id !== nodeId);
-    this._edges = this._edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
-    this.applyPhaseUpdates(phaseUpdates);
-    return ok(undefined);
-  }
-
-  removeEdge(
-    from: WorkflowNodeId,
-    to: WorkflowNodeId,
-  ): Result<
-    void,
-    | WorkflowAlreadyTerminal
-    | WorkflowNodeNotFound
-    | WorkflowNodeNotMutable
-    | WorkflowEdgeNotFound
-    | RemoveEdgeOrphansChild
-  > {
-    const running = this.requireRunning();
-    if (running.isErr()) return err(running.error);
-    const fromNode = this.nodeById(from);
-    if (fromNode === undefined || fromNode.workflowId !== this.id)
-      return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId: from });
-    const toNode = this.nodeById(to);
-    if (toNode === undefined || toNode.workflowId !== this.id)
-      return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId: to });
-    // The to-node's parent set is part of its lineage; re-parenting a node that
-    // has already left `not_started` would retroactively change an in-flight or
-    // finished node's phase, so edge removal is refused once it is mutable.
-    if (toNode.status !== "not_started")
-      return err(workflowNodeNotMutable(this.id, to, toNode.status, "removeEdge"));
-    if (!this.edges.some((edge) => edge.from === from && edge.to === to))
-      return err({
-        type: "WorkflowEdgeNotFound",
-        workflowId: this.id,
-        fromNodeId: from,
-        toNodeId: to,
-      });
-    if (this.parents(to).length <= 1)
-      return err({
-        type: "RemoveEdgeOrphansChild",
-        workflowId: this.id,
-        fromNodeId: from,
-        toNodeId: to,
-      });
-    const phaseUpdates = this.recomputePhases([to], [], [], [], [{ from, to }]);
-    this._edges = this._edges.filter((edge) => !(edge.from === from && edge.to === to));
-    this.applyPhaseUpdates(phaseUpdates);
-    return ok(undefined);
-  }
-
-  replaceNodeSpec(
-    nodeId: WorkflowNodeId,
-    validatedSpec: unknown,
-  ): Result<void, WorkflowAlreadyTerminal | WorkflowNodeNotFound | WorkflowNodeNotMutable> {
-    const running = this.requireRunning();
-    if (running.isErr()) return err(running.error);
-    const node = this.nodeById(nodeId);
-    if (node === undefined || node.workflowId !== this.id)
-      return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId });
-    if (node.status !== "not_started")
-      return err(workflowNodeNotMutable(this.id, nodeId, node.status, "replaceSpec"));
-    this.replaceNode(node.withPatch({ spec: validatedSpec }));
-    if (node.kind === COORDINATOR_KIND && this.latestCoordId() === nodeId)
-      this.patchCoordinatorAgent(validatedSpec);
-    return ok(undefined);
   }
 
   replaceNodeMetadata(
@@ -864,10 +731,6 @@ export class WorkflowEntity {
     return ok(undefined);
   }
 
-  private latestCoordId(): WorkflowNodeId | null {
-    return this.latestCoordIdWith([]);
-  }
-
   private latestCoordIdWith(extraNodes: readonly WorkflowNodeEntity[]): WorkflowNodeId | null {
     const coords = [...this.nodes, ...extraNodes].filter((node) => node.kind === COORDINATOR_KIND);
     coords.sort(
@@ -888,13 +751,6 @@ export class WorkflowEntity {
         compareDesc(left.id, right.id),
     );
     return coords[0] ?? null;
-  }
-
-  private wouldCreateCycle(newEdge: {
-    readonly from: WorkflowNodeId;
-    readonly to: WorkflowNodeId;
-  }): boolean {
-    return wouldCreateCycle(this.edges, newEdge);
   }
 
   private recomputePhases(
@@ -982,10 +838,6 @@ export class WorkflowEntity {
       const node = this.nodeById(id);
       if (node !== undefined && node.phase !== phase) this.replaceNode(node.withPatch({ phase }));
     }
-  }
-
-  private children(nodeId: WorkflowNodeId): readonly WorkflowNodeId[] {
-    return this.edges.filter((edge) => edge.from === nodeId).map((edge) => edge.to);
   }
 
   private parents(nodeId: WorkflowNodeId): readonly WorkflowNodeId[] {

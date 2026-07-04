@@ -1,5 +1,5 @@
 /**
- * Route-level tests for `routes/scheduled-tasks.ts`. Sibling of
+ * Route-level tests for `routes/schedules/scheduled-tasks.ts`. Sibling of
  * `tasks.test.ts` — same stub pattern, same vitest layout. The route
  * is read-only (a single `GET /` handler) so the assertion surface is
  * smaller than `/tasks`; we cover origin pinning, the per-query-param
@@ -11,11 +11,10 @@
  * surface gets a URL whose path IS the contract.
  */
 
-import type { TaskModule } from "@glyphs-ai/task";
+import type { DispatchTaskResponse as Task, TaskModule } from "@glyphs-ai/task";
 import { okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
-import { scheduledTasksRoutes } from "../../src/routes/scheduled-tasks.js";
-import type { Task } from "../../src/wire/domain.js";
+import { scheduledTasksRoutes } from "../../src/routes/schedules/scheduled-tasks.js";
 
 const sampleScheduledTask: Task = {
   id: "20260601-sched0001",

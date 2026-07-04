@@ -14,7 +14,8 @@ export const DeleteWorkflowRequestSchema = z
   .object({ workflowId: WorkflowIdSchema, purgeDir: z.boolean().optional() })
   .strict();
 export type DeleteWorkflowRequest = z.infer<typeof DeleteWorkflowRequestSchema>;
-export type DeleteWorkflowResponse = undefined;
+export const DeleteWorkflowResponseSchema = z.undefined();
+export type DeleteWorkflowResponse = z.infer<typeof DeleteWorkflowResponseSchema>;
 export type WorkflowDeleteRequiresTerminal = {
   readonly type: "WorkflowDeleteRequiresTerminal";
   readonly workflowId: string;

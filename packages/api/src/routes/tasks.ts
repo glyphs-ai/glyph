@@ -19,10 +19,10 @@ import type { Context } from "hono";
 import { respondTaskError } from "../_error-policies/tasks.js";
 import { logEvent } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
-import { contentTypeFor, streamFileAsResponse } from "./_task-artifact-stream.js";
+import { contentTypeFor, streamFileAsResponse } from "./_artifact-stream.js";
 
 const TaskPathSchema = z.object({ tid: z.string() });
-const ArtifactPathSchema = z.object({ tid: z.string(), name: z.string() });
+const ArtifactQuerySchema = z.object({ path: z.string().min(1) });
 
 // ─── ActivityItem timeline — api-owned zod for the OpenAPI projection ─────
 // (the runtime exposes `ActivityItem` / `ActivityResult` as TS types only.)
@@ -347,10 +347,10 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
   app.openapi(
     createRoute({
       method: "get",
-      path: "/{tid}/artifact/{name}",
+      path: "/{tid}/artifact",
       tags: ["tasks"],
       summary: "Download a task artifact",
-      request: { params: ArtifactPathSchema },
+      request: { params: TaskPathSchema, query: ArtifactQuerySchema },
       responses: {
         200: errorResponse("Artifact file stream"),
         400: errorResponse("Malformed artifact name"),
@@ -360,23 +360,24 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
     }),
     async (c) => {
       const id = c.req.param("tid");
-      const rawName = c.req.param("name");
+      // The artifact's relative-path identity rides as `?path=`, not a path
+      // segment, because it is slash-bearing and of arbitrary depth — which a
+      // single `{name}` segment can't carry (mirrors the catalog files route).
+      const relPath = c.req.query("path") ?? "";
       if (
-        rawName.includes("/") ||
-        rawName.includes("\\") ||
-        rawName === "." ||
-        rawName === ".." ||
-        rawName.split("/").includes("..") ||
-        rawName.split("\\").includes("..")
+        relPath === "" ||
+        relPath.startsWith("/") ||
+        relPath.includes("\\") ||
+        relPath.split("/").includes("..")
       ) {
-        return c.json({ error: "artifact name must be a bare filename", code: "BadRequest" }, 400);
+        return c.json({ error: "artifact path must be a relative path", code: "BadRequest" }, 400);
       }
 
-      const res = await resolve(c).resolveArtifactPath.execute({ id: id as TaskId, name: rawName });
+      const res = await resolve(c).resolveArtifactPath.execute({ id: id as TaskId, relPath });
       if (res.isErr()) {
         return respondTaskError(c, res.error, {
           route: "tasks.artifact",
-          meta: { taskId: id, artifact: rawName },
+          meta: { taskId: id, artifact: relPath },
         });
       }
       const absPath = res.value;

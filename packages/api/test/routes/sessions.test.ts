@@ -244,21 +244,6 @@ describe("sessionsRoutes", () => {
     expect(body.error).toBe("internal error");
   });
 
-  it("POST / maps SessionIdConflict to 500", async () => {
-    const m = stubModule({
-      createSession: {
-        execute: vi.fn(() => errAsync({ type: "SessionIdConflict", id: "20260508-9dfbdf05" })),
-      },
-    });
-    const res = await sessionsRoutes(() => stubContext(m)).request("/", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: "demo" }),
-    });
-    expect(res.status).toBe(500);
-    expect((await jsonBody(res)).code).toBe("SessionIdConflict");
-  });
-
   it("GET /:id returns 404 when not found", async () => {
     const m = stubModule({ getSession: { execute: vi.fn(() => okAsync(null)) } });
     const res = await sessionsRoutes(() => stubContext(m)).request("/20260508-9dfbdf05");

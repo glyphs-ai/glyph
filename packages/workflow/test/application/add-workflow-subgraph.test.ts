@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  addIteration,
   bootstrap,
   buildWorkflowFixture,
   fixedRandomUUID,
@@ -74,14 +75,13 @@ describe("WorkflowService.addSubgraph", () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
     // First land an existing worker root that some temps can attach
     // to as an existingParent.
-    const { nodeId: existingRoot } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "root" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds, coordId: existingCoord } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "root", spec: { agent: "w", brief: "root" } }],
+      coordSpec: { agent: "coord-root" },
+    });
+    const existingRoot = workerIds.root!;
     const res = (
       await f.module.addSubgraph.execute({
         workflowId,
@@ -122,7 +122,7 @@ describe("WorkflowService.addSubgraph", () => {
             tempId: "t-end",
             kind: "coordinator",
             spec: { agent: "coord-end" },
-            existingParents: [initialCoordNodeId],
+            existingParents: [existingCoord],
           },
         ],
         edges: [
@@ -170,24 +170,42 @@ describe("WorkflowService.addSubgraph", () => {
 
   it("recomputes phase on existing not_started to-nodes that gain a temp parent", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    // Existing chain: coord(0) → w1(1) → w2(2).
-    const { nodeId: w1 } = (
-      await f.module.addNode.execute({
+    // Existing chain: coord(0) → w1(1) → w2(2) → coord(3).
+    const seeded = (
+      await f.module.addSubgraph.execute({
         workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "w1" },
-        parents: [initialCoordNodeId],
+        nodes: [
+          {
+            tempId: "w1",
+            kind: "worker",
+            spec: { agent: "w", brief: "w1" },
+            existingParents: [initialCoordNodeId],
+          },
+          {
+            tempId: "w2",
+            kind: "worker",
+            spec: { agent: "w", brief: "w2" },
+            existingParents: [],
+          },
+          {
+            tempId: "coord",
+            kind: "coordinator",
+            spec: { agent: "coord-next" },
+            existingParents: [initialCoordNodeId],
+          },
+        ],
+        edges: [
+          { from: { kind: "temp", tempId: "w1" }, to: { kind: "temp", tempId: "w2" } },
+          { from: { kind: "temp", tempId: "w2" }, to: { kind: "temp", tempId: "coord" } },
+        ],
       })
     )._unsafeUnwrap();
-    const { nodeId: w2 } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "w2" },
-        parents: [w1],
-      })
-    )._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId: w2 }))._unsafeUnwrap().phase).toBe(2);
+    const w1 = seeded.insertedNodes.find((node) => node.tempId === "w1")!.nodeId;
+    const w2 = seeded.insertedNodes.find((node) => node.tempId === "w2")!.nodeId;
+    const coord = seeded.insertedNodes.find((node) => node.tempId === "coord")!.nodeId;
+    expect((await f.module.getNode.execute({ workflowId, nodeId: w2 }))._unsafeUnwrap().phase).toBe(
+      2,
+    );
     // Add a new temp parent below w1, then connect that temp into w2.
     // w2 now has parents {w1, tDeep}; tDeep has phase
     // w1.phase + 1 = 2, so w2 grows to phase 3.
@@ -207,7 +225,7 @@ describe("WorkflowService.addSubgraph", () => {
             tempId: "tEnd",
             kind: "coordinator",
             spec: { agent: "coord-end" },
-            existingParents: [initialCoordNodeId],
+            existingParents: [coord],
           },
         ],
         edges: [
@@ -216,7 +234,9 @@ describe("WorkflowService.addSubgraph", () => {
         ],
       })
     )._unsafeUnwrap();
-    expect((await f.module.getNode.execute({ nodeId: w2 }))._unsafeUnwrap().phase).toBe(3);
+    expect((await f.module.getNode.execute({ workflowId, nodeId: w2 }))._unsafeUnwrap().phase).toBe(
+      3,
+    );
   });
 
   // ─── Sad paths: shape validation ─────────────────────────
@@ -359,23 +379,38 @@ describe("WorkflowService.addSubgraph", () => {
 
   it("REJECTS a joined-DAG cycle via an existing edge", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    // Existing: coord → a → b
-    const { nodeId: a } = (
-      await f.module.addNode.execute({
+    // Existing: coord → a → b → coord.
+    const seeded = (
+      await f.module.addSubgraph.execute({
         workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "a" },
-        parents: [initialCoordNodeId],
+        nodes: [
+          {
+            tempId: "a",
+            kind: "worker",
+            spec: { agent: "w", brief: "a" },
+            existingParents: [initialCoordNodeId],
+          },
+          {
+            tempId: "b",
+            kind: "worker",
+            spec: { agent: "w", brief: "b" },
+            existingParents: [],
+          },
+          {
+            tempId: "coord",
+            kind: "coordinator",
+            spec: { agent: "coord-next" },
+            existingParents: [initialCoordNodeId],
+          },
+        ],
+        edges: [
+          { from: { kind: "temp", tempId: "a" }, to: { kind: "temp", tempId: "b" } },
+          { from: { kind: "temp", tempId: "b" }, to: { kind: "temp", tempId: "coord" } },
+        ],
       })
     )._unsafeUnwrap();
-    const { nodeId: b } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "b" },
-        parents: [a],
-      })
-    )._unsafeUnwrap();
+    const a = seeded.insertedNodes.find((node) => node.tempId === "a")!.nodeId;
+    const b = seeded.insertedNodes.find((node) => node.tempId === "b")!.nodeId;
     // Batch: insert temp t with parent = b, and edge t → a. That
     // closes a cycle a → b → t → a.
     const r = await f.module.addSubgraph.execute({
@@ -447,14 +482,13 @@ describe("WorkflowService.addSubgraph", () => {
         coordinatorAgent: "coord-z",
       })
     )._unsafeUnwrap();
-    const { nodeId: otherTask } = (
-      await f.module.addNode.execute({
-        workflowId: otherWorkflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "remote" },
-        parents: [otherCoord],
-      })
-    )._unsafeUnwrap();
+    const { workerIds } = await addIteration(f, {
+      workflowId: otherWorkflowId,
+      parentCoordId: otherCoord,
+      nodes: [{ tempId: "remote", spec: { agent: "w", brief: "remote" } }],
+      coordSpec: { agent: "coord-other-next" },
+    });
+    const otherTask = workerIds.remote!;
     const r = await f.module.addSubgraph.execute({
       workflowId,
       nodes: [
@@ -473,14 +507,13 @@ describe("WorkflowService.addSubgraph", () => {
 
   it("REJECTS when an existing to-node is not not_started", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: target } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "target", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const target = workerIds.target!;
     setNodeLifecycle(f, {
       id: target,
       status: "running",
@@ -507,8 +540,7 @@ describe("WorkflowService.addSubgraph", () => {
   it("dedupes duplicate existingParents within a temp", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
     // Caller passes the same parent ref three times. The substrate
-    // must silently collapse to a single edge (matches `addNode`'s
-    // `Array.from(new Set(args.parents))` convention) rather than
+    // must silently collapse to a single edge rather than
     // surfacing a composite-PK violation as a generic SQLite error.
     const res = (
       await f.module.addSubgraph.execute({
@@ -589,14 +621,13 @@ describe("WorkflowService.addSubgraph", () => {
 
   it("REJECTS a worker temp with a `failed` existing parent", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: deadParent } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "dead", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const deadParent = workerIds.dead!;
     setNodeLifecycle(f, {
       id: deadParent,
       status: "failed",
@@ -620,14 +651,13 @@ describe("WorkflowService.addSubgraph", () => {
 
   it("REJECTS a coord temp without a coord parent", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: someWorker } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "x" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "worker", spec: { agent: "w", brief: "x" } }],
+      coordSpec: { agent: "coord-next" },
+    });
+    const someWorker = workerIds.worker!;
     const r = await f.module.addSubgraph.execute({
       workflowId,
       nodes: [
@@ -648,11 +678,17 @@ describe("WorkflowService.addSubgraph", () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
     // Pre-existing coord child of the caller.
     (
-      await f.module.addNode.execute({
+      await f.module.addSubgraph.execute({
         workflowId,
-        kind: "coordinator",
-        spec: { agent: "coord-pre" },
-        parents: [initialCoordNodeId],
+        nodes: [
+          {
+            tempId: "coord-pre",
+            kind: "coordinator",
+            spec: { agent: "coord-pre" },
+            existingParents: [initialCoordNodeId],
+          },
+        ],
+        edges: [],
       })
     )._unsafeUnwrap();
     const r = await f.module.addSubgraph.execute({

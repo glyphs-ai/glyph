@@ -1,24 +1,20 @@
 /**
  * Route-level tests for `routes/workflows.ts`. Sibling of
  * `schedules.test.ts` — same stub-service pattern, same vitest
- * layout. Covers the 5-verb surface: list, create, get, dag, cancel,
- * plus thecoord-callback mutation surface (8 routes).
+ * layout. Covers list, create, get, dag, cancel, and the remaining
+ * coord-callback mutation surface.
  *
  * Assertion surface:
  *   - happy-path passthrough to the injected `WorkflowService` stub
  *   - input validation 400s (status query, create body shape,
- *     mutation body shapes, WorkflowNodeRef arms)
+ *     mutation body shapes, tagged NodeRef arms)
  *   - 404 mapping for `WorkflowNotFoundError`
  *   - 409 mapping for `WorkflowAlreadyTerminalError` /
- *     `WorkflowNodeNotMutableError` / `WorkflowEdgeCycleError` /
- *     `WorkflowRemoveNodeOrphansChildError`
- *   - wire-shape projection (flat per-kind node specs, ISO timestamps
- *     forwarded verbatim)
- *   - `iterationCount` derivation: 0 on list, coord-count-based on
- *     show / dag
- *   - cancel response is the post-cancel header (second getDag)
- *   - addSubgraph node-ref translation: both `{nodeId}` and `{tempId}`
- *     arms reach the substrate as the corresponding `NodeRef` tag
+ *     `WorkflowNodeNotMutableError`
+ *   - workflow-native read-model responses (opaque node specs, ISO
+ *     timestamps forwarded verbatim)
+ *   - cancel response is the post-cancel header (second getWorkflow)
+ *   - addSubgraph tagged node refs are forwarded unchanged
  */
 
 import type { TaskModule } from "@glyphs-ai/task";
@@ -38,7 +34,6 @@ import {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "../../src/wiring/workflow-coord-task-runner.js";
-import { WorkflowWorkerSpecError } from "../../src/wiring/workflow-worker-task-runner.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────
 
@@ -112,20 +107,14 @@ function stubUseCase<T>(response: T) {
 function stubModule(overrides: Partial<Record<keyof WorkflowModule, unknown>>): WorkflowModule {
   const stub: Partial<Record<keyof WorkflowModule, unknown>> = {
     listWorkflows: stubUseCase([makeHeaderView()]),
-    countAwaitingHuman: stubUseCase({}),
     createWorkflow: stubUseCase({ workflowId: WID, initialCoordNodeId: COORD_NID }),
     getWorkflow: stubUseCase(makeHeaderView()),
     getDag: stubUseCase(makeDagView()),
     getNode: stubUseCase(makeWorkerView()),
     cancelWorkflow: stubUseCase(undefined),
-    addNode: stubUseCase({ nodeId: NEW_NID, phase: 2 }),
-    addEdge: stubUseCase({ toPhase: 3 }),
     addSubgraph: stubUseCase({ insertedNodes: [] }),
     cancelNode: stubUseCase(undefined),
     finishWorkflow: stubUseCase(undefined),
-    removeNode: stubUseCase(undefined),
-    removeEdge: stubUseCase(undefined),
-    replaceNodeSpec: stubUseCase(undefined),
     respondHumanNode: stubUseCase(makeWorkerView()),
     deleteWorkflow: stubUseCase(undefined),
     ...overrides,
@@ -182,7 +171,7 @@ function mountRoutes(module: WorkflowModule, tasks: TaskModule = stubTasks()) {
 // ─── GET / — list ────────────────────────────────────────────────────
 
 describe("workflowsRoutes — list", () => {
-  it("GET / returns the workflow list and omits iterationCount per row", async () => {
+  it("GET / returns the workflow list without api enrichment", async () => {
     const module = stubModule({});
     const res = await mountRoutes(module).request("/");
     expect(res.status).toBe(200);
@@ -190,8 +179,8 @@ describe("workflowsRoutes — list", () => {
     expect(body).toHaveLength(1);
     expect(body[0]?.id).toBe(WID);
     expect(body[0]).not.toHaveProperty("iterationCount");
+    expect(body[0]).not.toHaveProperty("awaitingHumanCount");
     expect(body[0]?.status).toBe("running");
-    expect(body[0]?.awaitingHumanCount).toBe(0);
     expect(module.listWorkflows.execute).toHaveBeenCalledWith({ origin: ["standalone"] });
   });
 
@@ -267,7 +256,7 @@ describe("workflowsRoutes — list", () => {
 // ─── POST / — create ────────────────────────────────────────────────
 
 describe("workflowsRoutes — create", () => {
-  it("POST / creates and returns 201 with iterationCount=1", async () => {
+  it("POST / creates and returns 201 with the workflow read model", async () => {
     const module = stubModule({});
     const res = await mountRoutes(module).request("/", {
       method: "POST",
@@ -280,11 +269,13 @@ describe("workflowsRoutes — create", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.id).toBe(WID);
-    expect(body.iterationCount).toBe(1);
+    expect(body).not.toHaveProperty("iterationCount");
+    expect(body).not.toHaveProperty("awaitingHumanCount");
     expect(module.createWorkflow.execute).toHaveBeenCalledWith({
       brief: "ship feature X",
       coordinatorAgent: "coord-agent",
     });
+    expect(module.getWorkflow.execute).toHaveBeenCalledWith({ workflowId: WID });
   });
 
   it("POST / forwards details when present", async () => {
@@ -436,21 +427,20 @@ describe("workflowsRoutes — create", () => {
 // ─── GET /:wfid — header ────────────────────────────────────────────
 
 describe("workflowsRoutes — get", () => {
-  it("GET /:wfid returns header with derived iterationCount=1 (1 coord node)", async () => {
+  it("GET /:wfid returns the workflow read model directly", async () => {
     const module = stubModule({});
     const res = await mountRoutes(module).request(`/${WID}`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.id).toBe(WID);
-    // deriveIterationCount(coordNodes.length) — silent-retry coords
-    // are counted too, so the seeded coord = iteration 1.
-    expect(body.iterationCount).toBe(1);
-    expect(body.awaitingHumanCount).toBe(0);
+    expect(body).not.toHaveProperty("iterationCount");
+    expect(body).not.toHaveProperty("awaitingHumanCount");
+    expect(module.getWorkflow.execute).toHaveBeenCalledWith({ workflowId: WID });
   });
 
   it("GET /:wfid maps WorkflowNotFoundError to 404 with typed envelope", async () => {
     const module = stubModule({
-      getDag: {
+      getWorkflow: {
         execute: vi.fn(() => errAsync({ type: "WorkflowNotFound" as const, workflowId: WID })),
       },
     });
@@ -464,7 +454,7 @@ describe("workflowsRoutes — get", () => {
 // ─── GET /:wfid/dag — full snapshot ─────────────────────────────────
 
 describe("workflowsRoutes — dag", () => {
-  it("GET /:wfid/dag returns header + flat-spec nodes + edges", async () => {
+  it("GET /:wfid/dag returns the workflow-native DAG snapshot", async () => {
     const module = stubModule({});
     const res = await mountRoutes(module).request(`/${WID}/dag`);
     expect(res.status).toBe(200);
@@ -475,15 +465,15 @@ describe("workflowsRoutes — dag", () => {
     };
     expect(body.workflow.id).toBe(WID);
     expect(body.nodes).toHaveLength(2);
-    expect(body.edges).toEqual([{ from: COORD_NID, to: WORKER_NID }]);
+    expect(body.edges).toEqual([{ workflowId: WID, from: COORD_NID, to: WORKER_NID }]);
 
-    // Flat spec projection: coordinator → { kind: "coordinator", agent: ... }
     const coordNode = body.nodes.find((n) => n.id === COORD_NID);
-    expect(coordNode?.spec).toEqual({ kind: "coordinator", agent: "coord-agent" });
+    expect(coordNode?.kind).toBe("coordinator");
+    expect(coordNode?.spec).toEqual({ agent: "coord-agent" });
 
-    // Worker spec: kind "worker" → flat wire kind "worker" with agent + brief
     const workerNode = body.nodes.find((n) => n.id === WORKER_NID);
-    expect(workerNode?.spec).toEqual({ kind: "worker", agent: "writer", brief: "draft" });
+    expect(workerNode?.kind).toBe("worker");
+    expect(workerNode?.spec).toEqual({ agent: "writer", brief: "draft" });
   });
 
   it("GET /:wfid/dag maps WorkflowNotFoundError to 404", async () => {
@@ -496,7 +486,7 @@ describe("workflowsRoutes — dag", () => {
     expect(res.status).toBe(404);
   });
 
-  it("GET /:wfid/dag enriches nodes with taskId via tasks resolver", async () => {
+  it("GET /:wfid/dag does not enrich nodes with taskId", async () => {
     const module = stubModule({});
     const findTaskByWorkflowNode = vi.fn(async (nodeId: string) => {
       if (nodeId === WORKER_NID) return { id: "20260607-aaaa1111" };
@@ -508,19 +498,18 @@ describe("workflowsRoutes — dag", () => {
     const body = (await res.json()) as { nodes: Array<Record<string, unknown>> };
     const workerNode = body.nodes.find((n) => n.id === WORKER_NID);
     const coordNode = body.nodes.find((n) => n.id === COORD_NID);
-    expect(workerNode?.taskId).toBe("20260607-aaaa1111");
-    // null lookups omit the field entirely (no taskId: null on the wire).
+    expect(workerNode).toBeDefined();
+    expect("taskId" in (workerNode ?? {})).toBe(false);
     expect(coordNode).toBeDefined();
     expect("taskId" in (coordNode ?? {})).toBe(false);
-    expect(findTaskByWorkflowNode).toHaveBeenCalledWith(WORKER_NID);
-    expect(findTaskByWorkflowNode).toHaveBeenCalledWith(COORD_NID);
+    expect(findTaskByWorkflowNode).not.toHaveBeenCalled();
   });
 });
 
 // ─── GET /:wfid/nodes/:nid — single node lookup ─────────────────────
 
 describe("workflowsRoutes — getNode", () => {
-  it("GET /:wfid/nodes/:nid returns the projected node with taskId", async () => {
+  it("GET /:wfid/nodes/:nid returns the workflow-native node read model", async () => {
     const module = stubModule({
       getNode: stubUseCase(makeWorkerView()),
     });
@@ -534,9 +523,11 @@ describe("workflowsRoutes — getNode", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.id).toBe(WORKER_NID);
     expect(body.workflowId).toBe(WID);
-    expect(body.spec).toEqual({ kind: "worker", agent: "writer", brief: "draft" });
-    expect(body.taskId).toBe("20260607-bbbb2222");
-    expect(findTaskByWorkflowNode).toHaveBeenCalledWith(WORKER_NID);
+    expect(body.kind).toBe("worker");
+    expect(body.spec).toEqual({ agent: "writer", brief: "draft" });
+    expect(body).not.toHaveProperty("taskId");
+    expect(module.getNode.execute).toHaveBeenCalledWith({ workflowId: WID, nodeId: WORKER_NID });
+    expect(findTaskByWorkflowNode).not.toHaveBeenCalled();
   });
 
   it("GET /:wfid/nodes/:nid maps WorkflowNodeNotFoundError to 404", async () => {
@@ -553,15 +544,25 @@ describe("workflowsRoutes — getNode", () => {
     expect(body.code).toBe("WorkflowNodeNotFound");
   });
 
-  it("GET /:wfid/nodes/:nid returns 404 when the node belongs to a different workflow", async () => {
-    // Defense against the substrate's workflow-agnostic getNode(nid):
-    // a typo'd wfid must not silently return the right node from a
-    // different workflow.
-    const module = stubModule({
-      getNode: stubUseCase(makeWorkerView()),
-    });
+  it("GET /:wfid/nodes/:nid passes workflowId so the domain can enforce membership", async () => {
+    const getNode = {
+      execute: vi.fn((req: { readonly workflowId: string; readonly nodeId: string }) =>
+        req.workflowId === WID
+          ? okAsync(makeWorkerView())
+          : errAsync({
+              type: "WorkflowNodeNotFound" as const,
+              workflowId: req.workflowId as WorkflowId,
+              nodeId: req.nodeId as WorkflowNodeId,
+            }),
+      ),
+    };
+    const module = stubModule({ getNode });
     const res = await mountRoutes(module).request(`/some-other-wfid/nodes/${WORKER_NID}`);
     expect(res.status).toBe(404);
+    expect(getNode.execute).toHaveBeenCalledWith({
+      workflowId: "some-other-wfid",
+      nodeId: WORKER_NID,
+    });
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("WorkflowNodeNotFound");
   });
@@ -572,17 +573,16 @@ describe("workflowsRoutes — getNode", () => {
 describe("workflowsRoutes — cancel", () => {
   it("POST /:wfid/cancel calls cancelWorkflow and returns the post-cancel header", async () => {
     const cancelWorkflow = stubUseCase(undefined);
-    const cancelledDag: WorkflowDagSnapshot = {
-      workflow: makeHeaderView({ status: "cancelled", endedAt: "2026-06-07T01:00:00.000Z" }),
-      nodes: [makeCoordView()],
-      edges: [],
-    };
-    const getDag = stubUseCase(cancelledDag);
-    const module = stubModule({ cancelWorkflow, getDag });
+    const cancelledWorkflow = makeHeaderView({
+      status: "cancelled",
+      endedAt: "2026-06-07T01:00:00.000Z",
+    });
+    const getWorkflow = stubUseCase(cancelledWorkflow);
+    const module = stubModule({ cancelWorkflow, getWorkflow });
     const res = await mountRoutes(module).request(`/${WID}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cancellation: { message: "operator stopped" } }),
+      body: JSON.stringify({ cancellation: { kind: "user", message: "operator stopped" } }),
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
@@ -599,6 +599,7 @@ describe("workflowsRoutes — cancel", () => {
       workflowId: WID,
       cancellation: { kind: "user", message: "operator stopped" },
     });
+    expect(getWorkflow.execute).toHaveBeenCalledWith({ workflowId: WID });
   });
 
   it("POST /:wfid/cancel passes an explicit { kind: 'user' } through unchanged", async () => {
@@ -608,13 +609,12 @@ describe("workflowsRoutes — cancel", () => {
     // the explicit and the implicit case land at the service as
     // `{ kind: "user", message }`.
     const cancelWorkflow = stubUseCase(undefined);
-    const cancelledDag: WorkflowDagSnapshot = {
-      workflow: makeHeaderView({ status: "cancelled", endedAt: "2026-06-07T01:00:00.000Z" }),
-      nodes: [makeCoordView()],
-      edges: [],
-    };
-    const getDag = stubUseCase(cancelledDag);
-    const module = stubModule({ cancelWorkflow, getDag });
+    const cancelledWorkflow = makeHeaderView({
+      status: "cancelled",
+      endedAt: "2026-06-07T01:00:00.000Z",
+    });
+    const getWorkflow = stubUseCase(cancelledWorkflow);
+    const module = stubModule({ cancelWorkflow, getWorkflow });
     const res = await mountRoutes(module).request(`/${WID}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -636,7 +636,7 @@ describe("workflowsRoutes — cancel", () => {
     const res = await mountRoutes(module).request(`/${WID}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cancellation: { message: "" } }),
+      body: JSON.stringify({ cancellation: { kind: "user", message: "" } }),
     });
     expect(res.status).toBe(404);
   });
@@ -656,7 +656,7 @@ describe("workflowsRoutes — cancel", () => {
     const res = await mountRoutes(module).request(`/${WID}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cancellation: { message: "" } }),
+      body: JSON.stringify({ cancellation: { kind: "user", message: "" } }),
     });
     expect(res.status).toBe(409);
     const body = (await res.json()) as Record<string, unknown>;
@@ -686,172 +686,8 @@ describe("workflowsRoutes — cancel", () => {
 
 // ───coord-callback mutation surface ───────────────────────────
 
-describe("workflowsRoutes — addNode (POST /:wfid/nodes)", () => {
-  it("forwards body to substrate and returns AddNodeResult", async () => {
-    const addNode = stubUseCase({ nodeId: NEW_NID, phase: 2 });
-    const module = stubModule({ addNode });
-    const res = await mountRoutes(module).request(`/${WID}/nodes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        kind: "worker",
-        spec: { agent: "writer", brief: "do thing" },
-        parents: [COORD_NID],
-      }),
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.nodeId).toBe(NEW_NID);
-    expect(body.phase).toBe(2);
-    expect(addNode.execute).toHaveBeenCalledWith({
-      workflowId: WID,
-      kind: "worker",
-      spec: { agent: "writer", brief: "do thing" },
-      parents: [COORD_NID],
-    });
-  });
-
-  it("maps WorkflowWorkerSpecError to 400 with typed envelope", async () => {
-    const addNode = {
-      execute: vi.fn(() =>
-        errAsync({
-          type: "NodeSpecError" as const,
-          nodeKind: "worker" as const,
-          reason: "Worker node spec requires non-empty agent",
-          cause: new WorkflowWorkerSpecError("Worker node spec requires non-empty agent"),
-        }),
-      ),
-    };
-    const module = stubModule({ addNode });
-    const res = await mountRoutes(module).request(`/${WID}/nodes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        kind: "worker",
-        spec: { agent: "", brief: "do thing" },
-        parents: [COORD_NID],
-      }),
-    });
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("WorkflowWorkerSpecError");
-    expect(body.error).toBe("Worker node spec requires non-empty agent");
-  });
-
-  it("rejects unknown kind with 400 and does not call the substrate", async () => {
-    const addNode = { execute: vi.fn() };
-    const module = stubModule({ addNode });
-    const res = await mountRoutes(module).request(`/${WID}/nodes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "evaluator", spec: {}, parents: [COORD_NID] }),
-    });
-    expect(res.status).toBe(400);
-    expect(addNode.execute).not.toHaveBeenCalled();
-  });
-
-  it("rejects missing parents with 400", async () => {
-    const module = stubModule({ addNode: { execute: vi.fn() } });
-    const res = await mountRoutes(module).request(`/${WID}/nodes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "worker", spec: {} }),
-    });
-    expect(res.status).toBe(400);
-  });
-
-  it("maps WorkflowAlreadyTerminalError to 409", async () => {
-    const module = stubModule({
-      addNode: {
-        execute: vi.fn(() =>
-          errAsync({
-            type: "WorkflowAlreadyTerminal" as const,
-            workflowId: WID,
-            status: "cancelled" as const,
-          }),
-        ),
-      },
-    });
-    const res = await mountRoutes(module).request(`/${WID}/nodes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "worker", spec: {}, parents: [COORD_NID] }),
-    });
-    expect(res.status).toBe(409);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("WorkflowAlreadyTerminal");
-  });
-
-  it("maps WorkflowNotFoundError to 404", async () => {
-    const module = stubModule({
-      addNode: {
-        execute: vi.fn(() => errAsync({ type: "WorkflowNotFound" as const, workflowId: WID })),
-      },
-    });
-    const res = await mountRoutes(module).request(`/${WID}/nodes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "worker", spec: {}, parents: [COORD_NID] }),
-    });
-    expect(res.status).toBe(404);
-  });
-});
-
-describe("workflowsRoutes — addEdge (POST /:wfid/edges)", () => {
-  it("forwards (fromNodeId, toNodeId) and echoes the pair plus toPhase on success", async () => {
-    const addEdge = stubUseCase({ toPhase: 3 });
-    const module = stubModule({ addEdge });
-    const res = await mountRoutes(module).request(`/${WID}/edges`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromNodeId: COORD_NID, toNodeId: WORKER_NID }),
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body).toEqual({ fromNodeId: COORD_NID, toNodeId: WORKER_NID, toPhase: 3 });
-    expect(addEdge.execute).toHaveBeenCalledWith({
-      workflowId: WID,
-      fromNodeId: COORD_NID,
-      toNodeId: WORKER_NID,
-    });
-  });
-
-  it("rejects missing toNodeId with 400", async () => {
-    const module = stubModule({ addEdge: { execute: vi.fn() } });
-    const res = await mountRoutes(module).request(`/${WID}/edges`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromNodeId: COORD_NID }),
-    });
-    expect(res.status).toBe(400);
-  });
-
-  it("maps WorkflowEdgeCycleError to 409", async () => {
-    const module = stubModule({
-      addEdge: {
-        execute: vi.fn(() =>
-          errAsync({
-            type: "EdgeCycle" as const,
-            workflowId: WID,
-            from: COORD_NID,
-            to: WORKER_NID,
-          }),
-        ),
-      },
-    });
-    const res = await mountRoutes(module).request(`/${WID}/edges`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromNodeId: COORD_NID, toNodeId: WORKER_NID }),
-    });
-    expect(res.status).toBe(409);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("EdgeCycle");
-  });
-});
-
 describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
-  it("translates wire WorkflowNodeRef {nodeId} → substrate {kind:'existing'}", async () => {
+  it("forwards tagged existing NodeRef arms unchanged", async () => {
     const addSubgraph = stubUseCase({
       insertedNodes: [{ tempId: "t1", nodeId: NEW_NID, phase: 2 }],
     });
@@ -861,7 +697,7 @@ describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nodes: [{ tempId: "t1", kind: "worker", spec: { agent: "writer" } }],
-        edges: [{ from: { nodeId: COORD_NID }, to: { tempId: "t1" } }],
+        edges: [{ from: { kind: "existing", id: COORD_NID }, to: { kind: "temp", tempId: "t1" } }],
       }),
     });
     expect(res.status).toBe(200);
@@ -879,7 +715,7 @@ describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
     });
   });
 
-  it("translates wire WorkflowNodeRef {tempId} → substrate {kind:'temp'} on both arms", async () => {
+  it("forwards tagged temp NodeRef arms unchanged", async () => {
     const addSubgraph = stubUseCase({
       insertedNodes: [
         { tempId: "t1", nodeId: "n1", phase: 2 },
@@ -895,7 +731,7 @@ describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
           { tempId: "t1", kind: "worker", spec: {}, existingParents: [COORD_NID] },
           { tempId: "t2", kind: "worker", spec: {} },
         ],
-        edges: [{ from: { tempId: "t1" }, to: { tempId: "t2" } }],
+        edges: [{ from: { kind: "temp", tempId: "t1" }, to: { kind: "temp", tempId: "t2" } }],
       }),
     });
     expect(res.status).toBe(200);
@@ -914,14 +750,14 @@ describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
     });
   });
 
-  it("rejects an edge with both nodeId and tempId on one arm with 400", async () => {
+  it("rejects an untagged edge ref with 400", async () => {
     const module = stubModule({ addSubgraph: { execute: vi.fn() } });
     const res = await mountRoutes(module).request(`/${WID}/subgraph`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nodes: [{ tempId: "t1", kind: "worker", spec: {} }],
-        edges: [{ from: { nodeId: COORD_NID, tempId: "t1" }, to: { tempId: "t1" } }],
+        edges: [{ from: { nodeId: COORD_NID }, to: { tempId: "t1" } }],
       }),
     });
     expect(res.status).toBe(400);
@@ -929,7 +765,7 @@ describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
 });
 
 describe("workflowsRoutes — cancelNode (POST /:wfid/nodes/:nid/cancel)", () => {
-  it("forwards (workflowId, nodeId) and projects the post-cancel node", async () => {
+  it("forwards (workflowId, nodeId) and returns the post-cancel node", async () => {
     const cancelNode = stubUseCase(undefined);
     const cancelledWorker: GetWorkflowNodeResponse = {
       id: WORKER_NID,
@@ -957,6 +793,7 @@ describe("workflowsRoutes — cancelNode (POST /:wfid/nodes/:nid/cancel)", () =>
     expect(body.status).toBe("cancelled");
     expect(body.endedAt).toBe("2026-06-07T00:00:04.000Z");
     expect(cancelNode.execute).toHaveBeenCalledWith({ workflowId: WID, nodeId: WORKER_NID });
+    expect(module.getNode.execute).toHaveBeenCalledWith({ workflowId: WID, nodeId: WORKER_NID });
   });
 
   it("maps WorkflowNodeNotMutableError to 409 (coord-kind target)", async () => {
@@ -985,19 +822,18 @@ describe("workflowsRoutes — cancelNode (POST /:wfid/nodes/:nid/cancel)", () =>
 describe("workflowsRoutes — finish (POST /:wfid/finish)", () => {
   it("forwards outcome and returns post-finish header", async () => {
     const finishWorkflow = stubUseCase(undefined);
-    const succeededDag: WorkflowDagSnapshot = {
-      workflow: makeHeaderView({ status: "succeeded", endedAt: "2026-06-07T01:00:00.000Z" }),
-      nodes: [makeCoordView()],
-      edges: [],
-    };
+    const succeededWorkflow = makeHeaderView({
+      status: "succeeded",
+      endedAt: "2026-06-07T01:00:00.000Z",
+    });
     const module = stubModule({
       finishWorkflow,
-      getDag: stubUseCase(succeededDag),
+      getWorkflow: stubUseCase(succeededWorkflow),
     });
     const res = await mountRoutes(module).request(`/${WID}/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "succeeded", success: { output: "all good" } }),
+      body: JSON.stringify({ outcome: "succeeded", success: { output: "all good" } }),
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
@@ -1010,27 +846,25 @@ describe("workflowsRoutes — finish (POST /:wfid/finish)", () => {
     });
   });
 
-  it("defaults success.output to null when outcome='succeeded' and success is omitted", async () => {
+  it("omits success when outcome='succeeded' and success is omitted", async () => {
     const finishWorkflow = stubUseCase(undefined);
-    const succeededDag: WorkflowDagSnapshot = {
-      workflow: makeHeaderView({ status: "succeeded", endedAt: "2026-06-07T01:00:00.000Z" }),
-      nodes: [makeCoordView()],
-      edges: [],
-    };
+    const succeededWorkflow = makeHeaderView({
+      status: "succeeded",
+      endedAt: "2026-06-07T01:00:00.000Z",
+    });
     const module = stubModule({
       finishWorkflow,
-      getDag: stubUseCase(succeededDag),
+      getWorkflow: stubUseCase(succeededWorkflow),
     });
     const res = await mountRoutes(module).request(`/${WID}/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "succeeded" }),
+      body: JSON.stringify({ outcome: "succeeded" }),
     });
     expect(res.status).toBe(200);
     expect(finishWorkflow.execute).toHaveBeenCalledWith({
       workflowId: WID,
       outcome: "succeeded",
-      success: { output: null },
     });
   });
 
@@ -1039,7 +873,7 @@ describe("workflowsRoutes — finish (POST /:wfid/finish)", () => {
     const res = await mountRoutes(module).request(`/${WID}/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "cancelled" }),
+      body: JSON.stringify({ outcome: "cancelled" }),
     });
     expect(res.status).toBe(400);
   });
@@ -1049,26 +883,28 @@ describe("workflowsRoutes — finish (POST /:wfid/finish)", () => {
     const res = await mountRoutes(module).request(`/${WID}/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "failed" }),
+      body: JSON.stringify({ outcome: "failed" }),
     });
     expect(res.status).toBe(400);
   });
 
   it("accepts outcome='failed' with failure.message", async () => {
     const finishWorkflow = stubUseCase(undefined);
-    const failedDag: WorkflowDagSnapshot = {
-      workflow: makeHeaderView({ status: "failed", endedAt: "2026-06-07T01:00:00.000Z" }),
-      nodes: [makeCoordView()],
-      edges: [],
-    };
+    const failedWorkflow = makeHeaderView({
+      status: "failed",
+      endedAt: "2026-06-07T01:00:00.000Z",
+    });
     const module = stubModule({
       finishWorkflow,
-      getDag: stubUseCase(failedDag),
+      getWorkflow: stubUseCase(failedWorkflow),
     });
     const res = await mountRoutes(module).request(`/${WID}/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "failed", failure: { message: "budget out" } }),
+      body: JSON.stringify({
+        outcome: "failed",
+        failure: { kind: "coordinator", message: "budget out" },
+      }),
     });
     expect(res.status).toBe(200);
     expect(finishWorkflow.execute).toHaveBeenCalledWith({
@@ -1093,134 +929,40 @@ describe("workflowsRoutes — finish (POST /:wfid/finish)", () => {
     const res = await mountRoutes(module).request(`/${WID}/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "failed", failure: { message: "x" } }),
+      body: JSON.stringify({ outcome: "failed", failure: { kind: "coordinator", message: "x" } }),
     });
     expect(res.status).toBe(409);
   });
 });
 
-describe("workflowsRoutes — removeNode (DELETE /:wfid/nodes/:nid)", () => {
-  it("forwards (workflowId, nodeId) and returns 204 No Content on success", async () => {
-    const removeNode = stubUseCase(undefined);
-    const module = stubModule({ removeNode });
-    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}`, {
-      method: "DELETE",
-    });
-    expect(res.status).toBe(204);
-    expect(removeNode.execute).toHaveBeenCalledWith({ workflowId: WID, nodeId: WORKER_NID });
-  });
-
-  it("maps WorkflowRemoveNodeOrphansChildError to 409", async () => {
-    const module = stubModule({
-      removeNode: {
-        execute: vi.fn(() =>
-          errAsync({
-            type: "RemoveNodeOrphansChild" as const,
-            workflowId: WID,
-            nodeId: WORKER_NID,
-            orphanedChildId: "child-id",
-          }),
-        ),
-      },
-    });
-    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}`, {
-      method: "DELETE",
-    });
-    expect(res.status).toBe(409);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("RemoveNodeOrphansChild");
-  });
-});
-
-describe("workflowsRoutes — removeEdge (DELETE /:wfid/edges/:from/:to)", () => {
-  it("forwards (workflowId, from, to) and returns 204 on success", async () => {
-    const removeEdge = stubUseCase(undefined);
-    const module = stubModule({ removeEdge });
-    const res = await mountRoutes(module).request(`/${WID}/edges/${COORD_NID}/${WORKER_NID}`, {
-      method: "DELETE",
-    });
-    expect(res.status).toBe(204);
-    expect(removeEdge.execute).toHaveBeenCalledWith({
-      workflowId: WID,
-      fromNodeId: COORD_NID,
-      toNodeId: WORKER_NID,
-    });
-  });
-
-  it("maps WorkflowNotFoundError to 404", async () => {
-    const module = stubModule({
-      removeEdge: {
-        execute: vi.fn(() => errAsync({ type: "WorkflowNotFound" as const, workflowId: WID })),
-      },
-    });
-    const res = await mountRoutes(module).request(`/${WID}/edges/${COORD_NID}/${WORKER_NID}`, {
-      method: "DELETE",
-    });
-    expect(res.status).toBe(404);
-  });
-});
-
-describe("workflowsRoutes — replaceNodeSpec (PATCH /:wfid/nodes/:nid/spec)", () => {
-  it("forwards (workflowId, nodeId, newSpec) and projects the post-update node", async () => {
-    const replaceNodeSpec = stubUseCase(undefined);
-    const updatedWorker: GetWorkflowNodeResponse = {
-      id: WORKER_NID,
-      workflowId: WID,
-      kind: "worker",
-      spec: { agent: "writer", brief: "revised" },
-      phase: 1,
-      status: "not_started",
-      metadata: {},
-      createdAt: "2026-06-07T00:00:01.000Z",
-    };
-    const module = stubModule({
-      replaceNodeSpec,
-      getNode: stubUseCase(updatedWorker),
-    });
-    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
-      method: "PATCH",
+describe("workflowsRoutes — respondHumanNode (POST /:wfid/nodes/:nid/respond)", () => {
+  it("forwards nested response and returns the updated node", async () => {
+    const respondHumanNode = stubUseCase(makeWorkerView());
+    const module = stubModule({ respondHumanNode });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/respond`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newSpec: { agent: "writer", brief: "revised" } }),
+      body: JSON.stringify({ response: { choiceId: "approve", input: "looks good" } }),
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { spec: Record<string, unknown> };
-    expect(body.spec).toEqual({ kind: "worker", agent: "writer", brief: "revised" });
-    expect(replaceNodeSpec.execute).toHaveBeenCalledWith({
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("taskId");
+    expect(body.spec).toEqual({ agent: "writer", brief: "draft" });
+    expect(respondHumanNode.execute).toHaveBeenCalledWith({
       workflowId: WID,
       nodeId: WORKER_NID,
-      newSpec: { agent: "writer", brief: "revised" },
+      response: { choiceId: "approve", input: "looks good" },
     });
   });
 
-  it("rejects body missing newSpec with 400", async () => {
-    const module = stubModule({ replaceNodeSpec: { execute: vi.fn() } });
-    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
-      method: "PATCH",
+  it("rejects flat human responses with 400", async () => {
+    const module = stubModule({ respondHumanNode: { execute: vi.fn() } });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/respond`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ choiceId: "approve" }),
     });
     expect(res.status).toBe(400);
-  });
-
-  it("maps WorkflowNodeNotMutableError to 409 (running node)", async () => {
-    const module = stubModule({
-      replaceNodeSpec: {
-        execute: vi.fn(() =>
-          errAsync({
-            type: "WorkflowNodeNotMutable" as const,
-            workflowId: WID,
-            nodeId: WORKER_NID,
-            status: "running" as const,
-            verb: "replaceSpec",
-          }),
-        ),
-      },
-    });
-    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newSpec: {} }),
-    });
-    expect(res.status).toBe(409);
+    expect(module.respondHumanNode.execute).not.toHaveBeenCalled();
   });
 });

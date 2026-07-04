@@ -139,9 +139,7 @@ export async function workspaceUpdate(
 }
 
 // ─── rm ────────────────────────────────────────────────────────────────
-export interface WorkspaceRmOpts extends ConnectFlagOpts {
-  readonly purge?: boolean;
-}
+export type WorkspaceRmOpts = ConnectFlagOpts;
 
 export async function workspaceRm(
   workspaceId: string,
@@ -156,12 +154,11 @@ export async function workspaceRm(
     unwrap(
       await deleteApiWorkspacesById({
         path: { id: workspaceId },
-        ...(opts.purge ? { query: { purge: "1" } } : {}),
       }),
     );
     return {
       exitCode: 0,
-      stdout: `workspace ${workspaceId} removed${opts.purge ? " (purged)" : ""}\n`,
+      stdout: `workspace ${workspaceId} removed\n`,
     };
   } catch (err) {
     return formatError(err);

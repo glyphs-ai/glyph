@@ -71,13 +71,13 @@ describe("TaskMapper.toRow", () => {
       createdAt: CREATED_AT,
     });
     succeeded
-      .complete({ output: "done", artifacts: ["/w/artifact/a.html"] }, { now: CREATED_AT })
+      .complete({ output: "done", artifacts: ["ref/a.html"] }, { now: CREATED_AT })
       ._unsafeUnwrap();
     const row = TaskMapper.toRow(succeeded);
     expect(row.status).toBe("succeeded");
     expect(JSON.parse(row.success ?? "null")).toEqual({
       output: "done",
-      artifacts: ["/w/artifact/a.html"],
+      artifacts: ["ref/a.html"],
     });
     expect(row.failure).toBeNull();
   });

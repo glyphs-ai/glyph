@@ -211,8 +211,9 @@ export const handlers = [
     }
     return new HttpResponse(null, { status: 404 });
   }),
-  http.get(`/api/workspaces/${W}/tasks/:taskId/artifact/:name`, ({ params }) => {
-    const key = `${params.taskId}/${params.name}`;
+  http.get(`/api/workspaces/${W}/tasks/:taskId/artifact`, ({ params, request }) => {
+    const relPath = new URL(request.url).searchParams.get("path") ?? "";
+    const key = `${params.taskId}/${relPath}`;
     const entry = artifactBodies.get(key);
     if (!entry) return new HttpResponse(null, { status: 404 });
     return new HttpResponse(entry.body, {

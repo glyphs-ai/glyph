@@ -25,7 +25,7 @@ export type SandboxRemovalFailed = {
 export interface SessionSandbox {
   /** Addressable path of `id`'s sandbox (pure; stays under the sandbox root). */
   resolve(id: SessionId): string;
-  /** Provision the per-session sandbox; fails if the parent root is missing. */
+  /** Provision the per-session sandbox, creating the sandbox root if needed. */
   create(id: SessionId): ResultAsync<string, SandboxProvisionFailed>;
   /** Remove the per-session sandbox. */
   remove(id: SessionId): ResultAsync<void, SandboxRemovalFailed>;

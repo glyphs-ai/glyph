@@ -2,8 +2,21 @@ import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
 import type { TaskId, TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { WorkflowBriefSchema } from "@glyphs-ai/workflow";
-import type { WorkflowTargetData, WorkflowTargetPatch } from "../wire/index.js";
 import { taskAgentResolutionFailed } from "./_task-operation-error.js";
+
+/** Concrete workflow-target shape this handler validates + persists as opaque `data`. */
+interface WorkflowTargetData {
+  readonly coordinatorAgent: string;
+  readonly brief: string;
+  readonly details?: string;
+}
+
+/** RFC 7396 deep-merge patch for a workflow target (`null` deletes an optional). */
+interface WorkflowTargetPatch {
+  readonly coordinatorAgent?: string;
+  readonly brief?: string;
+  readonly details?: string | null;
+}
 
 interface CatalogAgent {
   readonly dependencies?: { readonly agents?: readonly { readonly fqn: string }[] };

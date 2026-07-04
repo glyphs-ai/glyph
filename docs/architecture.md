@@ -335,8 +335,7 @@ The pattern that works: **shared SQLite connection per scope (global
   mirrors: `DELETE /api/workspaces/:id/tasks/:tid?purge=1`.
 - **Stripe-style hybrid params** — primary key (id) positional;
   flags / options in a single trailing options bag
-  (`service.rename(id, { newName })`,
-  `service.unregister(id, { purge })`). `register`-style creates
+  (`service.rename(id, { newName })`). `register`-style creates
   that have no canonical positional key take a single options bag
   (`service.register({ id, workspaceDir, name })`). The shape
   matches Stripe's published API style; see

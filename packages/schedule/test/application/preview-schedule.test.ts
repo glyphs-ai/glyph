@@ -47,22 +47,22 @@ describe("PreviewScheduleUseCase", () => {
     expect(result.nextRuns[9]).toBe("2026-05-10T09:00:00.000Z");
   });
 
-  it("rejects n=0 with ScheduleError", async () => {
-    const result = await h.module.previewSchedule.execute({ expr: "0 9 * * *", tz: "UTC", n: 0 });
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().type).toBe("PreviewCountOutOfRange");
+  it("throws on n=0 (schema bound [1,100])", () => {
+    expect(() =>
+      h.module.previewSchedule.execute({ expr: "0 9 * * *", tz: "UTC", n: 0 }),
+    ).toThrow();
   });
 
-  it("rejects n above upper bound (101) with ScheduleError", async () => {
-    const result = await h.module.previewSchedule.execute({ expr: "0 9 * * *", tz: "UTC", n: 101 });
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().type).toBe("PreviewCountOutOfRange");
+  it("throws on n above upper bound (101)", () => {
+    expect(() =>
+      h.module.previewSchedule.execute({ expr: "0 9 * * *", tz: "UTC", n: 101 }),
+    ).toThrow();
   });
 
-  it("rejects non-integer n with ScheduleError", async () => {
-    const result = await h.module.previewSchedule.execute({ expr: "0 9 * * *", tz: "UTC", n: 2.5 });
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().type).toBe("PreviewCountOutOfRange");
+  it("throws on non-integer n", () => {
+    expect(() =>
+      h.module.previewSchedule.execute({ expr: "0 9 * * *", tz: "UTC", n: 2.5 }),
+    ).toThrow();
   });
 
   it("rejects 6-field cron with the locked literal phrase", async () => {

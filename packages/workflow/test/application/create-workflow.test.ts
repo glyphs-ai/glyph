@@ -37,7 +37,9 @@ describe("CreateWorkflowUseCase", () => {
     expect(wf.status).toBe("running");
     expect(wf.coordinatorAgent).toBe("coord-a");
 
-    const coord = (await f.module.getNode.execute({ nodeId: initialCoordNodeId }))._unsafeUnwrap();
+    const coord = (
+      await f.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })
+    )._unsafeUnwrap();
     expect(coord.kind).toBe("coordinator");
     expect(coord.phase).toBe(0);
     expect(coord.spec).toEqual({ agent: "coord-a" });
@@ -63,7 +65,9 @@ describe("CreateWorkflowUseCase", () => {
     expect(call.workflowId).toBe(workflowId);
     expect(call.nodeId).toBe(initialCoordNodeId);
     expect(call.spec).toEqual({ agent: "coord-a" });
-    const coord = (await f.module.getNode.execute({ nodeId: initialCoordNodeId }))._unsafeUnwrap();
+    const coord = (
+      await f.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })
+    )._unsafeUnwrap();
     expect(coord.status).toBe("running");
   });
 
@@ -82,7 +86,9 @@ describe("CreateWorkflowUseCase", () => {
     // `args.coordinatorAgent` directly because the workflow row doesn't
     // exist yet.
     expect(v.ctx.coordinatorAgent).toBe("coord-a");
-    const coord = (await f.module.getNode.execute({ nodeId: initialCoordNodeId }))._unsafeUnwrap();
+    const coord = (
+      await f.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })
+    )._unsafeUnwrap();
     expect(coord.spec).toEqual({ agent: "coord-a", validated: true });
   });
 
@@ -125,10 +131,12 @@ describe("CreateWorkflowUseCase", () => {
 
   it("dispatch-failure inside createWorkflow flips initial coord to failed", async () => {
     f.coordRunner.dispatchShouldThrow = true;
-    const { initialCoordNodeId } = (
+    const { workflowId, initialCoordNodeId } = (
       await f.module.createWorkflow.execute({ brief: "x", coordinatorAgent: "coord-a" })
     )._unsafeUnwrap();
-    const coord = (await f.module.getNode.execute({ nodeId: initialCoordNodeId }))._unsafeUnwrap();
+    const coord = (
+      await f.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })
+    )._unsafeUnwrap();
     expect(coord.status).toBe("failed");
     expect(coord.endedAt).toBeDefined();
   });

@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { workflowDir } from "../../src/infrastructure/file/workflow-sandbox.js";
 import {
+  addIteration,
   bootstrap,
   buildWorkflowFixture,
   fixedRandomUUID,
@@ -24,22 +25,17 @@ describe("WorkflowService.deleteWorkflow", () => {
 
   it("drops the workflow row + every owned node + every owned edge in one tx", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    const { nodeId: a } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "a" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
-    const { nodeId: b } = (
-      await f.module.addNode.execute({
-        workflowId,
-        kind: "worker",
-        spec: { agent: "w", brief: "b" },
-        parents: [initialCoordNodeId],
-      })
-    )._unsafeUnwrap();
+    const { workerIds } = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [
+        { tempId: "a", spec: { agent: "w", brief: "a" } },
+        { tempId: "b", spec: { agent: "w", brief: "b" } },
+      ],
+      coordSpec: { agent: "coord-next" },
+    });
+    const a = workerIds.a!;
+    const b = workerIds.b!;
     (
       await f.module.cancelWorkflow.execute({
         workflowId,
@@ -52,9 +48,11 @@ describe("WorkflowService.deleteWorkflow", () => {
     const wf = await f.module.getWorkflow.execute({ workflowId });
     expect(wf.isErr()).toBe(true);
     expect(wf._unsafeUnwrapErr().type).toBe("WorkflowNotFound");
-    expect((await f.module.getNode.execute({ nodeId: initialCoordNodeId })).isErr()).toBe(true);
-    expect((await f.module.getNode.execute({ nodeId: a })).isErr()).toBe(true);
-    expect((await f.module.getNode.execute({ nodeId: b })).isErr()).toBe(true);
+    expect(
+      (await f.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })).isErr(),
+    ).toBe(true);
+    expect((await f.module.getNode.execute({ workflowId, nodeId: a })).isErr()).toBe(true);
+    expect((await f.module.getNode.execute({ workflowId, nodeId: b })).isErr()).toBe(true);
   });
 
   it("rejects a running workflow with WorkflowDeleteRequiresTerminalError", async () => {

@@ -107,26 +107,19 @@ describe("DrizzleWorkspaceRepository", () => {
     });
   });
 
-  describe("constraint violations translate to typed errors", () => {
-    it("rejects duplicate id with WorkspaceIdConflict", async () => {
+  describe("constraint violations", () => {
+    it("rejects duplicate id with DatabaseUnavailable", async () => {
       await repo.save(fresh(STATE_A));
       const dup = WorkspaceEntity.create({ ...STATE_A, workspaceDir: "/other" });
       const res = await repo.save(dup);
-      const err = res._unsafeUnwrapErr();
-      expect(err.type).toBe("WorkspaceIdConflict");
-      if (err.type === "WorkspaceIdConflict") expect(err.id).toBe(STATE_A.id);
+      expect(res._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
     });
 
-    it("rejects duplicate workspaceDir with WorkspacePathConflict carrying existingId", async () => {
+    it("rejects duplicate workspaceDir with DatabaseUnavailable", async () => {
       await repo.save(fresh(STATE_A));
       const dup = WorkspaceEntity.create({ ...STATE_B, workspaceDir: STATE_A.workspaceDir });
       const res = await repo.save(dup);
-      const err = res._unsafeUnwrapErr();
-      expect(err.type).toBe("WorkspacePathConflict");
-      if (err.type === "WorkspacePathConflict") {
-        expect(err.workspaceDir).toBe(STATE_A.workspaceDir);
-        expect(err.existingId).toBe(STATE_A.id);
-      }
+      expect(res._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
     });
   });
 });
