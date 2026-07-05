@@ -28,6 +28,11 @@ const TREE_BLOB_PARALLELISM = 8;
 const GITHUB_TREE_RE =
   /^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+?)(?:\.git)?\/tree\/([^/\s]+)(?:\/(.+))?\/?$/;
 
+/** Encode a file path for URLs, keeping slashes literal. */
+function encodePath(filePath: string): string {
+  return filePath.split("/").map(encodeURIComponent).join("/");
+}
+
 interface GitHubOrigin {
   readonly owner: string;
   readonly repo: string;
@@ -94,7 +99,7 @@ export class GitHubFetcher implements Fetcher {
   private async fetchSingleFile(parsed: GitHubOrigin, relPath: string): Promise<Buffer> {
     const { owner, repo, ref, path: subPath } = parsed;
     const fullPath = subPath ? `${subPath}/${relPath}` : relPath;
-    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(fullPath)}?ref=${encodeURIComponent(ref)}`;
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodePath(fullPath)}?ref=${encodeURIComponent(ref)}`;
     const response = await fetch(url, {
       headers: await this.headers("application/vnd.github+json"),
       redirect: "follow",
@@ -125,15 +130,94 @@ export class GitHubFetcher implements Fetcher {
       return;
     }
 
-    // Subpath install: Trees API returns the full `(path, sha)` listing in
-    // one call; filter to the subpath and fan out parallel Blobs requests.
-    // Fall back to tarball if the listing is truncated.
+    // Subpath install: Contents API lists just the directory's files (one
+    // call per level). Much faster than listing the full repo tree.
+    const listing = await this.fetchContentsRecursive(owner, repo, ref, subPath);
+    if (listing !== null && listing.length > 0) {
+      yield* this.fetchBlobsFromListing(owner, repo, listing);
+      return;
+    }
+
+    // Fallback: full recursive tree listing → filter → parallel blobs.
     const tree = await this.fetchTreeListing(owner, repo, ref);
     if (tree === null) {
       yield* this.fetchTreeViaTarball(owner, repo, ref, subPath);
       return;
     }
     yield* this.fetchTreeViaBlobs(owner, repo, subPath, tree);
+  }
+
+  /**
+   * List directory contents recursively via the GitHub Contents API.
+   * Returns flat list of {sha, relPath} for all files under the path.
+   * Returns null on API failure (caller falls back to Trees API).
+   */
+  private async fetchContentsRecursive(
+    owner: string,
+    repo: string,
+    ref: string,
+    subPath: string,
+  ): Promise<{ sha: string; relPath: string }[] | null> {
+    const result: { sha: string; relPath: string }[] = [];
+    const queue: string[] = [subPath];
+    while (queue.length > 0) {
+      const dir = queue.shift()!;
+      const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodePath(dir)}?ref=${encodeURIComponent(ref)}`;
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          headers: await this.headers("application/vnd.github+json"),
+          redirect: "follow",
+        });
+      } catch {
+        return null;
+      }
+      if (!response.ok) return null;
+      let entries: Array<{ name: string; path: string; sha: string; type: string }>;
+      try {
+        const json = await response.json();
+        if (!Array.isArray(json)) return null;
+        entries = json;
+      } catch {
+        return null;
+      }
+      for (const entry of entries) {
+        if (entry.type === "file") {
+          const relPath = entry.path.startsWith(`${subPath}/`)
+            ? entry.path.slice(subPath.length + 1)
+            : entry.name;
+          result.push({ sha: entry.sha, relPath });
+        } else if (entry.type === "dir") {
+          queue.push(entry.path);
+        }
+      }
+    }
+    return result;
+  }
+
+  private async *fetchBlobsFromListing(
+    owner: string,
+    repo: string,
+    listing: { sha: string; relPath: string }[],
+  ): AsyncIterable<EntryFile> {
+    const results: EntryFile[] = new Array(listing.length);
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      while (true) {
+        const i = cursor++;
+        if (i >= listing.length) return;
+        const job = listing[i]!;
+        results[i] = {
+          relPath: job.relPath,
+          content: await this.fetchBlobRaw(owner, repo, job.sha),
+        };
+      }
+    };
+    const workers: Promise<void>[] = [];
+    for (let i = 0; i < Math.min(TREE_BLOB_PARALLELISM, listing.length); i++)
+      workers.push(worker());
+    await Promise.all(workers);
+    for (const file of results) yield file;
   }
 
   private async fetchTreeListing(
