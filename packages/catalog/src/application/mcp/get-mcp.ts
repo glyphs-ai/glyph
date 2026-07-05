@@ -1,10 +1,12 @@
-import { ok, safeTry } from "neverthrow";
+import { eq } from "drizzle-orm";
+import { errAsync, okAsync } from "neverthrow";
 import { z } from "zod";
-import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import { McpFqnSchema } from "../../domain/mcp-fqn.js";
-import type { McpNotFound, McpRepository } from "../../domain/mcp-repository.js";
-import type { SkillRepository } from "../../domain/skill-repository.js";
+import type { DatabaseUnavailable, McpNotFound } from "../../domain/mcp-repository.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
+import { mcps } from "../../infrastructure/drizzle/mcp-schema.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
+import { collectReferencedMcpFqns } from "./mcp-reads.js";
 
 const McpSchema = z.object({
   fqn: z.string(),
@@ -21,34 +23,30 @@ export const GetMcpResponseSchema = McpSchema;
 export type GetMcpResponse = Mcp;
 export type GetMcpError = McpNotFound | DatabaseUnavailable;
 export interface GetMcpDeps {
-  readonly mcpRepo: McpRepository;
-  readonly skillRepo: SkillRepository;
-  readonly agentRepo: AgentRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class GetMcpUseCase implements UseCase<GetMcpRequest, GetMcpResponse, GetMcpError> {
   constructor(private readonly deps: GetMcpDeps) {}
 
   execute(request: GetMcpRequest): UseCaseResult<GetMcpResponse, GetMcpError> {
-    const deps = this.deps;
-    return safeTry<GetMcpResponse, GetMcpError>(async function* () {
-      const mcp = yield* deps.mcpRepo.get(request.id);
-      const agents = yield* deps.agentRepo.list();
-      const skills = yield* deps.skillRepo.list();
-      const referencedMcpFqns = new Set<string>();
-      for (const agent of agents) {
-        for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-      }
-      for (const skill of skills) {
-        for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-      }
-      return ok({
-        fqn: mcp.fqn,
-        origin: mcp.origin,
-        orphaned: !referencedMcpFqns.has(mcp.fqn),
-        installedAt: mcp.installedAt,
-        updatedAt: mcp.updatedAt,
-      });
-    });
+    const { id } = request;
+    return this.deps.queries
+      .query((db): Mcp | undefined => {
+        const row = db.select().from(mcps).where(eq(mcps.fqn, id)).get();
+        if (row === undefined) return undefined;
+        const referenced = collectReferencedMcpFqns(db);
+        return {
+          fqn: row.fqn,
+          origin: row.origin,
+          orphaned: !referenced.has(row.fqn),
+          installedAt: row.installedAt,
+          updatedAt: row.updatedAt,
+        };
+      })
+      .andThen(
+        (dto): UseCaseResult<GetMcpResponse, GetMcpError> =>
+          dto === undefined ? errAsync({ type: "McpNotFound", fqn: id }) : okAsync(dto),
+      );
   }
 }

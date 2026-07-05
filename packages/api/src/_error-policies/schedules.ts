@@ -11,11 +11,10 @@
  * The schedule pkg is kind-agnostic. The task/workflow kind handlers in
  * `packages/api/src/wiring/*` validate `data` during `handler.validate`; a
  * rejection surfaces as the {@link TargetValidationFailed} atom carrying the
- * thrown `cause`. {@link respondScheduleError} unwraps that cause and delegates
- * to `respondError`, so a `TaskScheduleTargetError` / `WorkflowScheduleTargetError`
- * (400) or a `TaskOperationError` (task union code) resolves via the same
- * `statuses` / `codeStatuses` tables the task routes use — callers don't read
- * two policy files to predict status.
+ * `cause`. {@link respondScheduleError} unwraps that cause and delegates to
+ * `respondError`, so a task/workflow target-validation atom (400) or a task
+ * union atom resolves via the same `codeStatuses` tables the task routes use —
+ * callers don't read two policy files to predict status.
  */
 
 import type {
@@ -31,8 +30,8 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ErrorPolicy, RespondErrorOpts } from "../_http-errors.js";
 import { respondError } from "../_http-errors.js";
-import { TaskScheduleTargetError } from "../wiring/schedule-task-handler.js";
-import { WorkflowScheduleTargetError } from "../wiring/schedule-workflow-handler.js";
+import type { TaskTargetInvalid } from "../wiring/schedule-task-handler.js";
+import type { WorkflowTargetInvalid } from "../wiring/schedule-workflow-handler.js";
 import { taskUnionCodeStatuses } from "./tasks.js";
 
 type CodeStatusEntry = NonNullable<ErrorPolicy["codeStatuses"]>[number];
@@ -117,23 +116,34 @@ function scheduleCodeStatus(type: ScheduleErrorType): CodeStatusEntry {
 
 export const schedulesErrorPolicy: ErrorPolicy = {
   name: "schedules",
-  statuses: [
-    // Kind-handler-side input validation (thrown by the task/workflow handler's
-    // `validate`; reaches here as `TargetValidationFailed.cause`).
-    [TaskScheduleTargetError, 400],
-    [WorkflowScheduleTargetError, 400],
-  ],
+  statuses: [],
   codeStatuses: [
     ...taskUnionCodeStatuses,
     ...(Object.keys(STATUS_BY_TYPE) as ScheduleErrorType[]).map(scheduleCodeStatus),
+    [
+      "TaskTargetInvalid",
+      400,
+      (err) => ({
+        error: (err as TaskTargetInvalid).message,
+        code: "TaskTargetInvalid",
+      }),
+    ],
+    [
+      "WorkflowTargetInvalid",
+      400,
+      (err) => ({
+        error: (err as WorkflowTargetInvalid).message,
+        code: "WorkflowTargetInvalid",
+      }),
+    ],
   ],
 };
 
 /**
  * Respond to a schedule use-case error atom. Union-native: wraps the atom so
  * its `type` resolves via `codeStatuses`; a `TargetValidationFailed` unwraps
- * its `cause` and delegates so the kind handler's own error (task/workflow
- * target class, or a `TaskOperationError` code) resolves through the same policy.
+ * its `cause` and delegates so the kind handler's own DU resolves through the
+ * same policy.
  */
 export function respondScheduleError(
   c: Context,

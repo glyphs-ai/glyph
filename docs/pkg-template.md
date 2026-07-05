@@ -3,6 +3,10 @@
 This document describes the standard layout every BC-owning service
 package in glyph follows.
 
+> **Canonical source of truth:** the **Layout** + layering rules below, the
+> `packages/_template/` scaffold, and `packages/workspace/` (the smallest
+> package that follows them).
+
 ## Known exceptions
 
 Not every package in the repo is a BC-owning service. The following
@@ -37,48 +41,88 @@ pnpm --filter @glyphs-ai/notebook test
 The scaffolder copies `packages/_template/`, substitutes the placeholder
 tokens (`__PKG__` / `__Entity__` / `__entity__` / `__entities__` /
 `__entity-kebab__`), and deletes the placeholder migration so
-drizzle-kit can regenerate it from `src/persistence/tables.ts`. The
-result is a four-layer package with a main entry (`.`) and a declaration
-entry (`./contract`).
+drizzle-kit can regenerate it from
+`src/infrastructure/drizzle/<entity>-schema.ts`. The result is a
+**domain / application / infrastructure** package with a single main
+entry (`.`); there is no separate declaration entry.
 
 ## Layout
 
 ```
 packages/<pkg>/
   src/
-    index.ts                         main barrel: service + compose only
-    <entity>.compose.ts              compose<Entity>Module({ dbFile, now? })
+    index.ts                    package-root barrel: NAMED exports of the whole public
+                                surface (per-use-case Request/Response/Error contracts, the
+                                <entity>-public symbols, compose<Entity>Module + its option/
+                                result types, the db factory). NO `export *`.
+    <entity>-module.ts          compose<Entity>Module({ db }) — the composition root: takes/
+                                opens the Db, builds the repository + queries, wires use-cases.
 
-    contract/                        published declaration surface (`./contract`)
-      <entity>.schemas.ts            zod schemas: scalar, request, response
-      <entity>.types.ts              public types inferred with z.infer
-      <entity>.errors.ts             public error classes
-      index.ts                       contract barrel
+    domain/                     the RICH domain model (充血) — owns invariants + validation
+      <entity>-entity.ts        the aggregate: state transitions live here and return
+                                domain-error DUs via `Result` (never throw). `new` rehydrates
+                                trusted persisted state; `create` mints a fresh aggregate.
+      <entity>-id.ts            branded id value object + its zod schema (validates the id)
+      <entity>-<value>.ts       other value objects, each with its own schema (per-property
+                                validation)
+      <entity>-repository.ts    WRITE-side repository PORT — `get` / `save` / `delete` only,
+                                plus the error atoms (DatabaseUnavailable, <Entity>NotFound)
 
-    domain/
-      <entity>.entity.ts             pkg-owned domain shape (hand interface / class)
+    application/                use-cases — flexible standalone external contracts
+      <use-case>.ts             one file per use-case: its OWN Request/Response zod schema +
+                                Error union + the UseCase class
+      use-case.ts               UseCase<I,O,E> interface + DomainResult / UseCaseResult aliases
+      <entity>-public.ts        NAMED re-exports of the domain symbols that cross the pkg
+                                boundary (branded id + schema, error atoms) + the closed
+                                <Entity>Error union. NO `export *`.
+      ports/                    (optional) application-layer ports the module injects
 
-    application/
-      <entity>.service.ts            single public service; reads + writes
+    infrastructure/             adapters — the only layer allowed to touch third-party IO
+      drizzle/
+        <entity>-db.ts          openDb / Db type (better-sqlite3 + drizzle)
+        <entity>-schema.ts      drizzle table definitions + private Row types
+        <entity>-mapper.ts      the repository's bound MAPPER: domain entity <-> db row
+        <entity>-repository.ts  the WRITE-side repository IMPL (get/save/delete via the mapper)
+        <entity>-queries.ts     the READ-side seam: interface + Drizzle impl, CO-LOCATED here
+                                (not in domain). Exposes the table + `query<T>(fn):
+                                ResultAsync<T, DatabaseUnavailable>`; read use-cases compose
+                                their own SELECTs and project raw ROWS.
+        <entity>-migrations.ts  generated migration bundle
+      file/                     (optional) filesystem / other adapters
 
-    persistence/
-      tables.ts                      Drizzle table defs and private row types
-      migrations.ts                  generated migration bundle
-      <entity>.db.ts                 openDb(dbFile): prod + test DB factory
-      <entity>.repository.ts         Drizzle CRUD (PRIVATE)
-
-  drizzle/                           generated SQL migrations (committed)
-  drizzle.config.ts                  points at ./src/persistence/tables.ts
-  package.json                       depends on better-sqlite3 + drizzle-orm + zod
-  tsconfig.json                      extends ../../tsconfig.base.json
-  tsconfig.typecheck.json            typecheck-only config covering src/ + test/
-  vitest.config.ts
+  drizzle/                      generated SQL migrations (committed)
+  drizzle.config.ts             points at ./src/infrastructure/drizzle/<entity>-schema.ts
+  package.json / tsconfig*.json / vitest.config.ts
 ```
 
-`index.ts` intentionally exports only the service, the compose function,
-and the module option/result types. Schemas, DTO types, and errors are
-exported from `@glyphs-ai/<pkg>/contract`. Persistence, domain entities,
-and row types are package-private implementation details.
+### Layering rules (what each layer owns)
+
+- **domain** — the RICH model (充血). Owns every invariant and validates the
+  whole aggregate's legitimacy down to each property (value objects carry their
+  own zod schema). State transitions are methods on the entity that return
+  domain-error discriminated unions via `Result` — the domain never throws. The
+  write-side repository PORT lives here and exposes only `get` / `save` /
+  `delete`; there is no `find*` / `list` / `insert` on it (those are read
+  concerns, or fold into `save`).
+- **application** — one use-case per file. A use-case is a flexible, standalone
+  external contract: it defines its OWN `Request` / `Response` zod schema and
+  Error union, even when the shape currently matches the domain or another
+  use-case. Today's identical shapes are not guaranteed to stay identical, so we
+  accept a little redundancy to keep each use-case free to diverge. Write
+  use-cases depend on the repository; read use-cases depend on the queries seam.
+  `<entity>-public.ts` is the one curated file that named-re-exports the domain
+  symbols crossing the boundary.
+- **infrastructure** — the only layer that touches third-party IO (SQLite,
+  filesystem, HTTP). The repository IMPL and its bound MAPPER (entity <-> row)
+  live here, and so does the `queries` seam (interface + impl co-located).
+  Queries return raw ROWS, not domain entities, so read use-cases stay decoupled
+  from the aggregate and can shape their SELECTs freely.
+
+### Barrels: no `export *`
+
+Both `index.ts` (package root) and `application/<entity>-public.ts` enumerate
+their exports by name. `export *` is avoided so the public surface stays
+explicit + greppable and no stray internal symbol leaks across the boundary.
 
 ## Typecheck configuration
 
@@ -134,36 +178,39 @@ Large suites split by feature with a `.<feature>` infix.
 
 | source | test |
 | ------ | ---- |
-| `application/<entity>.service.ts` | `test/application/<entity>.service.test.ts` |
-| `application/<entity>.service.ts` (per-feature suite) | `test/application/<entity>.service.<feature>.test.ts` |
-| `persistence/<entity>.repository.ts` | `test/persistence/<entity>.repository.test.ts` |
-| `persistence/<entity>.repository.ts` (per-feature) | `test/persistence/<entity>.repository.<feature>.test.ts` |
-| `domain/<entity>.entity.ts` | `test/domain/<entity>.entity.test.ts` |
-| `contract/<entity>.schemas.ts` | `test/contract/<entity>.schemas.test.ts` |
-| `<entity>.compose.ts` | `test/<entity>.compose.test.ts` |
+| `application/<verb>-<entity>.ts` | `test/application/<verb>-<entity>.test.ts` |
+| `application/<verb>-<entity>.ts` (per-feature suite) | `test/application/<verb>-<entity>.<feature>.test.ts` |
+| `infrastructure/drizzle/<entity>-repository.ts` | `test/infrastructure/drizzle/<entity>-repository.test.ts` |
+| `infrastructure/drizzle/<entity>-queries.ts` | `test/infrastructure/drizzle/<entity>-queries.test.ts` |
+| `domain/<entity>-entity.ts` | `test/domain/<entity>-entity.test.ts` |
+| `domain/<entity>-id.ts` | `test/domain/<entity>-id.test.ts` |
+| `<entity>-module.ts` | `test/<entity>-module.test.ts` |
 
-A single source class may have several test files, split by feature or
+A single source module may have several test files, split by feature or
 scenario:
-- `<entity>.service.<feature>.test.ts` — per-feature splits of a service.
-- `<entity>.repository.<scenario>.test.ts` — per-scenario splits of a
+- `<verb>-<entity>.<feature>.test.ts` — per-feature splits of a use-case
+  or engine.
+- `<entity>-repository.<scenario>.test.ts` — per-scenario splits of a
   repository.
 
 Tests under a sub-folder mirror the source sub-folder:
-`src/application/<entity>.service.ts` → `test/application/<entity>.service.test.ts`.
+`src/application/<verb>-<entity>.ts` → `test/application/<verb>-<entity>.test.ts`.
 
 NEVER name a test file by an old class name or a non-source concept
 word.
 
 ## Public API guard
 
-Every pkg ships a `test/public-api-guard.test.ts` that uses Vitest's
-`expectTypeOf` to lock the pkg's public surface at typecheck time.
-The test:
+A package locks its public surface with a `test/public-api-guard.test.ts`
+that uses Vitest's `expectTypeOf` at typecheck time. The test:
 
-- Asserts every method on the public service class exists by name.
-- Asserts every declared error class is exported and constructible from the `./contract` subpath.
-- Asserts every public schema and DTO / interface shape.
-- Asserts the main entry exports the service and composition surface, not persistence internals.
+- Asserts every public use-case class exists by name, with its
+  `Request` / `Response` / `Error` types.
+- Asserts every exported value object and schema (e.g. `<Entity>IdSchema`).
+- Asserts `compose<Entity>Module` and the `<Entity>Module` /
+  `<Entity>ModuleOptions` types are exported.
+- Asserts the root `index.ts` exports the whole public surface by name —
+  never persistence, mapper, or entity internals.
 
 `expectTypeOf` catches silent renames or signature changes at
 `pnpm typecheck` time, before downstream pkgs surface the breakage. As a
@@ -175,34 +222,37 @@ the coupling.
 
 ## File naming convention
 
-**Domain / role files use a dot prefix:** `<entity>.<role>.ts`. The dot
-separates the aggregate facet from the role facet:
+**Domain / role files use a kebab-case `<entity>-<role>.ts` name** (a
+hyphen separates the aggregate facet from the role facet); use-cases are
+`<verb>-<entity>.ts`:
 
 | file pattern | exports |
 |---|---|
-| `application/<entity>.service.ts` | `<Entity>Service` |
-| `persistence/<entity>.repository.ts` | `<Entity>Repository` |
-| `domain/<entity>.entity.ts` | `<Entity>Entity` |
-| `contract/<entity>.schemas.ts` | `<Entity>Schema`, `<Entity>IdSchema`, operation schemas |
-| `contract/<entity>.types.ts` | `z.infer` public types |
-| `contract/<entity>.errors.ts` | `<Entity>Error` and subclasses |
-| `<entity>.compose.ts` | `compose<Entity>Module` |
-| `persistence/<entity>.db.ts` | `openDb` and `Db` |
+| `domain/<entity>-entity.ts` | `<Entity>Entity` |
+| `domain/<entity>-id.ts`, `domain/<entity>-<value>.ts` | branded value objects (`<Entity>IdSchema`, `<Entity>NameSchema`, …) |
+| `domain/<entity>-repository.ts` | `<Entity>Repository` write port + error atoms |
+| `application/<verb>-<entity>.ts` | `<Verb><Entity>UseCase` + its `Request` / `Response` / `Error` |
+| `application/<entity>-public.ts` | named domain re-exports + `<Entity>Error` union |
+| `infrastructure/drizzle/<entity>-schema.ts` | drizzle table + `<Entity>Row` |
+| `infrastructure/drizzle/<entity>-mapper.ts` | `<Entity>Mapper` |
+| `infrastructure/drizzle/<entity>-repository.ts` | `Drizzle<Entity>Repository` |
+| `infrastructure/drizzle/<entity>-queries.ts` | `<Entity>Queries` + `Drizzle<Entity>Queries` |
+| `infrastructure/drizzle/<entity>-db.ts` | `openDb`, `Db` |
+| `<entity>-module.ts` | `compose<Entity>Module`, `<Entity>Module`, `<Entity>ModuleOptions` |
 
-Multiword facets use hyphens inside the facet, Twenty-style, e.g.
-`task.workspace-entity` facet file. Test files mirror the same pattern:
-`<entity>.<role>.test.ts` and `<entity>.<role>.<feature>.test.ts`.
+A multiword entity is kebab-cased throughout (`TaskGroup` →
+`task-group-entity.ts`, `task-group-repository.ts`). Test files mirror the
+same pattern with `.test.ts` appended.
 
 The layer directory also namespaces files, but the per-file aggregate
-prefix is still required. A repo-wide Ctrl-P for `workspace.service` or
-`workspace.repository` must be unique across the sibling domain packages.
+prefix is still required. A repo-wide Ctrl-P for `workspace-repository` or
+`register-workspace` must be unique across the sibling domain packages.
 
-**Tooling-locked bare names** are exempt from the dot-prefix rule:
+**Tooling-locked / structural bare names** are exempt from the
+`<entity>-` prefix rule:
 
 - `index.ts` — barrels.
-- `tables.ts` — `drizzle.config.ts` references
-  `./src/persistence/tables.ts` by path.
-- `migrations.ts` — `scripts/inline-migrations.mjs` writes this file.
+- `use-case.ts` — the shared `UseCase<I, O, E>` interface + result aliases.
 - package config files such as `drizzle.config.ts`, `tsconfig.json`, and
   `vitest.config.ts`.
 
@@ -242,9 +292,10 @@ file never becomes a second public entry point. A `_<topic>.ts` MAY,
 however, own a small number of genuinely-public *value consts* (e.g.
 an operational cap such as a retry limit) that the barrel re-exports
 by name; the module's functions and types stay internal. Prefer
-`contract/<entity>.types.ts` for broadly-public types — reach for a
-named const re-export from a `_` module only when the const is
-inseparable from the internal concern that owns it.
+per-use-case `Request`/`Response` schemas (`application/<use-case>.ts`) or
+domain value objects (`domain/<entity>-{id,name}.ts`) for broadly-public
+types — reach for a named const re-export from a `_` module only when the
+const is inseparable from the internal concern that owns it.
 
 Tests for `_` files live alongside the helper they cover
 (`test/application/_helpers.test.ts` is a valid layout per § "Test
@@ -252,59 +303,49 @@ layout convention" rule 2).
 
 ## Where DTOs live
 
-> See [docs/architecture.md § The three layers](./architecture.md#the-three-layers) for the Row / Entity / DTO split that motivates the contract-surface rule.
+> See [docs/architecture.md § The three layers](./architecture.md#the-three-layers) for the Row / Entity / DTO split that motivates the surface rule.
 
-**ALL public declaration types — DTOs, operation request shapes,
-response shapes, option shapes, enums, and union types — live in
-`src/contract/<entity>.types.ts`, inferred from schemas where possible.**
-Every service package has one contract types file, regardless of size.
+Each use-case owns its own **public contracts**: a `RequestSchema` and
+`ResponseSchema` (zod; the TS type is `z.infer<typeof ...>`) plus an `Error`
+union — all declared at the top of `application/<use-case>.ts`. Use-cases
+**do not share DTOs**: identical-looking shapes today may diverge as each
+use-case evolves its own external contract independently. Accept the
+redundancy.
 
-The corresponding zod schemas live in `src/contract/<entity>.schemas.ts`:
-reusable scalar schemas (`<Entity>IdSchema`, `<Entity>NameSchema`), one
-input schema per write operation (for example
-`Create<Entity>RequestSchema`), and response / projection schemas (for
-example `<Entity>Schema`). Schemas are the single source of truth for
-runtime input validation, inferred types, and — when exposed over HTTP —
-the OpenAPI projection.
+Shared value objects (id, name, other per-property validators) live in
+`domain/<entity>-{id,name}.ts`. Cross-boundary domain types are
+named-re-exported via `application/<entity>-public.ts`; the pkg root
+`index.ts` named-exports the whole public surface. There is no `contract/`
+directory and no single `<entity>.types.ts` file.
 
-Other files must NOT `export interface` or `export type`
-consumer-facing types. The exceptions are:
-- `src/persistence/tables.ts` MAY define `<Entity>Row` /
-  `New<Entity>Row` for the repository's own row ↔ entity mapping, but
-  those types are **persistence-private** — never re-exported from
-  `index.ts` or `./contract`, and never used in a repository's public
-  signature (which speaks `<Entity>Entity`). Anemic BCs whose mapping is
-  structural usually omit them entirely.
-- `src/contract/<entity>.errors.ts` exports Error subclasses (classes are
-  values, not pure types).
-- `src/domain/<entity>.entity.ts` exports the domain Entity type or class,
-  but only for package-internal use.
-- Multi-entity BCs' facade-internal type files may export internal types.
+The only exceptions to "use-cases own their types" are:
+
+- `infrastructure/drizzle/<entity>-schema.ts` MAY define `<Entity>Row`
+  (via `$inferSelect`) for the mapper's row ↔ entity conversion, but that
+  type is **infrastructure-private** — never re-exported from `index.ts`
+  and never used in a repository's public signature (which speaks
+  `<Entity>Entity`).
+- `<entity>-module.ts` exports `<Entity>Module` and `<Entity>ModuleOptions`
+  alongside `compose<Entity>Module`. These are composition-surface types
+  (how downstream packages wire the pkg), distinct from per-use-case DTOs.
 - Capability-interface seams are declared by the consumer package when a
-  downstream needs a narrow surface (for example `AgentResolverPort` or
-  `SpawnFn`). The port surface is a cross-pkg seam, distinct from runtime
-  DTOs that flow over HTTP or through the service.
-- `<entity>.compose.ts` MAY export `<Entity>Module` and
-  `<Entity>ModuleOptions` alongside `compose<Entity>Module`. These are
-  composition surface (how downstream packages WIRE the pkg), distinct
-  from runtime DTOs (what flows over HTTP / through the service).
-
-Every public type has exactly one home — `contract/<entity>.types.ts`.
-Every pkg, single-entity or multi-entity, uses the same contract surface
-shape.
+  downstream needs a narrow surface (for example `AgentContentSource` or
+  `SpawnFn`). The port surface is a cross-pkg seam, distinct from per-use-case
+  DTOs.
 
 ## Type placement (which package owns this type?)
 
 > See [docs/architecture.md § The three layers](./architecture.md#the-three-layers) for the Row / Entity / DTO split inside one package. This section covers the orthogonal question: *which package* should host a given type.
 
 The "Where DTOs live" section above governs *intra-package* type layout
-(`contract/<entity>.types.ts` per entity). This section governs
+(per-use-case `Request`/`Response` schemas in `application/<use-case>.ts`, shared
+value objects in `domain/<entity>-{id,name}.ts`). This section governs
 *inter-package* type layout — given a new type, which of glyph's type-owning
 location kinds should host it.
 
 | Kind of type | Lives in | One-line test |
 |---|---|---|
-| A single BC's entity / DTO / error / option shape | the owning domain pkg's `domain/<entity>.entity.ts` / `contract/<entity>.types.ts` / `contract/<entity>.errors.ts` | "Does it belong to one BC only? Would you delete it if you deleted that BC?" |
+| A single BC's entity / DTO / error / option shape | the owning domain pkg's `domain/<entity>-entity.ts`, per-use-case `application/<use-case>.ts` (Request/Response/Error union), or domain value objects (`domain/<entity>-{id,name}.ts`) | "Does it belong to one BC only? Would you delete it if you deleted that BC?" |
 | HTTP wire contract OR cross-package path / route constant the surfaces need at compile time | `@glyphs-ai/api`'s `wire/` surface (fenced consumers see it via `@glyphs-ai/sdk`) | "Will it appear in a Network tab payload, OR is it a pure type / side-effect-free constant the dashboard / cli reaches for?" |
 | In-process composition / runtime container holding live service instances or callbacks | `@glyphs-ai/api` | "Does it own `Promise<Service>` / a `(c) => Service` resolver, OR a cross-BC composition shape constructed once per workspace?" |
 | HTTP-transport-internal type (`Hono.Context`-flavoured, route-resolver, middleware) | `@glyphs-ai/server` | "Does its signature reference `Hono.Context`, request bodies, or Express-style middleware?" |
@@ -369,14 +410,14 @@ location kinds should host it.
   the entity stays in the domain. The service in the domain pkg owns
   the projection.
 
-- **Errors that cross the wire.** If an error name appears in an HTTP
-  error response (i.e. the client branches on it), its `name` literal
-  is wire-shape and should be re-declared in the api `wire/` surface. The
-  Error *class* stays in the domain pkg's contract errors file. Cross-pkg
-  consumers that need to discriminate the error should branch on
-  `err.name === "AgentNotFoundError"` rather than `import`ing the
-  class for `instanceof` — the latter introduces a runtime cross-BC
-  dep that rule 4 forbids.
+- **Errors that cross the wire.** Errors are discriminated-union atoms
+  (`{ readonly type: "AgentNotFound"; ... }`). If a `type` literal
+  appears in an HTTP error response the client branches on, it is
+  wire-shape and should be re-declared in the api `wire/` surface. The
+  atom type stays in the domain pkg's repository or entity module. Cross-pkg
+  consumers branch on `err.type === "AgentNotFound"` — never `instanceof`
+  (no class hierarchy) and never `err.name` (that is the old class-error
+  convention). Rule 4 still forbids runtime cross-BC value imports.
 
 - **Resolvers (`(c: Hono.Context) => Service`) stay in `server`.**
   Their parameter type is HTTP-specific; promoting to `api` would
@@ -407,10 +448,10 @@ location kinds should host it.
   genuinely appears in a Network-tab payload.
 
 - A domain pkg value-importing another domain pkg's service or error
-  class — silently builds a runtime cross-BC dep. **Fix:** use
+  type — silently builds a runtime cross-BC dep. **Fix:** use
   `import type`; thread the live instance through `@glyphs-ai/api`'s
-  composer; for cross-BC error discrimination, branch on `err.name`
-  instead of `instanceof`. Mechanically audited by
+  composer; for cross-BC error discrimination, branch on `err.type`
+  (discriminated-union atoms). Mechanically audited by
   `inter-service-imports.test.ts`.
 
 ## Naming conventions
@@ -422,34 +463,33 @@ location kinds should host it.
 | concept | name / surface |
 | ------- | -------------- |
 | package name | `@glyphs-ai/<pkg>` |
-| main entry | `@glyphs-ai/<pkg>`: service + compose only |
-| contract entry | `@glyphs-ai/<pkg>/contract`: schemas + inferred types + errors |
-| **DTO** (wire shape) | `<Entity>` — bare noun |
-| list entry | `<Entity>Entry` (only if it differs from DTO) |
-| operation request | `<Verb><Entity>Request` |
-| operation response | `<Verb><Entity>Response` |
-| reusable scalar schema | `<Entity>IdSchema`, `<Entity>NameSchema` |
-| DTO schema | `<Entity>Schema` |
-| write+read surface | `<Entity>Service` |
-| service dependencies | `<Entity>ServiceOpts` (constructor opts; see "Parameter & constructor shape") |
+| main entry | `@glyphs-ai/<pkg>`: the whole public surface (use-cases + value objects + compose); no `./contract` subpath |
+| use-case class | `<Verb><Entity>UseCase` |
+| operation request | `<Verb><Entity>Request` (+ `<Verb><Entity>RequestSchema`) |
+| operation response | `<Verb><Entity>Response` (+ `<Verb><Entity>ResponseSchema`) |
+| use-case error union | `<Verb><Entity>Error` |
+| use-case dependencies | `<Verb><Entity>Deps` (constructor opts; see "Parameter & constructor shape") |
+| value object | `<Entity>Id` / `<Entity>IdSchema`, `<Entity>Name` / `<Entity>NameSchema` |
+| combined error union | `<Entity>Error` (from `application/<entity>-public.ts`) |
 | compose function | `compose<Entity>Module` |
 | module options | `<Entity>ModuleOptions` |
 | module result type | `<Entity>Module` |
-| DB factory | `openDb` from `persistence/<entity>.db.ts` (package-private) |
+| DB factory | `openDb` from `infrastructure/drizzle/<entity>-db.ts` (package-private) |
 
 ### Internal types (NOT exported)
 
 | concept | name |
 | ------- | ---- |
-| Drizzle row | `<Entity>Row` |
-| Drizzle insert row | `New<Entity>Row` |
-| repository class | `<Entity>Repository` |
-| entity type/class | `<Entity>Entity` |
+| Drizzle row / insert row | `<Entity>Row` / `New<Entity>Row` |
+| entity class | `<Entity>Entity` |
+| bound mapper | `<Entity>Mapper` |
+| write repository (port / impl) | `<Entity>Repository` / `Drizzle<Entity>Repository` |
+| read queries (seam / impl) | `<Entity>Queries` / `Drizzle<Entity>Queries` |
 
 NEVER use these suffixes:
-- `Manager` — replaced by `Service`
-- `Queries` — merged into `Service`
-- `View` / `Pojo` / `Dto` — replaced by bare-noun DTO
+- `Manager` — use a use-case class or a named port.
+- `Service` — there is no per-BC service facade; expose use-cases.
+- `View` / `Pojo` / `Dto` — use the use-case `Response` type.
 
 ## Parameter & constructor shape
 
@@ -460,8 +500,7 @@ NEVER use these suffixes:
 Pass **positional** parameters for:
 
 - A single identifying primitive — almost always an `id` (or a path /
-  name acting as a key): `get(id)`, `open(id)`, `findById(id)`,
-  `findByPath(dir)`, `delete(id)`.
+  name acting as a key): `get(id)`, `delete(id)`, `findByPath(dir)`.
 - A second positional only when it too is a required *locating* primitive
   and the order is unambiguous: `resolveArtifactPath(id, name)`.
 - A pure function / projection / factory's single argument:
@@ -512,36 +551,39 @@ the `*Request` body.
 
 ### Constructors take one named-deps object
 
-Every `*Service`, `*Repository`, and anything assembled in `*.compose.ts`
-takes exactly one named object — `constructor(opts: <Name>Opts)` — even
-for a single dependency:
+Every use-case, `*Repository`, `*Queries`, and anything assembled in
+`<entity>-module.ts` takes exactly one named object —
+`constructor(opts: <Name>Deps)` — even for a single dependency:
 
 ```ts
-constructor(opts: { db: Db }) { this.db = opts.db; }   // repository, 1 dep
-constructor(opts: WorkspaceServiceOpts) { /* … */ }    // service, N deps
+constructor(opts: { db: Db }) { this.db = opts.db; }        // repository, 1 dep
+constructor(opts: RegisterWorkspaceDeps) { /* … */ }        // use-case, N deps
 ```
 
 A new dependency joins as a named field without reshuffling call sites,
 and tests override deps by name
-(`new SessionService({ ...opts, contentSource })`). The `*Opts` type is
-exported as the package's composition contract.
+(`new RegisterWorkspaceUseCase({ ...deps, provisioner })`). The `*Deps`
+type is the use-case's injection contract.
 
 The composition-root factory `compose*Module` takes its single argument
 as `*ModuleOptions` (`composeWorkspaceModule(opts: WorkspaceModuleOptions)`)
 — the fuller-word name used uniformly across every package's `compose.ts`.
 
-Error and value classes follow the native `Error` shape: positional
-`constructor(message, options?)` or positional identifying fields
-(`constructor(public readonly workspaceId: string)`).
+This does not apply to discriminated-union error atoms (plain
+`{ type, … }` object literals — no constructor) or to value objects
+(branded zod schemas). A rare error that must be a `class` follows the
+native `Error` positional shape.
 
 ### At the contract boundary
 
-`*Service` public methods present the object-first shape outward:
+A use-case's `execute()` presents the object-first shape outward:
 
-- **writes** accept `input: <Verb><Entity>Request`, optionally led by an
-  `id`: `register(input)`, `rename(id, input)`.
-- **reads** key off a positional `id` and return the bare-noun DTO
-  (`Workspace`) or a `*Response` envelope (`CurrentWorkspaceResponse`).
+- it accepts exactly one `request: <Verb><Entity>Request` — an
+  identifying `id` rides as a field of the request, not a separate
+  positional — parsed through `<Verb><Entity>RequestSchema` on entry.
+- it returns `UseCaseResult<<Verb><Entity>Response, <Verb><Entity>Error>`
+  (a `ResultAsync`); a read whose row is absent returns a nullable
+  `Response`.
 
 A public boundary method never takes multiple parallel primitives, a bare
 boolean, or a `*Row`.
@@ -550,10 +592,10 @@ boolean, or a `*Row`.
 
 > Applies to `@glyphs-ai/api`'s `wire/` surface — the wire / HTTP layer.
 > The `## Naming conventions` rules above govern *pkg-internal* types
-> (`*Row` / `*Entity` / bare-noun DTO). This section governs the
-> *cross-the-wire* types that live under `packages/api/src/wire/`: HTTP
-> request / response bodies and the per-endpoint projections of pkg
-> DTOs.
+> (`*Row` / `*Entity` / use-case `Request` / `Response`). This section
+> governs the *cross-the-wire* types that live under
+> `packages/api/src/wire/`: HTTP request / response bodies and the
+> per-endpoint projections of pkg types.
 
 The wire surface is **only** JSON-over-HTTP. Four rules govern wire type
 names:
@@ -663,104 +705,109 @@ the `Parent.Child` import friction a `namespace` introduces.
 
 ## Repository contract
 
-> glyph uses an **explicit Row → Entity → DTO split**: the Entity layer
-> makes the contract uniform, the row stays ORM-private, and the DTO
-> stays wire-stable.
+> glyph uses an explicit Row → Entity split for write operations and a
+> Row → read-projection split for flexible reads.
 
 ### The layers
 
-| Layer | Lives in | Suffix | Visibility | Role |
-|---|---|---|---|---|
-| **Row** | `persistence/tables.ts` | `*Row` | pkg-private; repository-internal; optional | Drizzle `$inferSelect` / `$inferInsert` shape; used only inside the repository to map to/from the entity |
-| **Entity** | `domain/<entity>.entity.ts` | `*Entity` | pkg-private (NOT re-exported from `index.ts`) | Pkg-owned domain shape, **hand-declared** — a `class` for rich BCs, a hand `interface` for anemic BCs. Never an alias of the row |
-| **DTO** | `contract/<entity>.types.ts` | **bare noun** (no suffix) | exported from `./contract` | Wire shape; what `<Entity>Service` returns; stable contract for HTTP / CLI / other pkgs |
+| Layer | Lives in | Visibility | Role |
+|---|---|---|---|
+| **Row** | `infrastructure/drizzle/<entity>-schema.ts` (`$inferSelect` / `$inferInsert`) | pkg-private; mapper-internal | Drizzle table shape; used only inside the mapper to convert to/from the entity |
+| **Entity** | `domain/<entity>-entity.ts` | pkg-owned (never re-exported from `index.ts`) | A `class` with private mutable state; transitions return `Result`. Never an alias of the row |
+| **Read projection** | per-use-case `application/<use-case>.ts` (`Response` schema) | exported via `index.ts` | Shaped directly from query rows; each read use-case projects its own `SELECT` result |
 
 ### The boundary rule (hard)
 
-> **The repository is an adapter.** Its public methods speak the domain
-> `<Entity>Entity` (and primitive ids) only: reads RETURN
-> `<Entity>Entity`, writes ACCEPT `<Entity>Entity`. The Drizzle
-> `<Entity>Row` / `New<Entity>Row` types MUST NOT appear in any public
-> signature — the repository maps row ↔ entity internally.
+> **The repository is the write-side adapter.** Its public methods speak only
+> domain `<Entity>Entity` and primitive ids. The repository exposes exactly
+> **three methods**: `get` / `save` / `delete`. The Row type NEVER appears in a
+> public signature — the bound mapper handles the conversion internally.
 >
-> **`<Entity>Service`'s public methods return the wire `<Entity>` DTO.**
+> **Reads do NOT go through the repository.** Read use-cases depend on the
+> `<Entity>Queries` seam (`infrastructure/drizzle/<entity>-queries.ts`), which
+> returns raw rows the use-case projects to its own `Response` type.
 
-### Mapping row ↔ entity — structural for anemic, explicit for rich
+### The bound mapper
 
-The domain Entity is **hand-declared**, never aliased from the table —
-even for an anemic BC where it coincides with the row today. The domain
-owns its contract; persistence owns the table; the repository bridges
-them:
+`infrastructure/drizzle/<entity>-mapper.ts` owns the bidirectional row ↔
+entity conversion, keeping mapping logic out of both the repository and the
+domain:
 
-```ts
-// domain/<entity>.entity.ts — domain-owned, no import from persistence
-export interface WorkspaceEntity {
-  readonly id: string;
-  readonly workspaceDir: string;
-  readonly name: string;
-  readonly createdAt: string;
-  readonly lastOpenedAt: string | null;
+```typescript
+// infrastructure/drizzle/<entity>-mapper.ts
+export const <Entity>Mapper = {
+  toDomain(row: <Entity>Row): <Entity>Entity {
+    return new <Entity>Entity({
+      id: row.id as <Entity>Id,
+      name: row.name as <Entity>Name,
+      createdAt: row.createdAt,
+      archived: row.archived,
+    });
+  },
+  toRow(entity: <Entity>Entity): <Entity>Row {
+    return { id: entity.id, name: entity.name, createdAt: entity.createdAt, archived: entity.archived };
+  },
+} as const;
+```
+
+The repository's `get` calls `<Entity>Mapper.toDomain(row)` on the way out;
+`save` calls `<Entity>Mapper.toRow(entity)` on the way in.
+
+### Rich entity = class with private fields + Result-returning transitions
+
+The entity is always a `class`. Private mutable fields are mutated only
+through entity methods; each transition that can fail returns `Result`:
+
+```typescript
+// domain/<entity>-entity.ts
+archive(): Result<void, <Entity>AlreadyArchived> {
+  if (this._archived) return err({ type: "<Entity>AlreadyArchived", id: this.id });
+  this._archived = true;
+  return ok(undefined);
 }
 ```
 
-For an **anemic BC** the row and entity coincide structurally, so the
-repository maps them implicitly — no helper, and no `*Row` types needed:
+The application layer never writes entity fields directly — it calls the
+entity method and propagates the `Result`.
 
-```ts
-async findById(id: string): Promise<WorkspaceEntity | undefined> {
-  return this.db.select().from(workspaces).where(eq(workspaces.id, id)).get();
-}
+### Read use-case: using the queries seam
 
-async insert(entity: WorkspaceEntity): Promise<void> {
-  this.db.insert(workspaces).values(entity).run();
-}
-```
+A read use-case receives `<Entity>Queries` and composes its own SELECT,
+projecting directly from the raw row:
 
-For a **rich BC** the entity is a `class`; the repository maps both
-directions explicitly with private helpers — `rowToEntity` on the way
-out, `entityToRowFields` on the way in.
-
-Similarly, when Entity → DTO is a trivial spread + 1-line normalisation,
-inline it at each service read call site rather than extracting a helper:
-
-```ts
-async getById(id: string): Promise<Workspace | null> {
-  const entity = await this.repo.findById(id);
-  return entity ? { ...entity, lastOpenedAt: entity.lastOpenedAt ?? entity.createdAt } : null;
+```typescript
+// application/get-<entity>.ts
+execute(request: Get<Entity>Request): UseCaseResult<Get<Entity>Response, Get<Entity>Error> {
+  const { id } = Get<Entity>RequestSchema.parse(request);
+  const q = this.deps.query;
+  return q.query<Get<Entity>Response>(async (db) => {
+    const row = await db.select().from(q.<entities>).where(eq(q.<entities>.id, id)).get();
+    return row
+      ? { id: row.id as <Entity>Id, name: row.name as <Entity>Name, createdAt: row.createdAt, archived: row.archived }
+      : null;
+  });
 }
 ```
 
-Extract a `rowToEntity` / `entityToDto` helper when:
-- Row gains columns that must NOT bleed into Entity (e.g. soft-delete
-  `deletedAt`), OR
-- Multiple service methods do the same non-trivial projection, OR
-- The projection is async / requires cross-pkg context (e.g.
-  `SessionEntity` + workdir computation + live runtime metadata →
-  `Session` DTO).
+The row is projected to the use-case's `Response` here; the domain entity
+is not involved in reads.
 
-### When Entity is a class (rich BC)
+## Use-cases, not a service facade
 
-Implement `domain/<entity>.entity.ts` as a `class` instead of a hand
-`interface` when the BC needs:
-- Non-trivial state transitions (`running → succeeded`)
-- Invariant validation on every mutation
-- Immutable functional updates (`entity.withMetadata(...)`)
+There is no single service facade class per BC. Every BC exposes one
+**use-case class per operation** in `application/` — `Create<Entity>UseCase`,
+`Get<Entity>UseCase`, `Archive<Entity>UseCase`, `List<Entity>sUseCase` — each
+owning its own `Request`/`Response` zod schema and `Error` union. The
+`compose<Entity>Module` function assembles them into a DI container that
+external callers receive.
 
-Repository still returns the Entity class instance; service projects to
-DTO at the wire boundary.
+Consumers call `module.<useCase>.execute(request)` and handle the
+`ResultAsync` it returns. There is no shared service state and no shared DTO
+schema across use-cases.
 
-## Single service per BC
-
-Every BC exposes exactly ONE public class:
-
-- **`<Entity>Service`** — both reads (list / get / lookup) and writes
-  (create / update / delete / state transitions). Returns DTOs.
-
-There is no separate `<Entity>Queries` class.
-
-If a downstream package only needs a narrow subset of methods, declare
-a small **capability interface** in the downstream package and depend
-on that, rather than importing the whole service type:
+If a downstream package only needs a narrow subset of capabilities, declare a
+small **capability interface** (port) in the downstream package and depend on
+that, rather than importing the whole module type:
 
 ```typescript
 // packages/runtime/src/types.ts — minimal surface for "resolve an agent"
@@ -770,60 +817,86 @@ export interface AgentContentSource {
 }
 ```
 
-The downstream pkg accepts `AgentContentSource`; the composition root
-passes a `CatalogService` instance (which structurally implements the
-interface). This is a real example from `@glyphs-ai/runtime`.
+The downstream package accepts `AgentContentSource`; the composition root
+passes an adapter that structurally implements the interface. This is a real
+example from `@glyphs-ai/runtime`.
 
 ## Composition root
 
-The composition root (`@glyphs-ai/api`'s `WorkspaceContextRegistry.load`)
-calls each `compose<Entity>Module({ dbFile, now? })` once per workspace
-and threads the `service` into downstream pkgs (either as-is or through
-a capability interface). The template compose function accepts only a
-real SQLite path and optional test seams; tests that need an in-memory DB
-pass `dbFile: ":memory:"`.
+`compose<Entity>Module({ dbFile })` in `<entity>-module.ts` is the single
+assembly point for the package. It:
 
-`src/<entity>.compose.ts` opens the database with `openDb(dbFile)`,
-constructs the private repository, constructs the public service, and
-returns `{ service, close }`. External callers do not pass a DB handle
-or instantiate repositories directly.
+1. opens the SQLite database with `openDb(dbFile)` (WAL + migrations applied);
+2. builds the write-side `Drizzle<Entity>Repository` and the read-side
+   `Drizzle<Entity>Queries` adapters;
+3. wires each use-case with only the deps it needs — `repo` for write
+   use-cases, `query` for read use-cases;
+4. returns a `<Entity>Module` DI container:
+   `{ create<Entity>, get<Entity>, archive<Entity>, list<Entity>s, close }`.
+
+External callers receive use-cases, not a service facade. They invoke
+`module.<useCase>.execute(request)` and never interact with the DB handle or
+repositories directly. Tests pass `dbFile: ":memory:"` to get an in-memory
+database running the production schema.
 
 ## Errors
 
-All public error classes live in `src/contract/<entity>.errors.ts`.
-Convention:
+All domain and application errors are **discriminated-union atoms** that flow
+through neverthrow `Result` / `ResultAsync` — they are never thrown for control
+flow and have no class hierarchy.
 
 ```typescript
-export class XxxError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "XxxError";
-  }
-}
+// domain/<entity>-repository.ts — repository error atoms
+export type DatabaseUnavailable = {
+  readonly type: "DatabaseUnavailable";
+  readonly cause: unknown;
+};
 
-export class XxxNotFoundError extends XxxError {
-  override readonly name = "XxxNotFoundError";
-  constructor(public readonly id: string) {
-    super(`Xxx "${id}" not found`);
-  }
-}
+export type <Entity>NotFound = {
+  readonly type: "<Entity>NotFound";
+  readonly id: <Entity>Id;
+};
 ```
 
-Two rules:
-1. Every BC has a base `<Entity>Error` class; specific errors extend it.
-   Same-realm callers can `catch (e) { if (e instanceof XxxError) … }`.
-2. Subclasses declare `override readonly name = "..."` with a literal
-   string equal to the class name. Do NOT use `this.name = new.target.name`
-   — bundlers can name-mangle the class and break it.
+Three tiers:
 
-Route / CLI layers should branch on `error.name` (string literal), NOT on
-`instanceof XxxError` — bundlers can split the class definition across
-chunks and `instanceof` will silently fail across package boundaries.
+1. **Domain atoms** — declared in `domain/<entity>-entity.ts` (state-transition
+   failures) or `domain/<entity>-repository.ts` (port errors). These represent
+   legitimate business outcomes callers must handle.
+2. **Technical fault** — `DatabaseUnavailable` is the one atom infrastructure
+   adapters produce when a driver throws. Only the infrastructure layer catches
+   third-party throws and converts them; domain and application never throw or
+   catch for control flow.
+3. **Request validation** — each use-case's `execute()` parses its zod
+   `RequestSchema` on entry; malformed input throws `ZodError`, which the
+   api/server boundary maps to HTTP 400. `ZodError` is not an application error
+   atom.
 
-Input format validation is not represented by package-specific error
-classes. It lives in zod schemas under `contract/`; service methods call
-`Schema.parse(...)`, and the api layer maps `ZodError` to a 400
-`ValidationError` envelope.
+Each use-case declares its own closed `Error` union:
+
+```typescript
+// application/archive-<entity>.ts
+export type Archive<Entity>Error = <Entity>AlreadyArchived | <Entity>NotFound | DatabaseUnavailable;
+```
+
+`application/<entity>-public.ts` re-exports the closed `<Entity>Error` union
+(all atoms combined) for consumers that handle any error from any use-case.
+
+Consumers branch on `err.type`, never `instanceof`:
+
+```typescript
+result.match(
+  (response) => { /* success */ },
+  (err) => {
+    switch (err.type) {
+      case "<Entity>NotFound":    return respond(404, err);
+      case "DatabaseUnavailable": return respond(503, err);
+    }
+  },
+);
+```
+
+The api/server boundary maps each atom to an HTTP status.
 
 ### Catch-block error normalization (inline only)
 
@@ -853,16 +926,17 @@ regenerate after a table-definition change:
 pnpm -F @glyphs-ai/<pkg> db:generate
 ```
 
-`drizzle.config.ts` points `schema:` at `./src/persistence/tables.ts`.
+`drizzle.config.ts` points `schema:` at
+`./src/infrastructure/drizzle/<entity>-schema.ts`.
 After drizzle-kit writes a new `drizzle/NNNN_*.sql`,
 `scripts/inline-migrations.mjs` regenerates
-`src/persistence/migrations.ts` so the SQL is embedded into the runtime
-bundle. The package's `db:generate` script runs both steps.
+`src/infrastructure/drizzle/<entity>-migrations.ts` so the SQL is embedded into
+the runtime bundle. The package's `db:generate` script runs both steps.
 
 The generated migrations file is not hand-maintained:
 
 ```ts
-// src/persistence/migrations.ts — generated by scripts/inline-migrations.mjs
+// src/infrastructure/drizzle/<entity>-migrations.ts — generated by scripts/inline-migrations.mjs
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { MigrationMeta } from "drizzle-orm/migrator";
 
@@ -877,8 +951,8 @@ export function applyXxxMigrations<T extends Record<string, unknown>>(
 }
 ```
 
-At runtime, `persistence/<entity>.db.ts` calls the generated applier from
-`openDb(dbFile)`, walking migrations in order and recording them in the
+At runtime, `infrastructure/drizzle/<entity>-db.ts` calls the generated applier
+from `openDb(dbFile)`, walking migrations in order and recording them in the
 pkg's `__drizzle_migrations_<pkg>` table. SQL is embedded as strings in
 the JS bundle — no filesystem reads at runtime. The same `openDb` path is
 used by tests with `":memory:"`, so in-memory DBs see the production
@@ -888,111 +962,76 @@ schema.
 
 ### When to split
 
-Default: keep one file per `<entity>.<role>.ts` (see naming convention above).
-
-Split a single file ONLY when BOTH conditions hold:
+Default: keep one file per concern. Split a single file ONLY when BOTH
+conditions hold:
 
 1. The file is **≥ 600 LOC**.
-2. The file genuinely contains **≥ 3 cohesive sub-concerns** (e.g. queries vs mutations vs lifecycle vs streaming).
+2. The file genuinely contains **≥ 3 cohesive sub-concerns** (e.g. queries vs
+   mutations vs lifecycle vs streaming).
 
-A pure 800-LOC validator (one concern) does NOT split. A 400-LOC service touching 5 concerns does NOT split (too small). A 700-LOC service with reads / writes / lifecycle / streaming DOES split.
+A pure 800-LOC module (one concern) does NOT split. A 400-LOC file touching 5
+concerns does NOT split (too small). A 700-LOC module with reads / writes /
+lifecycle / streaming DOES split.
+
+Use-cases in `application/` are already one file per concern, so the split
+pattern applies most often to large infrastructure modules or cross-entity
+orchestration helpers, not to individual use-case files.
 
 ### Layout: facade + sibling subdir
 
 ```
-packages/<pkg>/src/application/
-  <entity>.service.ts          ← facade (public entry, ≤ ~250 LOC)
-  <entity>.service/            ← subdir; basename MUST equal facade basename
-    <concern-1>.ts             ← bare concern name; no entity prefix needed
+packages/<pkg>/src/<layer>/
+  <file>.ts                ← facade (public entry, ≤ ~250 LOC)
+  <file>/                  ← sibling subdir; basename MUST equal facade basename
+    <concern-1>.ts         ← bare concern name; no extra prefix needed
     <concern-2>.ts
     …
 ```
 
-Reference skeleton: `packages/_template/_examples/split-layout/`.
-It demonstrates `__entity-kebab__.service.ts` next to
-`__entity-kebab__.service/` using placeholder names.
+See [§ Package-private utility files](#package-private-utility-files) for the
+`_` convention — delegates inside the subdir that are not meant to be reached
+even by the parent facade use the `_<topic>.ts` prefix.
 
 ### Hard rules
 
-> **Scope.** These 7 rules apply ONLY when a subdir has a sibling `.ts` / `.tsx` file at the parent level (the SPLIT pattern — e.g. `example.service.ts` next to `example.service/`). Subdirs without a sibling file (CATEGORY dirs — e.g. `packages/catalog/src/agent/`, `packages/catalog/src/facade/`, `packages/server/src/routes/`) are a separate, pre-existing organisational pattern and are unaffected by these rules; they MAY contain an `index.ts` barrel and follow the multi-entity / per-route conventions documented elsewhere on this page.
+> **Scope.** These rules apply ONLY when a subdir has a sibling `.ts` / `.tsx`
+> file at the parent level (the SPLIT pattern). Subdirs without a sibling file
+> (CATEGORY dirs — e.g. `packages/catalog/src/agent/`,
+> `packages/catalog/src/facade/`, `packages/server/src/routes/`) are a
+> separate, pre-existing organisational pattern and are unaffected by these
+> rules; they MAY contain an `index.ts` barrel and follow the multi-entity /
+> per-route conventions documented elsewhere on this page.
 
-1. **Subdir basename equals facade basename AND is a direct sibling.** `example.service.ts` ↔ `example.service/` in the same directory. Enforced mechanically — see the structural test in `packages/e2e/test/architecture/split-convention.test.ts`. The subdir MUST sit next to its facade; a subdir at any other path (e.g. `src/internal/<role>/`) is not a recognised SPLIT and forfeits the no-barrel and package-private guarantees this convention provides.
-2. **No barrel re-export** inside the subdir (no `<entity>.<role>/index.ts`). The facade composes via direct relative imports (`./example.service/queries.js` etc.). Enforced by the same structural test.
+1. **Subdir basename equals facade basename AND is a direct sibling.** `example.ts` ↔ `example/` in the same directory. Enforced mechanically — see the structural test in `packages/e2e/test/architecture/split-convention.test.ts`. The subdir MUST sit next to its facade; a subdir at any other path is not a recognised SPLIT.
+2. **No barrel re-export** inside the subdir (no `example/index.ts`). The facade composes via direct relative imports (`./example/queries.js` etc.). Enforced by the same structural test.
 3. **Subdir files are package-private.** They MUST NOT appear in the package's top-level `src/index.ts` barrel. The facade is the only public surface.
-4. **Concern files use bare names** (`queries.ts`, `mutations.ts`, `shutdown.ts`) — the subdir name already supplies the entity context. Do NOT prefix (`example.queries.ts` inside `example.service/` is wrong).
-5. **Each concern file ≤ ~450 LOC.** If a single concern grows beyond that, that concern itself needs further decomposition — but always keep at one level of nesting (do NOT nest `example.service/queries/by-id.ts`).
+4. **Concern files use bare names** (`queries.ts`, `mutations.ts`, `shutdown.ts`) — the subdir name already supplies context. Do NOT re-prefix with the parent file name.
+5. **Each concern file ≤ ~450 LOC.** If a single concern grows beyond that, decompose it further — but always keep at one level of nesting.
 6. **Facade stays ≤ ~250 LOC** and contains only: constructor, ctx-object construction, and 1-line delegates to internals.
-7. **Shared context.** The facade builds a `<Entity>ServiceCtx` (or similar) once and passes it to every internal — no `this`-casting, no widening of class field visibility. Each internal exports plain functions taking `(ctx, …args)` OR a small object that consumes ctx.
+7. **Shared context.** The facade builds a context object once and passes it to every internal — no field-visibility widening. Each internal exports plain functions taking `(ctx, …args)` OR a small object that consumes ctx.
 
-### On-disk reference example
-
-`packages/_template/_examples/split-layout/` contains a self-contained,
-fully-rule-compliant SPLIT skeleton with placeholder names — a
-copyable shape for contributors making their first split. The skeleton
-is **documentation that happens to be on disk**. It is NOT built, NOT
-typechecked under any tsconfig, NOT run by any test — the leading
-underscores on `_examples/` and `_template/` keep it out of the
-structural classifier in
-`packages/e2e/test/architecture/split-convention.test.ts`, and the
-scaffolder (`scripts/new-pkg.mjs`) skips this dir when copying so new
-packages do not inherit it.
-
-**Each hard rule mapped to its concrete artifact in the example:**
-
-| Rule | Demonstrated by |
-|------|-----------------|
-| **#1** Subdir basename equals facade basename AND is a direct sibling | `__entity-kebab__.service.ts` next to `__entity-kebab__.service/` in the same directory |
-| **#2** No barrel inside the subdir | The subdir contains `types.ts`, `queries.ts`, `mutations.ts`, `lifecycle.ts`, `_helpers.ts` — no `index.ts` |
-| **#3** Subdir files are package-private | The facade is the only thing a downstream `index.ts` would re-export; concern files are never named in the public barrel |
-| **#4** Concern files use bare names | `queries.ts`, `mutations.ts`, `lifecycle.ts` — no `__entity-kebab__.queries.ts` prefix |
-| **#5** Each concern file ≤ ~450 LOC; no nesting | The skeleton concerns stay tiny; there is no `queries/by-id.ts` subdir |
-| **#6** Facade ≤ ~250 LOC, only ctx construction + 1-line delegates | `__entity-kebab__.service.ts` does exactly that and stays under 100 LOC |
-| **#7** Shared context | Facade builds `__Entity__ServiceCtx` once (defined in `__entity-kebab__.service/types.ts`) and passes it to every concern function. No `this`-casting, no field-visibility widening |
-
-The `_helpers.ts` file inside the subdir demonstrates the
-package-private utility seam: extract a helper there when **the same
-logic appears in two or more concern files** (e.g. an ISO-timestamp
-parser used by both `queries.ts` and `mutations.ts`). The leading `_`
-on the filename is the same "package-private utility" signal as the
-top-level `_shared.ts` files cited under "When NOT to use this
-pattern" below. If a helper is used inside only one concern, keep it
-private to that concern instead.
-
-### Applying the convention
-
-When your real `<entity>.service.ts` outgrows the 600 LOC / 3-concern
-thresholds:
-
-1. **Copy the structure, not the content** from
-   `packages/_template/_examples/split-layout/` into your package's
-   `src/application/` (the facade file + the matching subdir + the
-   concern peer files). Do not copy the placeholder file bodies — write
-   your own logic.
-2. **Rename the placeholders.** Search-and-replace
-   `__entity-kebab__` → your kebab-case entity name (e.g. `task`), and
-   `__Entity__` → your `PascalCase` entity name (e.g. `Task`). The
-   scaffolder's token substitution recipe is documented in
-   `scripts/new-pkg.mjs`.
-3. **Move methods into the appropriate concern peer file.** One concern
-   at a time: cut the read methods into `queries.ts`, the write methods
-   into `mutations.ts`, the lifecycle hooks into `lifecycle.ts`. Each
-   function takes `(ctx, …args)` as its first parameter. The facade keeps
-   only constructor + ctx-build + 1-line delegates.
-4. **Register the new SPLIT** — see § Migration of existing big files
-   below for the exact `REQUIRED_SPLITS` /
-   `EXPECTED_CATEGORY_DIRS_AT_CONVENTION_INTRODUCTION` updates.
+A `_helpers.ts` file inside the subdir demonstrates the package-private utility
+seam: extract a helper there when **the same logic appears in two or more
+concern files**. The leading `_` on the filename is the same "package-private
+utility" signal as the top-level `_shared.ts` files cited under
+"When NOT to use this pattern" below. If a helper is used inside only one
+concern, keep it private to that concern instead.
 
 ### When NOT to use this pattern
 
-- **Cross-entity shared infrastructure** → use a `_shared.ts` file (or a `_*` subdir) — the structural test skips any directory whose name starts with `_`, and treats `_`-prefixed files as ordinary peer modules outside any SPLIT registry. The leading underscore signals "package-private utility, not a facade-split peer".
-- **Component organisation** (e.g. a page + its sub-components) → `packages/dashboard/src/components/tasks/TaskDetail.tsx` + `TaskDetail/` already does this; it is a related but distinct pattern (the subdir contains presentational sub-components, not concern splits of one class). The same structural rules (no `index.tsx` barrel, exact-case sibling) apply.
-- **Different concerns belonging to different services** in the same package → keep them as separate top-level `<entity>.<role>.ts` files in the appropriate layer.
+- **Cross-entity shared infrastructure** → use a `_shared.ts` file (or a `_*` subdir) — the structural test skips any directory whose name starts with `_`, and treats `_`-prefixed files as ordinary peer modules outside any SPLIT registry.
+- **Component organisation** (e.g. a page + its sub-components) → `packages/dashboard/src/components/tasks/TaskDetail.tsx` + `TaskDetail/` already does this; it is a related but distinct pattern. The same structural rules (no `index.tsx` barrel, exact-case sibling) apply.
+- **Different concerns belonging to different files** in the same package → keep them as separate top-level files in the appropriate layer.
 
 ### Migration of existing big files
 
-Pre-existing big files do NOT need preemptive splitting. Apply this convention WHEN a refactor of that file is otherwise needed (e.g. a feature change, a bug fix that touches many sections, an audit-flagged improvement). PRs that opportunistically split should reference this section in the PR body.
+Pre-existing big files do NOT need preemptive splitting. Apply this convention
+WHEN a refactor of that file is otherwise needed (e.g. a feature change, a bug
+fix that touches many sections, an audit-flagged improvement).
 
-**Registry maintenance (mandatory).** When you split a previously-flat file under this convention, also update `packages/e2e/test/architecture/split-convention.test.ts`:
+**Registry maintenance (mandatory).** When you split a previously-flat file
+under this convention, also update
+`packages/e2e/test/architecture/split-convention.test.ts`:
 
 - Add the new subdir's repo-relative path to `REQUIRED_SPLITS` so future PRs cannot silently delete the facade (the structural test asserts every entry still classifies as SPLIT). If you remove or collapse a SPLIT, drop the entry in the same PR — the test treats `REQUIRED_SPLITS` as the *exact* set of on-disk SPLITs and will fail on either drift direction.
 - Remove the subdir from `EXPECTED_CATEGORY_DIRS_AT_CONVENTION_INTRODUCTION` if it was previously a CATEGORY (the SPLIT promotion turns the same path into a SPLIT, so leaving it in the snapshot would trip the "must still be CATEGORY" assertion).
@@ -1013,7 +1052,7 @@ If the BC owns a directory layout under a root the composer hands it
 layer-local `paths.ts` that centralizes the path math:
 
 ```typescript
-// src/application/paths.ts or src/persistence/paths.ts, depending on the owner
+// src/infrastructure/<entity>-paths.ts — the layer that owns the path math
 import path from "node:path";
 
 export function xxxDir(root: string, id: string): string {
@@ -1036,61 +1075,61 @@ The guard is a few lines of security-critical path math and each BC owns
 its own root invariant; keep the copies in lockstep and do not reach
 across BCs for it.
 
-### Multi-entity BCs → one set of four layers, entities namespaced by file prefix
+### Multi-entity BCs → domain/application/infrastructure layers, entities namespaced by file prefix
 
 A BC that owns more than one rich entity participating in cross-entity
 orchestration (catalog owns Agent + Skill + Mcp) keeps the SAME top-level
-four layers as a single-entity package. Entities are namespaced inside
-each layer by the `<entity>.` file prefix — there is no per-entity subtree
-(`agent/domain/…`). The dot prefix (see § File naming convention) already
-makes every file's class location unique.
+domain/application/infrastructure layers as a single-entity package. Entities
+are namespaced inside each layer by the `<entity>-` file prefix — there is no
+per-entity subtree (`agent/domain/…`). The hyphen-separated prefix (see § File
+naming convention) already makes every file's class location unique.
 
 ```
 src/
-  index.ts                       public barrel (facade service + compose + result types)
-  catalog.compose.ts             composeCatalogModule({ ... })
-
-  contract/
-    catalog.types.ts             cross-entity DTOs (bare nouns: Agent / Skill / Mcp)
-    catalog.errors.ts            cross-entity error base + facade errors
-    catalog.schemas.ts           cross-entity / install-body validators
-    agent.errors.ts              per-entity errors (skill / mcp mirror)
-    agent.schemas.ts             per-entity validators (skill / mcp mirror)
-    index.ts
+  index.ts                       public barrel (use-cases + compose + value objects; no export *)
+  catalog-module.ts              composeCatalogModule({ ... })
 
   domain/
-    agent.entity.ts              AgentEntity (internal; skill / mcp mirror)
-    agent.frontmatter.ts         entity-specific codec (mcp.format.ts, …)
-    catalog.dep-keys.ts          cross-entity domain helpers (origin grammar, …)
+    agent-entity.ts              AgentEntity (internal; skill / mcp mirror)
+    agent-id.ts                  AgentId value object (skill / mcp mirror)
+    agent-repository.ts          write-side repo port (skill / mcp mirror)
+    agent-frontmatter.ts         entity-specific codec (mcp.format.ts, …)
+    catalog-dep-keys.ts          cross-entity domain helpers (origin grammar, …)
 
   application/
-    agent.service.ts             per-entity write logic (internal; skill / mcp mirror)
-    catalog.service.ts           unified read+write facade across all entities
-    catalog.service/             facade split subdir (only past the split threshold)
-    catalog.projection.ts        cross-entity orchestration helpers (plan-types, pipeline, …)
+    use-case.ts
+    catalog-public.ts            named re-exports of cross-entity domain symbols
+    create-agent.ts              per-entity write use-cases (skill / mcp mirror)
+    get-agent.ts                 per-entity read use-cases (skill / mcp mirror)
+    list-agents.ts               per-entity list use-cases (skill / mcp mirror)
+    catalog-projection.ts        cross-entity orchestration helpers (plan-types, pipeline, …)
 
-  persistence/
-    tables.ts  migrations.ts  catalog.db.ts
-    agent.repository.ts          per-entity repository (skill / mcp mirror)
+  infrastructure/drizzle/
+    catalog-schema.ts            all table definitions + Row types
+    catalog-db.ts                openDb / Db type
+    catalog-migrations.ts        generated migration bundle
+    agent-mapper.ts              row ↔ entity mapper (skill / mcp mirror)
+    agent-repository.ts          write-side Drizzle adapter (skill / mcp mirror)
+    agent-queries.ts             read-side query seam (skill / mcp mirror)
 ```
 
-Naming follows one rule: cross-entity files take the bare-noun `catalog.`
-aggregate prefix (`catalog.service`, `catalog.projection`, `catalog.origin`);
-per-entity files take the `agent.` / `skill.` / `mcp.` prefix.
+Naming follows one rule: cross-entity files take the bare-noun `catalog-`
+aggregate prefix (`catalog-module`, `catalog-projection`, `catalog-dep-keys`);
+per-entity files take the `agent-` / `skill-` / `mcp-` prefix.
 
-The per-entity `<entity>.service.ts` classes are **internal** to the BC;
-they are not exported from the package barrel. External callers reach the
-BC through the facade (`index.ts`) and the DTOs / errors / schemas
-(`./contract`) only.
+Per-entity use-case classes are **internal** to the BC when not directly useful
+to external callers. External callers reach the BC through the
+`compose<Catalog>Module` container and the per-use-case request/response types
+exported from `index.ts`.
 
-An outbound infrastructure adapter that belongs to none of the four layers
+An outbound infrastructure adapter that belongs to none of the three layers
 (catalog's content `fetcher/` — origin URI → bytes) stays in its own
-top-level dir, a peer of `persistence/`.
+top-level dir, a peer of `infrastructure/`.
 
 ### Test seams (clock, randomness)
 
-Service constructors accept an optional `{ now?: () => Date; randomBytes?: (n: number) => Buffer }`
-opts object when the service touches the clock or generates ids. Pass
-fakes from tests; production callers omit the opts to get the real ones.
-The template's `__Entity__Service` shows the minimal `now?` pattern.
+A use-case or the compose function accepts an optional
+`{ now?: () => Date; randomBytes?: (n: number) => Buffer }` seam when it
+touches the clock or generates ids. Pass fakes from tests; production
+callers omit the opts to get the real ones.
 

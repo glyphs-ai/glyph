@@ -4,6 +4,7 @@ import { type MockProxy, mock } from "vitest-mock-extended";
 import { Archive__Entity__UseCase } from "../../src/application/archive-__entity-kebab__.js";
 import { __Entity__Entity } from "../../src/domain/__entity-kebab__-entity.js";
 import type { __Entity__Id } from "../../src/domain/__entity-kebab__-id.js";
+import type { __Entity__Name } from "../../src/domain/__entity-kebab__-name.js";
 import type { __Entity__Repository } from "../../src/domain/__entity-kebab__-repository.js";
 
 const ID = "11111111-1111-4111-8111-111111111111" as __Entity__Id;
@@ -11,7 +12,7 @@ const ID = "11111111-1111-4111-8111-111111111111" as __Entity__Id;
 function active(): __Entity__Entity {
   return new __Entity__Entity({
     id: ID,
-    name: "Demo",
+    name: "Demo" as __Entity__Name,
     createdAt: "2025-01-01T00:00:00.000Z",
     archived: false,
   });
@@ -48,7 +49,7 @@ describe("Archive__Entity__UseCase — error channel", () => {
       okAsync(
         new __Entity__Entity({
           id: ID,
-          name: "Demo",
+          name: "Demo" as __Entity__Name,
           createdAt: "2025-01-01T00:00:00.000Z",
           archived: true,
         }),

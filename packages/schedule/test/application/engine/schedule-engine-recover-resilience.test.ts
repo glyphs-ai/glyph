@@ -1,4 +1,4 @@
-import { errAsync, type ResultAsync } from "neverthrow";
+import { errAsync, okAsync, type ResultAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface CreateScheduleRequest {
@@ -54,9 +54,7 @@ describe("ScheduleService.recover resilience (P1 regression)", () => {
       randomUUID: fixedRandomUUID(VALID_UUIDS),
       taskHandler: makeStubHandler(),
     });
-    h.taskHandler.dispatch = async () => {
-      throw new Error("simulated dispatch failure");
-    };
+    h.taskHandler.dispatch = () => errAsync({ cause: new Error("simulated dispatch failure") });
     try {
       const plannedFireIso = "2026-05-01T18:00:00.000Z";
       const seeded = createEntity();
@@ -74,10 +72,11 @@ describe("ScheduleService.recover resilience (P1 regression)", () => {
   it("one row's failure does not abort recovery for remaining rows", async () => {
     const handler = makeStubHandler();
     let callCount = 0;
-    handler.dispatch = async (opts) => {
+    handler.dispatch = (opts) => {
       callCount++;
-      if (opts.scheduleId === VALID_UUIDS[0]) throw new Error("first row always fails");
-      return { id: `dispatch-${callCount}` };
+      if (opts.scheduleId === VALID_UUIDS[0])
+        return errAsync({ cause: new Error("first row always fails") });
+      return okAsync({ id: `dispatch-${callCount}` });
     };
     const h = await makeScheduleTestHandle({
       initialNow: new Date("2026-05-02T00:00:00.000Z"),

@@ -19,7 +19,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ErrorPolicy, RespondErrorOpts } from "../_http-errors.js";
 import { respondError } from "../_http-errors.js";
-import { TaskOperationError } from "../wiring/_task-operation-error.js";
+import { isTaskUnionError } from "../wiring/_task-operation-error.js";
 import {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
@@ -192,7 +192,7 @@ export function respondWorkflowError(c: Context, err: unknown, opts: RespondErro
   if (!isWorkflowRouteError(err)) {
     return respondError(c, err, { ...opts, policy: workflowsErrorPolicy });
   }
-  if (err.type === "NodeSpecError" && err.cause instanceof TaskOperationError) {
+  if (err.type === "NodeSpecError" && isTaskUnionError(err.cause)) {
     return respondError(c, err.cause, { ...opts, policy: workflowsErrorPolicy });
   }
   return respondError(c, withCode(err), { ...opts, policy: workflowsErrorPolicy });
@@ -200,8 +200,8 @@ export function respondWorkflowError(c: Context, err: unknown, opts: RespondErro
 
 export function workflowCustomDeleteBody(err: unknown): Record<string, unknown> | null {
   if (isWorkflowDeleteRequiresTerminal(err)) return workflowDeleteRequiresTerminalBody(err);
-  if (err instanceof TaskOperationError && err.code === "InvalidTransition") {
-    return taskErrorWireBody(err.detail as TaskRouteError, "delete");
+  if (isTaskUnionError(err) && err.type === "InvalidTransition") {
+    return taskErrorWireBody(err as unknown as TaskRouteError, "delete");
   }
   return null;
 }

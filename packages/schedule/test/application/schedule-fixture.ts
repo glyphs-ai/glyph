@@ -1,3 +1,4 @@
+import { okAsync } from "neverthrow";
 import type { Logger } from "pino";
 import pino from "pino";
 import type { ScheduleId } from "../../src/domain/schedule/schedule-id.js";
@@ -45,12 +46,12 @@ export function makeStubHandler(): StubHandler {
     set nextDispatchId(v: string) {
       overrideNextDispatchId = v;
     },
-    async validate(data, opts) {
+    validate(data, opts) {
       validateCalls.push({
         data,
         ...(opts?.changedKeys !== undefined ? { changedKeys: opts.changedKeys } : {}),
       });
-      return data;
+      return okAsync(data);
     },
     mergePatch(existing, patch) {
       mergePatchCalls.push({ existing, patch });
@@ -58,19 +59,19 @@ export function makeStubHandler(): StubHandler {
       const p = isRecord(patch) ? patch : {};
       return { data: { ...e, ...p }, changedKeys: Object.keys(p) };
     },
-    async dispatch(opts) {
+    dispatch(opts) {
       dispatchCalls.push(opts);
       seq += 1;
       const id = overrideNextDispatchId ?? `dispatch-${seq}`;
       overrideNextDispatchId = null;
-      return { id };
+      return okAsync({ id });
     },
-    async hasInFlightForSchedule(id) {
-      return inFlightSet.has(id);
+    hasInFlightForSchedule(id) {
+      return okAsync(inFlightSet.has(id));
     },
-    async deleteForSchedule(id) {
+    deleteForSchedule(id) {
       deleteCalls.push(id);
-      return deleteReturns.get(id) ?? { deletedCount: 0 };
+      return okAsync(deleteReturns.get(id) ?? { deletedCount: 0 });
     },
   };
   return stub;

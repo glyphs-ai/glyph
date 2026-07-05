@@ -1,25 +1,34 @@
-import { errAsync, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
-import { type MockProxy, mock } from "vitest-mock-extended";
+/**
+ * Read-path tests for `GetMcpUseCase`. Integration-style, matching the CQRS
+ * read seam: a real in-memory catalog db is seeded through the write
+ * repositories, then the use-case runs its `CatalogQueries` SELECT against it.
+ * Per-call `DatabaseUnavailable` propagation is covered centrally by the
+ * repository/queries layer, not re-asserted here.
+ */
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GetMcpUseCase } from "../../../src/application/mcp/get-mcp.js";
 import { AgentEntity } from "../../../src/domain/agent-entity.js";
 import type { AgentFqn } from "../../../src/domain/agent-fqn.js";
-import type { AgentRepository } from "../../../src/domain/agent-repository.js";
 import { McpEntity } from "../../../src/domain/mcp-entity.js";
 import type { McpFqn } from "../../../src/domain/mcp-fqn.js";
-import type { McpRepository } from "../../../src/domain/mcp-repository.js";
 import { SkillEntity } from "../../../src/domain/skill-entity.js";
 import type { SkillFqn } from "../../../src/domain/skill-fqn.js";
-import type { SkillRepository } from "../../../src/domain/skill-repository.js";
+import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
+import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
+import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-repository.js";
+import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
 
 const MCP_ID = "azure/mcp" as McpFqn;
+const ORIGIN = "file://catalog/azure.json";
 const INSTALLED_AT = "2025-01-01T00:00:00.000Z";
 const UPDATED_AT = "2025-01-02T00:00:00.000Z";
 
 function mcp(fqn: McpFqn = MCP_ID): McpEntity {
   return new McpEntity({
     fqn,
-    origin: "file://catalog/azure.json",
+    origin: ORIGIN,
     spec: '{"_meta":{"name":"azure/mcp"}}',
     installedAt: INSTALLED_AT,
     updatedAt: UPDATED_AT,
@@ -55,35 +64,39 @@ function skillUsing(mcps: readonly string[]): SkillEntity {
   });
 }
 
-let mcpRepo: MockProxy<McpRepository>;
-let agentRepo: MockProxy<AgentRepository>;
-let skillRepo: MockProxy<SkillRepository>;
+let db: Db;
+let close: () => void;
+let mcpRepo: DrizzleMcpRepository;
+let agentRepo: DrizzleAgentRepository;
+let skillRepo: DrizzleSkillRepository;
 let useCase: GetMcpUseCase;
 
 beforeEach(() => {
-  mcpRepo = mock<McpRepository>();
-  agentRepo = mock<AgentRepository>();
-  skillRepo = mock<SkillRepository>();
-  mcpRepo.get.mockReturnValue(errAsync({ type: "McpNotFound", fqn: MCP_ID }));
-  agentRepo.list.mockReturnValue(okAsync([]));
-  skillRepo.list.mockReturnValue(okAsync([]));
-  useCase = new GetMcpUseCase({ mcpRepo, agentRepo, skillRepo });
+  const opened = openDb(":memory:");
+  db = opened.db;
+  close = opened.close;
+  mcpRepo = new DrizzleMcpRepository({ db });
+  agentRepo = new DrizzleAgentRepository({ db });
+  skillRepo = new DrizzleSkillRepository({ db });
+  useCase = new GetMcpUseCase({ queries: new DrizzleCatalogQueries({ db }) });
+});
+
+afterEach(() => {
+  close();
 });
 
 describe("GetMcpUseCase — read paths", () => {
   it("propagates McpNotFound when the MCP is not installed", async () => {
     const res = await useCase.execute({ id: MCP_ID });
     expect(res._unsafeUnwrapErr()).toEqual({ type: "McpNotFound", fqn: MCP_ID });
-    expect(agentRepo.list).not.toHaveBeenCalled();
-    expect(skillRepo.list).not.toHaveBeenCalled();
   });
 
   it("returns the projected MCP DTO when found and unreferenced", async () => {
-    mcpRepo.get.mockReturnValue(okAsync(mcp()));
+    (await mcpRepo.save(mcp()))._unsafeUnwrap();
     const dto = (await useCase.execute({ id: MCP_ID }))._unsafeUnwrap();
     expect(dto).toEqual({
       fqn: MCP_ID,
-      origin: "file://catalog/azure.json",
+      origin: ORIGIN,
       orphaned: true,
       installedAt: INSTALLED_AT,
       updatedAt: UPDATED_AT,
@@ -91,44 +104,16 @@ describe("GetMcpUseCase — read paths", () => {
   });
 
   it("marks the MCP as not orphaned when an agent depends on it", async () => {
-    mcpRepo.get.mockReturnValue(okAsync(mcp()));
-    agentRepo.list.mockReturnValue(okAsync([agentUsing([MCP_ID])]));
+    (await mcpRepo.save(mcp()))._unsafeUnwrap();
+    (await agentRepo.save(agentUsing([MCP_ID])))._unsafeUnwrap();
     const dto = (await useCase.execute({ id: MCP_ID }))._unsafeUnwrap();
-    expect(dto?.orphaned).toBe(false);
+    expect(dto.orphaned).toBe(false);
   });
 
   it("marks the MCP as not orphaned when a skill depends on it", async () => {
-    mcpRepo.get.mockReturnValue(okAsync(mcp()));
-    skillRepo.list.mockReturnValue(okAsync([skillUsing([MCP_ID])]));
+    (await mcpRepo.save(mcp()))._unsafeUnwrap();
+    (await skillRepo.save(skillUsing([MCP_ID])))._unsafeUnwrap();
     const dto = (await useCase.execute({ id: MCP_ID }))._unsafeUnwrap();
-    expect(dto?.orphaned).toBe(false);
-  });
-});
-
-describe("GetMcpUseCase — error channel", () => {
-  it("DatabaseUnavailable propagated from mcpRepo.get", async () => {
-    mcpRepo.get.mockReturnValue(
-      errAsync({ type: "DatabaseUnavailable", cause: new Error("boom") }),
-    );
-    const res = await useCase.execute({ id: MCP_ID });
-    expect(res._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
-  });
-
-  it("DatabaseUnavailable propagated from agentRepo.list", async () => {
-    mcpRepo.get.mockReturnValue(okAsync(mcp()));
-    agentRepo.list.mockReturnValue(
-      errAsync({ type: "DatabaseUnavailable", cause: new Error("boom") }),
-    );
-    const res = await useCase.execute({ id: MCP_ID });
-    expect(res._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
-  });
-
-  it("DatabaseUnavailable propagated from skillRepo.list", async () => {
-    mcpRepo.get.mockReturnValue(okAsync(mcp()));
-    skillRepo.list.mockReturnValue(
-      errAsync({ type: "DatabaseUnavailable", cause: new Error("boom") }),
-    );
-    const res = await useCase.execute({ id: MCP_ID });
-    expect(res._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
+    expect(dto.orphaned).toBe(false);
   });
 });

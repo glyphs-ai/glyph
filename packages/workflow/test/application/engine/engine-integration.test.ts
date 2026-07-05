@@ -27,7 +27,7 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ok, ResultAsync } from "neverthrow";
+import { err, ok, okAsync, type Result, ResultAsync } from "neverthrow";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
@@ -90,37 +90,47 @@ function makeAutoSucceedRunner(label: string): RecordingRunner {
     },
     dispatchCalls,
     cancelCalls,
-    async validate(spec, _ctx: WorkflowNodeValidateCtx) {
-      return spec;
+    validate(spec, _ctx: WorkflowNodeValidateCtx) {
+      return okAsync(spec);
     },
-    async dispatch(opts) {
-      const dispatchKey = `${opts.workflowId}:${opts.nodeId}`;
-      if (seenDispatches.has(dispatchKey)) return;
-      seenDispatches.add(dispatchKey);
-      dispatchCalls.push({ workflowId: opts.workflowId, nodeId: opts.nodeId });
-      // Per-workflow first-dispatch gate (enforced HERE, before
-      // delegating to dispatchFn, so that test-overridden dispatch
-      // functions installed via setDispatch don't have to re-implement
-      // it). Subsequent dispatches for a workflow whose coord already
-      // auto-succeeded once are recorded but left in `running` —
-      // see the autoSucceededWorkflows comment above.
-      if (autoSucceededWorkflows.has(opts.workflowId)) {
-        return;
-      }
-      autoSucceededWorkflows.add(opts.workflowId);
-      return dispatchFn(opts);
+    dispatch(opts) {
+      return new ResultAsync(
+        (async (): Promise<Result<void, { readonly cause: unknown }>> => {
+          const dispatchKey = `${opts.workflowId}:${opts.nodeId}`;
+          if (seenDispatches.has(dispatchKey)) return ok(undefined);
+          seenDispatches.add(dispatchKey);
+          dispatchCalls.push({ workflowId: opts.workflowId, nodeId: opts.nodeId });
+          // Per-workflow first-dispatch gate (enforced HERE, before
+          // delegating to dispatchFn, so that test-overridden dispatch
+          // functions installed via setDispatch don't have to re-implement
+          // it). Subsequent dispatches for a workflow whose coord already
+          // auto-succeeded once are recorded but left in `running` —
+          // see the autoSucceededWorkflows comment above.
+          if (autoSucceededWorkflows.has(opts.workflowId)) {
+            return ok(undefined);
+          }
+          autoSucceededWorkflows.add(opts.workflowId);
+          try {
+            await dispatchFn(opts);
+          } catch (cause) {
+            return err({ cause });
+          }
+          return ok(undefined);
+        })(),
+      );
     },
-    async hasInFlightForNode(_nodeId) {
-      return false;
+    hasInFlightForNode(_nodeId) {
+      return okAsync(false);
     },
-    async cancel(nodeId) {
+    cancel(nodeId) {
       cancelCalls.push(nodeId);
+      return okAsync(undefined);
     },
-    async listArtifacts() {
-      return null;
+    listArtifacts() {
+      return okAsync(null);
     },
-    async resolveArtifactPath() {
-      return null;
+    resolveArtifactPath() {
+      return okAsync(null);
     },
   };
   return runner;
@@ -149,12 +159,12 @@ async function makeHarness(): Promise<Harness> {
       coordinator: coord,
       worker,
       human: {
-        validate: async (s) => s,
-        dispatch: async () => {},
-        hasInFlightForNode: async () => false,
-        cancel: async () => {},
-        listArtifacts: async () => null,
-        resolveArtifactPath: async () => null,
+        validate: (s) => okAsync(s),
+        dispatch: () => okAsync(undefined),
+        hasInFlightForNode: () => okAsync(false),
+        cancel: () => okAsync(undefined),
+        listArtifacts: () => okAsync(null),
+        resolveArtifactPath: () => okAsync(null),
       },
     },
     logger: silentLogger,
@@ -741,6 +751,7 @@ describe("WorkflowEngine integration", () => {
       2000,
       "coord succeeded",
     );
+    await waitUntil(() => h.coord.dispatchCalls.length >= 2, 2000, "retry coord dispatch settles");
     await h.module.engine.drain();
     const dispatchesBefore = h.coord.dispatchCalls.length;
     // Trigger after drain — should be a no-op.

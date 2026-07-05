@@ -5,12 +5,12 @@
  * `McpNotFound` is keyed by origin when nothing matches.
  */
 
+import { eq } from "drizzle-orm";
+import { errAsync, okAsync } from "neverthrow";
 import { z } from "zod";
-import type {
-  DatabaseUnavailable,
-  McpNotFound,
-  McpRepository,
-} from "../../domain/mcp-repository.js";
+import type { DatabaseUnavailable, McpNotFound } from "../../domain/mcp-repository.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
+import { mcps } from "../../infrastructure/drizzle/mcp-schema.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 
 export const GetMcpByOriginRequestSchema = z.object({
@@ -28,7 +28,7 @@ export type GetMcpByOriginResponse = z.infer<typeof GetMcpByOriginResponseSchema
 export type GetMcpByOriginError = McpNotFound | DatabaseUnavailable;
 
 export interface GetMcpByOriginDeps {
-  readonly mcpRepo: McpRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class GetMcpByOriginUseCase
@@ -39,8 +39,14 @@ export class GetMcpByOriginUseCase
   execute(
     request: GetMcpByOriginRequest,
   ): UseCaseResult<GetMcpByOriginResponse, GetMcpByOriginError> {
-    return this.deps.mcpRepo
-      .getByOrigin(request.origin)
-      .map((mcp) => ({ id: mcp.id, origin: mcp.origin, spec: mcp.spec }));
+    const { origin } = request;
+    return this.deps.queries
+      .query((db) => db.select().from(mcps).where(eq(mcps.origin, origin)).get())
+      .andThen(
+        (row): UseCaseResult<GetMcpByOriginResponse, GetMcpByOriginError> =>
+          row === undefined
+            ? errAsync({ type: "McpNotFound", fqn: origin })
+            : okAsync({ id: row.fqn, origin: row.origin, spec: row.spec }),
+      );
   }
 }

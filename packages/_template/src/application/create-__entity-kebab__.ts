@@ -2,18 +2,19 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { __Entity__Entity } from "../domain/__entity-kebab__-entity.js";
 import { type __Entity__Id, __Entity__IdSchema } from "../domain/__entity-kebab__-id.js";
+import { __Entity__NameSchema } from "../domain/__entity-kebab__-name.js";
 import type {
   __Entity__Repository,
   DatabaseUnavailable,
 } from "../domain/__entity-kebab__-repository.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-export const Create__Entity__RequestSchema = z.object({ name: z.string().min(1) }).strict();
+export const Create__Entity__RequestSchema = z.object({ name: __Entity__NameSchema }).strict();
 export type Create__Entity__Request = z.infer<typeof Create__Entity__RequestSchema>;
 
 export const Create__Entity__ResponseSchema = z.object({
   id: __Entity__IdSchema,
-  name: z.string(),
+  name: __Entity__NameSchema,
   createdAt: z.string(),
   archived: z.boolean(),
 });
@@ -35,13 +36,12 @@ export class Create__Entity__UseCase
     request: Create__Entity__Request,
   ): UseCaseResult<Create__Entity__Response, Create__Entity__Error> {
     const { name } = Create__Entity__RequestSchema.parse(request);
-    // Cast at the mint boundary: `randomUUID()` satisfies the UUID brand.
     const entity = __Entity__Entity.create({
       id: randomUUID() as __Entity__Id,
       name,
       now: new Date().toISOString(),
     });
-    return this.deps.repo.insert(entity).map(() => ({
+    return this.deps.repo.save(entity).map(() => ({
       id: entity.id,
       name: entity.name,
       createdAt: entity.createdAt,

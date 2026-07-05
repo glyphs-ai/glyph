@@ -8,11 +8,11 @@
  *   - `validate` is identity-by-default; tests swap `validateReturnValue` /
  *     `validateShouldThrow` to assert call args or simulate validate failures.
  *   - `dispatch` records the call (including the engine-supplied `onTerminal`
- *     callback) and returns `void`; the node stays `running` until the test
+ *     callback) and returns ok; the node stays `running` until the test
  *     drives termination by invoking the captured `onTerminal`. Setting
- *     `dispatchShouldThrow` makes the next dispatch throw.
+ *     `dispatchShouldThrow` makes the next dispatch err.
  *   - `hasInFlightForNode` reads from `inFlightSet` (defaults to `false`).
- *   - `cancel` records calls; throws when `cancelShouldThrow` is set (lets
+ *   - `cancel` records calls; errs when `cancelShouldThrow` is set (lets
  *     tests prove the substrate still marks the node cancelled even if the
  *     runner fails).
  */
@@ -21,6 +21,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { eq } from "drizzle-orm";
+import { errAsync, okAsync } from "neverthrow";
 import type { Logger } from "pino";
 import pino from "pino";
 import type {
@@ -92,12 +93,12 @@ export function makeStubRunner(): StubRunner {
     cancelShouldThrow: false,
     validateReturnValue: undefined,
     validateShouldThrow: null,
-    async validate(spec, ctx) {
+    validate(spec, ctx) {
       validateCalls.push({ spec, ctx });
-      if (stub.validateShouldThrow !== null) throw stub.validateShouldThrow;
-      return stub.validateReturnValue !== undefined ? stub.validateReturnValue : spec;
+      if (stub.validateShouldThrow !== null) return errAsync({ cause: stub.validateShouldThrow });
+      return okAsync(stub.validateReturnValue !== undefined ? stub.validateReturnValue : spec);
     },
-    async dispatch(opts: WorkflowNodeDispatchOpts) {
+    dispatch(opts: WorkflowNodeDispatchOpts) {
       dispatchCalls.push({
         workflowId: opts.workflowId,
         nodeId: opts.nodeId,
@@ -106,24 +107,26 @@ export function makeStubRunner(): StubRunner {
       });
       if (stub.dispatchShouldThrow) {
         stub.dispatchShouldThrow = false;
-        throw new Error("stub dispatch failure");
+        return errAsync({ cause: new Error("stub dispatch failure") });
       }
+      return okAsync(undefined);
     },
-    async hasInFlightForNode(nodeId) {
-      return inFlightSet.has(nodeId);
+    hasInFlightForNode(nodeId) {
+      return okAsync(inFlightSet.has(nodeId));
     },
-    async cancel(nodeId) {
+    cancel(nodeId) {
       cancelCalls.push(nodeId);
       if (stub.cancelShouldThrow) {
         stub.cancelShouldThrow = false;
-        throw new Error("stub cancel failure");
+        return errAsync({ cause: new Error("stub cancel failure") });
       }
+      return okAsync(undefined);
     },
-    async listArtifacts(nodeId) {
-      return artifactListings.get(nodeId) ?? null;
+    listArtifacts(nodeId) {
+      return okAsync(artifactListings.get(nodeId) ?? null);
     },
-    async resolveArtifactPath(nodeId, name) {
-      return artifactPaths.get(`${nodeId}:${name}`) ?? null;
+    resolveArtifactPath(nodeId, name) {
+      return okAsync(artifactPaths.get(`${nodeId}:${name}`) ?? null);
     },
   };
   return stub;

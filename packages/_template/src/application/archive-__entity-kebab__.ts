@@ -5,6 +5,7 @@ import type {
   __Entity__Entity,
 } from "../domain/__entity-kebab__-entity.js";
 import { __Entity__IdSchema } from "../domain/__entity-kebab__-id.js";
+import { __Entity__NameSchema } from "../domain/__entity-kebab__-name.js";
 import type {
   __Entity__NotFound,
   __Entity__Repository,
@@ -17,7 +18,7 @@ export type Archive__Entity__Request = z.infer<typeof Archive__Entity__RequestSc
 
 export const Archive__Entity__ResponseSchema = z.object({
   id: __Entity__IdSchema,
-  name: z.string(),
+  name: __Entity__NameSchema,
   createdAt: z.string(),
   archived: z.boolean(),
 });

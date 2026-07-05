@@ -1,4 +1,4 @@
-import { okAsync, ResultAsync } from "neverthrow";
+import { okAsync } from "neverthrow";
 import { z } from "zod";
 import { WorkflowNodeIdSchema } from "../domain/node/workflow-node-id.js";
 import type { WorkflowArtifactListingFailed } from "../domain/workflow/workflow-artifact.js";
@@ -66,13 +66,14 @@ export class ResolveWorkflowArtifactPathUseCase
     return getDag.execute({ workflowId }).andThen((snapshot) => {
       const node = snapshot.nodes.find((n) => n.id === ref.nodeId);
       if (node === undefined) return okAsync(null);
-      return ResultAsync.fromPromise(
-        runnerFor(this.deps.runners, node.kind).resolveArtifactPath(ref.nodeId, ref.relPath),
-        (cause): WorkflowArtifactListingFailed => ({
-          type: "WorkflowArtifactListingFailed",
-          cause,
-        }),
-      );
+      return runnerFor(this.deps.runners, node.kind)
+        .resolveArtifactPath(ref.nodeId, ref.relPath)
+        .mapErr(
+          (fault): WorkflowArtifactListingFailed => ({
+            type: "WorkflowArtifactListingFailed",
+            cause: fault.cause,
+          }),
+        );
     });
   }
 }

@@ -7,22 +7,22 @@
  * identical from there: fetch upstream, fetch local, diff by version/spec,
  * flag origin conflicts, compute orphans.
  *
- * Owns `CatalogPlan` (its Response). Apply consumes this Response verbatim.
+ * Local reads go through the read-side `CatalogQueries` seam; the write
+ * repositories are never touched here. Owns `CatalogPlan` (its Response);
+ * apply consumes this Response verbatim.
  */
 
-import { errAsync, ResultAsync } from "neverthrow";
+import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import { z } from "zod";
-import { type AgentFqn, AgentFqnSchema } from "../../domain/agent-fqn.js";
-import type {
-  AgentNotFound,
-  AgentRepository,
-  DatabaseUnavailable,
-} from "../../domain/agent-repository.js";
+import type { AgentNotFound, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import { CatalogKindSchema } from "../../domain/catalog-kind.js";
-import { type McpFqn, McpFqnSchema } from "../../domain/mcp-fqn.js";
-import type { McpNotFound, McpRepository } from "../../domain/mcp-repository.js";
-import { type SkillFqn, SkillFqnSchema } from "../../domain/skill-fqn.js";
-import type { SkillNotFound, SkillRepository } from "../../domain/skill-repository.js";
+import type { McpNotFound } from "../../domain/mcp-repository.js";
+import type { SkillNotFound } from "../../domain/skill-repository.js";
+import type { Db } from "../../infrastructure/drizzle/catalog-db.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
+import { selectAgentByFqn, selectAllAgents } from "../agent/agent-reads.js";
+import { selectMcpByFqn } from "../mcp/mcp-reads.js";
+import { selectAllSkills, selectSkillByFqn } from "../skill/skill-reads.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import {
   type CatalogConflict,
@@ -98,11 +98,7 @@ export type ResolvePlanError = SkillNotFound | AgentNotFound | McpNotFound | Dat
 export interface ResolvePlanDeps {
   readonly getUpstreamTree: GetUpstreamTreeUseCase;
   readonly getTree: GetTreeUseCase;
-  readonly repos: {
-    skill: SkillRepository;
-    agent: AgentRepository;
-    mcp: McpRepository;
-  };
+  readonly queries: CatalogQueries;
 }
 
 type CatalogKind = "skill" | "agent" | "mcp";
@@ -135,6 +131,13 @@ function indexByOrigin(graph: ResolvedGraph): Map<string, ResolvedNode> {
   return new Map(graph.nodes.map((n) => [n.origin, n]));
 }
 
+/** Installed origin for a dependency fqn, or `undefined` when not installed. */
+function originForFqn(db: Db, kind: CatalogKind, fqn: string): string | undefined {
+  if (kind === "skill") return selectSkillByFqn(db, fqn)?.origin;
+  if (kind === "agent") return selectAgentByFqn(db, fqn)?.origin;
+  return selectMcpByFqn(db, fqn)?.origin;
+}
+
 export class ResolvePlanUseCase
   implements UseCase<ResolvePlanRequest, ResolvePlanResponse, ResolvePlanError>
 {
@@ -152,36 +155,37 @@ export class ResolvePlanUseCase
    * installed entry is looked up to recover its origin.
    */
   private rootOrigin(request: ResolvePlanRequest): ResultAsync<string, ResolvePlanError> {
-    if (request.origin !== undefined)
-      return ResultAsync.fromSafePromise(Promise.resolve(request.origin));
+    if (request.origin !== undefined) return okAsync(request.origin);
     const raw = request.fqn ?? "";
-    if (request.kind === "skill") {
-      const fqn = SkillFqnSchema.safeParse(raw);
-      if (!fqn.success)
-        return errAsync<string, ResolvePlanError>({ type: "SkillNotFound", fqn: raw });
-      return this.deps.repos.skill.get(fqn.data).map((skill) => skill.origin);
-    }
-    if (request.kind === "agent") {
-      const fqn = AgentFqnSchema.safeParse(raw);
-      if (!fqn.success)
-        return errAsync<string, ResolvePlanError>({ type: "AgentNotFound", fqn: raw });
-      return this.deps.repos.agent.get(fqn.data).map((agent) => agent.origin);
-    }
-    const fqn = McpFqnSchema.safeParse(raw);
-    if (!fqn.success) return errAsync<string, ResolvePlanError>({ type: "McpNotFound", fqn: raw });
-    return this.deps.repos.mcp.get(fqn.data).map((mcp) => mcp.origin);
+    const kind = request.kind;
+    return this.deps.queries
+      .query((db) => originForFqn(db, kind, raw))
+      .andThen((origin): ResultAsync<string, ResolvePlanError> => {
+        if (origin !== undefined) return okAsync(origin);
+        if (kind === "skill")
+          return errAsync<string, ResolvePlanError>({ type: "SkillNotFound", fqn: raw });
+        if (kind === "agent")
+          return errAsync<string, ResolvePlanError>({ type: "AgentNotFound", fqn: raw });
+        return errAsync<string, ResolvePlanError>({ type: "McpNotFound", fqn: raw });
+      });
   }
 
   private async build(kind: CatalogKind, origin: string): Promise<ResolvePlanResponse> {
     const fetched = (await this.deps.getUpstreamTree.execute({ kind, origin }))._unsafeUnwrap();
-    const upstream = await this.flagOriginConflicts(fetched);
+    // A driver fault while flagging degrades to the unflagged graph (no
+    // conflicts surfaced), matching the previous swallow-and-continue policy.
+    const upstream = (
+      await this.deps.queries.query((db) => this.flagOriginConflicts(db, fetched))
+    ).unwrapOr(fetched);
     // getTree only fails on DatabaseUnavailable; an empty local graph (the
     // install case, nothing installed yet) resolves to ok with no nodes.
     const local = (await this.deps.getTree.execute({ origin })).unwrapOr({
       nodes: [],
       conflicts: [],
     });
-    const reverseDepIndex = await this.reverseDepIndex(origin);
+    const reverseDepIndex = (
+      await this.deps.queries.query((db) => this.reverseDepIndex(db, origin))
+    ).unwrapOr(new Set<string>());
     const diff = this.diff(upstream, local, origin, kind, reverseDepIndex);
     const settled =
       diff.toInstall.length === 0 &&
@@ -259,17 +263,18 @@ export class ResolvePlanUseCase
     return { toInstall, alreadyInstalled, orphans };
   }
 
-  private async flagOriginConflicts(graph: ResolvedGraph): Promise<ResolvedGraph> {
+  /** Flag upstream nodes whose fqn is installed under a DIFFERENT origin. */
+  private flagOriginConflicts(db: Db, graph: ResolvedGraph): ResolvedGraph {
     const conflicts: CatalogConflict[] = [...graph.conflicts];
     const nodes: ResolvedNode[] = [];
     for (const node of graph.nodes) {
       const existing =
         node.kind === "skill"
-          ? await this.deps.repos.skill.get(node.fqn as SkillFqn)
+          ? selectSkillByFqn(db, node.fqn)
           : node.kind === "agent"
-            ? await this.deps.repos.agent.get(node.fqn as AgentFqn)
-            : await this.deps.repos.mcp.get(node.fqn as McpFqn);
-      if (existing.isErr() || existing.value.origin === node.origin) {
+            ? selectAgentByFqn(db, node.fqn)
+            : selectMcpByFqn(db, node.fqn);
+      if (existing === undefined || existing.origin === node.origin) {
         nodes.push(node);
         continue;
       }
@@ -277,57 +282,32 @@ export class ResolvePlanUseCase
         kind: node.kind,
         origin: node.origin,
         fqn: node.fqn,
-        reason: { kind: "origin-conflict", existingOrigin: existing.value.origin },
+        reason: { kind: "origin-conflict", existingOrigin: existing.origin },
       });
     }
     return { nodes, conflicts };
   }
 
-  private async reverseDepIndex(rootOrigin: string): Promise<Set<string>> {
+  /** Origins referenced by any installed entry OTHER than the root. */
+  private reverseDepIndex(db: Db, rootOrigin: string): Set<string> {
     const referenced = new Set<string>();
-    const skills = (await this.deps.repos.skill.list()).unwrapOr([]);
-    const agents = (await this.deps.repos.agent.list()).unwrapOr([]);
-    for (const skill of skills) {
+    const addOrigins = (kind: CatalogKind, fqns: readonly string[]): void => {
+      for (const fqn of fqns) {
+        const origin = originForFqn(db, kind, fqn);
+        if (origin !== undefined) referenced.add(origin);
+      }
+    };
+    for (const skill of selectAllSkills(db)) {
       if (skill.origin === rootOrigin) continue;
-      for (const origin of await this.skillOrigins(skill.dependencyRefs.skills))
-        referenced.add(origin);
-      for (const origin of await this.mcpOrigins(skill.dependencyRefs.mcps)) referenced.add(origin);
+      addOrigins("skill", skill.dependencyRefs.skills);
+      addOrigins("mcp", skill.dependencyRefs.mcps);
     }
-    for (const agent of agents) {
+    for (const agent of selectAllAgents(db)) {
       if (agent.origin === rootOrigin) continue;
-      for (const origin of await this.skillOrigins(agent.dependencyRefs.skills))
-        referenced.add(origin);
-      for (const origin of await this.mcpOrigins(agent.dependencyRefs.mcps)) referenced.add(origin);
-      for (const origin of await this.agentOrigins(agent.dependencyRefs.agents))
-        referenced.add(origin);
+      addOrigins("skill", agent.dependencyRefs.skills);
+      addOrigins("mcp", agent.dependencyRefs.mcps);
+      addOrigins("agent", agent.dependencyRefs.agents);
     }
     return referenced;
-  }
-
-  private async skillOrigins(fqns: readonly string[]): Promise<string[]> {
-    const out: string[] = [];
-    for (const fqn of fqns) {
-      const skill = await this.deps.repos.skill.get(fqn as SkillFqn);
-      if (skill.isOk()) out.push(skill.value.origin);
-    }
-    return out;
-  }
-
-  private async mcpOrigins(fqns: readonly string[]): Promise<string[]> {
-    const out: string[] = [];
-    for (const fqn of fqns) {
-      const mcp = await this.deps.repos.mcp.get(fqn as McpFqn);
-      if (mcp.isOk()) out.push(mcp.value.origin);
-    }
-    return out;
-  }
-
-  private async agentOrigins(fqns: readonly string[]): Promise<string[]> {
-    const out: string[] = [];
-    for (const fqn of fqns) {
-      const agent = await this.deps.repos.agent.get(fqn as AgentFqn);
-      if (agent.isOk()) out.push(agent.value.origin);
-    }
-    return out;
   }
 }

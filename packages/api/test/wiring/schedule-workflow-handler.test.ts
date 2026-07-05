@@ -9,7 +9,7 @@
  *     `dependencies.agents` dispatch menu)
  *   - `validate(data, { changedKeys })` SKIPs the catalog lookup when
  *     `coordinatorAgent` is not in `changedKeys` (patch-when-catalog-down)
- *   - `validate` throws `WorkflowScheduleTargetError` on unknown /
+ *   - `validate` returns `WorkflowTargetInvalid` on unknown /
  *     not-coord-eligible agent, but wraps catalog throws as task
  *     `AgentResolutionFailed` unions (→ 500 opaque)
  *   - `mergePatch` RFC 7396 semantics + `changedKeys` accuracy
@@ -25,15 +25,31 @@
 
 import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
-import { okAsync } from "neverthrow";
+import { okAsync, type ResultAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
-import { TaskOperationError } from "../../src/wiring/_task-operation-error.js";
-import {
-  makeWorkflowKindHandler,
-  WorkflowScheduleTargetError,
-} from "../../src/wiring/schedule-workflow-handler.js";
+import { makeWorkflowKindHandler } from "../../src/wiring/schedule-workflow-handler.js";
 
 type CatalogAgentLookup = Parameters<typeof makeWorkflowKindHandler>[0]["catalog"];
+
+async function expectOk<T, E>(resultLike: ResultAsync<T, E>): Promise<T> {
+  const result = await resultLike;
+  expect(result.isOk()).toBe(true);
+  return result._unsafeUnwrap();
+}
+
+async function expectErr<T, E>(resultLike: ResultAsync<T, E>): Promise<E> {
+  const result = await resultLike;
+  expect(result.isErr()).toBe(true);
+  return result._unsafeUnwrapErr();
+}
+
+async function expectWorkflowTargetInvalid(
+  resultLike: ResultAsync<unknown, { readonly cause: unknown }>,
+  message: string,
+): Promise<void> {
+  const fault = await expectErr(resultLike);
+  expect(fault.cause).toEqual({ type: "WorkflowTargetInvalid", message });
+}
 
 const COORD_OK = { name: "coord", dependencies: { agents: ["worker"] } };
 
@@ -137,70 +153,86 @@ function makeHandler(deps: ReturnType<typeof stubDeps>) {
 describe("makeWorkflowKindHandler.validate — shape checks", () => {
   it("accepts a minimal valid payload (coordinatorAgent + brief)", async () => {
     const h = makeHandler(stubDeps());
-    const result = await h.validate({ coordinatorAgent: "coord", brief: "do x" });
+    const result = await expectOk(h.validate({ coordinatorAgent: "coord", brief: "do x" }));
     expect(result).toEqual({ coordinatorAgent: "coord", brief: "do x" });
   });
 
   it("preserves details when provided", async () => {
     const h = makeHandler(stubDeps());
-    const result = await h.validate({
-      coordinatorAgent: "coord",
-      brief: "do x",
-      details: "long body",
-    });
+    const result = await expectOk(
+      h.validate({
+        coordinatorAgent: "coord",
+        brief: "do x",
+        details: "long body",
+      }),
+    );
     expect(result).toEqual({ coordinatorAgent: "coord", brief: "do x", details: "long body" });
   });
 
   it("rejects non-object data", async () => {
     const h = makeHandler(stubDeps());
-    await expect(h.validate(null)).rejects.toBeInstanceOf(WorkflowScheduleTargetError);
-    await expect(h.validate("string")).rejects.toBeInstanceOf(WorkflowScheduleTargetError);
-    await expect(h.validate([1, 2])).rejects.toBeInstanceOf(WorkflowScheduleTargetError);
+    await expectWorkflowTargetInvalid(h.validate(null), "Workflow target data must be an object");
+    await expectWorkflowTargetInvalid(
+      h.validate("string"),
+      "Workflow target data must be an object",
+    );
+    await expectWorkflowTargetInvalid(h.validate([1, 2]), "Workflow target data must be an object");
   });
 
   it("rejects missing / empty coordinatorAgent", async () => {
     const h = makeHandler(stubDeps());
-    await expect(h.validate({ brief: "x" })).rejects.toBeInstanceOf(WorkflowScheduleTargetError);
-    await expect(h.validate({ coordinatorAgent: "", brief: "x" })).rejects.toBeInstanceOf(
-      WorkflowScheduleTargetError,
+    await expectWorkflowTargetInvalid(
+      h.validate({ brief: "x" }),
+      "Workflow target requires non-empty coordinatorAgent",
     );
-    await expect(h.validate({ coordinatorAgent: "   ", brief: "x" })).rejects.toBeInstanceOf(
-      WorkflowScheduleTargetError,
+    await expectWorkflowTargetInvalid(
+      h.validate({ coordinatorAgent: "", brief: "x" }),
+      "Workflow target requires non-empty coordinatorAgent",
+    );
+    await expectWorkflowTargetInvalid(
+      h.validate({ coordinatorAgent: "   ", brief: "x" }),
+      "Workflow target requires non-empty coordinatorAgent",
     );
   });
 
   it("rejects missing / empty brief", async () => {
     const h = makeHandler(stubDeps());
-    await expect(h.validate({ coordinatorAgent: "coord" })).rejects.toBeInstanceOf(
-      WorkflowScheduleTargetError,
+    await expectWorkflowTargetInvalid(
+      h.validate({ coordinatorAgent: "coord" }),
+      "Workflow target Invalid input: expected string, received undefined",
     );
-    await expect(h.validate({ coordinatorAgent: "coord", brief: "" })).rejects.toBeInstanceOf(
-      WorkflowScheduleTargetError,
+    await expectWorkflowTargetInvalid(
+      h.validate({ coordinatorAgent: "coord", brief: "" }),
+      "Workflow target brief must be non-empty after trim",
     );
   });
 
   it("rejects multi-line brief", async () => {
     const h = makeHandler(stubDeps());
-    await expect(
+    await expectWorkflowTargetInvalid(
       h.validate({ coordinatorAgent: "coord", brief: "line1\nline2" }),
-    ).rejects.toBeInstanceOf(WorkflowScheduleTargetError);
-    await expect(
+      "Workflow target brief must be a single line (no newline characters); pass long content via details",
+    );
+    await expectWorkflowTargetInvalid(
       h.validate({ coordinatorAgent: "coord", brief: "line1\rline2" }),
-    ).rejects.toBeInstanceOf(WorkflowScheduleTargetError);
+      "Workflow target brief must be a single line (no newline characters); pass long content via details",
+    );
   });
 
   it("rejects brief > 200 chars", async () => {
     const h = makeHandler(stubDeps());
-    await expect(
+    await expectWorkflowTargetInvalid(
       h.validate({ coordinatorAgent: "coord", brief: "x".repeat(201) }),
-    ).rejects.toBeInstanceOf(WorkflowScheduleTargetError);
+      "Workflow target brief must be 200 characters or fewer",
+    );
   });
 
   it("rejects non-string details", async () => {
     const h = makeHandler(stubDeps());
-    await expect(
+    await expectWorkflowTargetInvalid(
       h.validate({ coordinatorAgent: "coord", brief: "b", details: 123 }),
-    ).rejects.toBeInstanceOf(WorkflowScheduleTargetError);
+      "Workflow target details, when set, must be a string",
+    );
   });
 });
 
@@ -208,7 +240,7 @@ describe("makeWorkflowKindHandler.validate — catalog cross-check + coord-eligi
   it("calls catalog.getAgent on the full validate path (no changedKeys)", async () => {
     const deps = stubDeps({ agent: COORD_OK });
     const h = makeHandler(deps);
-    await h.validate({ coordinatorAgent: "coord", brief: "x" });
+    await expectOk(h.validate({ coordinatorAgent: "coord", brief: "x" }));
     expect(deps.getAgent).toHaveBeenCalledTimes(1);
     expect(deps.getAgent).toHaveBeenCalledWith("coord");
   });
@@ -216,60 +248,55 @@ describe("makeWorkflowKindHandler.validate — catalog cross-check + coord-eligi
   it("SKIPS catalog.getAgent when changedKeys excludes 'coordinatorAgent'", async () => {
     const deps = stubDeps({ agent: COORD_OK });
     const h = makeHandler(deps);
-    await h.validate({ coordinatorAgent: "coord", brief: "new brief" }, { changedKeys: ["brief"] });
+    await expectOk(
+      h.validate({ coordinatorAgent: "coord", brief: "new brief" }, { changedKeys: ["brief"] }),
+    );
     expect(deps.getAgent).not.toHaveBeenCalled();
   });
 
   it("DOES call catalog.getAgent when changedKeys includes 'coordinatorAgent'", async () => {
     const deps = stubDeps({ agent: COORD_OK });
     const h = makeHandler(deps);
-    await h.validate(
-      { coordinatorAgent: "coord", brief: "x" },
-      { changedKeys: ["coordinatorAgent"] },
+    await expectOk(
+      h.validate({ coordinatorAgent: "coord", brief: "x" }, { changedKeys: ["coordinatorAgent"] }),
     );
     expect(deps.getAgent).toHaveBeenCalledTimes(1);
   });
 
-  it("throws WorkflowScheduleTargetError when the agent is unknown (catalog returns null)", async () => {
+  it("returns WorkflowTargetInvalid when the agent is unknown (catalog returns null)", async () => {
     const deps = stubDeps({ agent: null });
     const h = makeHandler(deps);
-    await expect(h.validate({ coordinatorAgent: "ghost", brief: "x" })).rejects.toBeInstanceOf(
-      WorkflowScheduleTargetError,
+    await expectWorkflowTargetInvalid(
+      h.validate({ coordinatorAgent: "ghost", brief: "x" }),
+      'Coordinator agent "ghost" not found in catalog',
     );
   });
 
-  it("throws WorkflowScheduleTargetError when the agent is not coord-eligible (empty menu)", async () => {
+  it("returns WorkflowTargetInvalid when the agent is not coord-eligible (empty menu)", async () => {
     const deps = stubDeps({ agent: { name: "leaf", dependencies: { agents: [] } } });
     const h = makeHandler(deps);
-    const err = await h.validate({ coordinatorAgent: "leaf", brief: "x" }).then(
-      () => null,
-      (e) => e,
+    await expectWorkflowTargetInvalid(
+      h.validate({ coordinatorAgent: "leaf", brief: "x" }),
+      'Agent "leaf" is not coordinator-eligible (no dependencies.agents dispatch menu)',
     );
-    expect(err).toBeInstanceOf(WorkflowScheduleTargetError);
-    expect((err as Error).message).toMatch(/coordinator-eligible/);
   });
 
   it("treats a missing dependencies.agents menu as not coord-eligible", async () => {
     const deps = stubDeps({ agent: { name: "bare" } });
     const h = makeHandler(deps);
-    await expect(h.validate({ coordinatorAgent: "bare", brief: "x" })).rejects.toBeInstanceOf(
-      WorkflowScheduleTargetError,
+    await expectWorkflowTargetInvalid(
+      h.validate({ coordinatorAgent: "bare", brief: "x" }),
+      'Agent "bare" is not coordinator-eligible (no dependencies.agents dispatch menu)',
     );
   });
 
-  it("throws task-pkg's AgentResolutionFailedError (NOT a 400 target error) when the catalog throws", async () => {
+  it("returns task-pkg's AgentResolutionFailed DU when the catalog throws", async () => {
     const deps = stubDeps({ getAgentThrows: new Error("catalog DB down") });
     const h = makeHandler(deps);
-    const err = await h.validate({ coordinatorAgent: "coord", brief: "x" }).then(
-      () => null,
-      (e) => e,
-    );
-    expect(err).toBeInstanceOf(TaskOperationError);
-    expect(err).not.toBeInstanceOf(WorkflowScheduleTargetError);
-    expect((err as TaskOperationError).code).toBe("AgentResolutionFailed");
-    expect((err as TaskOperationError).detail).toMatchObject({ agent: "coord" });
+    const fault = await expectErr(h.validate({ coordinatorAgent: "coord", brief: "x" }));
+    expect(fault.cause).toMatchObject({ type: "AgentResolutionFailed", agent: "coord" });
     // Must NOT echo the raw catalog error string back to the caller.
-    expect((err as Error).message).not.toMatch(/catalog DB down/);
+    expect(String(fault.cause)).not.toMatch(/catalog DB down/);
   });
 });
 
@@ -320,11 +347,13 @@ describe("makeWorkflowKindHandler.dispatch", () => {
   it("calls workflows.createWorkflow with origin/originId + metadata { firedAt } + returns { id }", async () => {
     const deps = stubDeps({ createReturn: { workflowId: "wf-001" } });
     const h = makeHandler(deps);
-    const out = await h.dispatch({
-      scheduleId: "sched-abc",
-      firedAt: "2026-06-01T00:00:00.000Z",
-      data: { coordinatorAgent: "coord", brief: "Ship it" },
-    });
+    const out = await expectOk(
+      h.dispatch({
+        scheduleId: "sched-abc",
+        firedAt: "2026-06-01T00:00:00.000Z",
+        data: { coordinatorAgent: "coord", brief: "Ship it" },
+      }),
+    );
     expect(out).toEqual({ id: "wf-001" });
     expect(deps.createWorkflow).toHaveBeenCalledTimes(1);
     const call = deps.createWorkflow.mock.calls[0]?.[0] as Record<string, unknown>;
@@ -338,11 +367,13 @@ describe("makeWorkflowKindHandler.dispatch", () => {
   it("conditional-spreads details (omits when not on data)", async () => {
     const deps = stubDeps();
     const h = makeHandler(deps);
-    await h.dispatch({
-      scheduleId: "s",
-      firedAt: "t",
-      data: { coordinatorAgent: "coord", brief: "b" },
-    });
+    await expectOk(
+      h.dispatch({
+        scheduleId: "s",
+        firedAt: "t",
+        data: { coordinatorAgent: "coord", brief: "b" },
+      }),
+    );
     const call = deps.createWorkflow.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(Object.hasOwn(call, "details")).toBe(false);
   });
@@ -350,11 +381,13 @@ describe("makeWorkflowKindHandler.dispatch", () => {
   it("forwards details when present", async () => {
     const deps = stubDeps();
     const h = makeHandler(deps);
-    await h.dispatch({
-      scheduleId: "s",
-      firedAt: "t",
-      data: { coordinatorAgent: "coord", brief: "b", details: "long" },
-    });
+    await expectOk(
+      h.dispatch({
+        scheduleId: "s",
+        firedAt: "t",
+        data: { coordinatorAgent: "coord", brief: "b", details: "long" },
+      }),
+    );
     const call = deps.createWorkflow.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(call.details).toBe("long");
   });
@@ -369,7 +402,7 @@ describe("makeWorkflowKindHandler.hasInFlightForSchedule", () => {
       ],
     });
     const h = makeHandler(deps);
-    expect(await h.hasInFlightForSchedule("sched-abc")).toBe(true);
+    expect(await expectOk(h.hasInFlightForSchedule("sched-abc"))).toBe(true);
   });
 
   it("ignores running workflows belonging to a different schedule", async () => {
@@ -377,7 +410,7 @@ describe("makeWorkflowKindHandler.hasInFlightForSchedule", () => {
       workflows: [{ id: "w2", status: "running", originId: "other" }],
     });
     const h = makeHandler(deps);
-    expect(await h.hasInFlightForSchedule("sched-abc")).toBe(false);
+    expect(await expectOk(h.hasInFlightForSchedule("sched-abc"))).toBe(false);
   });
 
   it("returns false when only terminal workflows belong to the schedule", async () => {
@@ -388,7 +421,7 @@ describe("makeWorkflowKindHandler.hasInFlightForSchedule", () => {
       ],
     });
     const h = makeHandler(deps);
-    expect(await h.hasInFlightForSchedule("sched-abc")).toBe(false);
+    expect(await expectOk(h.hasInFlightForSchedule("sched-abc"))).toBe(false);
   });
 });
 
@@ -407,7 +440,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
     });
     const h = makeHandler(deps);
 
-    const out = await h.deleteForSchedule("sched-abc");
+    const out = await expectOk(h.deleteForSchedule("sched-abc"));
     expect(out).toEqual({ deletedCount: 1 });
 
     // Both node-backing tasks purged.
@@ -428,7 +461,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
     });
     const h = makeHandler(deps);
 
-    const out = await h.deleteForSchedule("sched-abc");
+    const out = await expectOk(h.deleteForSchedule("sched-abc"));
     expect(out).toEqual({ deletedCount: 1 });
     expect(deps.deleteTask).toHaveBeenCalledTimes(1);
     expect(deps.deleteTask).toHaveBeenCalledWith({ id: "task-1", purge: true });
@@ -443,7 +476,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
     });
     const h = makeHandler(deps);
 
-    const out = await h.deleteForSchedule("sched-abc");
+    const out = await expectOk(h.deleteForSchedule("sched-abc"));
     // Nothing deleted — the run is left for a later sweep.
     expect(out).toEqual({ deletedCount: 0 });
     expect(deps.deleteTask).not.toHaveBeenCalled();
@@ -455,7 +488,7 @@ describe("makeWorkflowKindHandler.deleteForSchedule", () => {
       workflows: [{ id: "wf-live", status: "running", originId: "sched-abc" }],
     });
     const h = makeHandler(deps);
-    const out = await h.deleteForSchedule("sched-abc");
+    const out = await expectOk(h.deleteForSchedule("sched-abc"));
     expect(out).toEqual({ deletedCount: 0 });
     expect(deps.deleteWorkflow).not.toHaveBeenCalled();
   });

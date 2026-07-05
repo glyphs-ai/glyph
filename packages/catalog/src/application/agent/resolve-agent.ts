@@ -1,15 +1,16 @@
-import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import { errAsync, okAsync } from "neverthrow";
 import { z } from "zod";
 import { AgentFqnSchema } from "../../domain/agent-fqn.js";
-import type {
-  AgentNotFound,
-  AgentRepository,
-  DatabaseUnavailable,
-} from "../../domain/agent-repository.js";
-import type { McpRepository } from "../../domain/mcp-repository.js";
-import type { SkillEntity } from "../../domain/skill-entity.js";
-import type { SkillRepository } from "../../domain/skill-repository.js";
+import type { AgentNotFound, DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
+import { selectInstalledMcpFqns } from "../mcp/mcp-reads.js";
+import {
+  collectReferencedSkillFqns,
+  type SkillView,
+  selectAllSkills,
+} from "../skill/skill-reads.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
+import { selectAllAgents } from "./agent-reads.js";
 
 const DependencyRefSchema = z.object({ fqn: z.string() });
 
@@ -68,9 +69,7 @@ type ResolvedMcp = z.infer<typeof ResolvedMcpSchema>;
 export type ResolveAgentResponse = z.infer<typeof ResolveAgentResponseSchema>;
 export type ResolveAgentError = AgentNotFound | DatabaseUnavailable;
 export interface ResolveAgentDeps {
-  readonly agentRepo: AgentRepository;
-  readonly skillRepo: SkillRepository;
-  readonly mcpRepo: McpRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class ResolveAgentUseCase
@@ -79,113 +78,99 @@ export class ResolveAgentUseCase
   constructor(private readonly deps: ResolveAgentDeps) {}
 
   execute(request: ResolveAgentRequest): UseCaseResult<ResolveAgentResponse, ResolveAgentError> {
-    return ResultAsync.combine([
-      this.deps.agentRepo.list(),
-      this.deps.skillRepo.list(),
-      this.deps.mcpRepo.list(),
-    ]).andThen(([agents, skills, mcps]) => {
-      const root = agents.find((agent) => agent.fqn === request.id);
-      if (root === undefined)
-        return errAsync<ResolveAgentResponse, AgentNotFound>({
-          type: "AgentNotFound",
-          fqn: request.id,
-        });
+    const { id } = request;
+    return this.deps.queries
+      .query((db): ResolveAgentResponse | undefined => {
+        const agents = selectAllAgents(db);
+        const root = agents.find((agent) => agent.fqn === id);
+        if (root === undefined) return undefined;
 
-      const referencedSkillFqns = new Set<string>();
-      const referencedMcpFqns = new Set<string>();
-      for (const agent of agents) {
-        for (const fqn of agent.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-        for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-      }
-      for (const skill of skills) {
-        for (const fqn of skill.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-        for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-      }
-      const skillByFqn = new Map<string, SkillEntity>(
-        skills.map((skill) => [skill.fqn, skill] as const),
+        const skills = selectAllSkills(db);
+        const referencedSkillFqns = collectReferencedSkillFqns(db);
+        const installedMcpFqns = selectInstalledMcpFqns(db);
+        const skillByFqn = new Map<string, SkillView>(skills.map((skill) => [skill.fqn, skill]));
+
+        const visited = new Set<string>();
+        const orderedSkills: SkillView[] = [];
+        const mcpFqns = new Set<string>();
+        const walk = (skillDeps: readonly string[], mcpDeps: readonly string[]): void => {
+          for (const fqn of mcpDeps) {
+            if (installedMcpFqns.has(fqn)) mcpFqns.add(fqn);
+          }
+          for (const fqn of skillDeps) {
+            if (visited.has(fqn)) continue;
+            visited.add(fqn);
+            const skill = skillByFqn.get(fqn);
+            if (skill === undefined) continue;
+            walk(skill.dependencyRefs.skills, skill.dependencyRefs.mcps);
+            orderedSkills.push(skill);
+          }
+        };
+        walk(root.dependencyRefs.skills, root.dependencyRefs.mcps);
+
+        const agentDependencies =
+          root.dependencyRefs.skills.length > 0 ||
+          root.dependencyRefs.mcps.length > 0 ||
+          root.dependencyRefs.agents.length > 0
+            ? {
+                ...(root.dependencyRefs.skills.length > 0
+                  ? { skills: root.dependencyRefs.skills.map((fqn) => ({ fqn })) }
+                  : {}),
+                ...(root.dependencyRefs.mcps.length > 0
+                  ? { mcps: root.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
+                  : {}),
+                ...(root.dependencyRefs.agents.length > 0
+                  ? { agents: root.dependencyRefs.agents.map((fqn) => ({ fqn })) }
+                  : {}),
+              }
+            : undefined;
+
+        return {
+          agent: {
+            fqn: root.fqn,
+            origin: root.origin,
+            description: root.description,
+            version: root.version,
+            ...(root.prereqs !== undefined ? { prereqs: root.prereqs } : {}),
+            prereqsAck: root.prereqsAck,
+            disabledByUser: root.disabledByUser,
+            installedAt: root.installedAt,
+            updatedAt: root.updatedAt,
+            ...(agentDependencies !== undefined ? { dependencies: agentDependencies } : {}),
+          },
+          skills: orderedSkills.map<ResolvedSkill>((skill) => {
+            const dependencies =
+              skill.dependencyRefs.skills.length > 0 || skill.dependencyRefs.mcps.length > 0
+                ? {
+                    ...(skill.dependencyRefs.skills.length > 0
+                      ? { skills: skill.dependencyRefs.skills.map((fqn) => ({ fqn })) }
+                      : {}),
+                    ...(skill.dependencyRefs.mcps.length > 0
+                      ? { mcps: skill.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
+                      : {}),
+                  }
+                : undefined;
+            return {
+              skill: {
+                fqn: skill.fqn,
+                origin: skill.origin,
+                description: skill.description,
+                version: skill.version,
+                ...(skill.prereqs !== undefined ? { prereqs: skill.prereqs } : {}),
+                prereqsAck: skill.prereqsAck,
+                orphaned: !referencedSkillFqns.has(skill.fqn),
+                installedAt: skill.installedAt,
+                updatedAt: skill.updatedAt,
+                ...(dependencies !== undefined ? { dependencies } : {}),
+              },
+            };
+          }),
+          mcps: [...mcpFqns].map<ResolvedMcp>((fqn) => ({ fqn })),
+        };
+      })
+      .andThen(
+        (dto): UseCaseResult<ResolveAgentResponse, ResolveAgentError> =>
+          dto === undefined ? errAsync({ type: "AgentNotFound", fqn: id }) : okAsync(dto),
       );
-      const mcpByFqn = new Map<string, (typeof mcps)[number]>(
-        mcps.map((mcp) => [mcp.fqn, mcp] as const),
-      );
-
-      const visited = new Set<string>();
-      const orderedSkills: SkillEntity[] = [];
-      const mcpFqns = new Set<string>();
-      const walk = (skillDeps: readonly string[], mcpDeps: readonly string[]): void => {
-        for (const fqn of mcpDeps) {
-          const mcp = mcpByFqn.get(fqn);
-          if (mcp !== undefined) mcpFqns.add(mcp.fqn);
-        }
-        for (const fqn of skillDeps) {
-          if (visited.has(fqn)) continue;
-          visited.add(fqn);
-          const skill = skillByFqn.get(fqn);
-          if (skill === undefined) continue;
-          walk(skill.dependencyRefs.skills, skill.dependencyRefs.mcps);
-          orderedSkills.push(skill);
-        }
-      };
-      walk(root.dependencyRefs.skills, root.dependencyRefs.mcps);
-
-      const agentDependencies =
-        root.dependencyRefs.skills.length > 0 ||
-        root.dependencyRefs.mcps.length > 0 ||
-        root.dependencyRefs.agents.length > 0
-          ? {
-              ...(root.dependencyRefs.skills.length > 0
-                ? { skills: root.dependencyRefs.skills.map((fqn) => ({ fqn })) }
-                : {}),
-              ...(root.dependencyRefs.mcps.length > 0
-                ? { mcps: root.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
-                : {}),
-              ...(root.dependencyRefs.agents.length > 0
-                ? { agents: root.dependencyRefs.agents.map((fqn) => ({ fqn })) }
-                : {}),
-            }
-          : undefined;
-
-      return okAsync({
-        agent: {
-          fqn: root.fqn,
-          origin: root.origin,
-          description: root.description,
-          version: root.version,
-          ...(root.prereqs !== undefined ? { prereqs: root.prereqs } : {}),
-          prereqsAck: root.prereqsAck,
-          disabledByUser: root.disabledByUser,
-          installedAt: root.installedAt,
-          updatedAt: root.updatedAt,
-          ...(agentDependencies !== undefined ? { dependencies: agentDependencies } : {}),
-        },
-        skills: orderedSkills.map<ResolvedSkill>((skill) => {
-          const dependencies =
-            skill.dependencyRefs.skills.length > 0 || skill.dependencyRefs.mcps.length > 0
-              ? {
-                  ...(skill.dependencyRefs.skills.length > 0
-                    ? { skills: skill.dependencyRefs.skills.map((fqn) => ({ fqn })) }
-                    : {}),
-                  ...(skill.dependencyRefs.mcps.length > 0
-                    ? { mcps: skill.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
-                    : {}),
-                }
-              : undefined;
-          return {
-            skill: {
-              fqn: skill.fqn,
-              origin: skill.origin,
-              description: skill.description,
-              version: skill.version,
-              ...(skill.prereqs !== undefined ? { prereqs: skill.prereqs } : {}),
-              prereqsAck: skill.prereqsAck,
-              orphaned: !referencedSkillFqns.has(skill.fqn),
-              installedAt: skill.installedAt,
-              updatedAt: skill.updatedAt,
-              ...(dependencies !== undefined ? { dependencies } : {}),
-            },
-          };
-        }),
-        mcps: [...mcpFqns].map<ResolvedMcp>((fqn) => ({ fqn })),
-      });
-    });
   }
 }

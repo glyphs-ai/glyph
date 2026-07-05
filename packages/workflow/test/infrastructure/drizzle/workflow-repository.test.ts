@@ -9,7 +9,11 @@ import { WorkflowEntity } from "../../../src/domain/workflow/workflow-entity.js"
 import { type WorkflowId, WorkflowIdSchema } from "../../../src/domain/workflow/workflow-id.js";
 import { type Db, openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
 import { DrizzleWorkflowRepository } from "../../../src/infrastructure/drizzle/workflow-repository.js";
-import { workflows } from "../../../src/infrastructure/drizzle/workflow-schema.js";
+import {
+  workflowEdges,
+  workflowNodes,
+  workflows,
+} from "../../../src/infrastructure/drizzle/workflow-schema.js";
 
 const NOW = "2026-06-07T00:00:00.000Z";
 const NODE_UUIDS = [
@@ -78,9 +82,9 @@ afterEach(() => {
   close();
 });
 
-describe("DrizzleWorkflowRepository — insert / get round-trip", () => {
-  it("inserts a workflow + initial coord node and reads the aggregate back", async () => {
-    (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
+describe("DrizzleWorkflowRepository — save insert / get round-trip", () => {
+  it("saves a fresh workflow + initial coord node and reads the aggregate back", async () => {
+    (await repo.save(makeWorkflow(wfId(1))))._unsafeUnwrap();
     const got = (await repo.get(wfId(1)))._unsafeUnwrap();
     expect(got.id).toBe("20260607-00000001");
     expect(got.brief).toBe("b");
@@ -94,7 +98,7 @@ describe("DrizzleWorkflowRepository — insert / get round-trip", () => {
   it("round-trips nodes + edges for a frontier-valid iteration", async () => {
     const wf = makeWorkflow(wfId(1));
     addIteration(wf);
-    (await repo.insert(wf))._unsafeUnwrap();
+    (await repo.save(wf))._unsafeUnwrap();
     const got = (await repo.get(wfId(1)))._unsafeUnwrap();
     expect(got.nodes.map((n) => n.id).sort()).toEqual([nodeId(0), nodeId(1), nodeId(2)].sort());
     expect(got.edges).toHaveLength(3);
@@ -110,7 +114,7 @@ describe("DrizzleWorkflowRepository — insert / get round-trip", () => {
   });
 
   it("get surfaces WorkflowEntityCorruption for a row with an invalid status enum", async () => {
-    (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
+    (await repo.save(makeWorkflow(wfId(1))))._unsafeUnwrap();
     db.update(workflows)
       .set({ status: "bogus" })
       .where(eq(workflows.id, "20260607-00000001"))
@@ -123,7 +127,7 @@ describe("DrizzleWorkflowRepository — insert / get round-trip", () => {
 
 describe("DrizzleWorkflowRepository — save (snapshot diff)", () => {
   it("persists a header change (cancel) + its terminal payload", async () => {
-    (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
+    (await repo.save(makeWorkflow(wfId(1))))._unsafeUnwrap();
     const wf = (await repo.get(wfId(1)))._unsafeUnwrap();
     wf.cancel({ kind: "user", message: "stop" }, NOW)._unsafeUnwrap();
     (await repo.save(wf))._unsafeUnwrap();
@@ -134,7 +138,7 @@ describe("DrizzleWorkflowRepository — save (snapshot diff)", () => {
   });
 
   it("inserts newly added subgraph nodes on save", async () => {
-    (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
+    (await repo.save(makeWorkflow(wfId(1))))._unsafeUnwrap();
     const wf = (await repo.get(wfId(1)))._unsafeUnwrap();
     addIteration(wf);
     (await repo.save(wf))._unsafeUnwrap();
@@ -146,7 +150,7 @@ describe("DrizzleWorkflowRepository — save (snapshot diff)", () => {
   it("updates a node's lifecycle columns on save", async () => {
     const wf = makeWorkflow(wfId(1));
     addIteration(wf);
-    (await repo.insert(wf))._unsafeUnwrap();
+    (await repo.save(wf))._unsafeUnwrap();
     const loaded = (await repo.get(wfId(1)))._unsafeUnwrap();
     loaded.markNodeTerminal(nodeId(0), "succeeded", undefined, NOW)._unsafeUnwrap();
     loaded.markNodeRunning(nodeId(1), "2026-06-07T01:00:00.000Z")._unsafeUnwrap();
@@ -158,7 +162,7 @@ describe("DrizzleWorkflowRepository — save (snapshot diff)", () => {
   });
 
   it("adds subgraph edges on save", async () => {
-    (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
+    (await repo.save(makeWorkflow(wfId(1))))._unsafeUnwrap();
     const loaded = (await repo.get(wfId(1)))._unsafeUnwrap();
     addIteration(loaded);
     (await repo.save(loaded))._unsafeUnwrap();
@@ -169,23 +173,47 @@ describe("DrizzleWorkflowRepository — save (snapshot diff)", () => {
     expect(edges).toHaveLength(3);
   });
 
-  it("cascade-deletes the workflow + nodes + edges when the aggregate is marked deleted", async () => {
-    (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
-    const wf = (await repo.get(wfId(1)))._unsafeUnwrap();
-    wf.cancel({ kind: "user", message: "" }, NOW)._unsafeUnwrap();
-    wf.markDeleted()._unsafeUnwrap();
-    (await repo.save(wf))._unsafeUnwrap();
-    const r = await repo.get(wfId(1));
-    expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowNotFound");
-  });
-
   it("is a no-op when the aggregate has no changes since load", async () => {
-    (await repo.insert(makeWorkflow(wfId(1))))._unsafeUnwrap();
+    (await repo.save(makeWorkflow(wfId(1))))._unsafeUnwrap();
     const wf = (await repo.get(wfId(1)))._unsafeUnwrap();
     (await repo.save(wf))._unsafeUnwrap();
     const got = (await repo.get(wfId(1)))._unsafeUnwrap();
     expect(got.status).toBe("running");
     expect(got.nodes.map((n) => n.id)).toEqual([nodeId(0)]);
+  });
+});
+
+describe("DrizzleWorkflowRepository — delete", () => {
+  it("hard-deletes the workflow + nodes + edges", async () => {
+    const wf = makeWorkflow(wfId(1));
+    addIteration(wf);
+    (await repo.save(wf))._unsafeUnwrap();
+
+    (await repo.delete(wfId(1)))._unsafeUnwrap();
+
+    const r = await repo.get(wfId(1));
+    expect(r.isErr()).toBe(true);
+    expect(r._unsafeUnwrapErr().type).toBe("WorkflowNotFound");
+    expect(
+      db
+        .select()
+        .from(workflows)
+        .where(eq(workflows.id, wfId(1)))
+        .all(),
+    ).toEqual([]);
+    expect(
+      db
+        .select()
+        .from(workflowNodes)
+        .where(eq(workflowNodes.workflowId, wfId(1)))
+        .all(),
+    ).toEqual([]);
+    expect(
+      db
+        .select()
+        .from(workflowEdges)
+        .where(eq(workflowEdges.workflowId, wfId(1)))
+        .all(),
+    ).toEqual([]);
   });
 });

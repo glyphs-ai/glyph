@@ -1,13 +1,4 @@
-/**
- * Throw-based runner port for untrusted injected IO. The shipping runner
- * implementations live in `packages/api/src/wiring/` and bridge to
- * `@glyphs-ai/task` plus `@glyphs-ai/catalog`, which throw today; application
- * use-cases wrap this boundary with `ResultAsync.fromPromise(...)` and translate
- * thrown validation failures into domain atoms at the call site. Keeping this
- * port throw-based avoids adapter churn while preserving Result-native
- * application boundaries.
- */
-
+import type { ResultAsync } from "neverthrow";
 import type { WorkflowNodeKind } from "../../domain/node/workflow-node-kind.js";
 import type { WorkflowArtifactFile } from "../../domain/workflow/workflow-artifact.js";
 import type { WorkflowStatus } from "../../domain/workflow/workflow-status.js";
@@ -109,17 +100,22 @@ export interface WorkflowNodeArtifactListing {
  * coordinator/worker runners that adapt `@glyphs-ai/task` +
  * `@glyphs-ai/catalog` to this interface). The substrate pkg itself
  * never imports any of its callers.
+ *
+ * This is a Result-native adapter port. Each fallible call errs with a
+ * {@link RunnerFault} carrying the underlying cause; calling use-cases unwrap
+ * it and translate into their own atoms at the boundary. The substrate stays
+ * kind-agnostic — the fault is an opaque `cause`, never a kind-specific error
+ * type.
  */
 export interface WorkflowNodeRunner {
   /**
-   * Validate an inbound `spec` payload. MUST throw on invalid shape;
-   * MAY perform async side-effects (e.g. catalog existence lookup
-   * for an agent FQN). Returns the validated / normalized payload,
-   * which the substrate persists as `spec_json`. Implementations are
-   * free to normalize (trim, drop unknown keys); the returned value
-   * is what gets stored.
+   * Validate an inbound `spec` payload. Errs with {@link RunnerFault} on
+   * invalid shape; MAY perform async side-effects (e.g. catalog existence
+   * lookup for an agent FQN). Returns the validated / normalized payload, which
+   * the substrate persists as `spec_json`. Implementations are free to normalize
+   * (trim, drop unknown keys); the returned value is what gets stored.
    */
-  validate(spec: unknown, ctx: WorkflowNodeValidateCtx): Promise<unknown>;
+  validate(spec: unknown, ctx: WorkflowNodeValidateCtx): ResultAsync<unknown, RunnerFault>;
 
   /**
    * Fire the unit of work backing this node. Called by the substrate
@@ -155,7 +151,7 @@ export interface WorkflowNodeRunner {
    * denorm the substrate would have to keep in sync with the
    * unit-of-work side.)
    */
-  dispatch(opts: WorkflowNodeDispatchOpts): Promise<void>;
+  dispatch(opts: WorkflowNodeDispatchOpts): ResultAsync<void, RunnerFault>;
 
   /**
    * Whether this kind currently has a dispatched-but-incomplete
@@ -163,7 +159,7 @@ export interface WorkflowNodeRunner {
    * engine-restart recovery (`running` rows with no in-flight unit
    * get rolled back to `ready`).
    */
-  hasInFlightForNode(nodeId: string): Promise<boolean>;
+  hasInFlightForNode(nodeId: string): ResultAsync<boolean, RunnerFault>;
 
   /**
    * Cancel the in-flight unit-of-work for `nodeId`. Idempotent;
@@ -172,7 +168,7 @@ export interface WorkflowNodeRunner {
    * actually stopped — the unit may still complete after the cancel
    * returns, and its result will simply be discarded.
    */
-  cancel(nodeId: string): Promise<void>;
+  cancel(nodeId: string): ResultAsync<void, RunnerFault>;
 
   /**
    * List terminal per-node artifacts for the unit-of-work backing `nodeId`.
@@ -180,15 +176,23 @@ export interface WorkflowNodeRunner {
    * human runners return `null` because coordinator output is surfaced as
    * workflow-summary artifacts and human nodes have no task.
    */
-  listArtifacts(nodeId: string): Promise<WorkflowNodeArtifactListing | null>;
+  listArtifacts(nodeId: string): ResultAsync<WorkflowNodeArtifactListing | null, RunnerFault>;
 
   /**
    * Resolve one per-node artifact to an absolute filesystem path. Worker
    * runners delegate to the task artifact whitelist; coordinator and human
    * runners return `null`.
    */
-  resolveArtifactPath(nodeId: string, relPath: string): Promise<string | null>;
+  resolveArtifactPath(nodeId: string, relPath: string): ResultAsync<string | null, RunnerFault>;
 }
+
+/**
+ * An opaque substrate fault surfaced by a node runner — a validation reject, a
+ * dispatch failure, or a lifecycle IO fault. Kind-agnostic: it carries only the
+ * underlying `cause`, which the calling use-case unwraps + translates into its
+ * own error atom at the boundary.
+ */
+export type RunnerFault = { readonly cause: unknown };
 
 /**
  * Compose-time wiring: one runner per substrate kind. Required by

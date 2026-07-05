@@ -1,5 +1,98 @@
 import type { CatalogConflict, CatalogPlan, PlanNode } from "@glyphs-ai/catalog";
-import type { ResolveManifest, ResolveManifestNode } from "../../schemas/plan-to-manifest.js";
+import { z } from "zod";
+
+/**
+ * Wire shape consumed by the dashboard's `ResolveTree` component for the
+ * install + sync flows, and the projection target of {@link planToManifest}.
+ *
+ * Two-phase install + sync flow:
+ *  - Install: dashboard POSTs `/skills/resolve` with `{ origin }` to preview,
+ *    then `/skills` to commit.
+ *  - Sync: dashboard POSTs `/skills/:fqn/sync/resolve` to preview the diff for
+ *    an already-installed entry, then `/skills/:fqn/sync` to commit. `isSync`
+ *    distinguishes the two flows so the dashboard renders orphans +
+ *    identity-change banners only when they're meaningful.
+ */
+const CatalogKindSchema = z.enum(["skill", "agent", "mcp"]);
+const DependencyKindSchema = z.enum(["skill", "mcp"]);
+
+export const OrphanManifestEntrySchema = z.object({
+  kind: DependencyKindSchema,
+  fqn: z.string(),
+  origin: z.string(),
+});
+
+const ManifestNodeStatusSchema = z.enum([
+  "new",
+  "will-sync",
+  "already-installed",
+  "up-to-date",
+  "identity-changed",
+  "would-conflict",
+  "fetch-failed",
+  "parse-failed",
+]);
+
+const manifestBaseNodeShape = {
+  origin: z.string(),
+  fqn: z.string(),
+  status: ManifestNodeStatusSchema,
+  dependencyOrigins: z.array(z.string()),
+  identityChange: z.object({ oldFqn: z.string(), newFqn: z.string() }).optional(),
+  error: z.object({ name: z.string(), message: z.string() }).optional(),
+};
+
+export const SkillManifestNodeSchema = z.object({
+  ...manifestBaseNodeShape,
+  kind: z.literal("skill"),
+  shortName: z.string(),
+  scope: z.string(),
+});
+
+export const AgentManifestNodeSchema = z.object({
+  ...manifestBaseNodeShape,
+  kind: z.literal("agent"),
+  shortName: z.string(),
+  scope: z.string(),
+});
+
+export const McpManifestNodeSchema = z.object({
+  ...manifestBaseNodeShape,
+  kind: z.literal("mcp"),
+  specName: z.string(),
+});
+
+export const ResolveManifestNodeSchema = z.discriminatedUnion("kind", [
+  SkillManifestNodeSchema,
+  AgentManifestNodeSchema,
+  McpManifestNodeSchema,
+]);
+
+export const ResolveManifestSchema = z.object({
+  rootOrigin: z.string(),
+  rootFqn: z.string(),
+  /** True iff produced via a sync resolve, not a fresh install. */
+  isSync: z.boolean(),
+  /**
+   * Single-use token returned only by sync resolves; the dashboard ships it
+   * back on `POST .../sync` so apply replays the previewed plan. Absent on
+   * install resolves (the install path takes an origin and is idempotent).
+   */
+  planToken: z.string().optional(),
+  /** True iff a sync where root + all deps are unchanged and no orphans. */
+  upToDate: z.boolean(),
+  /** Set when the upstream fqn differs from the local row's fqn. */
+  identityChange: z
+    .object({ kind: CatalogKindSchema, oldFqn: z.string(), newFqn: z.string() })
+    .optional(),
+  /** Sync-only: deps the new closure dropped that have no remaining reverse-deps. */
+  orphans: z.array(OrphanManifestEntrySchema),
+  nodes: z.array(ResolveManifestNodeSchema),
+});
+
+export type ResolveManifest = z.infer<typeof ResolveManifestSchema>;
+export type ResolveManifestNode = z.infer<typeof ResolveManifestNodeSchema>;
+export type OrphanManifestEntry = z.infer<typeof OrphanManifestEntrySchema>;
 
 type NodeStatus = ResolveManifestNode["status"];
 

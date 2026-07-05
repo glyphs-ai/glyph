@@ -1,26 +1,37 @@
-import type { AgentFqn, CatalogModule } from "@glyphs-ai/catalog";
+import {
+  type AgentFqn,
+  ApplyPlanResponseSchema,
+  type CatalogModule,
+  GetAgentContentResponseSchema,
+  GetAgentEntryResponseSchema,
+  GetAgentResponseSchema,
+  ListAgentEntriesResponseSchema,
+  ListAgentFilesResponseSchema,
+} from "@glyphs-ai/catalog";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { catalogErrorPolicy } from "../../_error-policies/catalog.js";
 import { logEvent, respondError } from "../../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../../_http-helpers.js";
-import {
-  AgentEntrySchema,
-  AgentSchema,
-  AgentWithContentSchema,
-  AnchorResponseSchema,
-  CatalogFileEntrySchema,
-  CatalogInstallResultSchema,
-  CatalogSyncResultSchema,
-  InstallAgentRequestSchema,
-  OkResponseSchema,
-  ResolveManifestSchema,
-  SyncCatalogRequestSchema,
-} from "../../schemas/catalog.js";
 import { mimeFromExt } from "./mime.js";
 import { planStoreFor } from "./plan-store.js";
-import { planToManifest } from "./plan-to-manifest.js";
+import { planToManifest, ResolveManifestSchema } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 import { unwrapCatalog } from "./use-case.js";
+
+// HTTP request bodies owned by this transport: the client posts an origin to
+// install, and a planToken to apply a previously previewed sync.
+const InstallAgentRequestSchema = z
+  .object({
+    origin: z.string().min(1, { message: "origin is required and must be a non-empty string" }),
+  })
+  .strict();
+const SyncCatalogRequestSchema = z
+  .object({
+    planToken: z.string().min(1, {
+      message: "body must be { planToken: string } from a prior /sync/resolve response",
+    }),
+  })
+  .strict();
 
 /**
  * Routes for /agents/* relative to the parent mount. Mirrors
@@ -46,7 +57,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       tags: ["catalog"],
       summary: "List agent entries",
       responses: {
-        200: jsonResponse(AgentEntrySchema.array(), "Agent entries"),
+        200: jsonResponse(ListAgentEntriesResponseSchema, "Agent entries"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -92,7 +103,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Get an agent's anchor content",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(AnchorResponseSchema, "Anchor content"),
+        200: jsonResponse(GetAgentContentResponseSchema.omit({ id: true }), "Anchor content"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -127,7 +138,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       },
       responses: {
         200: jsonResponse(
-          CatalogFileEntrySchema.array(),
+          ListAgentFilesResponseSchema,
           "File entries, or raw file bytes when ?path= is set",
         ),
         404: errorResponse("File not found"),
@@ -188,7 +199,10 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Get an agent with content",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(AgentWithContentSchema, "Agent with content"),
+        200: jsonResponse(
+          GetAgentEntryResponseSchema.unwrap().extend({ content: z.string() }),
+          "Agent with content",
+        ),
         404: errorResponse("Agent not found"),
         500: errorResponse("Internal error"),
       },
@@ -225,7 +239,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Install an agent from an origin",
       request: { body: jsonRequest(InstallAgentRequestSchema) },
       responses: {
-        201: jsonResponse(CatalogInstallResultSchema, "Install result"),
+        201: jsonResponse(ApplyPlanResponseSchema, "Install result"),
         400: errorResponse("Malformed request body"),
         500: errorResponse("Internal error"),
       },
@@ -303,7 +317,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
         body: jsonRequest(SyncCatalogRequestSchema),
       },
       responses: {
-        200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
+        200: jsonResponse(ApplyPlanResponseSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
         410: errorResponse("Plan token expired or already applied"),
         500: errorResponse("Internal error"),
@@ -349,7 +363,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Acknowledge an agent's prereqs",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(AgentSchema, "Agent"),
+        200: jsonResponse(GetAgentResponseSchema, "Agent"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -381,7 +395,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Disable an agent",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(AgentSchema, "Agent"),
+        200: jsonResponse(GetAgentResponseSchema, "Agent"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -413,7 +427,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Enable an agent",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(AgentSchema, "Agent"),
+        200: jsonResponse(GetAgentResponseSchema, "Agent"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -445,7 +459,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Delete an agent",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(OkResponseSchema, "Deleted"),
+        200: jsonResponse(z.object({ ok: z.literal(true) }), "Deleted"),
         409: errorResponse("Agent still has dependents"),
         500: errorResponse("Internal error"),
       },

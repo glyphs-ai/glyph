@@ -83,10 +83,7 @@ export class CancelWorkflowNodeUseCase
         // failure is swallowed (the substrate state remains cancelled) rather than
         // propagated out of execute().
         if (node.status === "running")
-          await ResultAsync.fromPromise(
-            runnerFor(this.deps.runners, node.kind).cancel(parsed.nodeId),
-            (cause) => cause,
-          );
+          await runnerFor(this.deps.runners, node.kind).cancel(parsed.nodeId);
         this.deps.coordinator.triggerWorkflowTick(parsed.workflowId);
         return ok(undefined);
       })(),

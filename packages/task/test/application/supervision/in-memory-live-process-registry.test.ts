@@ -51,6 +51,21 @@ describe("InMemoryLiveProcessRegistry", () => {
     expect(registry.size()).toBe(0);
   });
 
+  it("drops the entry and resolves `settled` even when onExit rejects", async () => {
+    const registry = new InMemoryLiveProcessRegistry();
+    const h = fakeHandle();
+    registry.supervise("t1", h.handle, async () => {
+      throw new Error("onExit blew up");
+    });
+    expect(registry.size()).toBe(1);
+
+    h.resolveExit({ code: 0, signal: null });
+    // Defensive: an onExit rejection must neither leak the entry nor reject
+    // `settled` (awaitSettled callers await it directly).
+    await expect(registry.awaitSettled("t1")).resolves.toBeUndefined();
+    expect(registry.size()).toBe(0);
+  });
+
   it("requestKill is first-wins: killed, then already-killing", async () => {
     const registry = new InMemoryLiveProcessRegistry();
     const h = fakeHandle();

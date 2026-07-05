@@ -1,10 +1,10 @@
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { AgentFqnSchema } from "../../domain/agent-fqn.js";
-import type {
-  AgentRepository,
-  CatalogFileEntry,
-  DatabaseUnavailable,
-} from "../../domain/agent-repository.js";
+import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { CatalogFileEntry } from "../../domain/catalog-file.js";
+import { agentFiles } from "../../infrastructure/drizzle/agent-schema.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 
 export const ListAgentFilesRequestSchema = z.object({ id: AgentFqnSchema });
@@ -16,7 +16,7 @@ export type ListAgentFilesResponse = CatalogFileEntry[];
 export type ListAgentFilesError = DatabaseUnavailable;
 
 export interface ListAgentFilesDeps {
-  readonly agentRepo: AgentRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class ListAgentFilesUseCase
@@ -27,6 +27,15 @@ export class ListAgentFilesUseCase
   execute(
     request: ListAgentFilesRequest,
   ): UseCaseResult<ListAgentFilesResponse, ListAgentFilesError> {
-    return this.deps.agentRepo.listFilePaths(request.id);
+    const { id } = request;
+    return this.deps.queries.query((db) =>
+      db
+        .select({ relPath: agentFiles.relPath, content: agentFiles.content })
+        .from(agentFiles)
+        .where(eq(agentFiles.agentFqn, id))
+        .orderBy(agentFiles.relPath)
+        .all()
+        .map((row) => ({ relPath: row.relPath, size: row.content.byteLength })),
+    );
   }
 }

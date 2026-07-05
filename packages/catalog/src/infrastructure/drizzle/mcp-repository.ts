@@ -1,16 +1,12 @@
 /**
- * Drizzle-backed McpRepository — the port's adapter.
+ * Drizzle-backed McpRepository — the write-side port's adapter (get/save/
+ * delete). Read projections live on `CatalogQueries`; this adapter only loads
+ * the aggregate for mutation and persists it.
  *
  * Throw/catch policy: the ONLY layer that turns driver faults into
- * `DatabaseUnavailable`. Each method wraps its (synchronous better-sqlite3)
- * work in an inline async IIFE so a sync throw surfaces as a promise
- * rejection that `ResultAsync.fromPromise` routes into the `Err` channel
- * A shared `find` primitive returns the entity or `undefined`; `get` and
- * `getByOrigin` turn absence into `McpNotFound`.
- *
- * `save` is an honest full-row insert-or-replace — drizzle has no
- * change-tracking, and a single-blob MCP has nothing to patch column by
- * column. MCP saves have no file-tree branch.
+ * `DatabaseUnavailable`. The private `find` loads the row; `get` turns absence
+ * into `McpNotFound`. `save` is an honest full-row insert-or-replace — a
+ * single-blob MCP has nothing to patch column by column and no file tree.
  */
 
 import { eq } from "drizzle-orm";
@@ -24,16 +20,10 @@ import type {
   McpNotFound,
   McpRepository,
 } from "../../domain/mcp-repository.js";
-import type { agentMcpDeps } from "./agent-schema.js";
 import { McpMapper } from "./mcp-mapper.js";
 import { mcps } from "./mcp-schema.js";
-import type { skillMcpDeps } from "./skill-schema.js";
 
-type Db = BetterSQLite3Database<{
-  mcps: typeof mcps;
-  agentMcpDeps: typeof agentMcpDeps;
-  skillMcpDeps: typeof skillMcpDeps;
-}>;
+type Db = BetterSQLite3Database<{ mcps: typeof mcps }>;
 
 export class DrizzleMcpRepository implements McpRepository {
   private readonly db: Db;
@@ -47,33 +37,13 @@ export class DrizzleMcpRepository implements McpRepository {
   }
 
   get(fqn: McpFqn): ResultAsync<McpEntity, McpNotFound | DatabaseUnavailable> {
-    return this.assertFound(this.findByFqn(fqn), fqn);
-  }
-
-  getByOrigin(origin: string): ResultAsync<McpEntity, McpNotFound | DatabaseUnavailable> {
-    return this.assertFound(this.findByOrigin(origin), origin);
-  }
-
-  findByFqn(fqn: McpFqn): ResultAsync<McpEntity | undefined, DatabaseUnavailable> {
-    return this.find(eq(mcps.fqn, fqn));
-  }
-
-  findByOrigin(origin: string): ResultAsync<McpEntity | undefined, DatabaseUnavailable> {
-    return this.find(eq(mcps.origin, origin));
-  }
-
-  /** Turn a `find` miss into the business `McpNotFound` (keyed by `key`). */
-  private assertFound(
-    found: ResultAsync<McpEntity | undefined, DatabaseUnavailable>,
-    key: string,
-  ): ResultAsync<McpEntity, McpNotFound | DatabaseUnavailable> {
-    return found.andThen(
+    return this.find(eq(mcps.fqn, fqn)).andThen(
       (mcp): ResultAsync<McpEntity, McpNotFound | DatabaseUnavailable> =>
-        mcp === undefined ? errAsync({ type: "McpNotFound", fqn: key }) : okAsync(mcp),
+        mcp === undefined ? errAsync({ type: "McpNotFound", fqn }) : okAsync(mcp),
     );
   }
 
-  /** Shared query primitive: the matching aggregate, or `undefined`. */
+  /** Load the row for mutation, mapped to the aggregate. */
   private find(
     where: ReturnType<typeof eq>,
   ): ResultAsync<McpEntity | undefined, DatabaseUnavailable> {
@@ -104,12 +74,5 @@ export class DrizzleMcpRepository implements McpRepository {
       })(),
       DrizzleMcpRepository.asDatabaseUnavailable,
     );
-  }
-
-  list(): ResultAsync<McpEntity[], DatabaseUnavailable> {
-    return ResultAsync.fromPromise(
-      (async () => this.db.select().from(mcps).orderBy(mcps.fqn).all())(),
-      DrizzleMcpRepository.asDatabaseUnavailable,
-    ).map((rows) => rows.map((r) => McpMapper.toDomain(r)));
   }
 }

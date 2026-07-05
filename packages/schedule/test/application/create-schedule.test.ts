@@ -1,3 +1,4 @@
+import { errAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CreateScheduleRequest } from "../../src/application/create-schedule.js";
 import {
@@ -63,9 +64,9 @@ describe("CreateScheduleUseCase", () => {
 
   it("create runs schedule-level invariants BEFORE handler.validate", async () => {
     let validateCalled = false;
-    h.taskHandler.validate = async () => {
+    h.taskHandler.validate = () => {
       validateCalled = true;
-      throw new Error("fake catalog error");
+      return errAsync({ cause: new Error("fake catalog error") });
     };
     const result = await h.module.createSchedule.execute(baseCreateOpts({ name: "" }));
     expect(result.isErr()).toBe(true);
@@ -74,9 +75,7 @@ describe("CreateScheduleUseCase", () => {
   });
 
   it("create propagates handler.validate rejections (e.g. catalog miss)", async () => {
-    h.taskHandler.validate = async () => {
-      throw new Error("agent not found");
-    };
+    h.taskHandler.validate = () => errAsync({ cause: new Error("agent not found") });
     const result = await h.module.createSchedule.execute(baseCreateOpts());
     expect(result.isErr()).toBe(true);
     const err = result._unsafeUnwrapErr();

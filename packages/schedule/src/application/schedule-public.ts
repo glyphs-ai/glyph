@@ -7,6 +7,7 @@ export * from "./get-schedule.js";
 export * from "./list-schedules.js";
 export * from "./patch-schedule.js";
 export type {
+  HandlerFault,
   ScheduleKindHandler,
   ScheduleKindNotRegistered,
   TargetValidationFailed,

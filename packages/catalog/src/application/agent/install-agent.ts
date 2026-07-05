@@ -23,7 +23,7 @@ const AgentDependencyRefsSchema = z.object({
 
 export const InstallAgentRequestSchema = z.object({
   origin: z.string(),
-  dependencyRefs: AgentDependencyRefsSchema.optional(),
+  dependencyRefs: AgentDependencyRefsSchema,
 });
 export type InstallAgentRequest = z.infer<typeof InstallAgentRequestSchema>;
 
@@ -77,7 +77,7 @@ export class InstallAgentUseCase
   private buildEntity(
     manifest: AgentManifest,
     origin: string,
-    dependencyRefs: AgentDependencyRefs | undefined,
+    dependencyRefs: AgentDependencyRefs,
   ): ResultAsync<Built, AgentOriginConflict | DatabaseUnavailable> {
     const fqn = AgentFqn.create(manifest.scope, manifest.name);
     const mint = (carriedAck: boolean, carriedDisabled: boolean): Built => {
@@ -88,7 +88,7 @@ export class InstallAgentUseCase
         description: manifest.description,
         version: manifest.version,
         prereqs: manifest.prereqs,
-        dependencyRefs: dependencyRefs ?? manifest.dependencyRefs,
+        dependencyRefs,
         now: new Date().toISOString(),
       });
       if (carriedAck) agent.acknowledgePrereqs();

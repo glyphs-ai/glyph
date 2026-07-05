@@ -57,9 +57,14 @@ export type WorkflowEntityCorruption =
 
 /** CQRS write-side repository for the mutable workflow aggregate. */
 export interface WorkflowRepository {
-  insert(entity: WorkflowEntity): ResultAsync<void, DatabaseUnavailable>;
   get(
     id: WorkflowId,
   ): ResultAsync<WorkflowEntity, WorkflowNotFound | WorkflowEntityCorruption | DatabaseUnavailable>;
+  /**
+   * Upserts the aggregate: inserts a never-persisted workflow, otherwise applies
+   * a targeted diff against the loaded snapshot.
+   */
   save(entity: WorkflowEntity): ResultAsync<void, DatabaseUnavailable>;
+  /** Hard-deletes the workflow row and its nodes/edges. */
+  delete(id: WorkflowId): ResultAsync<void, DatabaseUnavailable>;
 }

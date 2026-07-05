@@ -2,6 +2,7 @@
 
 import { __Entity__Entity } from "../../domain/__entity-kebab__-entity.js";
 import type { __Entity__Id } from "../../domain/__entity-kebab__-id.js";
+import type { __Entity__Name } from "../../domain/__entity-kebab__-name.js";
 import type { __entities__ } from "./__entity-kebab__-schema.js";
 
 export type __Entity__Row = typeof __entities__.$inferSelect;
@@ -10,7 +11,7 @@ export const __Entity__Mapper = {
   toDomain(row: __Entity__Row): __Entity__Entity {
     return new __Entity__Entity({
       id: row.id as __Entity__Id,
-      name: row.name,
+      name: row.name as __Entity__Name,
       createdAt: row.createdAt,
       archived: row.archived,
     });

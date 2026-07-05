@@ -10,6 +10,7 @@ import type {
 } from "../../domain/schedule/schedule-repository.js";
 import type { ScheduleQueries } from "../../infrastructure/drizzle/schedule-queries.js";
 import type {
+  HandlerFault,
   ScheduleKindHandler,
   ScheduleKindNotRegistered,
 } from "../ports/schedule-kind-handler.js";
@@ -163,16 +164,16 @@ export class ScheduleEngine {
     }
     if (entity.nextFireAt !== undefined && new Date(entity.nextFireAt).getTime() <= now.getTime()) {
       const plannedFiredAt = entity.nextFireAt;
-      try {
-        await this.dispatch(handlerResult.value, entity, plannedFiredAt);
+      const dispatched = await this.dispatch(handlerResult.value, entity, plannedFiredAt);
+      if (dispatched.isErr()) {
+        this.logger.warn(
+          { scheduleId: entity.id, err: dispatched.error.cause },
+          "schedule recover: catchup dispatch failed",
+        );
+      } else {
         const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, now, 1);
         entity.recordFired(plannedFiredAt, nextIso);
         await this.persist(entity);
-      } catch (dispatchErr) {
-        this.logger.warn(
-          { scheduleId: entity.id, err: dispatchErr },
-          "schedule recover: catchup dispatch failed",
-        );
       }
     }
     const fresh = await this.repo.get(entity.id);
@@ -263,7 +264,15 @@ export class ScheduleEngine {
       return;
     }
     const handler = handlerResult.value;
-    if (await handler.hasInFlightForSchedule(entity.id)) {
+    const inFlight = await handler.hasInFlightForSchedule(entity.id);
+    if (inFlight.isErr()) {
+      this.logger.warn(
+        { scheduleId: entity.id, err: inFlight.error.cause },
+        "schedule fire: in-flight check failed",
+      );
+      return;
+    }
+    if (inFlight.value) {
       this.logger.warn(
         { scheduleId: entity.id },
         "schedule fire skipped (previous dispatch still running)",
@@ -275,11 +284,10 @@ export class ScheduleEngine {
       return;
     }
     const firedAt = this.now().toISOString();
-    try {
-      await this.dispatch(handler, entity, firedAt);
-    } catch (dispatchErr) {
+    const dispatched = await this.dispatch(handler, entity, firedAt);
+    if (dispatched.isErr()) {
       this.logger.warn(
-        { scheduleId: entity.id, err: dispatchErr },
+        { scheduleId: entity.id, err: dispatched.error.cause },
         "schedule fire: dispatch failed",
       );
       // No failure retry: record the fire and re-arm.
@@ -296,17 +304,14 @@ export class ScheduleEngine {
    * `data` (validated at create / patch time). The caller resolves the handler
    * via {@link ScheduleKindRegistry.handlerFor} and passes it in.
    */
-  private async dispatch(
+  private dispatch(
     handler: ScheduleKindHandler,
     entity: ScheduleEntity,
     firedAt: string,
-  ): Promise<string> {
-    const { id: dispatchId } = await handler.dispatch({
-      scheduleId: entity.id,
-      firedAt,
-      data: entity.target.data,
-    });
-    return dispatchId;
+  ): ResultAsync<string, HandlerFault> {
+    return handler
+      .dispatch({ scheduleId: entity.id, firedAt, data: entity.target.data })
+      .map((dispatched) => dispatched.id);
   }
 
   private async persist(entity: ScheduleEntity): Promise<void> {

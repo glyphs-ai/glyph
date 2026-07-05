@@ -55,7 +55,6 @@ The package exports:
 
 - `composeApplication` and `Application`.
 - `WorkspaceContext` and `WorkspaceHasLiveTasksError`.
-- Schedule validation error: `TaskScheduleTargetError`.
 - Workflow public validation errors: `WorkflowCoordAgentNotCapableError`,
   `WorkflowCoordSpecError`, and `WorkflowWorkerSpecError`.
 - Every public wire contract from the `wire/` surface.

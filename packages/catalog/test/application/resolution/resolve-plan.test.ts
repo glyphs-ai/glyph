@@ -1,6 +1,5 @@
-import { errAsync, ok, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
-import { type MockProxy, mock } from "vitest-mock-extended";
+import { okAsync } from "neverthrow";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ResolvedGraph,
   ResolvedNode,
@@ -10,16 +9,17 @@ import type { GetUpstreamTreeUseCase } from "../../../src/application/resolution
 import { ResolvePlanUseCase } from "../../../src/application/resolution/resolve-plan.js";
 import { AgentEntity } from "../../../src/domain/agent-entity.js";
 import type { AgentFqn } from "../../../src/domain/agent-fqn.js";
-import type { AgentRepository } from "../../../src/domain/agent-repository.js";
 import { McpEntity } from "../../../src/domain/mcp-entity.js";
 import type { McpFqn } from "../../../src/domain/mcp-fqn.js";
-import type { McpRepository } from "../../../src/domain/mcp-repository.js";
 import { SkillEntity } from "../../../src/domain/skill-entity.js";
 import type { SkillFqn } from "../../../src/domain/skill-fqn.js";
-import type { SkillRepository } from "../../../src/domain/skill-repository.js";
+import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
+import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
+import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-repository.js";
+import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
 
 const NOW = "2026-01-01T00:00:00.000Z";
-const EMPTY_DEPS = { skills: [], mcps: [], agents: [] };
 
 function node(
   kind: "skill" | "agent" | "mcp",
@@ -69,16 +69,24 @@ function skillEntity(
   });
 }
 
-function agentEntity(fqn: string, origin: string): AgentEntity {
+function agentEntity(
+  fqn: string,
+  origin: string,
+  opts: { version?: string; skills?: string[]; mcps?: string[]; agents?: string[] } = {},
+): AgentEntity {
   return new AgentEntity({
     fqn: fqn as AgentFqn,
     origin,
     description: `${fqn} agent`,
-    version: "1.0.0",
+    version: opts.version ?? "1.0.0",
     prereqs: undefined,
     prereqsAck: true,
     disabledByUser: false,
-    dependencyRefs: EMPTY_DEPS,
+    dependencyRefs: {
+      skills: opts.skills ?? [],
+      mcps: opts.mcps ?? [],
+      agents: opts.agents ?? [],
+    },
     installedAt: NOW,
     updatedAt: NOW,
   });
@@ -94,37 +102,51 @@ function mcpEntity(fqn: string, origin: string, spec = "spec"): McpEntity {
   });
 }
 
-let getUpstreamTree: MockProxy<GetUpstreamTreeUseCase>;
-let getTree: MockProxy<GetTreeUseCase>;
-let skillRepo: MockProxy<SkillRepository>;
-let agentRepo: MockProxy<AgentRepository>;
-let mcpRepo: MockProxy<McpRepository>;
+let close: () => void;
+let db: Db;
+let skillRepo: DrizzleSkillRepository;
+let agentRepo: DrizzleAgentRepository;
+let mcpRepo: DrizzleMcpRepository;
+let getUpstreamTreeExecute: ReturnType<typeof vi.fn>;
+let getTreeExecute: ReturnType<typeof vi.fn>;
 let useCase: ResolvePlanUseCase;
 
+async function saveSkill(entity: SkillEntity): Promise<void> {
+  (await skillRepo.save(entity))._unsafeUnwrap();
+}
+
+async function saveAgent(entity: AgentEntity): Promise<void> {
+  (await agentRepo.save(entity))._unsafeUnwrap();
+}
+
+async function saveMcp(entity: McpEntity): Promise<void> {
+  (await mcpRepo.save(entity))._unsafeUnwrap();
+}
+
 beforeEach(() => {
-  getUpstreamTree = mock<GetUpstreamTreeUseCase>();
-  getTree = mock<GetTreeUseCase>();
-  skillRepo = mock<SkillRepository>();
-  agentRepo = mock<AgentRepository>();
-  mcpRepo = mock<McpRepository>();
-  getTree.execute.mockResolvedValue(ok(graph([])));
-  skillRepo.get.mockImplementation((fqn) => errAsync({ type: "SkillNotFound", fqn }));
-  agentRepo.get.mockImplementation((fqn) => errAsync({ type: "AgentNotFound", fqn }));
-  mcpRepo.get.mockImplementation((fqn) => errAsync({ type: "McpNotFound", fqn }));
-  skillRepo.list.mockReturnValue(okAsync([]));
-  agentRepo.list.mockReturnValue(okAsync([]));
-  mcpRepo.list.mockReturnValue(okAsync([]));
+  const opened = openDb(":memory:");
+  db = opened.db;
+  close = opened.close;
+  skillRepo = new DrizzleSkillRepository({ db });
+  agentRepo = new DrizzleAgentRepository({ db });
+  mcpRepo = new DrizzleMcpRepository({ db });
+  getUpstreamTreeExecute = vi.fn(() => okAsync(graph([])));
+  getTreeExecute = vi.fn(() => okAsync(graph([])));
   useCase = new ResolvePlanUseCase({
-    getUpstreamTree,
-    getTree,
-    repos: { skill: skillRepo, agent: agentRepo, mcp: mcpRepo },
+    getUpstreamTree: { execute: getUpstreamTreeExecute } as unknown as GetUpstreamTreeUseCase,
+    getTree: { execute: getTreeExecute } as unknown as GetTreeUseCase,
+    queries: new DrizzleCatalogQueries({ db }),
   });
+});
+
+afterEach(() => {
+  close();
 });
 
 describe("ResolvePlanUseCase — diffing", () => {
   it("marks a fresh upstream closure as new", async () => {
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(
         graph([
           node("mcp", "file:/mcp/azure", "azure/mcp"),
           node("skill", "file:/skill/root", "public/root", { mcps: ["file:/mcp/azure"] }),
@@ -147,8 +169,9 @@ describe("ResolvePlanUseCase — diffing", () => {
 
   it("marks an unchanged installed closure up-to-date", async () => {
     const upstream = graph([node("skill", "file:/skill/root", "public/root")]);
-    getUpstreamTree.execute.mockResolvedValue(ok(upstream));
-    getTree.execute.mockResolvedValue(ok(upstream));
+    getUpstreamTreeExecute.mockReturnValue(okAsync(upstream));
+    getTreeExecute.mockReturnValue(okAsync(upstream));
+    await saveSkill(skillEntity("public/root", "file:/skill/root"));
 
     const plan = (
       await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
@@ -162,22 +185,24 @@ describe("ResolvePlanUseCase — diffing", () => {
   });
 
   it("promotes an unchanged root to will-sync when a dependency changed", async () => {
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(
         graph([
           node("skill", "file:/skill/child", "public/child", { version: "2.0.0" }),
           node("skill", "file:/skill/root", "public/root", { skills: ["file:/skill/child"] }),
         ]),
       ),
     );
-    getTree.execute.mockResolvedValue(
-      ok(
+    getTreeExecute.mockReturnValue(
+      okAsync(
         graph([
           node("skill", "file:/skill/child", "public/child", { version: "1.0.0" }),
           node("skill", "file:/skill/root", "public/root", { skills: ["file:/skill/child"] }),
         ]),
       ),
     );
+    await saveSkill(skillEntity("public/root", "file:/skill/root", { skills: ["public/child"] }));
+    await saveSkill(skillEntity("public/child", "file:/skill/child"));
 
     const plan = (
       await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
@@ -190,11 +215,11 @@ describe("ResolvePlanUseCase — diffing", () => {
   });
 
   it("flags local skill and mcp dependencies dropped by upstream as orphans", async () => {
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(graph([node("skill", "file:/skill/root", "public/root", { version: "2.0.0" })])),
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(graph([node("skill", "file:/skill/root", "public/root", { version: "2.0.0" })])),
     );
-    getTree.execute.mockResolvedValue(
-      ok(
+    getTreeExecute.mockReturnValue(
+      okAsync(
         graph([
           node("skill", "file:/skill/root", "public/root", {
             version: "1.0.0",
@@ -206,6 +231,15 @@ describe("ResolvePlanUseCase — diffing", () => {
         ]),
       ),
     );
+    await saveSkill(
+      skillEntity("public/root", "file:/skill/root", {
+        version: "1.0.0",
+        skills: ["public/child"],
+        mcps: ["azure/mcp"],
+      }),
+    );
+    await saveSkill(skillEntity("public/child", "file:/skill/child"));
+    await saveMcp(mcpEntity("azure/mcp", "file:/mcp/azure"));
 
     const plan = (
       await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
@@ -218,25 +252,20 @@ describe("ResolvePlanUseCase — diffing", () => {
   });
 
   it("does not orphan a dropped dependency still referenced by another installed entry", async () => {
-    const child = skillEntity("public/child", "file:/skill/child");
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(graph([node("skill", "file:/skill/root", "public/root")])),
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(graph([node("skill", "file:/skill/root", "public/root")])),
     );
-    getTree.execute.mockResolvedValue(
-      ok(
+    getTreeExecute.mockReturnValue(
+      okAsync(
         graph([
           node("skill", "file:/skill/root", "public/root", { skills: ["file:/skill/child"] }),
           node("skill", "file:/skill/child", "public/child"),
         ]),
       ),
     );
-    skillRepo.list.mockReturnValue(
-      okAsync([skillEntity("public/other", "file:/skill/other", { skills: ["public/child"] })]),
-    );
-    skillRepo.get.mockImplementation((fqn) => {
-      if (fqn === child.fqn) return okAsync(child);
-      return errAsync({ type: "SkillNotFound", fqn });
-    });
+    await saveSkill(skillEntity("public/root", "file:/skill/root", { skills: ["public/child"] }));
+    await saveSkill(skillEntity("public/child", "file:/skill/child"));
+    await saveSkill(skillEntity("public/other", "file:/skill/other", { skills: ["public/child"] }));
 
     const plan = (
       await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
@@ -246,12 +275,13 @@ describe("ResolvePlanUseCase — diffing", () => {
   });
 
   it("short-circuits a root identity change", async () => {
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(graph([node("skill", "file:/skill/entry", "public/new-name", { version: "2.0.0" })])),
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(graph([node("skill", "file:/skill/entry", "public/new-name", { version: "2.0.0" })])),
     );
-    getTree.execute.mockResolvedValue(
-      ok(graph([node("skill", "file:/skill/entry", "public/old-name", { version: "1.0.0" })])),
+    getTreeExecute.mockReturnValue(
+      okAsync(graph([node("skill", "file:/skill/entry", "public/old-name", { version: "1.0.0" })])),
     );
+    await saveSkill(skillEntity("public/old-name", "file:/skill/entry", { version: "1.0.0" }));
 
     const plan = (
       await useCase.execute({ kind: "skill", origin: "file:/skill/entry" })
@@ -272,18 +302,17 @@ describe("ResolvePlanUseCase — diffing", () => {
 describe("ResolvePlanUseCase — orchestration", () => {
   it("resolves the root origin from an installed fqn before fetching upstream", async () => {
     const installed = skillEntity("public/root", "file:/skill/root", { version: "1.0.0" });
-    skillRepo.get.mockImplementation((fqn) => {
-      if (fqn === installed.fqn) return okAsync(installed);
-      return errAsync({ type: "SkillNotFound", fqn });
-    });
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(graph([node("skill", installed.origin, installed.fqn)])),
+    await saveSkill(installed);
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(graph([node("skill", installed.origin, installed.fqn)])),
     );
-    getTree.execute.mockResolvedValue(ok(graph([node("skill", installed.origin, installed.fqn)])));
+    getTreeExecute.mockReturnValue(
+      okAsync(graph([node("skill", installed.origin, installed.fqn)])),
+    );
 
     const plan = (await useCase.execute({ kind: "skill", fqn: installed.fqn }))._unsafeUnwrap();
 
-    expect(getUpstreamTree.execute).toHaveBeenCalledWith({
+    expect(getUpstreamTreeExecute).toHaveBeenCalledWith({
       kind: "skill",
       origin: installed.origin,
     });
@@ -294,17 +323,13 @@ describe("ResolvePlanUseCase — orchestration", () => {
     const res = await useCase.execute({ kind: "skill", fqn: "not-a-fqn" });
 
     expect(res._unsafeUnwrapErr()).toEqual({ type: "SkillNotFound", fqn: "not-a-fqn" });
-    expect(getUpstreamTree.execute).not.toHaveBeenCalled();
+    expect(getUpstreamTreeExecute).not.toHaveBeenCalled();
   });
 
   it("flags upstream fqn collisions with a different installed origin", async () => {
-    const existing = mcpEntity("azure/mcp", "file:/mcp/existing");
-    mcpRepo.get.mockImplementation((fqn) => {
-      if (fqn === existing.fqn) return okAsync(existing);
-      return errAsync({ type: "McpNotFound", fqn });
-    });
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(graph([node("mcp", "file:/mcp/new", "azure/mcp")])),
+    await saveMcp(mcpEntity("azure/mcp", "file:/mcp/existing"));
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(graph([node("mcp", "file:/mcp/new", "azure/mcp")])),
     );
 
     const plan = (await useCase.execute({ kind: "mcp", origin: "file:/mcp/new" }))._unsafeUnwrap();
@@ -322,8 +347,8 @@ describe("ResolvePlanUseCase — orchestration", () => {
   });
 
   it("propagates upstream conflicts into the plan", async () => {
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(
         graph(
           [node("skill", "file:/skill/root", "public/root")],
           [
@@ -348,12 +373,15 @@ describe("ResolvePlanUseCase — orchestration", () => {
 
   it("keeps agent entities out of orphan reporting", async () => {
     const installedAgent = agentEntity("public/helper", "file:/agent/helper");
-    agentRepo.list.mockReturnValue(okAsync([installedAgent]));
-    getUpstreamTree.execute.mockResolvedValue(
-      ok(graph([node("agent", "file:/agent/root", "public/root")])),
+    await saveAgent(
+      agentEntity("public/root", "file:/agent/root", { agents: [installedAgent.fqn] }),
     );
-    getTree.execute.mockResolvedValue(
-      ok(
+    await saveAgent(installedAgent);
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(graph([node("agent", "file:/agent/root", "public/root")])),
+    );
+    getTreeExecute.mockReturnValue(
+      okAsync(
         graph([
           node("agent", "file:/agent/root", "public/root", { agents: ["file:/agent/helper"] }),
           node("agent", installedAgent.origin, installedAgent.fqn),

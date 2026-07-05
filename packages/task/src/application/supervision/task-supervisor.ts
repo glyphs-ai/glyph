@@ -342,10 +342,11 @@ export class TaskSupervisor {
         { taskId: id },
         "tasks: cancelling row in running status with no live subprocess (orphan)",
       );
-      await this.applyTerminal(this.deps.sandbox.resolve(id), existing, {
+      const applied = await this.applyTerminal(this.deps.sandbox.resolve(id), existing, {
         kind: "cancelled",
         cancellation: { kind: "cascade", message: "cancelled (recovered from inconsistent state)" },
       });
+      if (applied.isErr()) return err(applied.error);
     } else {
       await this.deps.liveProcesses.awaitSettled(id);
       if (outcome === "already-killing") {
@@ -450,7 +451,7 @@ export class TaskSupervisor {
     workdir: string,
     running: TaskEntity,
     decision: TerminalDecision,
-  ): Promise<void> {
+  ): Promise<Result<void, DatabaseUnavailable>> {
     const now = this.deps.now().toISOString();
     let transition: Result<void, InvalidTransition>;
     switch (decision.kind) {
@@ -471,17 +472,21 @@ export class TaskSupervisor {
         { taskId: running.id, err: transition.error },
         "tasks: illegal terminal transition; persisted state left unchanged",
       );
-      return;
+      return ok(undefined);
     }
-    // Persistence failure is warn-logged but not rethrown — the subprocess is
-    // already gone, so the caller cannot act on an error here.
+    // The persistence result is RETURNED so a caller that can still act on a
+    // failure (the orphan-cancel path) surfaces it instead of reporting a
+    // successful cancel over a row that never left `running`. The fire-and-forget
+    // exit watcher discards it — the subprocess is already gone.
     const saved = await this.deps.repository.save(running);
     if (saved.isErr()) {
       this.deps.logger.warn(
         { taskId: running.id, err: saved.error },
         "tasks: failed to persist terminal status",
       );
+      return err(saved.error);
     }
+    return ok(undefined);
   }
 
   /**

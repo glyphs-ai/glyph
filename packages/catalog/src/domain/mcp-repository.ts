@@ -1,15 +1,13 @@
 /**
- * Repository port for the MCP aggregate. Domain-owned interface; the
- * drizzle adapter under `infrastructure/drizzle/` implements it.
+ * Write-side repository port for the MCP aggregate. Domain-owned interface; the
+ * drizzle adapter implements it. Only the CQRS write triad `get` / `save` /
+ * `delete`, used solely by write use-cases; read projections go through the
+ * read-side `CatalogQueries` seam.
  *
- * Error contract: inline unions per signature (no per-op alias). Atoms
- * are exported so use-case unions can reference them. `McpNotFound` is a
- * normal business outcome (id resolves to 0 rows), distinct from
- * `DatabaseUnavailable` (the IO layer faulted).
- *
- * Only get/save/delete/list — no business verbs. Origin-conflict checks
- * are an application concern: the install use-case reads via `get` and
- * compares origins. `save` is a full-row write (insert-or-replace).
+ * Error contract: inline unions per signature (no per-op alias). Atoms are
+ * exported so use-case unions can reference them. `McpNotFound` is a normal
+ * business outcome (id resolves to 0 rows), distinct from `DatabaseUnavailable`
+ * (the IO layer faulted). `save` is a full-row insert-or-replace.
  */
 
 import type { ResultAsync } from "neverthrow";
@@ -18,7 +16,7 @@ import type { McpFqn } from "./mcp-fqn.js";
 
 export type McpNotFound = {
   readonly type: "McpNotFound";
-  /** The lookup key that resolved to zero rows — fqn for `get`, origin for `getByOrigin`. */
+  /** The lookup key that resolved to zero rows. */
   readonly fqn: string;
 };
 
@@ -28,11 +26,8 @@ export type DatabaseUnavailable = {
 };
 
 export interface McpRepository {
+  /** Load the aggregate for mutation. `McpNotFound` when the fqn is absent. */
   get(fqn: McpFqn): ResultAsync<McpEntity, McpNotFound | DatabaseUnavailable>;
-  getByOrigin(origin: string): ResultAsync<McpEntity, McpNotFound | DatabaseUnavailable>;
-  findByFqn(fqn: McpFqn): ResultAsync<McpEntity | undefined, DatabaseUnavailable>;
-  findByOrigin(origin: string): ResultAsync<McpEntity | undefined, DatabaseUnavailable>;
   save(mcp: McpEntity): ResultAsync<void, DatabaseUnavailable>;
   delete(fqn: McpFqn): ResultAsync<void, DatabaseUnavailable>;
-  list(): ResultAsync<McpEntity[], DatabaseUnavailable>;
 }

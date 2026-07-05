@@ -42,10 +42,10 @@ export class DeleteWorkflowUseCase
       (async () => {
         const workflow = await this.deps.repo.get(parsed.workflowId);
         if (workflow.isErr()) return err(workflow.error);
-        const deleted = workflow.value.markDeleted();
+        const deletable = workflow.value.ensureDeletable();
+        if (deletable.isErr()) return err(deletable.error);
+        const deleted = await this.deps.repo.delete(parsed.workflowId);
         if (deleted.isErr()) return err(deleted.error);
-        const saved = await this.deps.repo.save(workflow.value);
-        if (saved.isErr()) return err(saved.error);
         if (parsed.purgeDir === true)
           await ResultAsync.fromSafePromise(this.deps.sandbox.remove(parsed.workflowId));
         return ok(undefined);

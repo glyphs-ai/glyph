@@ -27,7 +27,6 @@ import { ZodError } from "zod";
  */
 export const SAFE_ERROR_NAMES = new Set<string>([
   // @glyphs-ai/api
-  "TaskScheduleTargetError",
   "WorkflowCoordAgentNotCapableError",
   "WorkflowCoordSpecError",
   "WorkflowHumanSpecError",
@@ -52,13 +51,6 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "InvalidCronExprError",
   "InvalidTimezoneError",
   "InvalidJsonPathError",
-  // schedule's own `AgentNotFoundError` shares the name string with
-  // the catalog + session variants already on this list — one allow-list
-  // entry covers all three callers. The schedule class's super(...)
-  // template (`Agent "${agent}" not found`, see
-  // `packages/schedule/src/errors.ts`) is audited safe: no host paths,
-  // no caller-controlled echoes beyond the agent FQN the caller
-  // themselves provided.
   "ScheduleEnabledError",
   "ScheduleHasInFlightError",
   // @glyphs-ai/terminal (surface via /:id/spawn)
@@ -407,7 +399,9 @@ export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): 
 }
 
 function readErrorCode(err: unknown): string | undefined {
-  if (typeof err !== "object" || err === null || !("code" in err)) return undefined;
-  const code = err.code;
-  return typeof code === "string" ? code : undefined;
+  if (typeof err !== "object" || err === null) return undefined;
+  const rec = err as { code?: unknown; type?: unknown };
+  if (typeof rec.code === "string") return rec.code;
+  if (typeof rec.type === "string") return rec.type;
+  return undefined;
 }

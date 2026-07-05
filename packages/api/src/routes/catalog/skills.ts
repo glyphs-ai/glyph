@@ -1,26 +1,37 @@
-import type { CatalogModule, SkillFqn } from "@glyphs-ai/catalog";
+import {
+  ApplyPlanResponseSchema,
+  type CatalogModule,
+  GetSkillContentResponseSchema,
+  GetSkillEntryResponseSchema,
+  GetSkillResponseSchema,
+  ListSkillEntriesResponseSchema,
+  ListSkillFilesResponseSchema,
+  type SkillFqn,
+} from "@glyphs-ai/catalog";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { catalogErrorPolicy } from "../../_error-policies/catalog.js";
 import { logEvent, respondError } from "../../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../../_http-helpers.js";
-import {
-  AnchorResponseSchema,
-  CatalogFileEntrySchema,
-  CatalogInstallResultSchema,
-  CatalogSyncResultSchema,
-  InstallSkillRequestSchema,
-  OkResponseSchema,
-  ResolveManifestSchema,
-  SkillEntrySchema,
-  SkillSchema,
-  SkillWithContentSchema,
-  SyncCatalogRequestSchema,
-} from "../../schemas/catalog.js";
 import { mimeFromExt } from "./mime.js";
 import { planStoreFor } from "./plan-store.js";
-import { planToManifest } from "./plan-to-manifest.js";
+import { planToManifest, ResolveManifestSchema } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 import { unwrapCatalog } from "./use-case.js";
+
+// HTTP request bodies owned by this transport: the client posts an origin to
+// install, and a planToken to apply a previously previewed sync.
+const InstallSkillRequestSchema = z
+  .object({
+    origin: z.string().min(1, { message: "origin is required and must be a non-empty string" }),
+  })
+  .strict();
+const SyncCatalogRequestSchema = z
+  .object({
+    planToken: z.string().min(1, {
+      message: "body must be { planToken: string } from a prior /sync/resolve response",
+    }),
+  })
+  .strict();
 
 /**
  * Routes for /skills/* relative to the parent mount. Mounted by
@@ -48,7 +59,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       tags: ["catalog"],
       summary: "List skill entries",
       responses: {
-        200: jsonResponse(SkillEntrySchema.array(), "Skill entries"),
+        200: jsonResponse(ListSkillEntriesResponseSchema, "Skill entries"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -94,7 +105,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Get a skill's anchor content",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(AnchorResponseSchema, "Anchor content"),
+        200: jsonResponse(GetSkillContentResponseSchema.omit({ id: true }), "Anchor content"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -129,7 +140,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       },
       responses: {
         200: jsonResponse(
-          CatalogFileEntrySchema.array(),
+          ListSkillFilesResponseSchema,
           "File entries, or raw file bytes when ?path= is set",
         ),
         404: errorResponse("File not found"),
@@ -190,7 +201,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Get a skill with content",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(SkillWithContentSchema, "Skill with content"),
+        200: jsonResponse(
+          GetSkillEntryResponseSchema.unwrap().extend({ content: z.string() }),
+          "Skill with content",
+        ),
         404: errorResponse("Skill not found"),
         500: errorResponse("Internal error"),
       },
@@ -227,7 +241,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Install a skill from an origin",
       request: { body: jsonRequest(InstallSkillRequestSchema) },
       responses: {
-        201: jsonResponse(CatalogInstallResultSchema, "Install result"),
+        201: jsonResponse(ApplyPlanResponseSchema, "Install result"),
         400: errorResponse("Malformed request body"),
         500: errorResponse("Internal error"),
       },
@@ -309,7 +323,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
         body: jsonRequest(SyncCatalogRequestSchema),
       },
       responses: {
-        200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
+        200: jsonResponse(ApplyPlanResponseSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
         410: errorResponse("Plan token expired or already applied"),
         500: errorResponse("Internal error"),
@@ -359,7 +373,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Acknowledge a skill's prereqs",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(SkillSchema, "Skill"),
+        200: jsonResponse(GetSkillResponseSchema, "Skill"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -391,7 +405,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       summary: "Delete a skill",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(OkResponseSchema, "Deleted"),
+        200: jsonResponse(z.object({ ok: z.literal(true) }), "Deleted"),
         409: errorResponse("Skill still has dependents"),
         500: errorResponse("Internal error"),
       },

@@ -1,3 +1,4 @@
+import { errAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CreateScheduleRequest } from "../../src/application/create-schedule.js";
 import {
@@ -86,9 +87,7 @@ describe("RunScheduleUseCase", () => {
 
   it("maps a handler.dispatch throw to DatabaseUnavailable (does not record a fire)", async () => {
     (await h.module.createSchedule.execute(baseCreateOpts()))._unsafeUnwrap();
-    h.taskHandler.dispatch = async () => {
-      throw new Error("substrate down");
-    };
+    h.taskHandler.dispatch = () => errAsync({ cause: new Error("substrate down") });
     const result = await h.module.runSchedule.execute({ id: VALID_UUIDS[0] });
     expect(result.isErr()).toBe(true);
     const err = result._unsafeUnwrapErr();

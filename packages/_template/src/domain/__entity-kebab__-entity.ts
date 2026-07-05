@@ -8,6 +8,7 @@
 
 import { err, ok, type Result } from "neverthrow";
 import type { __Entity__Id } from "./__entity-kebab__-id.js";
+import type { __Entity__Name } from "./__entity-kebab__-name.js";
 
 export type __Entity__AlreadyArchived = {
   readonly type: "__Entity__AlreadyArchived";
@@ -16,21 +17,21 @@ export type __Entity__AlreadyArchived = {
 
 export interface __Entity__EntityArgs {
   readonly id: __Entity__Id;
-  readonly name: string;
+  readonly name: __Entity__Name;
   readonly createdAt: string;
   readonly archived: boolean;
 }
 
 export interface Create__Entity__Args {
   readonly id: __Entity__Id;
-  readonly name: string;
+  readonly name: __Entity__Name;
   /** ISO-8601 timestamp seeding `createdAt`. */
   readonly now: string;
 }
 
 export class __Entity__Entity {
   readonly id: __Entity__Id;
-  readonly name: string;
+  readonly name: __Entity__Name;
   readonly createdAt: string;
   private _archived: boolean;
 

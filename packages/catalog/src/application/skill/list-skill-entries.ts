@@ -1,10 +1,9 @@
-import { ResultAsync } from "neverthrow";
 import { z } from "zod";
-import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
-import type { McpRepository } from "../../domain/mcp-repository.js";
-import type { SkillEntity } from "../../domain/skill-entity.js";
-import type { SkillRepository } from "../../domain/skill-repository.js";
+import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
+import { selectInstalledMcpFqns } from "../mcp/mcp-reads.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
+import { collectReferencedSkillFqns, type SkillView, selectAllSkills } from "./skill-reads.js";
 
 const DependencyRefSchema = z.object({ fqn: z.string() });
 
@@ -64,9 +63,7 @@ export const ListSkillEntriesResponseSchema = z.array(ListSkillEntrySchema);
 export type ListSkillEntriesResponse = z.infer<typeof ListSkillEntriesResponseSchema>;
 export type ListSkillEntriesError = DatabaseUnavailable;
 export interface ListSkillEntriesDeps {
-  readonly skillRepo: SkillRepository;
-  readonly agentRepo: AgentRepository;
-  readonly mcpRepo: McpRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class ListSkillEntriesUseCase
@@ -77,42 +74,27 @@ export class ListSkillEntriesUseCase
   execute(
     _request: ListSkillEntriesRequest,
   ): UseCaseResult<ListSkillEntriesResponse, ListSkillEntriesError> {
-    return ResultAsync.combine([
-      this.deps.skillRepo.list(),
-      this.deps.agentRepo.list(),
-      this.deps.mcpRepo.list(),
-    ]).map(([skills, agents, mcps]) => {
-      const referencedSkillFqns = new Set<string>();
-      const referencedMcpFqns = new Set<string>();
-      for (const agent of agents) {
-        for (const fqn of agent.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-        for (const fqn of agent.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-      }
-      for (const skill of skills) {
-        for (const fqn of skill.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-        for (const fqn of skill.dependencyRefs.mcps) referencedMcpFqns.add(fqn);
-      }
-      const skillByFqn = new Map<string, SkillEntity>(
-        skills.map((skill) => [skill.fqn, skill] as const),
-      );
-      const mcpByFqn = new Map<string, (typeof mcps)[number]>(
-        mcps.map((mcp) => [mcp.fqn, mcp] as const),
-      );
+    return this.deps.queries.query((db) => {
+      const installed = selectAllSkills(db);
+      const referencedSkillFqns = collectReferencedSkillFqns(db);
+      const installedMcpFqns = selectInstalledMcpFqns(db);
+      const skillByFqn = new Map<string, SkillView>(installed.map((s) => [s.fqn, s] as const));
+
       const skillCache = new Map<string, ComputedStatus>();
       const inFlight = new Set<string>();
-      const computeSkillStatus = (skillEntity: SkillEntity): ComputedStatus => {
-        const cached = skillCache.get(skillEntity.fqn);
+      const computeSkillStatus = (skill: SkillView): ComputedStatus => {
+        const cached = skillCache.get(skill.fqn);
         if (cached !== undefined) return cached;
-        if (inFlight.has(skillEntity.fqn)) return { status: "ready" as const };
-        inFlight.add(skillEntity.fqn);
+        if (inFlight.has(skill.fqn)) return { status: "ready" as const };
+        inFlight.add(skill.fqn);
         const reason: BlockedReason = {};
-        if (!skillEntity.prereqsAck && (skillEntity.prereqs ?? "").trim().length > 0) {
+        if (!skill.prereqsAck && (skill.prereqs ?? "").trim().length > 0) {
           reason.needsPrereqsAck = true;
         }
-        if (!referencedSkillFqns.has(skillEntity.fqn)) reason.orphaned = true;
+        if (!referencedSkillFqns.has(skill.fqn)) reason.orphaned = true;
         const missing: MissingDep[] = [];
         const blockedDeps: BlockedDep[] = [];
-        for (const fqn of skillEntity.dependencyRefs.skills) {
+        for (const fqn of skill.dependencyRefs.skills) {
           const child = skillByFqn.get(fqn);
           if (child === undefined) {
             missing.push({ kind: "skill", name: fqn });
@@ -121,9 +103,8 @@ export class ListSkillEntriesUseCase
           const childStatus = computeSkillStatus(child);
           if (childStatus.status === "blocked") blockedDeps.push({ kind: "skill", fqn: child.fqn });
         }
-        for (const fqn of skillEntity.dependencyRefs.mcps) {
-          const child = mcpByFqn.get(fqn);
-          if (child === undefined) missing.push({ kind: "mcp", name: fqn });
+        for (const fqn of skill.dependencyRefs.mcps) {
+          if (!installedMcpFqns.has(fqn)) missing.push({ kind: "mcp", name: fqn });
         }
         if (missing.length > 0) reason.missingDeps = missing;
         if (blockedDeps.length > 0) reason.blockedDeps = blockedDeps;
@@ -131,36 +112,36 @@ export class ListSkillEntriesUseCase
           Object.keys(reason).length === 0
             ? { status: "ready" as const }
             : { status: "blocked" as const, reason };
-        inFlight.delete(skillEntity.fqn);
-        skillCache.set(skillEntity.fqn, result);
+        inFlight.delete(skill.fqn);
+        skillCache.set(skill.fqn, result);
         return result;
       };
-      const skillEntities = skills;
-      return skillEntities.map((skillEntity) => {
+
+      return installed.map((target) => {
         const dependencies =
-          skillEntity.dependencyRefs.skills.length > 0 || skillEntity.dependencyRefs.mcps.length > 0
+          target.dependencyRefs.skills.length > 0 || target.dependencyRefs.mcps.length > 0
             ? {
-                ...(skillEntity.dependencyRefs.skills.length > 0
-                  ? { skills: skillEntity.dependencyRefs.skills.map((fqn) => ({ fqn })) }
+                ...(target.dependencyRefs.skills.length > 0
+                  ? { skills: target.dependencyRefs.skills.map((fqn) => ({ fqn })) }
                   : {}),
-                ...(skillEntity.dependencyRefs.mcps.length > 0
-                  ? { mcps: skillEntity.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
+                ...(target.dependencyRefs.mcps.length > 0
+                  ? { mcps: target.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
                   : {}),
               }
             : undefined;
         const skill = {
-          fqn: skillEntity.fqn,
-          origin: skillEntity.origin,
-          description: skillEntity.description,
-          version: skillEntity.version,
-          ...(skillEntity.prereqs !== undefined ? { prereqs: skillEntity.prereqs } : {}),
-          prereqsAck: skillEntity.prereqsAck,
-          orphaned: !referencedSkillFqns.has(skillEntity.fqn),
-          installedAt: skillEntity.installedAt,
-          updatedAt: skillEntity.updatedAt,
+          fqn: target.fqn,
+          origin: target.origin,
+          description: target.description,
+          version: target.version,
+          ...(target.prereqs !== undefined ? { prereqs: target.prereqs } : {}),
+          prereqsAck: target.prereqsAck,
+          orphaned: !referencedSkillFqns.has(target.fqn),
+          installedAt: target.installedAt,
+          updatedAt: target.updatedAt,
           ...(dependencies !== undefined ? { dependencies } : {}),
         };
-        const computed = computeSkillStatus(skillEntity);
+        const computed = computeSkillStatus(target);
         if (computed.status === "ready") return { skill, status: "ready" as const };
         const out = {
           skill,

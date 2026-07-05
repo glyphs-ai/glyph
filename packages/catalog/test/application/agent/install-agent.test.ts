@@ -81,21 +81,18 @@ beforeEach(() => {
 describe("InstallAgentUseCase — happy path", () => {
   it("loads a manifest, creates a new agent, saves files, and returns the install DTO", async () => {
     const files = new Map([["AGENTS.md", Buffer.from("# triage")]]);
-    agentSource.load.mockReturnValue(
-      okAsync(
-        agentManifest({
-          prereqs: "Set token",
-          dependencyRefs: {
-            skills: [asSkillFqn("public/tool-use")],
-            mcps: [asMcpFqn("azure/mcp")],
-            agents: [asAgentFqn("public/worker")],
-          },
-          files,
-        }),
-      ),
-    );
+    agentSource.load.mockReturnValue(okAsync(agentManifest({ prereqs: "Set token", files })));
 
-    const dto = (await useCase.execute({ origin: AGENT_ORIGIN }))._unsafeUnwrap();
+    const dto = (
+      await useCase.execute({
+        origin: AGENT_ORIGIN,
+        dependencyRefs: {
+          skills: [asSkillFqn("public/tool-use")],
+          mcps: [asMcpFqn("azure/mcp")],
+          agents: [asAgentFqn("public/worker")],
+        },
+      })
+    )._unsafeUnwrap();
 
     const saved = agentRepo.save.mock.calls[0]?.[0];
     expect(agentSource.load).toHaveBeenCalledWith(AGENT_ORIGIN);
@@ -153,7 +150,12 @@ describe("InstallAgentUseCase — happy path", () => {
       ),
     );
 
-    const dto = (await useCase.execute({ origin: AGENT_ORIGIN }))._unsafeUnwrap();
+    const dto = (
+      await useCase.execute({
+        origin: AGENT_ORIGIN,
+        dependencyRefs: { skills: [], mcps: [], agents: [] },
+      })
+    )._unsafeUnwrap();
 
     expect(dto.prereqsAck).toBe(true);
     expect(dto.disabledByUser).toBe(true);
@@ -165,7 +167,12 @@ describe("InstallAgentUseCase — happy path", () => {
       okAsync(agentEntity({ origin: AGENT_ORIGIN, prereqs: "Old prereq", prereqsAck: true })),
     );
 
-    const dto = (await useCase.execute({ origin: AGENT_ORIGIN }))._unsafeUnwrap();
+    const dto = (
+      await useCase.execute({
+        origin: AGENT_ORIGIN,
+        dependencyRefs: { skills: [], mcps: [], agents: [] },
+      })
+    )._unsafeUnwrap();
 
     expect(dto.prereqsAck).toBe(false);
   });
@@ -177,7 +184,10 @@ describe("InstallAgentUseCase — error channel", () => {
       errAsync({ type: "OriginInvalid", origin: AGENT_ORIGIN, reason: "bad scheme" }),
     );
 
-    const res = await useCase.execute({ origin: AGENT_ORIGIN });
+    const res = await useCase.execute({
+      origin: AGENT_ORIGIN,
+      dependencyRefs: { skills: [], mcps: [], agents: [] },
+    });
 
     expect(res._unsafeUnwrapErr()).toEqual({
       type: "OriginInvalid",
@@ -191,7 +201,10 @@ describe("InstallAgentUseCase — error channel", () => {
     agentSource.load.mockReturnValue(okAsync(agentManifest()));
     agentRepo.get.mockReturnValue(okAsync(agentEntity({ origin: "file:///other" })));
 
-    const res = await useCase.execute({ origin: AGENT_ORIGIN });
+    const res = await useCase.execute({
+      origin: AGENT_ORIGIN,
+      dependencyRefs: { skills: [], mcps: [], agents: [] },
+    });
 
     expect(res._unsafeUnwrapErr()).toEqual({
       type: "AgentOriginConflict",
@@ -207,7 +220,10 @@ describe("InstallAgentUseCase — error channel", () => {
     agentSource.load.mockReturnValue(okAsync(agentManifest()));
     agentRepo.get.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
 
-    const res = await useCase.execute({ origin: AGENT_ORIGIN });
+    const res = await useCase.execute({
+      origin: AGENT_ORIGIN,
+      dependencyRefs: { skills: [], mcps: [], agents: [] },
+    });
 
     expect(res._unsafeUnwrapErr()).toEqual({ type: "DatabaseUnavailable", cause });
   });
@@ -217,7 +233,10 @@ describe("InstallAgentUseCase — error channel", () => {
     agentSource.load.mockReturnValue(okAsync(agentManifest()));
     agentRepo.save.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
 
-    const res = await useCase.execute({ origin: AGENT_ORIGIN });
+    const res = await useCase.execute({
+      origin: AGENT_ORIGIN,
+      dependencyRefs: { skills: [], mcps: [], agents: [] },
+    });
 
     expect(res._unsafeUnwrapErr()).toEqual({ type: "DatabaseUnavailable", cause });
   });

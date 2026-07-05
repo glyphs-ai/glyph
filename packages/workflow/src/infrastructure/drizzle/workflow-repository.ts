@@ -31,21 +31,6 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
     this.logger = opts.logger ?? silentLogger;
   }
 
-  insert(entity: WorkflowEntity): ResultAsync<void, DatabaseUnavailable> {
-    return ResultAsync.fromPromise(
-      Promise.resolve().then(() =>
-        this.db.transaction((tx) => {
-          tx.insert(workflows).values(WorkflowMapper.toWorkflowRow(entity)).run();
-          for (const node of entity.nodes)
-            tx.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
-          for (const edge of entity.edges)
-            tx.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
-        }),
-      ),
-      mapToDatabaseUnavailable,
-    );
-  }
-
   get(
     id: WorkflowId,
   ): ResultAsync<
@@ -89,13 +74,15 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
     return ResultAsync.fromPromise(
       Promise.resolve().then(() =>
         this.db.transaction((tx) => {
-          if (entity.__isDeleted()) {
-            tx.delete(workflowEdges).where(eq(workflowEdges.workflowId, entity.id)).run();
-            tx.delete(workflowNodes).where(eq(workflowNodes.workflowId, entity.id)).run();
-            tx.delete(workflows).where(eq(workflows.id, entity.id)).run();
+          const snapshot = entity.__snapshot();
+          if (snapshot.header === null) {
+            tx.insert(workflows).values(WorkflowMapper.toWorkflowRow(entity)).run();
+            for (const node of entity.nodes)
+              tx.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
+            for (const edge of entity.edges)
+              tx.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
             return;
           }
-          const snapshot = entity.__snapshot();
           if (headerChanged(snapshot.header, entity))
             tx.update(workflows)
               .set(workflowPatch(entity))
@@ -130,6 +117,19 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
           for (const edge of entity.edges)
             if (!snapshot.edgeKeys.has(edgeKey(edge.from, edge.to)))
               tx.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
+        }),
+      ),
+      mapToDatabaseUnavailable,
+    );
+  }
+
+  delete(id: WorkflowId): ResultAsync<void, DatabaseUnavailable> {
+    return ResultAsync.fromPromise(
+      Promise.resolve().then(() =>
+        this.db.transaction((tx) => {
+          tx.delete(workflowEdges).where(eq(workflowEdges.workflowId, id)).run();
+          tx.delete(workflowNodes).where(eq(workflowNodes.workflowId, id)).run();
+          tx.delete(workflows).where(eq(workflows.id, id)).run();
         }),
       ),
       mapToDatabaseUnavailable,

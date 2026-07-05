@@ -40,7 +40,14 @@ export class InMemoryLiveProcessRegistry implements LiveProcessRegistry {
         // watch failure so the orchestrator records a typed terminal status.
         outcome = { kind: "watch-failed", cause };
       }
-      await onExit(outcome, entry.killReason);
+      try {
+        await onExit(outcome, entry.killReason);
+      } catch {
+        // `onExit` (the supervisor's terminal-persistence step) is designed to
+        // swallow its own failures; guard defensively so an unexpected rejection
+        // can neither leak this entry (the delete below always runs) nor reject
+        // `settled` (which `awaitSettled` callers await directly).
+      }
       this.live.delete(id);
     })();
     this.live.set(id, entry);

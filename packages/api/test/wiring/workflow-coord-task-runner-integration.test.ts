@@ -126,19 +126,23 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
   // Worker stub — not exercised by these scenarios; present only
   // because `WorkflowRunners` requires both kinds.
   const workerRunner: WorkflowNodeRunner = {
-    async validate(spec) {
-      return spec;
+    validate(spec) {
+      return okAsync(spec);
     },
-    async dispatch(_opts) {},
-    async hasInFlightForNode(_nodeId) {
-      return false;
+    dispatch(_opts) {
+      return okAsync(undefined);
     },
-    async cancel(_nodeId) {},
-    async listArtifacts() {
-      return null;
+    hasInFlightForNode(_nodeId) {
+      return okAsync(false);
     },
-    async resolveArtifactPath() {
-      return null;
+    cancel(_nodeId) {
+      return okAsync(undefined);
+    },
+    listArtifacts() {
+      return okAsync(null);
+    },
+    resolveArtifactPath() {
+      return okAsync(null);
     },
   };
 
@@ -150,12 +154,12 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
       coordinator: coordRunner,
       worker: workerRunner,
       human: {
-        validate: async (s) => s,
-        dispatch: async () => {},
-        hasInFlightForNode: async () => false,
-        cancel: async () => {},
-        listArtifacts: async () => null,
-        resolveArtifactPath: async () => null,
+        validate: (s) => okAsync(s),
+        dispatch: () => okAsync(undefined),
+        hasInFlightForNode: () => okAsync(false),
+        cancel: () => okAsync(undefined),
+        listArtifacts: () => okAsync(null),
+        resolveArtifactPath: () => okAsync(null),
       },
     },
     logger: silentLogger,

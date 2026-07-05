@@ -1,4 +1,4 @@
-import { err, ok, ResultAsync, safeTry } from "neverthrow";
+import { err, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import { nextRuns } from "../domain/schedule/cron.js";
 import type { ScheduleCorruption } from "../domain/schedule/schedule-errors.js";
@@ -59,10 +59,11 @@ export class RunScheduleUseCase
 
       const now = deps.now();
       const firedAt = now.toISOString();
-      const dispatched = yield* ResultAsync.fromPromise(
-        handler.dispatch({ scheduleId: id, firedAt, data: entity.target.data }),
-        (cause): DatabaseUnavailable => ({ type: "DatabaseUnavailable", cause }),
-      );
+      const dispatched = yield* handler
+        .dispatch({ scheduleId: id, firedAt, data: entity.target.data })
+        .mapErr(
+          (fault): DatabaseUnavailable => ({ type: "DatabaseUnavailable", cause: fault.cause }),
+        );
       const [nextIso] = nextRuns(entity.trigger.expr, entity.trigger.tz, now, 1);
       entity.recordFired(firedAt, nextIso);
       yield* deps.repo.save(entity);

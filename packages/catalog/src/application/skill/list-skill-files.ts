@@ -1,7 +1,10 @@
+import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { CatalogFileEntry, DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { CatalogFileEntry } from "../../domain/catalog-file.js";
 import { SkillFqnSchema } from "../../domain/skill-fqn.js";
-import type { SkillRepository } from "../../domain/skill-repository.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
+import { skillFiles } from "../../infrastructure/drizzle/skill-schema.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 
 export const ListSkillFilesRequestSchema = z.object({ id: SkillFqnSchema });
@@ -13,7 +16,7 @@ export type ListSkillFilesResponse = CatalogFileEntry[];
 export type ListSkillFilesError = DatabaseUnavailable;
 
 export interface ListSkillFilesDeps {
-  readonly skillRepo: SkillRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class ListSkillFilesUseCase
@@ -24,6 +27,15 @@ export class ListSkillFilesUseCase
   execute(
     request: ListSkillFilesRequest,
   ): UseCaseResult<ListSkillFilesResponse, ListSkillFilesError> {
-    return this.deps.skillRepo.listFilePaths(request.id);
+    const { id } = request;
+    return this.deps.queries.query((db) =>
+      db
+        .select({ relPath: skillFiles.relPath, content: skillFiles.content })
+        .from(skillFiles)
+        .where(eq(skillFiles.skillFqn, id))
+        .orderBy(skillFiles.relPath)
+        .all()
+        .map((row) => ({ relPath: row.relPath, size: row.content.byteLength })),
+    );
   }
 }

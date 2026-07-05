@@ -1,4 +1,4 @@
-import { err, ok, ResultAsync, safeTry } from "neverthrow";
+import { err, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import type {
   ScheduleCorruption,
@@ -70,22 +70,15 @@ export class DeleteScheduleUseCase
       if (existing.enabled) return err({ type: "ScheduleEnabled" as const, id });
       const handler = yield* deps.registry.handlerFor(existing.target.kind);
 
-      const inFlightBefore = yield* ResultAsync.fromPromise(
-        handler.hasInFlightForSchedule(id),
-        asDatabaseUnavailable,
-      );
+      const inFlightBefore = yield* handler
+        .hasInFlightForSchedule(id)
+        .mapErr(asDatabaseUnavailable);
       if (inFlightBefore) return err({ type: "ScheduleHasInFlight" as const, id });
 
       deps.engine.cancel(id);
-      const { deletedCount } = yield* ResultAsync.fromPromise(
-        handler.deleteForSchedule(id),
-        asDatabaseUnavailable,
-      );
+      const { deletedCount } = yield* handler.deleteForSchedule(id).mapErr(asDatabaseUnavailable);
 
-      const inFlightAfter = yield* ResultAsync.fromPromise(
-        handler.hasInFlightForSchedule(id),
-        asDatabaseUnavailable,
-      );
+      const inFlightAfter = yield* handler.hasInFlightForSchedule(id).mapErr(asDatabaseUnavailable);
       // TOCTOU: a concurrent manual run() slipped a fresh dispatch in between
       // our original check and the cascade. The cascade's terminal-only filter
       // left it alone; refuse the delete so no orphan dispatch points at a dead
@@ -98,6 +91,6 @@ export class DeleteScheduleUseCase
   }
 }
 
-function asDatabaseUnavailable(cause: unknown): DatabaseUnavailable {
-  return { type: "DatabaseUnavailable", cause };
+function asDatabaseUnavailable(fault: { readonly cause: unknown }): DatabaseUnavailable {
+  return { type: "DatabaseUnavailable", cause: fault.cause };
 }

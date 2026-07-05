@@ -1,4 +1,4 @@
-import { err, ok, ResultAsync, safeTry } from "neverthrow";
+import { err, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import { nextRuns } from "../domain/schedule/cron.js";
 import type { ScheduleEntity } from "../domain/schedule/schedule-entity.js";
@@ -136,12 +136,11 @@ export class PatchScheduleUseCase
           originalTargetData,
           parsed.target.patch,
         );
-        const validatedMerged = yield* ResultAsync.fromPromise(
-          handler.validate(merged, { changedKeys }),
-          (cause): TargetValidationFailed => ({
+        const validatedMerged = yield* handler.validate(merged, { changedKeys }).mapErr(
+          (fault): TargetValidationFailed => ({
             type: "TargetValidationFailed",
             kind: originalTargetKind,
-            cause,
+            cause: fault.cause,
           }),
         );
         yield* existing.withTarget({ kind: originalTargetKind, data: validatedMerged }, now);

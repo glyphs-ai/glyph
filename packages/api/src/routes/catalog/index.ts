@@ -1,11 +1,20 @@
 import type { CatalogModule } from "@glyphs-ai/catalog";
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { createApiApp, errorResponse, jsonResponse } from "../../_http-helpers.js";
-import { CatalogOverviewSchema } from "../../schemas/catalog.js";
 import { agentsRoutes } from "./agents.js";
 import { mcpsRoutes } from "./mcps.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 import { skillsRoutes } from "./skills.js";
+
+const CatalogOverviewSchema = z.object({
+  counts: z.object({
+    skills: z.number(),
+    agents: z.number(),
+    mcps: z.number(),
+    blocked: z.number(),
+    orphaned: z.number(),
+  }),
+});
 
 /**
  * Workspace-scoped catalog routes. The routes pull a per-workspace

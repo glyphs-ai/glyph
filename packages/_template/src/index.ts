@@ -11,6 +11,16 @@ export {
   compose__Entity__Module,
 } from "./__entity-kebab__-module.js";
 export {
+  type __Entity__AlreadyArchived,
+  type __Entity__Error,
+  type __Entity__Id,
+  __Entity__IdSchema,
+  type __Entity__Name,
+  __Entity__NameSchema,
+  type __Entity__NotFound,
+  type DatabaseUnavailable,
+} from "./application/__entity-kebab__-public.js";
+export {
   type Archive__Entity__Error,
   type Archive__Entity__Request,
   Archive__Entity__RequestSchema,
@@ -31,7 +41,6 @@ export {
   type Get__Entity__Response,
   Get__Entity__ResponseSchema,
 } from "./application/get-__entity-kebab__.js";
-export * from "./application/index.js";
 export {
   type List__Entity__sError,
   type List__Entity__sRequest,
@@ -39,3 +48,4 @@ export {
   type List__Entity__sResponse,
   List__Entity__sResponseSchema,
 } from "./application/list-__entity-kebab__s.js";
+export { type Db, openDb } from "./infrastructure/drizzle/__entity-kebab__-db.js";

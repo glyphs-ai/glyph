@@ -59,7 +59,7 @@ beforeEach(() => {
 
 describe("InstallSkillUseCase — mutation paths", () => {
   it("loads a new skill, saves entity plus files, and returns install status", async () => {
-    const res = await useCase.execute({ origin: ORIGIN });
+    const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrap()).toEqual({
       id: SKILL_ID,
       origin: ORIGIN,
@@ -82,7 +82,7 @@ describe("InstallSkillUseCase — mutation paths", () => {
 
   it("omits blank prereqs and auto-acknowledges when no prereqs exist", async () => {
     skillSource.load.mockReturnValue(okAsync(manifest()));
-    const res = await useCase.execute({ origin: ORIGIN });
+    const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrap()).toEqual({ id: SKILL_ID, origin: ORIGIN, prereqsAck: true });
   });
 
@@ -104,13 +104,13 @@ describe("InstallSkillUseCase — mutation paths", () => {
 
   it("carries prereqs acknowledgement across same-origin reinstall when prereqs match", async () => {
     skillRepo.get.mockReturnValue(okAsync(skill({ prereqsAck: true })));
-    const res = await useCase.execute({ origin: ORIGIN });
+    const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrap().prereqsAck).toBe(true);
   });
 
   it("resets carried acknowledgement when prereqs change", async () => {
     skillRepo.get.mockReturnValue(okAsync(skill({ prereqs: "old", prereqsAck: true })));
-    const res = await useCase.execute({ origin: ORIGIN });
+    const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrap().prereqsAck).toBe(false);
   });
 });
@@ -119,14 +119,14 @@ describe("InstallSkillUseCase — error channel", () => {
   it("propagates SourceError from skillSource.load", async () => {
     const sourceError = { type: "OriginInvalid", origin: ORIGIN, reason: "bad" } as const;
     skillSource.load.mockReturnValue(errAsync(sourceError));
-    const res = await useCase.execute({ origin: ORIGIN });
+    const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrapErr()).toBe(sourceError);
     expect(skillRepo.save).not.toHaveBeenCalled();
   });
 
   it("returns SkillOriginConflict when an existing skill has another origin", async () => {
     skillRepo.get.mockReturnValue(okAsync(skill({ origin: OTHER_ORIGIN })));
-    const res = await useCase.execute({ origin: ORIGIN });
+    const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrapErr()).toEqual({
       type: "SkillOriginConflict",
       fqn: SKILL_ID,
@@ -138,13 +138,13 @@ describe("InstallSkillUseCase — error channel", () => {
 
   it("propagates DatabaseUnavailable from repo.get", async () => {
     skillRepo.get.mockReturnValue(errAsync(databaseError));
-    const res = await useCase.execute({ origin: ORIGIN });
+    const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrapErr()).toBe(databaseError);
   });
 
   it("propagates DatabaseUnavailable from repo.save", async () => {
     skillRepo.save.mockReturnValue(errAsync(databaseError));
-    const res = await useCase.execute({ origin: ORIGIN });
+    const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrapErr()).toBe(databaseError);
   });
 });

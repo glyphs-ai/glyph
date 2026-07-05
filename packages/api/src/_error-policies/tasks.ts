@@ -34,7 +34,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { CodeStatusEntry } from "../_http-errors.js";
 import { logFault } from "../_http-errors.js";
-import { TaskOperationError } from "../wiring/_task-operation-error.js";
+import { isTaskUnionError } from "../wiring/_task-operation-error.js";
 
 /** Every DU error value a task / scheduled-task route can surface from `.execute()`. */
 export type TaskRouteError =
@@ -97,8 +97,8 @@ export interface RespondTaskErrorOpts {
  * two richer envelopes the dashboard / CLI consume. Shared by
  * {@link respondTaskError} (task + scheduled-task routes) and
  * {@link taskUnionCodeStatuses} (the schedule / workflow policies, which
- * catch the same union via the `TaskOperationError` carrier), so every task
- * error surfaces one `code = union type` + message table.
+ * catch the same raw union atoms), so every task error surfaces one
+ * `code = union type` + message table.
  */
 export function taskErrorWireBody(
   err: TaskRouteError,
@@ -142,17 +142,16 @@ export function respondTaskError(
 
 /**
  * `codeStatuses` rows shared by the schedule and workflow error policies. A
- * task use-case failure raised inside a schedule run or a workflow node is
- * wrapped in a `TaskOperationError` (carrying the union value as `.detail`);
- * these rows resolve its HTTP status from the shared {@link STATUS_BY_TYPE}
- * table — identical to the task routes — and build the body from `.detail`, so
- * `code` is the union `type` everywhere. The body builder guards on
- * `TaskOperationError` so a same-`code` error from another source falls back
- * to an opaque body rather than dereferencing a missing `.detail`.
+ * task use-case failure raised inside a schedule run or a workflow node
+ * propagates as a raw task union atom. These rows resolve its HTTP status from
+ * the shared {@link STATUS_BY_TYPE} table — identical to the task routes — and
+ * build the body from the atom, so `code` is the union `type` everywhere. The
+ * body builder guards on the DU shape so a same-`code` error from another source
+ * falls back to an opaque body.
  */
 function taskCarrierWireBody(err: unknown): Record<string, unknown> {
-  if (err instanceof TaskOperationError) {
-    return taskErrorWireBody(err.detail as TaskRouteError);
+  if (isTaskUnionError(err)) {
+    return taskErrorWireBody(err as unknown as TaskRouteError);
   }
   return { error: "internal error" };
 }

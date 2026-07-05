@@ -44,7 +44,6 @@ import {
 } from "../src/routes/schedules/scheduled-tasks.js";
 import { tasksRoutes } from "../src/routes/tasks.js";
 import { workspacesRoutes } from "../src/routes/workspaces.js";
-import { TaskOperationError } from "../src/wiring/_task-operation-error.js";
 import { captureLogger } from "./_capture-logger.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: transport tests assert on dynamically-shaped JSON bodies
@@ -126,11 +125,11 @@ describe("respondError contract — cross-domain status preservation", () => {
     // The schedule pkg is kind-agnostic and does not own an
     // agent-not-found class. The task-kind handler (in
     // `packages/api/src/wiring/schedule-task-handler.ts`) raises
-    // TaskOperationError with an AgentNotFound detail on catalog miss,
-    // and the schedules policy maps that code to 400 (one row covers
+    // a raw AgentNotFound atom on catalog miss, and the schedules policy
+    // maps that code to 400 (one row covers
     // both the validation and dispatch paths).
     const create = vi.fn(() =>
-      errAsync(new TaskOperationError({ type: "AgentNotFound", agent: "ghost" } as AgentNotFound)),
+      errAsync({ type: "AgentNotFound", agent: "ghost" } as AgentNotFound),
     );
     const stub = { createSchedule: { execute: create } } as never;
     const res = await schedulesTaskRoutes(() => stub).request("/", {
@@ -387,13 +386,11 @@ describe("respondError contract — AgentResolutionFailed 500 path", () => {
 
   it("schedules CREATE AgentResolutionFailed (via kind handler) → 500 + opaque body + 5xx fault log", async () => {
     const create = vi.fn(() =>
-      errAsync(
-        new TaskOperationError({
-          type: "AgentResolutionFailed",
-          agent: "public/writer",
-          cause: new Error("DB exploded"),
-        } as AgentResolutionFailed),
-      ),
+      errAsync({
+        type: "AgentResolutionFailed",
+        agent: "public/writer",
+        cause: new Error("DB exploded"),
+      } as AgentResolutionFailed),
     );
     const stub = { createSchedule: { execute: create } } as never;
     const { app, cap } = await buildAppWithLogger((a) => {
@@ -429,13 +426,11 @@ describe("respondError contract — AgentResolutionFailed 500 path", () => {
     // this would fall through to 400 'unmapped'.
     const sid = "550e8400-e29b-41d4-a716-446655440000";
     const run = vi.fn(() =>
-      errAsync(
-        new TaskOperationError({
-          type: "AgentResolutionFailed",
-          agent: "public/writer",
-          cause: new Error("DB exploded"),
-        } as AgentResolutionFailed),
-      ),
+      errAsync({
+        type: "AgentResolutionFailed",
+        agent: "public/writer",
+        cause: new Error("DB exploded"),
+      } as AgentResolutionFailed),
     );
     const stub = { runSchedule: { execute: run } } as never;
     const { app, cap } = await buildAppWithLogger((a) => {

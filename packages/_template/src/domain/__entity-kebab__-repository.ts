@@ -17,17 +17,14 @@ export type __Entity__NotFound = {
 };
 
 /**
- * Persistence port for the __Entity__ aggregate. Reads return
- * {@link __Entity__Entity}; row shapes stay inside infrastructure.
- * Error unions are inlined per signature (no per-op alias). `findById`
- * treats absence as `undefined`; `get` asserts existence with
- * `__Entity__NotFound`.
+ * Write-side persistence port for the __Entity__ aggregate. Repositories expose
+ * only the basic write-side triad: `get` asserts aggregate existence for a
+ * mutation, `save` persists both new and changed aggregates, and `delete`
+ * removes an aggregate. Flexible read use-cases go through the query seam in
+ * infrastructure/drizzle instead of expanding this port.
  */
 export interface __Entity__Repository {
   get(id: __Entity__Id): ResultAsync<__Entity__Entity, __Entity__NotFound | DatabaseUnavailable>;
-  findById(id: __Entity__Id): ResultAsync<__Entity__Entity | undefined, DatabaseUnavailable>;
-  list(): ResultAsync<__Entity__Entity[], DatabaseUnavailable>;
-  insert(entity: __Entity__Entity): ResultAsync<void, DatabaseUnavailable>;
   save(entity: __Entity__Entity): ResultAsync<void, DatabaseUnavailable>;
   delete(id: __Entity__Id): ResultAsync<void, DatabaseUnavailable>;
 }

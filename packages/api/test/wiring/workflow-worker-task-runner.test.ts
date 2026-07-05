@@ -34,6 +34,7 @@
  */
 
 import type { TaskModule } from "@glyphs-ai/task";
+import type { ResultAsync } from "neverthrow";
 import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -45,6 +46,14 @@ import {
 } from "../../src/wiring/workflow-worker-task-runner.js";
 
 type CatalogAgentLookup = Parameters<typeof makeWorkerNodeRunner>[0]["catalog"];
+
+async function errCause<T>(
+  resultAsync: ResultAsync<T, { readonly cause: unknown }>,
+): Promise<unknown> {
+  const result = await resultAsync;
+  expect(result.isErr()).toBe(true);
+  return result._unsafeUnwrapErr().cause;
+}
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal Task stub for status-mapping tests; full Task type not needed.
 function fakeTaskRow(overrides: Partial<{ id: string; status: string }> = {}): any {
@@ -164,7 +173,9 @@ describe("makeWorkerNodeRunner — validate", () => {
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    const result = await r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX);
+    const result = (
+      await r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)
+    )._unsafeUnwrap();
     expect(result).toEqual({ agent: "w", brief: "b" });
     expect(deps.getAgent).toHaveBeenCalledWith("w");
     await r.dispose();
@@ -176,10 +187,12 @@ describe("makeWorkerNodeRunner — validate", () => {
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    const result = await r.validate(
-      { agent: "w", brief: "b", details: "long body", runtime: "copilot" },
-      NODE_VALIDATE_CTX,
-    );
+    const result = (
+      await r.validate(
+        { agent: "w", brief: "b", details: "long body", runtime: "copilot" },
+        NODE_VALIDATE_CTX,
+      )
+    )._unsafeUnwrap();
     expect(result).toEqual({
       agent: "w",
       brief: "b",
@@ -195,13 +208,15 @@ describe("makeWorkerNodeRunner — validate", () => {
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    await expect(r.validate(null, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate(null, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowWorkerSpecError,
     );
-    await expect(r.validate("string", NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate("string", NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowWorkerSpecError,
     );
-    await expect(r.validate([], NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowWorkerSpecError);
+    expect(await errCause(r.validate([], NODE_VALIDATE_CTX))).toBeInstanceOf(
+      WorkflowWorkerSpecError,
+    );
     await r.dispose();
   });
 
@@ -211,12 +226,12 @@ describe("makeWorkerNodeRunner — validate", () => {
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    await expect(r.validate({ brief: "b" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ brief: "b" }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowWorkerSpecError,
     );
-    await expect(r.validate({ agent: "  ", brief: "b" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
-      WorkflowWorkerSpecError,
-    );
+    expect(
+      await errCause(r.validate({ agent: "  ", brief: "b" }, NODE_VALIDATE_CTX)),
+    ).toBeInstanceOf(WorkflowWorkerSpecError);
     await r.dispose();
   });
 
@@ -226,33 +241,36 @@ describe("makeWorkerNodeRunner — validate", () => {
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    await expect(
-      r.validate({ agent: "w", brief: "line1\nline2" }, NODE_VALIDATE_CTX),
-    ).rejects.toBeInstanceOf(WorkflowWorkerSpecError);
+    expect(
+      await errCause(r.validate({ agent: "w", brief: "line1\nline2" }, NODE_VALIDATE_CTX)),
+    ).toBeInstanceOf(WorkflowWorkerSpecError);
     await r.dispose();
   });
 
-  it("throws AgentNotFoundError when catalog returns null", async () => {
+  it("throws AgentNotFound DU when catalog returns null", async () => {
     const deps = stubDeps({ agent: null });
     const r = makeWorkerNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    await expect(
-      r.validate({ agent: "missing", brief: "b" }, NODE_VALIDATE_CTX),
-    ).rejects.toMatchObject({ code: "AgentNotFound" });
+    expect(
+      await errCause(r.validate({ agent: "missing", brief: "b" }, NODE_VALIDATE_CTX)),
+    ).toMatchObject({ type: "AgentNotFound", agent: "missing" });
     await r.dispose();
   });
 
-  it("throws AgentResolutionFailedError when catalog throws", async () => {
+  it("throws AgentResolutionFailed DU when catalog throws", async () => {
     const deps = stubDeps({ getAgentThrows: new Error("catalog down") });
     const r = makeWorkerNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    await expect(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)).rejects.toMatchObject({
-      code: "AgentResolutionFailed",
-    });
+    expect(await errCause(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX))).toMatchObject(
+      {
+        type: "AgentResolutionFailed",
+        agent: "w",
+      },
+    );
     await r.dispose();
   });
 
@@ -276,7 +294,9 @@ describe("makeWorkerNodeRunner — validate", () => {
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    const result = await r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX);
+    const result = (
+      await r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)
+    )._unsafeUnwrap();
     expect(result).toEqual({ agent: "w", brief: "b" });
     // The menu check must query the coord agent in addition to the worker.
     expect(deps.getAgent).toHaveBeenCalledWith("w");
@@ -295,11 +315,14 @@ describe("makeWorkerNodeRunner — validate", () => {
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    await expect(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
-      WorkflowWorkerNotInCoordMenuError,
-    );
-    await expect(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)).rejects.toThrow(
-      /dispatch menu|dependencies\.agents|not in/i,
+    expect(
+      await errCause(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)),
+    ).toBeInstanceOf(WorkflowWorkerNotInCoordMenuError);
+    expect(
+      await errCause(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)),
+    ).toHaveProperty(
+      "message",
+      expect.stringMatching(/dispatch menu|dependencies\.agents|not in/i),
     );
     await r.dispose();
   });
@@ -314,9 +337,9 @@ describe("makeWorkerNodeRunner — validate", () => {
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    await expect(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
-      WorkflowWorkerNotInCoordMenuError,
-    );
+    expect(
+      await errCause(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX)),
+    ).toBeInstanceOf(WorkflowWorkerNotInCoordMenuError);
     await r.dispose();
   });
 });
@@ -330,10 +353,12 @@ describe("makeWorkerNodeRunner — dispatch", () => {
       tasks: deps.tasks,
       pollIntervalMs: 100_000, // never poll during this test
     });
-    const result = await r.dispatch({
-      ...DISPATCH_OPTS_BASE,
-      onTerminal: () => {},
-    });
+    const result = (
+      await r.dispatch({
+        ...DISPATCH_OPTS_BASE,
+        onTerminal: () => {},
+      })
+    )._unsafeUnwrap();
     expect(deps.dispatch).toHaveBeenCalledWith({
       agent: "w",
       brief: "b",
@@ -629,7 +654,9 @@ describe("makeWorkerNodeRunner — hasInFlightForNode + cancel + dispose", () =>
       catalog: deps.catalog,
       tasks: deps.tasks,
     });
-    const result = await r.hasInFlightForNode("deadbeef-cafe-4bab-89ab-cafebabe1234");
+    const result = (
+      await r.hasInFlightForNode("deadbeef-cafe-4bab-89ab-cafebabe1234")
+    )._unsafeUnwrap();
     expect(result).toBe(true);
     expect(deps.hasInFlightForWorkflowNode).toHaveBeenCalledWith({
       origin: "workflow",

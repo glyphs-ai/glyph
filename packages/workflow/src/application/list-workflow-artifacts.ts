@@ -1,4 +1,4 @@
-import { ResultAsync } from "neverthrow";
+import { err, ok, type Result, ResultAsync } from "neverthrow";
 import { z } from "zod";
 import type { WorkflowArtifactListingFailed } from "../domain/workflow/workflow-artifact.js";
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
@@ -82,39 +82,52 @@ export class ListWorkflowArtifactsUseCase
   ): UseCaseResult<ListWorkflowArtifactsResponse, ListWorkflowArtifactsError> {
     const { workflowId } = ListWorkflowArtifactsRequestSchema.parse(request);
     const getDag = new GetWorkflowDagUseCase({ query: this.deps.query });
-    return getDag.execute({ workflowId }).andThen((snapshot) =>
-      ResultAsync.fromPromise(
-        (async (): Promise<ListWorkflowArtifactsResponse> => {
-          const summaryFiles = await this.deps.sandbox.listArtifacts(workflowId);
-          const artifacts: WorkflowArtifactEntry[] = summaryFiles.map((f) => ({
-            kind: "workflow-summary",
-            relPath: f.relPath,
-            size: f.size,
-            modifiedAt: f.modifiedAt,
-          }));
-
-          const nodes = [...snapshot.nodes].sort((a, b) => a.id.localeCompare(b.id));
-          for (const node of nodes) {
-            const listing = await runnerFor(this.deps.runners, node.kind).listArtifacts(node.id);
-            if (listing === null) continue;
-            for (const f of listing.artifacts) {
-              artifacts.push({
-                kind: "node",
-                nodeId: node.id,
-                relPath: f.relPath,
-                size: f.size,
-                modifiedAt: f.modifiedAt,
-              });
+    return getDag.execute({ workflowId }).andThen(
+      (snapshot) =>
+        new ResultAsync(
+          (async (): Promise<
+            Result<ListWorkflowArtifactsResponse, WorkflowArtifactListingFailed>
+          > => {
+            let summaryFiles: Awaited<ReturnType<WorkflowSandbox["listArtifacts"]>>;
+            try {
+              summaryFiles = await this.deps.sandbox.listArtifacts(workflowId);
+            } catch (cause) {
+              return err({ type: "WorkflowArtifactListingFailed", cause });
             }
-          }
+            const artifacts: WorkflowArtifactEntry[] = summaryFiles.map((f) => ({
+              kind: "workflow-summary",
+              relPath: f.relPath,
+              size: f.size,
+              modifiedAt: f.modifiedAt,
+            }));
 
-          return { artifacts };
-        })(),
-        (cause): WorkflowArtifactListingFailed => ({
-          type: "WorkflowArtifactListingFailed",
-          cause,
-        }),
-      ),
+            const nodes = [...snapshot.nodes].sort((a, b) => a.id.localeCompare(b.id));
+            for (const node of nodes) {
+              const listingResult = await runnerFor(this.deps.runners, node.kind).listArtifacts(
+                node.id,
+              );
+              if (listingResult.isErr()) {
+                return err({
+                  type: "WorkflowArtifactListingFailed",
+                  cause: listingResult.error.cause,
+                });
+              }
+              const listing = listingResult.value;
+              if (listing === null) continue;
+              for (const f of listing.artifacts) {
+                artifacts.push({
+                  kind: "node",
+                  nodeId: node.id,
+                  relPath: f.relPath,
+                  size: f.size,
+                  modifiedAt: f.modifiedAt,
+                });
+              }
+            }
+
+            return ok({ artifacts });
+          })(),
+        ),
     );
   }
 }

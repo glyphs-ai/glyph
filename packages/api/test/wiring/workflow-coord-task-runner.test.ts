@@ -25,9 +25,9 @@
 
 import type { TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
+import type { ResultAsync } from "neverthrow";
 import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TaskOperationError } from "../../src/wiring/_task-operation-error.js";
 import {
   COORD_FRAMING_PROMPT_COPILOT,
   DEFAULT_COORD_MAX_POLL_ERRORS,
@@ -36,6 +36,14 @@ import {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "../../src/wiring/workflow-coord-task-runner.js";
+
+async function errCause<T>(
+  resultAsync: ResultAsync<T, { readonly cause: unknown }>,
+): Promise<unknown> {
+  const result = await resultAsync;
+  expect(result.isErr()).toBe(true);
+  return result._unsafeUnwrapErr().cause;
+}
 
 describe("COORD_FRAMING_PROMPT_COPILOT", () => {
   it("is single-line printable ASCII (safe as a cmd.exe /c argv element)", () => {
@@ -193,7 +201,7 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    const result = await r.validate({ agent: "x" }, NODE_VALIDATE_CTX);
+    const result = (await r.validate({ agent: "x" }, NODE_VALIDATE_CTX))._unsafeUnwrap();
     expect(result).toEqual({ agent: "x" });
     expect(deps.getAgent).toHaveBeenCalledWith("x");
     await r.dispose();
@@ -207,8 +215,13 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({}, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowCoordSpecError);
-    await expect(r.validate({}, NODE_VALIDATE_CTX)).rejects.toThrow(/agent/);
+    expect(await errCause(r.validate({}, NODE_VALIDATE_CTX))).toBeInstanceOf(
+      WorkflowCoordSpecError,
+    );
+    expect(await errCause(r.validate({}, NODE_VALIDATE_CTX))).toHaveProperty(
+      "message",
+      expect.stringMatching(/agent/),
+    );
     await r.dispose();
   });
 
@@ -220,10 +233,13 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ agent: "" }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordSpecError,
     );
-    await expect(r.validate({ agent: "" }, NODE_VALIDATE_CTX)).rejects.toThrow(/non-empty/);
+    expect(await errCause(r.validate({ agent: "" }, NODE_VALIDATE_CTX))).toHaveProperty(
+      "message",
+      expect.stringMatching(/non-empty/),
+    );
     await r.dispose();
   });
 
@@ -235,7 +251,7 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "   " }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ agent: "   " }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordSpecError,
     );
     await r.dispose();
@@ -249,7 +265,7 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "x", extra: 1 }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ agent: "x", extra: 1 }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordSpecError,
     );
     await r.dispose();
@@ -263,7 +279,7 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate(null, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate(null, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordSpecError,
     );
     await r.dispose();
@@ -277,7 +293,9 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate("x", NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowCoordSpecError);
+    expect(await errCause(r.validate("x", NODE_VALIDATE_CTX))).toBeInstanceOf(
+      WorkflowCoordSpecError,
+    );
     await r.dispose();
   });
 
@@ -289,11 +307,13 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate([], NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowCoordSpecError);
+    expect(await errCause(r.validate([], NODE_VALIDATE_CTX))).toBeInstanceOf(
+      WorkflowCoordSpecError,
+    );
     await r.dispose();
   });
 
-  it("U9: throws AgentNotFoundError when catalog returns null", async () => {
+  it("U9: throws AgentNotFound DU when catalog returns null", async () => {
     const deps = stubDeps({ agent: null });
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
@@ -301,13 +321,14 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "missing" }, NODE_VALIDATE_CTX)).rejects.toMatchObject({
-      code: "AgentNotFound",
+    expect(await errCause(r.validate({ agent: "missing" }, NODE_VALIDATE_CTX))).toMatchObject({
+      type: "AgentNotFound",
+      agent: "missing",
     });
     await r.dispose();
   });
 
-  it("U10: throws AgentResolutionFailedError wrapping the cause when catalog throws", async () => {
+  it("U10: throws AgentResolutionFailed DU carrying the cause when catalog throws", async () => {
     const cause = new Error("catalog down");
     const deps = stubDeps({ getAgentThrows: cause });
     const r = makeCoordNodeRunner({
@@ -316,17 +337,10 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    let captured: unknown;
-    try {
-      await r.validate({ agent: "x" }, NODE_VALIDATE_CTX);
-    } catch (err) {
-      captured = err;
-    }
-    expect(captured).toBeInstanceOf(TaskOperationError);
-    expect((captured as TaskOperationError).code).toBe("AgentResolutionFailed");
+    const captured = await errCause(r.validate({ agent: "x" }, NODE_VALIDATE_CTX));
+    expect(captured).toMatchObject({ type: "AgentResolutionFailed", agent: "x" });
     // The AgentResolutionFailed atom carries the original error as `cause`.
-    const detail = (captured as TaskOperationError).detail as { cause?: unknown };
-    expect(detail.cause).toBe(cause);
+    expect((captured as { cause?: unknown }).cause).toBe(cause);
     await r.dispose();
   });
 
@@ -352,7 +366,9 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    const result = await r.validate({ agent: "capable-coord" }, NODE_VALIDATE_CTX);
+    const result = (
+      await r.validate({ agent: "capable-coord" }, NODE_VALIDATE_CTX)
+    )._unsafeUnwrap();
     expect(result).toEqual({ agent: "capable-coord" });
     await r.dispose();
   });
@@ -371,11 +387,12 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordAgentNotCapableError,
     );
-    await expect(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX)).rejects.toThrow(
-      /dispatch menu|dependencies\.agents/,
+    expect(await errCause(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX))).toHaveProperty(
+      "message",
+      expect.stringMatching(/dispatch menu|dependencies\.agents/),
     );
     await r.dispose();
   });
@@ -394,9 +411,9 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(
-      r.validate({ agent: "empty-menu-coord" }, NODE_VALIDATE_CTX),
-    ).rejects.toBeInstanceOf(WorkflowCoordAgentNotCapableError);
+    expect(
+      await errCause(r.validate({ agent: "empty-menu-coord" }, NODE_VALIDATE_CTX)),
+    ).toBeInstanceOf(WorkflowCoordAgentNotCapableError);
     await r.dispose();
   });
 });
@@ -415,10 +432,12 @@ describe("makeCoordNodeRunner — dispatch", () => {
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100_000, // never poll during this test
     });
-    const result = await r.dispatch({
-      ...DISPATCH_OPTS_BASE,
-      onTerminal: () => {},
-    });
+    const result = (
+      await r.dispatch({
+        ...DISPATCH_OPTS_BASE,
+        onTerminal: () => {},
+      })
+    )._unsafeUnwrap();
     expect(deps.getService).toHaveBeenCalledTimes(1);
     expect(deps.getWorkflow).toHaveBeenCalledWith({ workflowId: "20260101-deadbeef" });
     expect(deps.dispatch).toHaveBeenCalledWith({
@@ -567,12 +586,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100_000,
     });
-    let captured: unknown;
-    try {
-      await r.dispatch({ ...DISPATCH_OPTS_BASE, onTerminal: () => {} });
-    } catch (err) {
-      captured = err;
-    }
+    const captured = await errCause(r.dispatch({ ...DISPATCH_OPTS_BASE, onTerminal: () => {} }));
     expect(captured).toBeInstanceOf(Error);
     expect((captured as Error).message).toContain("composeWorkflowModule");
     expect(deps.dispatch).not.toHaveBeenCalled();
@@ -731,7 +745,9 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    const result = await r.hasInFlightForNode("deadbeef-cafe-4bab-89ab-cafebabe1234");
+    const result = (
+      await r.hasInFlightForNode("deadbeef-cafe-4bab-89ab-cafebabe1234")
+    )._unsafeUnwrap();
     expect(result).toBe(true);
     expect(deps.hasInFlightForWorkflowNode).toHaveBeenCalledWith({
       origin: "workflow",

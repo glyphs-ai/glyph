@@ -21,6 +21,7 @@ import {
   HUMAN_PROMPT_STYLES,
   type HumanNodePromptStyle,
   type HumanNodeSpec,
+  type RunnerFault,
   type WorkflowId,
   type WorkflowModule,
   type WorkflowNodeDispatchOpts,
@@ -28,6 +29,7 @@ import {
   type WorkflowNodeRunner,
   type WorkflowNodeValidateCtx,
 } from "@glyphs-ai/workflow";
+import { err, ok, okAsync, type Result, ResultAsync } from "neverthrow";
 
 /**
  * Wire-shape error for a malformed human node spec. Mirrors
@@ -48,116 +50,156 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
   const workflowIdsByNodeId = new Map<string, string>();
 
   return {
-    async validate(spec: unknown, _ctx: WorkflowNodeValidateCtx): Promise<unknown> {
-      if (spec === null || typeof spec !== "object" || Array.isArray(spec)) {
-        throw new WorkflowHumanSpecError("human node spec must be an object");
-      }
-      const s = spec as Record<string, unknown>;
-
-      if (typeof s.prompt !== "string" || s.prompt.trim().length === 0) {
-        throw new WorkflowHumanSpecError("human node spec.prompt must be a non-empty string");
-      }
-
-      if (s.promptStyle === undefined) {
-        throw new WorkflowHumanSpecError(
-          `human node spec.promptStyle is required; must be one of: ${HUMAN_PROMPT_STYLES.join(", ")}`,
-        );
-      }
-      if (
-        typeof s.promptStyle !== "string" ||
-        !(HUMAN_PROMPT_STYLES as readonly string[]).includes(s.promptStyle)
-      ) {
-        throw new WorkflowHumanSpecError(
-          `human node spec.promptStyle must be one of: ${HUMAN_PROMPT_STYLES.join(", ")}`,
-        );
-      }
-      const promptStyle = s.promptStyle as HumanNodePromptStyle;
-
-      const choices = s.choices;
-      if (choices !== undefined) {
-        if (!Array.isArray(choices)) {
-          throw new WorkflowHumanSpecError("human node spec.choices must be an array when present");
-        }
-        if (choices.length > HUMAN_MAX_CHOICES) {
-          throw new WorkflowHumanSpecError(
-            `human node spec.choices must have at most ${HUMAN_MAX_CHOICES} entries`,
-          );
-        }
-        const seenIds = new Set<string>();
-        for (let i = 0; i < choices.length; i++) {
-          const c = choices[i];
-          if (c === null || typeof c !== "object" || Array.isArray(c)) {
-            throw new WorkflowHumanSpecError(`human node spec.choices[${i}] must be an object`);
+    validate(spec: unknown, _ctx: WorkflowNodeValidateCtx) {
+      return new ResultAsync(
+        (async (): Promise<Result<unknown, RunnerFault>> => {
+          if (spec === null || typeof spec !== "object" || Array.isArray(spec)) {
+            return err({ cause: new WorkflowHumanSpecError("human node spec must be an object") });
           }
-          const choice = c as Record<string, unknown>;
-          if (typeof choice.id !== "string" || choice.id.length === 0) {
-            throw new WorkflowHumanSpecError(
-              `human node spec.choices[${i}].id must be a non-empty string`,
-            );
-          }
-          if (seenIds.has(choice.id)) {
-            throw new WorkflowHumanSpecError(
-              `human node spec.choices[${i}].id "${choice.id}" is duplicated`,
-            );
-          }
-          seenIds.add(choice.id);
-          if (typeof choice.label !== "string" || choice.label.length === 0) {
-            throw new WorkflowHumanSpecError(
-              `human node spec.choices[${i}].label must be a non-empty string`,
-            );
-          }
-        }
-      }
+          const s = spec as Record<string, unknown>;
 
-      // Return the validated/normalized spec
-      const validated: HumanNodeSpec = {
-        prompt: s.prompt as string,
-        promptStyle,
-        ...(choices !== undefined
-          ? {
-              choices: (choices as Array<{ id: string; label: string }>).map((c) => ({
-                id: c.id,
-                label: c.label,
-              })),
+          if (typeof s.prompt !== "string" || s.prompt.trim().length === 0) {
+            return err({
+              cause: new WorkflowHumanSpecError(
+                "human node spec.prompt must be a non-empty string",
+              ),
+            });
+          }
+
+          if (s.promptStyle === undefined) {
+            return err({
+              cause: new WorkflowHumanSpecError(
+                `human node spec.promptStyle is required; must be one of: ${HUMAN_PROMPT_STYLES.join(", ")}`,
+              ),
+            });
+          }
+          if (
+            typeof s.promptStyle !== "string" ||
+            !(HUMAN_PROMPT_STYLES as readonly string[]).includes(s.promptStyle)
+          ) {
+            return err({
+              cause: new WorkflowHumanSpecError(
+                `human node spec.promptStyle must be one of: ${HUMAN_PROMPT_STYLES.join(", ")}`,
+              ),
+            });
+          }
+          const promptStyle = s.promptStyle as HumanNodePromptStyle;
+
+          const choices = s.choices;
+          if (choices !== undefined) {
+            if (!Array.isArray(choices)) {
+              return err({
+                cause: new WorkflowHumanSpecError(
+                  "human node spec.choices must be an array when present",
+                ),
+              });
             }
-          : {}),
-      };
-      return validated;
+            if (choices.length > HUMAN_MAX_CHOICES) {
+              return err({
+                cause: new WorkflowHumanSpecError(
+                  `human node spec.choices must have at most ${HUMAN_MAX_CHOICES} entries`,
+                ),
+              });
+            }
+            const seenIds = new Set<string>();
+            for (let i = 0; i < choices.length; i++) {
+              const c = choices[i];
+              if (c === null || typeof c !== "object" || Array.isArray(c)) {
+                return err({
+                  cause: new WorkflowHumanSpecError(
+                    `human node spec.choices[${i}] must be an object`,
+                  ),
+                });
+              }
+              const choice = c as Record<string, unknown>;
+              if (typeof choice.id !== "string" || choice.id.length === 0) {
+                return err({
+                  cause: new WorkflowHumanSpecError(
+                    `human node spec.choices[${i}].id must be a non-empty string`,
+                  ),
+                });
+              }
+              if (seenIds.has(choice.id)) {
+                return err({
+                  cause: new WorkflowHumanSpecError(
+                    `human node spec.choices[${i}].id "${choice.id}" is duplicated`,
+                  ),
+                });
+              }
+              seenIds.add(choice.id);
+              if (typeof choice.label !== "string" || choice.label.length === 0) {
+                return err({
+                  cause: new WorkflowHumanSpecError(
+                    `human node spec.choices[${i}].label must be a non-empty string`,
+                  ),
+                });
+              }
+            }
+          }
+
+          // Return the validated/normalized spec
+          const validated: HumanNodeSpec = {
+            prompt: s.prompt as string,
+            promptStyle,
+            ...(choices !== undefined
+              ? {
+                  choices: (choices as Array<{ id: string; label: string }>).map((c) => ({
+                    id: c.id,
+                    label: c.label,
+                  })),
+                }
+              : {}),
+          };
+          return ok(validated);
+        })(),
+      );
     },
 
-    async dispatch(opts: WorkflowNodeDispatchOpts): Promise<void> {
+    dispatch(opts: WorkflowNodeDispatchOpts) {
       workflowIdsByNodeId.set(opts.nodeId, opts.workflowId);
       // No-op: the human node simply sits in `running` status until
       // the respond API is called. No subprocess, no polling.
+      return okAsync(undefined);
     },
 
-    async hasInFlightForNode(nodeId: string): Promise<boolean> {
-      const module = getModule?.();
-      if (module === undefined) throw new Error("workflow-human-node-runner: missing module");
-      const workflowId = workflowIdsByNodeId.get(nodeId);
-      if (workflowId === undefined) {
-        throw new Error(`workflow-human-node-runner: missing workflow id for node ${nodeId}`);
-      }
-      const nodeResult = await module.getNode.execute({
-        workflowId: workflowId as WorkflowId,
-        nodeId: nodeId as WorkflowNodeId,
-      });
-      if (nodeResult.isErr()) throw new Error(nodeResult.error.type);
-      const node = nodeResult.value;
-      return node.status === "running";
+    hasInFlightForNode(nodeId: string) {
+      return new ResultAsync(
+        (async (): Promise<Result<boolean, RunnerFault>> => {
+          const module = getModule?.();
+          if (module === undefined) {
+            return err({ cause: new Error("workflow-human-node-runner: missing module") });
+          }
+          const workflowId = workflowIdsByNodeId.get(nodeId);
+          if (workflowId === undefined) {
+            return err({
+              cause: new Error(
+                `workflow-human-node-runner: missing workflow id for node ${nodeId}`,
+              ),
+            });
+          }
+          const nodeResult = await module.getNode.execute({
+            workflowId: workflowId as WorkflowId,
+            nodeId: nodeId as WorkflowNodeId,
+          });
+          if (nodeResult.isErr()) return err({ cause: new Error(nodeResult.error.type) });
+          const node = nodeResult.value;
+          return ok(node.status === "running");
+        })(),
+      );
     },
 
-    async cancel(_nodeId: string): Promise<void> {
+    cancel(_nodeId: string) {
       // No-op: nothing to kill. The substrate's reconcileCancel marks
       // the node cancelled directly.
+      return okAsync(undefined);
     },
 
-    async listArtifacts() {
-      return null;
+    listArtifacts() {
+      return okAsync(null);
     },
 
-    async resolveArtifactPath() {
-      return null;
+    resolveArtifactPath() {
+      return okAsync(null);
     },
   };
 }

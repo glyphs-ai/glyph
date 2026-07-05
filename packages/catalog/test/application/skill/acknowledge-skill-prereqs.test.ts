@@ -1,14 +1,15 @@
-import { errAsync, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
-import { type MockProxy, mock } from "vitest-mock-extended";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AcknowledgePrereqsUseCase } from "../../../src/application/skill/acknowledge-skill-prereqs.js";
-import type { AgentRepository } from "../../../src/domain/agent-repository.js";
+import { AgentEntity } from "../../../src/domain/agent-entity.js";
+import type { AgentFqn } from "../../../src/domain/agent-fqn.js";
 import { SkillEntity, type SkillEntityArgs } from "../../../src/domain/skill-entity.js";
 import { SkillFqnSchema } from "../../../src/domain/skill-fqn.js";
-import type { SkillRepository } from "../../../src/domain/skill-repository.js";
+import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
+import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
+import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
 
 const SKILL_ID = SkillFqnSchema.parse("public/tool-use");
-const databaseError = { type: "DatabaseUnavailable", cause: new Error("db down") } as const;
 
 function skill(overrides: Partial<SkillEntityArgs> = {}): SkillEntity {
   return new SkillEntity({
@@ -22,6 +23,21 @@ function skill(overrides: Partial<SkillEntityArgs> = {}): SkillEntity {
     installedAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-02T00:00:00.000Z",
     ...overrides,
+  });
+}
+
+function agentUsingSkill(): AgentEntity {
+  return new AgentEntity({
+    fqn: "public/triage" as AgentFqn,
+    origin: "file:///catalog/agents/triage",
+    description: "Triage agent",
+    version: "1.0.0",
+    prereqs: undefined,
+    prereqsAck: true,
+    disabledByUser: false,
+    dependencyRefs: { skills: [SKILL_ID], mcps: [], agents: [] },
+    installedAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-02T00:00:00.000Z",
   });
 }
 
@@ -51,49 +67,54 @@ function skillDto(entity: SkillEntity, orphaned: boolean) {
   };
 }
 
-let skillRepo: MockProxy<SkillRepository>;
-let agentRepo: MockProxy<AgentRepository>;
+let db: Db;
+let close: () => void;
+let skillRepo: DrizzleSkillRepository;
+let agentRepo: DrizzleAgentRepository;
 let useCase: AcknowledgePrereqsUseCase;
 
 beforeEach(() => {
-  skillRepo = mock<SkillRepository>();
-  agentRepo = mock<AgentRepository>();
-  skillRepo.save.mockReturnValue(okAsync(undefined));
-  skillRepo.list.mockReturnValue(okAsync([]));
-  agentRepo.list.mockReturnValue(okAsync([]));
-  useCase = new AcknowledgePrereqsUseCase({ skillRepo, agentRepo });
+  const opened = openDb(":memory:");
+  db = opened.db;
+  close = opened.close;
+  skillRepo = new DrizzleSkillRepository({ db });
+  agentRepo = new DrizzleAgentRepository({ db });
+  useCase = new AcknowledgePrereqsUseCase({
+    skillRepo,
+    queries: new DrizzleCatalogQueries({ db }),
+  });
+});
+
+afterEach(() => {
+  close();
 });
 
 describe("AcknowledgePrereqsUseCase — mutation paths", () => {
   it("acknowledges prereqs, saves the entity, and returns the Skill DTO", async () => {
     const entity = skill();
-    skillRepo.get.mockReturnValue(okAsync(entity));
+    (await skillRepo.save(entity))._unsafeUnwrap();
+
     const res = await useCase.execute({ id: SKILL_ID });
-    expect(res._unsafeUnwrap()).toEqual(skillDto(entity, true));
-    expect(entity.prereqsAck).toBe(true);
-    expect(skillRepo.save).toHaveBeenCalledWith(entity);
+
+    expect(res._unsafeUnwrap()).toEqual(skillDto(skill({ prereqsAck: true }), true));
+    expect((await skillRepo.get(SKILL_ID))._unsafeUnwrap().prereqsAck).toBe(true);
+  });
+
+  it("returns orphaned=false when another installed entity references the skill", async () => {
+    const entity = skill();
+    (await skillRepo.save(entity))._unsafeUnwrap();
+    (await agentRepo.save(agentUsingSkill()))._unsafeUnwrap();
+
+    const res = await useCase.execute({ id: SKILL_ID });
+
+    expect(res._unsafeUnwrap()).toEqual(skillDto(skill({ prereqsAck: true }), false));
   });
 });
 
 describe("AcknowledgePrereqsUseCase — error channel", () => {
   it("propagates SkillNotFound from repo.get", async () => {
-    skillRepo.get.mockReturnValue(errAsync({ type: "SkillNotFound", fqn: SKILL_ID }));
     const res = await useCase.execute({ id: SKILL_ID });
+
     expect(res._unsafeUnwrapErr()).toEqual({ type: "SkillNotFound", fqn: SKILL_ID });
-    expect(skillRepo.save).not.toHaveBeenCalled();
-  });
-
-  it("propagates DatabaseUnavailable from repo.save", async () => {
-    skillRepo.get.mockReturnValue(okAsync(skill()));
-    skillRepo.save.mockReturnValue(errAsync(databaseError));
-    const res = await useCase.execute({ id: SKILL_ID });
-    expect(res._unsafeUnwrapErr()).toBe(databaseError);
-  });
-
-  it("propagates DatabaseUnavailable from agentRepo.list", async () => {
-    skillRepo.get.mockReturnValue(okAsync(skill()));
-    agentRepo.list.mockReturnValue(errAsync(databaseError));
-    const res = await useCase.execute({ id: SKILL_ID });
-    expect(res._unsafeUnwrapErr()).toBe(databaseError);
   });
 });

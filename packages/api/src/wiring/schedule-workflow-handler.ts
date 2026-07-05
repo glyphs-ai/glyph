@@ -1,7 +1,8 @@
-import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
+import type { HandlerFault, ScheduleKindHandler } from "@glyphs-ai/schedule";
 import type { TaskId, TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { WorkflowBriefSchema } from "@glyphs-ai/workflow";
+import { err, ok, type Result, ResultAsync } from "neverthrow";
 import { taskAgentResolutionFailed } from "./_task-operation-error.js";
 
 /** Concrete workflow-target shape this handler validates + persists as opaque `data`. */
@@ -58,7 +59,7 @@ interface CatalogAgentLookup {
  * catalog outage never masquerades as a 400 bad-request that leaks the
  * underlying error string. Genuine validation failures (unknown
  * coordinatorAgent, not coord-eligible, malformed brief) stay
- * `WorkflowScheduleTargetError` (→ 400 with message).
+ * `WorkflowTargetInvalid` atoms (→ 400 with message).
  */
 export function makeWorkflowKindHandler(opts: {
   readonly workflows: WorkflowModule;
@@ -70,68 +71,97 @@ export function makeWorkflowKindHandler(opts: {
   const catalog = opts.catalog;
 
   return {
-    async validate(raw, opts) {
-      if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-        throw new WorkflowScheduleTargetError("Workflow target data must be an object");
-      }
-      const obj = raw as Record<string, unknown>;
-      if (typeof obj.coordinatorAgent !== "string" || obj.coordinatorAgent.trim().length === 0) {
-        throw new WorkflowScheduleTargetError(
-          "Workflow target requires non-empty coordinatorAgent",
-        );
-      }
-      const briefResult = WorkflowBriefSchema.safeParse(obj.brief);
-      if (!briefResult.success) {
-        throw new WorkflowScheduleTargetError(
-          `Workflow target ${briefResult.error.issues[0]?.message ?? "has an invalid brief"}`,
-        );
-      }
-      if (obj.details !== undefined && typeof obj.details !== "string") {
-        throw new WorkflowScheduleTargetError(
-          "Workflow target details, when set, must be a string",
-        );
-      }
+    validate(raw, opts) {
+      return new ResultAsync(
+        (async (): Promise<Result<unknown, HandlerFault>> => {
+          if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+            return err({
+              cause: {
+                type: "WorkflowTargetInvalid",
+                message: "Workflow target data must be an object",
+              } satisfies WorkflowTargetInvalid,
+            });
+          }
+          const obj = raw as Record<string, unknown>;
+          if (
+            typeof obj.coordinatorAgent !== "string" ||
+            obj.coordinatorAgent.trim().length === 0
+          ) {
+            return err({
+              cause: {
+                type: "WorkflowTargetInvalid",
+                message: "Workflow target requires non-empty coordinatorAgent",
+              } satisfies WorkflowTargetInvalid,
+            });
+          }
+          const briefResult = WorkflowBriefSchema.safeParse(obj.brief);
+          if (!briefResult.success) {
+            return err({
+              cause: {
+                type: "WorkflowTargetInvalid",
+                message: `Workflow target ${briefResult.error.issues[0]?.message ?? "has an invalid brief"}`,
+              } satisfies WorkflowTargetInvalid,
+            });
+          }
+          if (obj.details !== undefined && typeof obj.details !== "string") {
+            return err({
+              cause: {
+                type: "WorkflowTargetInvalid",
+                message: "Workflow target details, when set, must be a string",
+              } satisfies WorkflowTargetInvalid,
+            });
+          }
 
-      // Catalog existence + coord-eligibility — skip if changedKeys
-      // excludes "coordinatorAgent". changedKeys === undefined means
-      // "full validate" (the create path); the patch path passes the
-      // exact set of changed keys so a brief-only edit skips the
-      // catalog round-trip.
-      const mustCheckAgent =
-        opts?.changedKeys === undefined || opts.changedKeys.includes("coordinatorAgent");
-      if (mustCheckAgent) {
-        let found: Awaited<ReturnType<typeof catalog.getAgent>>;
-        try {
-          found = await catalog.getAgent(obj.coordinatorAgent as string);
-        } catch (err) {
-          // Catalog unreachable / resolver crash — infrastructure, not
-          // bad caller input. Surface as the task pkg's resolution
-          // error (→ 500 opaque) rather than a 400 that would falsely
-          // blame the caller and echo the raw error message.
-          throw taskAgentResolutionFailed(obj.coordinatorAgent as string, err);
-        }
-        if (found === null) {
-          throw new WorkflowScheduleTargetError(
-            `Coordinator agent "${obj.coordinatorAgent}" not found in catalog`,
-          );
-        }
-        // Coord-eligibility: the agent must declare a non-empty
-        // `dependencies.agents` dispatch menu (same check the coord
-        // runner performs at validate time).
-        const menu = found.dependencies?.agents ?? [];
-        if (menu.length === 0) {
-          throw new WorkflowScheduleTargetError(
-            `Agent "${obj.coordinatorAgent}" is not coordinator-eligible (no dependencies.agents dispatch menu)`,
-          );
-        }
-      }
+          // Catalog existence + coord-eligibility — skip if changedKeys
+          // excludes "coordinatorAgent". changedKeys === undefined means
+          // "full validate" (the create path); the patch path passes the
+          // exact set of changed keys so a brief-only edit skips the
+          // catalog round-trip.
+          const mustCheckAgent =
+            opts?.changedKeys === undefined || opts.changedKeys.includes("coordinatorAgent");
+          if (mustCheckAgent) {
+            let found: Awaited<ReturnType<typeof catalog.getAgent>>;
+            try {
+              found = await catalog.getAgent(obj.coordinatorAgent as string);
+            } catch (cause) {
+              // Catalog unreachable / resolver crash — infrastructure, not
+              // bad caller input. Surface as the task pkg's resolution
+              // error (→ 500 opaque) rather than a 400 that would falsely
+              // blame the caller and echo the raw error message.
+              return err({
+                cause: taskAgentResolutionFailed(obj.coordinatorAgent as string, cause),
+              });
+            }
+            if (found === null) {
+              return err({
+                cause: {
+                  type: "WorkflowTargetInvalid",
+                  message: `Coordinator agent "${obj.coordinatorAgent}" not found in catalog`,
+                } satisfies WorkflowTargetInvalid,
+              });
+            }
+            // Coord-eligibility: the agent must declare a non-empty
+            // `dependencies.agents` dispatch menu (same check the coord
+            // runner performs at validate time).
+            const menu = found.dependencies?.agents ?? [];
+            if (menu.length === 0) {
+              return err({
+                cause: {
+                  type: "WorkflowTargetInvalid",
+                  message: `Agent "${obj.coordinatorAgent}" is not coordinator-eligible (no dependencies.agents dispatch menu)`,
+                } satisfies WorkflowTargetInvalid,
+              });
+            }
+          }
 
-      const validated: WorkflowTargetData = {
-        coordinatorAgent: obj.coordinatorAgent as string,
-        brief: briefResult.data,
-        ...(obj.details !== undefined ? { details: obj.details as string } : {}),
-      };
-      return validated;
+          const validated: WorkflowTargetData = {
+            coordinatorAgent: obj.coordinatorAgent as string,
+            brief: briefResult.data,
+            ...(obj.details !== undefined ? { details: obj.details as string } : {}),
+          };
+          return ok(validated);
+        })(),
+      );
     },
 
     mergePatch(existing, patch) {
@@ -169,18 +199,19 @@ export function makeWorkflowKindHandler(opts: {
       return { data, changedKeys };
     },
 
-    async dispatch({ scheduleId, firedAt, data }) {
+    dispatch({ scheduleId, firedAt, data }) {
       const t = data as WorkflowTargetData;
-      const result = await workflows.createWorkflow.execute({
-        coordinatorAgent: t.coordinatorAgent,
-        brief: t.brief,
-        ...(t.details !== undefined ? { details: t.details } : {}),
-        origin: "schedule",
-        originId: scheduleId,
-        metadata: { firedAt },
-      });
-      if (result.isErr()) throw new Error(result.error.type);
-      return { id: result.value.workflowId };
+      return workflows.createWorkflow
+        .execute({
+          coordinatorAgent: t.coordinatorAgent,
+          brief: t.brief,
+          ...(t.details !== undefined ? { details: t.details } : {}),
+          origin: "schedule",
+          originId: scheduleId,
+          metadata: { firedAt },
+        })
+        .map((created) => ({ id: created.workflowId }))
+        .mapErr((cause): HandlerFault => ({ cause }));
     },
 
     // Both lookups narrow to the schedule's workflows in SQL via the
@@ -188,85 +219,81 @@ export function makeWorkflowKindHandler(opts: {
     // `workflows_origin_pair_idx`), so the DB returns only the rows for
     // this schedule — no full `origin: "schedule"` scan + client-side
     // `metadata.scheduleId` filter.
-    async hasInFlightForSchedule(scheduleId) {
-      const matched = await workflows.listWorkflows.execute({
-        origin: "schedule",
-        originId: scheduleId,
-      });
-      if (matched.isErr()) throw new Error(matched.error.type);
-      return matched.value.some((wf) => wf.status === "running");
+    hasInFlightForSchedule(scheduleId) {
+      return workflows.listWorkflows
+        .execute({ origin: "schedule", originId: scheduleId })
+        .map((matched) => matched.some((wf) => wf.status === "running"))
+        .mapErr((cause): HandlerFault => ({ cause }));
     },
 
-    async deleteForSchedule(scheduleId) {
-      const matched = await workflows.listWorkflows.execute({
-        origin: "schedule",
-        originId: scheduleId,
-      });
-      if (matched.isErr()) throw new Error(matched.error.type);
-      const terminal = matched.value.filter((wf) => wf.status !== "running");
-      let deletedCount = 0;
-      for (const wf of terminal) {
-        // The workflow substrate's `deleteWorkflow` drops only its own
-        // workflow/node/edge rows — each node's backing task row + its
-        // workdir live in the task module and must be cascaded here, or
-        // they outlive the schedule (orphaned rows + disk). This mirrors
-        // the canonical `DELETE /workflows/:wfid` route's cascade and
-        // matches the task kind's purge-on-schedule-delete semantics.
-        const snapshotResult = await workflows.getDag.execute({ workflowId: wf.id });
-        if (snapshotResult.isErr()) throw new Error(snapshotResult.error.type);
-        const snapshot = snapshotResult.value;
-        // Defense-in-depth against the post-finishWorkflow coord-task
-        // race: a workflow can read terminal while a node task is still
-        // wrapping up. Skip the whole workflow (no partial delete) and
-        // let a later sweep reclaim it — the same holdout the DELETE
-        // route applies, and the "never destroy in-flight" invariant the
-        // schedule cascade promises.
-        let hasInFlightNode = false;
-        for (const node of snapshot.nodes) {
-          const inFlight = await tasks.hasInFlightByOrigin.execute({
-            origin: "workflow",
-            originId: node.id,
+    deleteForSchedule(scheduleId) {
+      return new ResultAsync(
+        (async (): Promise<Result<{ deletedCount: number }, HandlerFault>> => {
+          const matched = await workflows.listWorkflows.execute({
+            origin: "schedule",
+            originId: scheduleId,
           });
-          if (inFlight.isErr()) throw new Error(inFlight.error.type);
-          if (inFlight.value) {
-            hasInFlightNode = true;
-            break;
+          if (matched.isErr()) return err({ cause: matched.error });
+          const terminal = matched.value.filter((wf) => wf.status !== "running");
+          let deletedCount = 0;
+          for (const wf of terminal) {
+            // The workflow substrate's `deleteWorkflow` drops only its own
+            // workflow/node/edge rows — each node's backing task row + its
+            // workdir live in the task module and must be cascaded here, or
+            // they outlive the schedule (orphaned rows + disk). This mirrors
+            // the canonical `DELETE /workflows/:wfid` route's cascade and
+            // matches the task kind's purge-on-schedule-delete semantics.
+            const snapshotResult = await workflows.getDag.execute({ workflowId: wf.id });
+            if (snapshotResult.isErr()) return err({ cause: snapshotResult.error });
+            const snapshot = snapshotResult.value;
+            // Defense-in-depth against the post-finishWorkflow coord-task
+            // race: a workflow can read terminal while a node task is still
+            // wrapping up. Skip the whole workflow (no partial delete) and
+            // let a later sweep reclaim it — the same holdout the DELETE
+            // route applies, and the "never destroy in-flight" invariant the
+            // schedule cascade promises.
+            let hasInFlightNode = false;
+            for (const node of snapshot.nodes) {
+              const inFlight = await tasks.hasInFlightByOrigin.execute({
+                origin: "workflow",
+                originId: node.id,
+              });
+              if (inFlight.isErr()) return err({ cause: inFlight.error });
+              if (inFlight.value) {
+                hasInFlightNode = true;
+                break;
+              }
+            }
+            if (hasInFlightNode) continue;
+            for (const node of snapshot.nodes) {
+              const linkedResult = await tasks.findLatestByOrigin.execute({
+                origin: "workflow",
+                originId: node.id,
+              });
+              if (linkedResult.isErr()) return err({ cause: linkedResult.error });
+              const linked = linkedResult.value;
+              if (linked === null) continue;
+              const deleteResult = await tasks.deleteTask.execute({
+                id: linked.id as TaskId,
+                purge: true,
+              });
+              if (deleteResult.isErr()) return err({ cause: deleteResult.error });
+            }
+            const deleted = await workflows.deleteWorkflow.execute({
+              workflowId: wf.id,
+              purgeDir: true,
+            });
+            if (deleted.isErr()) return err({ cause: deleted.error });
+            deletedCount++;
           }
-        }
-        if (hasInFlightNode) continue;
-        for (const node of snapshot.nodes) {
-          const linkedResult = await tasks.findLatestByOrigin.execute({
-            origin: "workflow",
-            originId: node.id,
-          });
-          if (linkedResult.isErr()) throw new Error(linkedResult.error.type);
-          const linked = linkedResult.value;
-          if (linked === null) continue;
-          const deleteResult = await tasks.deleteTask.execute({
-            id: linked.id as TaskId,
-            purge: true,
-          });
-          if (deleteResult.isErr()) throw new Error(deleteResult.error.type);
-        }
-        const deleted = await workflows.deleteWorkflow.execute({
-          workflowId: wf.id,
-          purgeDir: true,
-        });
-        if (deleted.isErr()) throw new Error(deleted.error.type);
-        deletedCount++;
-      }
-      return { deletedCount };
+          return ok({ deletedCount });
+        })(),
+      );
     },
   };
 }
 
-/**
- * Wire-shape error for malformed workflow target data. Lives next to
- * the handler (rather than in `@glyphs-ai/schedule`) because the
- * schedule pkg is kind-agnostic. The schedules-route's error policy
- * needs a 400 row for this; we set `.name = "WorkflowScheduleTargetError"`
- * so the policy's instanceof match wires up cleanly.
- */
-export class WorkflowScheduleTargetError extends Error {
-  override readonly name = "WorkflowScheduleTargetError";
-}
+export type WorkflowTargetInvalid = {
+  readonly type: "WorkflowTargetInvalid";
+  readonly message: string;
+};

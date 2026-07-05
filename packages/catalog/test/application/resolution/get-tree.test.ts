@@ -1,16 +1,16 @@
-import { errAsync, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
-import { type MockProxy, mock } from "vitest-mock-extended";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GetTreeUseCase } from "../../../src/application/resolution/get-tree.js";
 import { AgentEntity } from "../../../src/domain/agent-entity.js";
 import type { AgentFqn } from "../../../src/domain/agent-fqn.js";
-import type { AgentRepository } from "../../../src/domain/agent-repository.js";
 import { McpEntity } from "../../../src/domain/mcp-entity.js";
 import type { McpFqn } from "../../../src/domain/mcp-fqn.js";
-import type { McpRepository } from "../../../src/domain/mcp-repository.js";
 import { SkillEntity } from "../../../src/domain/skill-entity.js";
 import type { SkillFqn } from "../../../src/domain/skill-fqn.js";
-import type { SkillRepository } from "../../../src/domain/skill-repository.js";
+import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
+import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
+import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-repository.js";
+import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
 
 const NOW = "2026-01-01T00:00:00.000Z";
 
@@ -69,22 +69,25 @@ function mcp(
   });
 }
 
-let skillRepo: MockProxy<SkillRepository>;
-let agentRepo: MockProxy<AgentRepository>;
-let mcpRepo: MockProxy<McpRepository>;
+let close: () => void;
+let db: Db;
+let skillRepo: DrizzleSkillRepository;
+let agentRepo: DrizzleAgentRepository;
+let mcpRepo: DrizzleMcpRepository;
 let useCase: GetTreeUseCase;
 
 beforeEach(() => {
-  skillRepo = mock<SkillRepository>();
-  agentRepo = mock<AgentRepository>();
-  mcpRepo = mock<McpRepository>();
-  skillRepo.findByOrigin.mockImplementation(() => okAsync(undefined));
-  agentRepo.findByOrigin.mockImplementation(() => okAsync(undefined));
-  mcpRepo.findByOrigin.mockImplementation(() => okAsync(undefined));
-  skillRepo.findByFqn.mockImplementation(() => okAsync(undefined));
-  agentRepo.findByFqn.mockImplementation(() => okAsync(undefined));
-  mcpRepo.findByFqn.mockImplementation(() => okAsync(undefined));
-  useCase = new GetTreeUseCase({ skill: skillRepo, agent: agentRepo, mcp: mcpRepo });
+  const opened = openDb(":memory:");
+  db = opened.db;
+  close = opened.close;
+  skillRepo = new DrizzleSkillRepository({ db });
+  agentRepo = new DrizzleAgentRepository({ db });
+  mcpRepo = new DrizzleMcpRepository({ db });
+  useCase = new GetTreeUseCase({ queries: new DrizzleCatalogQueries({ db }) });
+});
+
+afterEach(() => {
+  close();
 });
 
 describe("GetTreeUseCase — installed graph", () => {
@@ -104,26 +107,10 @@ describe("GetTreeUseCase — installed graph", () => {
     const child = skill("public/child", "file:/skill/child", { mcps: ["azure/mcp"] });
     const shared = mcp("azure/mcp", "file:/mcp/shared");
 
-    agentRepo.findByOrigin.mockImplementation((origin) => {
-      if (origin === root.origin) return okAsync(root);
-      if (origin === helper.origin) return okAsync(helper);
-      return okAsync(undefined);
-    });
-    skillRepo.findByOrigin.mockImplementation((origin) =>
-      origin === child.origin ? okAsync(child) : okAsync(undefined),
-    );
-    mcpRepo.findByOrigin.mockImplementation((origin) =>
-      origin === shared.origin ? okAsync(shared) : okAsync(undefined),
-    );
-    agentRepo.findByFqn.mockImplementation((fqn) =>
-      fqn === helper.fqn ? okAsync(helper) : okAsync(undefined),
-    );
-    skillRepo.findByFqn.mockImplementation((fqn) =>
-      fqn === child.fqn ? okAsync(child) : okAsync(undefined),
-    );
-    mcpRepo.findByFqn.mockImplementation((fqn) =>
-      fqn === shared.fqn ? okAsync(shared) : okAsync(undefined),
-    );
+    (await agentRepo.save(root))._unsafeUnwrap();
+    (await agentRepo.save(helper))._unsafeUnwrap();
+    (await skillRepo.save(child))._unsafeUnwrap();
+    (await mcpRepo.save(shared))._unsafeUnwrap();
 
     const graph = (await useCase.execute({ origin: root.origin }))._unsafeUnwrap();
 
@@ -133,38 +120,53 @@ describe("GetTreeUseCase — installed graph", () => {
       "public/helper",
       "public/root",
     ]);
-    expect(graph.nodes.find((n) => n.fqn === "public/root")?.dependencyRefs).toEqual({
-      skills: [child.origin],
-      mcps: [shared.origin],
-      agents: [helper.origin],
+    expect(graph.nodes.find((n) => n.fqn === "public/root")).toEqual({
+      kind: "agent",
+      origin: root.origin,
+      fqn: root.fqn,
+      version: root.version,
+      content: "",
+      dependencyRefs: {
+        skills: [child.origin],
+        mcps: [shared.origin],
+        agents: [helper.origin],
+      },
+    });
+    expect(graph.nodes.find((n) => n.fqn === "public/child")).toEqual({
+      kind: "skill",
+      origin: child.origin,
+      fqn: child.fqn,
+      version: child.version,
+      content: "",
+      dependencyRefs: { skills: [], mcps: [shared.origin], agents: [] },
+    });
+    expect(graph.nodes.find((n) => n.fqn === "azure/mcp")).toEqual({
+      kind: "mcp",
+      origin: shared.origin,
+      fqn: shared.fqn,
+      version: "",
+      content: shared.spec,
+      dependencyRefs: { skills: [], mcps: [], agents: [] },
     });
     expect(graph.conflicts).toEqual([]);
-    expect(mcpRepo.findByOrigin).toHaveBeenCalledWith(shared.origin);
   });
 
   it("preserves unresolved dependency fqns as graph refs", async () => {
     const root = skill("public/root", "file:/skill/root", { skills: ["public/missing"] });
-    skillRepo.findByOrigin.mockImplementation((origin) =>
-      origin === root.origin ? okAsync(root) : okAsync(undefined),
-    );
+    (await skillRepo.save(root))._unsafeUnwrap();
 
     const graph = (await useCase.execute({ origin: root.origin }))._unsafeUnwrap();
 
     expect(graph.nodes).toEqual([
       expect.objectContaining({
+        kind: "skill",
+        origin: root.origin,
         fqn: "public/root",
+        version: "1.0.0",
+        content: "",
         dependencyRefs: { skills: ["public/missing"], mcps: [], agents: [] },
       }),
     ]);
-  });
-
-  it("propagates DatabaseUnavailable from repository reads", async () => {
-    agentRepo.findByOrigin.mockReturnValue(
-      errAsync({ type: "DatabaseUnavailable", cause: new Error("disk") }),
-    );
-
-    const res = await useCase.execute({ origin: "file:/agent/root" });
-
-    expect(res._unsafeUnwrapErr().type).toBe("DatabaseUnavailable");
+    expect(graph.conflicts).toEqual([]);
   });
 });

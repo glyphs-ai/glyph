@@ -122,6 +122,7 @@ export {
   ListWorkflowsResponseSchema,
 } from "./application/list-workflows.js";
 export {
+  type RunnerFault,
   runnerFor,
   type WorkflowNodeArtifactListing,
   type WorkflowNodeDispatchOpts,

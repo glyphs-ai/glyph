@@ -1,22 +1,33 @@
-import type { CatalogModule, McpFqn } from "@glyphs-ai/catalog";
+import {
+  ApplyPlanResponseSchema,
+  type CatalogModule,
+  GetMcpResponseSchema,
+  ListMcpsResponseSchema,
+  type McpFqn,
+} from "@glyphs-ai/catalog";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { catalogErrorPolicy } from "../../_error-policies/catalog.js";
 import { logEvent, respondError } from "../../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../../_http-helpers.js";
-import {
-  CatalogInstallResultSchema,
-  CatalogSyncResultSchema,
-  InstallMcpRequestSchema,
-  McpSchema,
-  McpWithContentSchema,
-  OkResponseSchema,
-  ResolveManifestSchema,
-  SyncCatalogRequestSchema,
-} from "../../schemas/catalog.js";
 import { planStoreFor } from "./plan-store.js";
-import { planToManifest } from "./plan-to-manifest.js";
+import { planToManifest, ResolveManifestSchema } from "./plan-to-manifest.js";
 import { type CatalogResolver, resolveCatalog } from "./resolver.js";
 import { unwrapCatalog } from "./use-case.js";
+
+// HTTP request bodies owned by this transport: the client posts an origin to
+// install, and a planToken to apply a previously previewed sync.
+const InstallMcpRequestSchema = z
+  .object({
+    origin: z.string().min(1, { message: "origin is required and must be a non-empty string" }),
+  })
+  .strict();
+const SyncCatalogRequestSchema = z
+  .object({
+    planToken: z.string().min(1, {
+      message: "body must be { planToken: string } from a prior /sync/resolve response",
+    }),
+  })
+  .strict();
 
 /**
  * Routes for /mcps/* relative to the parent mount. Mounted by
@@ -42,7 +53,7 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono {
       tags: ["catalog"],
       summary: "List installed MCPs",
       responses: {
-        200: jsonResponse(McpSchema.array(), "Installed MCPs"),
+        200: jsonResponse(ListMcpsResponseSchema, "Installed MCPs"),
         500: errorResponse("Internal error"),
       },
     }),
@@ -63,7 +74,7 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono {
       summary: "Get an MCP with content",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(McpWithContentSchema, "MCP with content"),
+        200: jsonResponse(GetMcpResponseSchema.extend({ content: z.string() }), "MCP with content"),
         404: errorResponse("MCP not found"),
         500: errorResponse("Internal error"),
       },
@@ -96,7 +107,7 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono {
       summary: "Install an MCP from an origin",
       request: { body: jsonRequest(InstallMcpRequestSchema) },
       responses: {
-        201: jsonResponse(CatalogInstallResultSchema, "Install result"),
+        201: jsonResponse(ApplyPlanResponseSchema, "Install result"),
         400: errorResponse("Malformed request body"),
         500: errorResponse("Internal error"),
       },
@@ -171,7 +182,7 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono {
         body: jsonRequest(SyncCatalogRequestSchema),
       },
       responses: {
-        200: jsonResponse(CatalogSyncResultSchema, "Sync result"),
+        200: jsonResponse(ApplyPlanResponseSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
         410: errorResponse("Plan token expired or already applied"),
         500: errorResponse("Internal error"),
@@ -217,7 +228,7 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono {
       summary: "Delete an MCP",
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
-        200: jsonResponse(OkResponseSchema, "Deleted"),
+        200: jsonResponse(z.object({ ok: z.literal(true) }), "Deleted"),
         409: errorResponse("MCP still has dependents"),
         500: errorResponse("Internal error"),
       },

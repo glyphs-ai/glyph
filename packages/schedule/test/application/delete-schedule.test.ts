@@ -1,3 +1,4 @@
+import { okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CreateScheduleRequest } from "../../src/application/create-schedule.js";
 import {
@@ -79,9 +80,9 @@ describe("DeleteScheduleUseCase", () => {
     (await h.module.createSchedule.execute(baseCreateOpts({ enabled: false })))._unsafeUnwrap();
     const sid = VALID_UUIDS[0];
     let hasInFlightCalls = 0;
-    h.taskHandler.hasInFlightForSchedule = async () => {
+    h.taskHandler.hasInFlightForSchedule = () => {
       hasInFlightCalls += 1;
-      return hasInFlightCalls > 1;
+      return okAsync(hasInFlightCalls > 1);
     };
     h.taskHandler.deleteReturns.set(sid, { deletedCount: 2 });
     const result = await h.module.deleteSchedule.execute({ id: sid });

@@ -1,3 +1,4 @@
+import { ResultAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CreateScheduleRequest } from "../../../src/application/create-schedule.js";
 import {
@@ -38,11 +39,14 @@ describe("ScheduleService shutdown awaits in-flight fires", () => {
       resolveDispatch = resolve;
     });
     const origDispatch = h.taskHandler.dispatch.bind(h.taskHandler);
-    h.taskHandler.dispatch = async (opts) => {
-      const result = await origDispatch(opts);
-      await dispatchPromise;
-      return result;
-    };
+    h.taskHandler.dispatch = (opts) =>
+      new ResultAsync(
+        (async () => {
+          const result = await origDispatch(opts);
+          await dispatchPromise;
+          return result;
+        })(),
+      );
     (await h.module.createSchedule.execute(baseCreateOpts()))._unsafeUnwrap();
     h.setNow(new Date("2026-05-01T09:00:00.000Z"));
     await vi.advanceTimersByTimeAsync(60_000);
@@ -65,11 +69,14 @@ describe("ScheduleService shutdown awaits in-flight fires", () => {
       resolveDispatch = resolve;
     });
     const origDispatch = h.taskHandler.dispatch.bind(h.taskHandler);
-    h.taskHandler.dispatch = async (opts) => {
-      const result = await origDispatch(opts);
-      await dispatchPromise;
-      return result;
-    };
+    h.taskHandler.dispatch = (opts) =>
+      new ResultAsync(
+        (async () => {
+          const result = await origDispatch(opts);
+          await dispatchPromise;
+          return result;
+        })(),
+      );
     (await h.module.createSchedule.execute(baseCreateOpts()))._unsafeUnwrap();
     h.setNow(new Date("2026-05-01T09:00:00.000Z"));
     await vi.advanceTimersByTimeAsync(60_000);

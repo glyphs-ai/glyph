@@ -1,12 +1,13 @@
-import { errAsync, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
-import { type MockProxy, mock } from "vitest-mock-extended";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { UninstallAgentUseCase } from "../../../src/application/agent/uninstall-agent.js";
 import { AgentEntity, type AgentEntityArgs } from "../../../src/domain/agent-entity.js";
 import { AgentFqnSchema } from "../../../src/domain/agent-fqn.js";
-import type { AgentRepository } from "../../../src/domain/agent-repository.js";
+import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
+import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
 
 const AGENT_ID = AgentFqnSchema.parse("public/triage");
+const DEPENDENT_AGENT_ID = AgentFqnSchema.parse("public/reviewer");
 
 function agentEntity(overrides: Partial<AgentEntityArgs> = {}): AgentEntity {
   return new AgentEntity({
@@ -24,64 +25,61 @@ function agentEntity(overrides: Partial<AgentEntityArgs> = {}): AgentEntity {
   });
 }
 
-let agentRepo: MockProxy<AgentRepository>;
+let db: Db;
+let close: () => void;
+let agentRepo: DrizzleAgentRepository;
 let useCase: UninstallAgentUseCase;
 
 beforeEach(() => {
-  agentRepo = mock<AgentRepository>();
-  agentRepo.get.mockReturnValue(okAsync(agentEntity()));
-  agentRepo.existsUsingAgent.mockReturnValue(okAsync(false));
-  agentRepo.delete.mockReturnValue(okAsync(undefined));
-  useCase = new UninstallAgentUseCase({ agentRepo });
+  const opened = openDb(":memory:");
+  db = opened.db;
+  close = opened.close;
+  agentRepo = new DrizzleAgentRepository({ db });
+  useCase = new UninstallAgentUseCase({
+    agentRepo,
+    queries: new DrizzleCatalogQueries({ db }),
+  });
+});
+
+afterEach(() => {
+  close();
 });
 
 describe("UninstallAgentUseCase — happy path", () => {
   it("deletes an installed agent when no installed agent depends on it", async () => {
+    (await agentRepo.save(agentEntity()))._unsafeUnwrap();
+
     const res = await useCase.execute({ id: AGENT_ID });
 
     expect(res._unsafeUnwrap()).toBeUndefined();
-    expect(agentRepo.get).toHaveBeenCalledWith(AGENT_ID);
-    expect(agentRepo.existsUsingAgent).toHaveBeenCalledWith(AGENT_ID);
-    expect(agentRepo.delete).toHaveBeenCalledWith(AGENT_ID);
+    expect((await agentRepo.get(AGENT_ID))._unsafeUnwrapErr()).toEqual({
+      type: "AgentNotFound",
+      fqn: AGENT_ID,
+    });
   });
 });
 
 describe("UninstallAgentUseCase — error channel", () => {
   it("propagates AgentNotFound from repo.get", async () => {
-    agentRepo.get.mockReturnValue(errAsync({ type: "AgentNotFound", fqn: AGENT_ID }));
-
     const res = await useCase.execute({ id: AGENT_ID });
 
     expect(res._unsafeUnwrapErr()).toEqual({ type: "AgentNotFound", fqn: AGENT_ID });
-    expect(agentRepo.existsUsingAgent).not.toHaveBeenCalled();
-    expect(agentRepo.delete).not.toHaveBeenCalled();
   });
 
   it("returns HasDependents when another agent references the target", async () => {
-    agentRepo.existsUsingAgent.mockReturnValue(okAsync(true));
+    (await agentRepo.save(agentEntity()))._unsafeUnwrap();
+    (
+      await agentRepo.save(
+        agentEntity({
+          fqn: DEPENDENT_AGENT_ID,
+          origin: "file:///catalog/agents/reviewer",
+          dependencyRefs: { skills: [], mcps: [], agents: [AGENT_ID] },
+        }),
+      )
+    )._unsafeUnwrap();
 
     const res = await useCase.execute({ id: AGENT_ID });
 
     expect(res._unsafeUnwrapErr()).toEqual({ type: "HasDependents", fqn: AGENT_ID });
-    expect(agentRepo.delete).not.toHaveBeenCalled();
-  });
-
-  it("propagates DatabaseUnavailable from existsUsingAgent", async () => {
-    const cause = new Error("disk");
-    agentRepo.existsUsingAgent.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
-
-    const res = await useCase.execute({ id: AGENT_ID });
-
-    expect(res._unsafeUnwrapErr()).toEqual({ type: "DatabaseUnavailable", cause });
-    expect(agentRepo.delete).not.toHaveBeenCalled();
-  });
-
-  it("propagates DatabaseUnavailable from delete", async () => {
-    const cause = new Error("disk");
-    agentRepo.delete.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
-
-    const res = await useCase.execute({ id: AGENT_ID });
-
-    expect(res._unsafeUnwrapErr()).toEqual({ type: "DatabaseUnavailable", cause });
   });
 });

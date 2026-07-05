@@ -41,6 +41,7 @@ import { ListSkillsUseCase } from "./application/skill/list-skills.js";
 import { UninstallSkillUseCase } from "./application/skill/uninstall-skill.js";
 import { DrizzleAgentRepository } from "./infrastructure/drizzle/agent-repository.js";
 import { openDb } from "./infrastructure/drizzle/catalog-db.js";
+import { DrizzleCatalogQueries } from "./infrastructure/drizzle/catalog-queries.js";
 import { DrizzleMcpRepository } from "./infrastructure/drizzle/mcp-repository.js";
 import { DrizzleSkillRepository } from "./infrastructure/drizzle/skill-repository.js";
 import { defaultRegistry } from "./infrastructure/source/fetcher/registry.js";
@@ -99,6 +100,7 @@ export function composeCatalog(opts: CatalogModuleOptions): CatalogModule {
   const agentRepo = new DrizzleAgentRepository({ db });
   const skillRepo = new DrizzleSkillRepository({ db });
   const mcpRepo = new DrizzleMcpRepository({ db });
+  const queries = new DrizzleCatalogQueries({ db });
 
   const agentSource = new MarkdownAgentSource(registry);
   const skillSource = new MarkdownSkillSource(registry);
@@ -113,9 +115,8 @@ export function composeCatalog(opts: CatalogModuleOptions): CatalogModule {
     agent: agentSource,
     mcp: mcpSource,
   });
-  const getTree = new GetTreeUseCase({ skill: skillRepo, agent: agentRepo, mcp: mcpRepo });
+  const getTree = new GetTreeUseCase({ queries });
   const repos = { skill: skillRepo, agent: agentRepo, mcp: mcpRepo };
-  const namedRepos = { skillRepo, agentRepo, mcpRepo };
 
   return {
     installAgent,
@@ -123,35 +124,35 @@ export function composeCatalog(opts: CatalogModuleOptions): CatalogModule {
     installMcp,
     getUpstreamTree,
     getTree,
-    resolvePlan: new ResolvePlanUseCase({ getUpstreamTree, getTree, repos }),
+    resolvePlan: new ResolvePlanUseCase({ getUpstreamTree, getTree, queries }),
     applyPlan: new ApplyPlanUseCase({ installSkill, installAgent, installMcp, repos }),
-    uninstallAgent: new UninstallAgentUseCase({ agentRepo }),
-    uninstallSkill: new UninstallSkillUseCase({ skillRepo, agentRepo }),
-    uninstallMcp: new UninstallMcpUseCase({ mcpRepo, agentRepo, skillRepo }),
+    uninstallAgent: new UninstallAgentUseCase({ agentRepo, queries }),
+    uninstallSkill: new UninstallSkillUseCase({ skillRepo, queries }),
+    uninstallMcp: new UninstallMcpUseCase({ mcpRepo, queries }),
     enableAgent: new EnableAgentUseCase({ agentRepo }),
     disableAgent: new DisableAgentUseCase({ agentRepo }),
-    acknowledgeSkillPrereqs: new AcknowledgePrereqsUseCase(namedRepos),
+    acknowledgeSkillPrereqs: new AcknowledgePrereqsUseCase({ skillRepo, queries }),
     acknowledgeAgentPrereqs: new AcknowledgeAgentPrereqsUseCase({ agentRepo }),
-    getAgent: new GetAgentUseCase({ agentRepo }),
-    getAgentEntry: new GetAgentEntryUseCase(namedRepos),
-    getAgentContent: new GetAgentContentUseCase({ agentRepo }),
-    listAgentFiles: new ListAgentFilesUseCase({ agentRepo }),
-    getAgentFile: new GetAgentFileUseCase({ agentRepo }),
-    resolveAgent: new ResolveAgentUseCase(namedRepos),
-    getSkillEntry: new GetSkillEntryUseCase(namedRepos),
-    getSkill: new GetSkillUseCase(namedRepos),
-    getSkillByOrigin: new GetSkillByOriginUseCase({ skillRepo }),
-    getSkillContent: new GetSkillContentUseCase({ skillRepo }),
-    listSkillFiles: new ListSkillFilesUseCase({ skillRepo }),
-    getSkillFile: new GetSkillFileUseCase({ skillRepo }),
-    getMcp: new GetMcpUseCase(namedRepos),
-    getMcpByOrigin: new GetMcpByOriginUseCase({ mcpRepo }),
-    getMcpContent: new GetMcpContentUseCase({ mcpRepo }),
-    listAgentEntries: new ListAgentEntriesUseCase(namedRepos),
-    listSkillEntries: new ListSkillEntriesUseCase(namedRepos),
-    listAgents: new ListAgentsUseCase({ agentRepo }),
-    listSkills: new ListSkillsUseCase(namedRepos),
-    listMcps: new ListMcpsUseCase(namedRepos),
+    getAgent: new GetAgentUseCase({ queries }),
+    getAgentEntry: new GetAgentEntryUseCase({ queries }),
+    getAgentContent: new GetAgentContentUseCase({ queries }),
+    listAgentFiles: new ListAgentFilesUseCase({ queries }),
+    getAgentFile: new GetAgentFileUseCase({ queries }),
+    resolveAgent: new ResolveAgentUseCase({ queries }),
+    getSkillEntry: new GetSkillEntryUseCase({ queries }),
+    getSkill: new GetSkillUseCase({ queries }),
+    getSkillByOrigin: new GetSkillByOriginUseCase({ queries }),
+    getSkillContent: new GetSkillContentUseCase({ queries }),
+    listSkillFiles: new ListSkillFilesUseCase({ queries }),
+    getSkillFile: new GetSkillFileUseCase({ queries }),
+    getMcp: new GetMcpUseCase({ queries }),
+    getMcpByOrigin: new GetMcpByOriginUseCase({ queries }),
+    getMcpContent: new GetMcpContentUseCase({ queries }),
+    listAgentEntries: new ListAgentEntriesUseCase({ queries }),
+    listSkillEntries: new ListSkillEntriesUseCase({ queries }),
+    listAgents: new ListAgentsUseCase({ queries }),
+    listSkills: new ListSkillsUseCase({ queries }),
+    listMcps: new ListMcpsUseCase({ queries }),
     async close() {
       close();
     },

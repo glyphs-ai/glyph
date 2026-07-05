@@ -6,8 +6,10 @@
  */
 
 import { z } from "zod";
-import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
+import { selectAllAgents } from "./agent-reads.js";
 
 export const ListAgentsRequestSchema = z.object({});
 export type ListAgentsRequest = z.infer<typeof ListAgentsRequestSchema>;
@@ -26,7 +28,7 @@ export type ListAgentsResponse = z.infer<typeof ListAgentsResponseSchema>;
 export type ListAgentsError = DatabaseUnavailable;
 
 export interface ListAgentsDeps {
-  readonly agentRepo: AgentRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class ListAgentsUseCase
@@ -35,9 +37,9 @@ export class ListAgentsUseCase
   constructor(private readonly deps: ListAgentsDeps) {}
 
   execute(_request: ListAgentsRequest): UseCaseResult<ListAgentsResponse, ListAgentsError> {
-    return this.deps.agentRepo.list().map((agents) =>
-      agents.map((agent) => ({
-        id: agent.id,
+    return this.deps.queries.query((db) =>
+      selectAllAgents(db).map((agent) => ({
+        id: agent.fqn,
         disabledByUser: agent.disabledByUser,
         skills: [...agent.dependencyRefs.skills],
         mcps: [...agent.dependencyRefs.mcps],

@@ -3,14 +3,15 @@ import { Create__Entity__UseCase } from "./application/create-__entity-kebab__.j
 import { Get__Entity__UseCase } from "./application/get-__entity-kebab__.js";
 import { List__Entity__sUseCase } from "./application/list-__entity-kebab__s.js";
 import { openDb } from "./infrastructure/drizzle/__entity-kebab__-db.js";
+import { Drizzle__Entity__Queries } from "./infrastructure/drizzle/__entity-kebab__-queries.js";
 import { Drizzle__Entity__Repository } from "./infrastructure/drizzle/__entity-kebab__-repository.js";
 
 /**
  * Public surface of the __PKG__ package: a DI container of use-case
  * instances plus `close`. The composition root opens the DB, builds the
- * repository adapter, and wires each use-case with the deps it needs.
- * Consumers call `module.<useCase>.execute(request)`; there is no service
- * facade.
+ * write repository and read query adapters, and wires each use-case with the
+ * deps it needs. Consumers call `module.<useCase>.execute(request)`; there is
+ * no service facade.
  */
 export interface __Entity__Module {
   readonly create__Entity__: Create__Entity__UseCase;
@@ -34,12 +35,13 @@ export async function compose__Entity__Module(
 ): Promise<__Entity__Module> {
   const { db, close } = openDb(opts.dbFile);
   const repo = new Drizzle__Entity__Repository({ db });
+  const query = new Drizzle__Entity__Queries({ db });
 
   return {
     create__Entity__: new Create__Entity__UseCase({ repo }),
-    get__Entity__: new Get__Entity__UseCase({ repo }),
+    get__Entity__: new Get__Entity__UseCase({ query }),
     archive__Entity__: new Archive__Entity__UseCase({ repo }),
-    list__Entity__s: new List__Entity__sUseCase({ repo }),
+    list__Entity__s: new List__Entity__sUseCase({ query }),
     async close() {
       close();
     },

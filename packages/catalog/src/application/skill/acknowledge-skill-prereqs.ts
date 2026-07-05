@@ -1,9 +1,11 @@
 import { ok, safeTry } from "neverthrow";
 import { z } from "zod";
-import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
 import { SkillFqnSchema } from "../../domain/skill-fqn.js";
 import type { SkillNotFound, SkillRepository } from "../../domain/skill-repository.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
+import { collectReferencedSkillFqns } from "./skill-reads.js";
 
 const DependencyRefSchema = z.object({ fqn: z.string() });
 
@@ -35,7 +37,7 @@ export type AcknowledgePrereqsResponse = Skill;
 export type AcknowledgePrereqsError = SkillNotFound | DatabaseUnavailable;
 export interface AcknowledgePrereqsDeps {
   readonly skillRepo: SkillRepository;
-  readonly agentRepo: AgentRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class AcknowledgePrereqsUseCase
@@ -51,15 +53,7 @@ export class AcknowledgePrereqsUseCase
       const skill = yield* deps.skillRepo.get(request.id);
       skill.acknowledgePrereqs();
       yield* deps.skillRepo.save(skill);
-      const agents = yield* deps.agentRepo.list();
-      const skills = yield* deps.skillRepo.list();
-      const referencedSkillFqns = new Set<string>();
-      for (const agent of agents) {
-        for (const fqn of agent.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-      }
-      for (const installedSkill of skills) {
-        for (const fqn of installedSkill.dependencyRefs.skills) referencedSkillFqns.add(fqn);
-      }
+      const referencedSkillFqns = yield* deps.queries.query((db) => collectReferencedSkillFqns(db));
       const dependencies =
         skill.dependencyRefs.skills.length > 0 || skill.dependencyRefs.mcps.length > 0
           ? {

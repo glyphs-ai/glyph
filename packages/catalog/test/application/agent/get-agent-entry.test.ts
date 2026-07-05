@@ -1,16 +1,16 @@
-import { errAsync, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
-import { type MockProxy, mock } from "vitest-mock-extended";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GetAgentEntryUseCase } from "../../../src/application/agent/get-agent-entry.js";
 import { AgentEntity, type AgentEntityArgs } from "../../../src/domain/agent-entity.js";
 import { AgentFqnSchema } from "../../../src/domain/agent-fqn.js";
-import type { AgentRepository } from "../../../src/domain/agent-repository.js";
 import { McpEntity, type McpEntityArgs } from "../../../src/domain/mcp-entity.js";
 import { McpFqnSchema } from "../../../src/domain/mcp-fqn.js";
-import type { McpRepository } from "../../../src/domain/mcp-repository.js";
 import { SkillEntity, type SkillEntityArgs } from "../../../src/domain/skill-entity.js";
 import { SkillFqnSchema } from "../../../src/domain/skill-fqn.js";
-import type { SkillRepository } from "../../../src/domain/skill-repository.js";
+import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
+import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
+import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-repository.js";
+import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
 
 const AGENT_ID = AgentFqnSchema.parse("public/triage");
 const CHILD_AGENT_ID = AgentFqnSchema.parse("public/worker");
@@ -90,25 +90,29 @@ function agentDto(entity: AgentEntity) {
   };
 }
 
-let agentRepo: MockProxy<AgentRepository>;
-let skillRepo: MockProxy<SkillRepository>;
-let mcpRepo: MockProxy<McpRepository>;
+let db: Db;
+let close: () => void;
+let agentRepo: DrizzleAgentRepository;
+let skillRepo: DrizzleSkillRepository;
+let mcpRepo: DrizzleMcpRepository;
 let useCase: GetAgentEntryUseCase;
 
 beforeEach(() => {
-  agentRepo = mock<AgentRepository>();
-  skillRepo = mock<SkillRepository>();
-  mcpRepo = mock<McpRepository>();
-  skillRepo.list.mockReturnValue(okAsync([]));
-  agentRepo.list.mockReturnValue(okAsync([]));
-  mcpRepo.list.mockReturnValue(okAsync([]));
-  useCase = new GetAgentEntryUseCase({ agentRepo, skillRepo, mcpRepo });
+  const opened = openDb(":memory:");
+  db = opened.db;
+  close = opened.close;
+  agentRepo = new DrizzleAgentRepository({ db });
+  skillRepo = new DrizzleSkillRepository({ db });
+  mcpRepo = new DrizzleMcpRepository({ db });
+  useCase = new GetAgentEntryUseCase({ queries: new DrizzleCatalogQueries({ db }) });
+});
+
+afterEach(() => {
+  close();
 });
 
 describe("GetAgentEntryUseCase — read paths", () => {
   it("returns null when the agent is not installed", async () => {
-    agentRepo.get.mockReturnValue(errAsync({ type: "AgentNotFound", fqn: AGENT_ID }));
-
     const dto = (await useCase.execute({ id: AGENT_ID }))._unsafeUnwrap();
 
     expect(dto).toBeNull();
@@ -118,10 +122,9 @@ describe("GetAgentEntryUseCase — read paths", () => {
     const entity = agentEntity({
       dependencyRefs: { skills: [SKILL_ID], mcps: [MCP_ID], agents: [CHILD_AGENT_ID] },
     });
-    agentRepo.get.mockReturnValue(okAsync(entity));
-    agentRepo.list.mockReturnValue(okAsync([entity]));
-    skillRepo.list.mockReturnValue(okAsync([skillEntity()]));
-    mcpRepo.list.mockReturnValue(okAsync([mcpEntity()]));
+    (await agentRepo.save(entity))._unsafeUnwrap();
+    (await skillRepo.save(skillEntity()))._unsafeUnwrap();
+    (await mcpRepo.save(mcpEntity()))._unsafeUnwrap();
 
     const entry = (await useCase.execute({ id: AGENT_ID }))._unsafeUnwrap();
 
@@ -135,8 +138,7 @@ describe("GetAgentEntryUseCase — read paths", () => {
       disabledByUser: true,
       dependencyRefs: { skills: [SKILL_ID], mcps: [MCP_ID], agents: [] },
     });
-    agentRepo.get.mockReturnValue(okAsync(entity));
-    agentRepo.list.mockReturnValue(okAsync([entity]));
+    (await agentRepo.save(entity))._unsafeUnwrap();
 
     const entry = (await useCase.execute({ id: AGENT_ID }))._unsafeUnwrap();
 
@@ -162,34 +164,12 @@ describe("GetAgentEntryUseCase — read paths", () => {
   it("marks the agent blocked when a skill dependency is blocked", async () => {
     const entity = agentEntity({ dependencyRefs: { skills: [SKILL_ID], mcps: [], agents: [] } });
     const child = skillEntity({ fqn: SKILL_ID, prereqs: "Do setup", prereqsAck: false });
-    agentRepo.get.mockReturnValue(okAsync(entity));
-    agentRepo.list.mockReturnValue(okAsync([entity]));
-    skillRepo.list.mockReturnValue(okAsync([child]));
+    (await agentRepo.save(entity))._unsafeUnwrap();
+    (await skillRepo.save(child))._unsafeUnwrap();
 
     const entry = (await useCase.execute({ id: AGENT_ID }))._unsafeUnwrap();
 
     expect(entry?.status).toBe("blocked");
     expect(entry?.blockedReason).toEqual({ blockedDeps: [{ kind: "skill", fqn: SKILL_ID }] });
-  });
-});
-
-describe("GetAgentEntryUseCase — error channel", () => {
-  it("propagates DatabaseUnavailable from repo.get", async () => {
-    const cause = new Error("disk");
-    agentRepo.get.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
-
-    const res = await useCase.execute({ id: AGENT_ID });
-
-    expect(res._unsafeUnwrapErr()).toEqual({ type: "DatabaseUnavailable", cause });
-  });
-
-  it("propagates DatabaseUnavailable from dependency listing", async () => {
-    const cause = new Error("skill-db");
-    agentRepo.get.mockReturnValue(okAsync(agentEntity()));
-    skillRepo.list.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
-
-    const res = await useCase.execute({ id: AGENT_ID });
-
-    expect(res._unsafeUnwrapErr()).toEqual({ type: "DatabaseUnavailable", cause });
   });
 });

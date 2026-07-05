@@ -976,6 +976,32 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       },
                       "type": "array",
                     },
+                    "orphansFlagged": {
+                      "items": {
+                        "properties": {
+                          "fqn": {
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "skill",
+                              "mcp",
+                            ],
+                            "type": "string",
+                          },
+                          "origin": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "fqn",
+                          "origin",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
                     "skipped": {
                       "items": {
                         "properties": {
@@ -993,8 +1019,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "reason": {
                             "enum": [
                               "already-installed",
-                              "dep-failed",
                               "up-to-date",
+                              "dep-failed",
                             ],
                             "type": "string",
                           },
@@ -1014,6 +1040,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "skipped",
                     "failed",
                     "conflicts",
+                    "orphansFlagged",
                   ],
                   "type": "object",
                 },
@@ -2524,8 +2551,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "reason": {
                             "enum": [
                               "already-installed",
-                              "dep-failed",
                               "up-to-date",
+                              "dep-failed",
                             ],
                             "type": "string",
                           },
@@ -3188,6 +3215,32 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       },
                       "type": "array",
                     },
+                    "orphansFlagged": {
+                      "items": {
+                        "properties": {
+                          "fqn": {
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "skill",
+                              "mcp",
+                            ],
+                            "type": "string",
+                          },
+                          "origin": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "fqn",
+                          "origin",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
                     "skipped": {
                       "items": {
                         "properties": {
@@ -3205,8 +3258,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "reason": {
                             "enum": [
                               "already-installed",
-                              "dep-failed",
                               "up-to-date",
+                              "dep-failed",
                             ],
                             "type": "string",
                           },
@@ -3226,6 +3279,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "skipped",
                     "failed",
                     "conflicts",
+                    "orphansFlagged",
                   ],
                   "type": "object",
                 },
@@ -3641,8 +3695,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "reason": {
                             "enum": [
                               "already-installed",
-                              "dep-failed",
                               "up-to-date",
+                              "dep-failed",
                             ],
                             "type": "string",
                           },
@@ -4523,6 +4577,32 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       },
                       "type": "array",
                     },
+                    "orphansFlagged": {
+                      "items": {
+                        "properties": {
+                          "fqn": {
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "skill",
+                              "mcp",
+                            ],
+                            "type": "string",
+                          },
+                          "origin": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "fqn",
+                          "origin",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
                     "skipped": {
                       "items": {
                         "properties": {
@@ -4540,8 +4620,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "reason": {
                             "enum": [
                               "already-installed",
-                              "dep-failed",
                               "up-to-date",
+                              "dep-failed",
                             ],
                             "type": "string",
                           },
@@ -4561,6 +4641,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "skipped",
                     "failed",
                     "conflicts",
+                    "orphansFlagged",
                   ],
                   "type": "object",
                 },
@@ -5765,8 +5846,8 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "reason": {
                             "enum": [
                               "already-installed",
-                              "dep-failed",
                               "up-to-date",
+                              "dep-failed",
                             ],
                             "type": "string",
                           },

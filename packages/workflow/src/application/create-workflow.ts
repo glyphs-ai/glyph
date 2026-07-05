@@ -1,4 +1,4 @@
-import { err, ok, type Result, ResultAsync, safeTry } from "neverthrow";
+import { err, ok, type Result, safeTry } from "neverthrow";
 import { z } from "zod";
 import { generateWorkflowNodeId, WorkflowNodeIdSchema } from "../domain/node/workflow-node-id.js";
 import { COORDINATOR_KIND } from "../domain/node/workflow-node-kind.js";
@@ -91,18 +91,19 @@ export class CreateWorkflowUseCase
     const nowIso = deps.now().toISOString();
     const runner = runnerFor(deps.runners, COORDINATOR_KIND);
     return safeTry<CreateWorkflowResponse, CreateWorkflowError>(async function* () {
-      const validated = yield* ResultAsync.fromPromise(
-        runner.validate(
+      const validated = yield* runner
+        .validate(
           { agent: parsed.coordinatorAgent },
           { workflowId, workflowStatus: "running", coordinatorAgent: parsed.coordinatorAgent },
-        ),
-        (cause): NodeSpecError => ({
-          type: "NodeSpecError",
-          nodeKind: COORDINATOR_KIND,
-          reason: errorReason(cause),
-          cause,
-        }),
-      );
+        )
+        .mapErr(
+          (fault): NodeSpecError => ({
+            type: "NodeSpecError",
+            nodeKind: COORDINATOR_KIND,
+            reason: errorReason(fault.cause),
+            cause: fault.cause,
+          }),
+        );
       const spec = assertCoordinatorSpecAgent(validated, COORDINATOR_KIND);
       if (spec.isErr()) return err(spec.error);
       const wfDir = deps.sandbox.workflowDir(workflowId);
@@ -135,10 +136,10 @@ export class CreateWorkflowUseCase
         await deps.sandbox.remove(workflowId);
         return err(added.error);
       }
-      const inserted = await deps.repo.insert(workflow);
-      if (inserted.isErr()) {
+      const saved = await deps.repo.save(workflow);
+      if (saved.isErr()) {
         await deps.sandbox.remove(workflowId);
-        return err(inserted.error);
+        return err(saved.error);
       }
       yield* deps.coordinator.dispatch(workflowId, initialCoordNodeId);
       deps.coordinator.triggerWorkflowTick(workflowId);

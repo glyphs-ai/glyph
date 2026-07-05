@@ -9,7 +9,7 @@
  * Exports:
  *   - Per use-case: its `Request` / `Response` Zod schemas + inferred
  *     types and `Error` union — the wire contract.
- *   - Curated domain surface via `./application/index.js`: branded fqns
+ *   - Curated domain surface via `./application/catalog-public.js`: branded fqns
  *     + schemas, `CatalogKind`, the dependency-ref value objects, and
  *     the error atoms the use-case error unions are built from.
  *   - Resolution graph types (`ResolvedGraph`, `ResolvedNode`,
@@ -121,7 +121,7 @@ export {
 // classes, repository / source ports, manifest DTOs, and the drizzle +
 // markdown adapters are intentionally NOT exported: hosts construct
 // everything through `composeCatalog`.
-export * from "./application/index.js";
+export * from "./application/catalog-public.js";
 export {
   type GetMcpError,
   type GetMcpRequest,
@@ -289,4 +289,4 @@ export {
   type CatalogModule,
   type CatalogModuleOptions,
   composeCatalog,
-} from "./compose.js";
+} from "./catalog-module.js";

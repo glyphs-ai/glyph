@@ -70,10 +70,10 @@ function makeAutoSucceedRunner(
   let seq = 0;
   const runner: AutoSucceedRunner = {
     dispatchCalls,
-    async validate(spec) {
-      return spec;
+    validate(spec) {
+      return okAsync(spec);
     },
-    async dispatch(dispatchOpts: {
+    dispatch(dispatchOpts: {
       readonly workflowId: string;
       readonly nodeId: string;
       readonly spec: unknown;
@@ -81,7 +81,7 @@ function makeAutoSucceedRunner(
     }) {
       dispatchCalls.push({ workflowId: dispatchOpts.workflowId, nodeId: dispatchOpts.nodeId });
       if (opts.gated && autoSucceededWorkflows.has(dispatchOpts.workflowId)) {
-        return;
+        return okAsync(undefined);
       }
       autoSucceededWorkflows.add(dispatchOpts.workflowId);
       // Push the terminal onto the microtask queue so the engine has
@@ -92,16 +92,19 @@ function makeAutoSucceedRunner(
       // Stub still tracks a per-call identifier mirroring the runner's
       // task-id log line; the substrate does not consume it.
       void `${label}-unit-${seq}`;
+      return okAsync(undefined);
     },
-    async hasInFlightForNode() {
-      return false;
+    hasInFlightForNode() {
+      return okAsync(false);
     },
-    async cancel() {},
-    async listArtifacts() {
-      return null;
+    cancel() {
+      return okAsync(undefined);
     },
-    async resolveArtifactPath() {
-      return null;
+    listArtifacts() {
+      return okAsync(null);
+    },
+    resolveArtifactPath() {
+      return okAsync(null);
     },
   };
   return runner;
@@ -127,12 +130,12 @@ async function makeHarness(): Promise<Harness> {
       coordinator: coord,
       worker,
       human: {
-        validate: async (s) => s,
-        dispatch: async () => {},
-        hasInFlightForNode: async () => false,
-        cancel: async () => {},
-        listArtifacts: async () => null,
-        resolveArtifactPath: async () => null,
+        validate: (s) => okAsync(s),
+        dispatch: () => okAsync(undefined),
+        hasInFlightForNode: () => okAsync(false),
+        cancel: () => okAsync(undefined),
+        listArtifacts: () => okAsync(null),
+        resolveArtifactPath: () => okAsync(null),
       } as import("@glyphs-ai/workflow").WorkflowNodeRunner,
     },
     logger: silentLogger,

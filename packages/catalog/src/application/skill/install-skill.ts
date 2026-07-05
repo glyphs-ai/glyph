@@ -23,7 +23,7 @@ const SkillDependencyRefsSchema = z.object({
 
 export const InstallSkillRequestSchema = z.object({
   origin: z.string(),
-  dependencyRefs: SkillDependencyRefsSchema.optional(),
+  dependencyRefs: SkillDependencyRefsSchema,
 });
 export type InstallSkillRequest = z.infer<typeof InstallSkillRequestSchema>;
 
@@ -67,7 +67,7 @@ export class InstallSkillUseCase
   private buildEntity(
     manifest: SkillManifest,
     origin: string,
-    dependencyRefs: SkillDependencyRefs | undefined,
+    dependencyRefs: SkillDependencyRefs,
   ): ResultAsync<Built, SkillOriginConflict | DatabaseUnavailable> {
     const fqn = SkillFqn.create(manifest.scope, manifest.name);
     const mint = (carriedAck: boolean): Built => {
@@ -78,7 +78,7 @@ export class InstallSkillUseCase
         description: manifest.description,
         version: manifest.version,
         prereqs: manifest.prereqs,
-        dependencyRefs: dependencyRefs ?? manifest.dependencyRefs,
+        dependencyRefs,
         now: new Date().toISOString(),
       });
       if (carriedAck) skill.acknowledgePrereqs();

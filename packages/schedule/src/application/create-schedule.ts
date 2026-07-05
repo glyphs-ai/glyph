@@ -1,4 +1,4 @@
-import { err, ok, ResultAsync, safeTry } from "neverthrow";
+import { err, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import { nextRuns } from "../domain/schedule/cron.js";
 import { ScheduleEntity } from "../domain/schedule/schedule-entity.js";
@@ -86,12 +86,11 @@ export class CreateScheduleUseCase
       yield* validateTrigger(parsed.trigger);
       if (!isNonEmptyName(parsed.name)) return err({ type: "InvalidScheduleName" as const });
       const handler = yield* deps.registry.handlerFor(parsed.target.kind);
-      const validatedData = yield* ResultAsync.fromPromise(
-        handler.validate(parsed.target.data),
-        (cause): TargetValidationFailed => ({
+      const validatedData = yield* handler.validate(parsed.target.data).mapErr(
+        (fault): TargetValidationFailed => ({
           type: "TargetValidationFailed",
           kind: parsed.target.kind,
-          cause,
+          cause: fault.cause,
         }),
       );
       const id = generateScheduleId(deps.randomUUID);

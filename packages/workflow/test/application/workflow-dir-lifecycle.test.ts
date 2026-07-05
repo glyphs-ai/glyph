@@ -98,8 +98,8 @@ describe("workflowDir lifecycle", () => {
     // Force the repository's write tx to throw (simulating a unique-constraint
     // violation or any DB-level write failure). The use-case must remove the
     // freshly reserved workflowDir on the catch path so the next operator sees
-    // a consistent fs/db state. (The old test spied `repo.insertWorkflow`; the
-    // 3-method repo isn't exposed, so we fail the underlying write tx instead.)
+    // a consistent fs/db state. The repository isn't exposed, so we fail the
+    // underlying write tx instead.
     const spy = vi.spyOn(f.db, "transaction").mockImplementation(() => {
       throw new Error("simulated tx failure");
     });

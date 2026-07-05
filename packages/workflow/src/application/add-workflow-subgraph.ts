@@ -192,15 +192,16 @@ function validateNodeSpec(args: {
   readonly spec: unknown;
   readonly ctx: WorkflowNodeValidateCtx;
 }): ResultAsync<unknown, NodeSpecError> {
-  return ResultAsync.fromPromise(
-    runnerFor(args.runners, args.kind).validate(args.spec, args.ctx),
-    (cause): NodeSpecError => ({
-      type: "NodeSpecError",
-      nodeKind: args.kind,
-      reason: errorReason(cause),
-      cause,
-    }),
-  );
+  return runnerFor(args.runners, args.kind)
+    .validate(args.spec, args.ctx)
+    .mapErr(
+      (fault): NodeSpecError => ({
+        type: "NodeSpecError",
+        nodeKind: args.kind,
+        reason: errorReason(fault.cause),
+        cause: fault.cause,
+      }),
+    );
 }
 
 function errorReason(cause: unknown): string {

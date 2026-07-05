@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { __Entity__Entity } from "../../../src/domain/__entity-kebab__-entity.js";
 import type { __Entity__Id } from "../../../src/domain/__entity-kebab__-id.js";
+import type { __Entity__Name } from "../../../src/domain/__entity-kebab__-name.js";
 import {
   __Entity__Mapper,
   type __Entity__Row,
@@ -28,7 +29,7 @@ describe("__Entity__Mapper.toRow", () => {
   it("round-trips with toDomain", () => {
     const e = new __Entity__Entity({
       id: "11111111-1111-4111-8111-111111111111" as __Entity__Id,
-      name: "Demo",
+      name: "Demo" as __Entity__Name,
       createdAt: "2025-01-01T00:00:00.000Z",
       archived: false,
     });
@@ -38,7 +39,7 @@ describe("__Entity__Mapper.toRow", () => {
   it("reflects post-archive state", () => {
     const e = new __Entity__Entity({
       id: "11111111-1111-4111-8111-111111111111" as __Entity__Id,
-      name: "Demo",
+      name: "Demo" as __Entity__Name,
       createdAt: "2025-01-01T00:00:00.000Z",
       archived: false,
     });

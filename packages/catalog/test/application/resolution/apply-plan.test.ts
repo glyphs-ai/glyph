@@ -213,7 +213,7 @@ describe("ApplyPlanUseCase — install pass", () => {
 });
 
 describe("ApplyPlanUseCase — plan metadata", () => {
-  it("deletes the old fqn before applying a root identity change", async () => {
+  it("surfaces a failed old-fqn delete on a root identity change", async () => {
     skillRepo.delete.mockReturnValue(
       errAsync({ type: "DatabaseUnavailable", cause: new Error("busy") }),
     );
@@ -239,6 +239,18 @@ describe("ApplyPlanUseCase — plan metadata", () => {
 
     expect(skillRepo.delete).toHaveBeenCalledWith("public/old-name" as SkillFqn);
     expect(res.installed).toEqual([{ kind: "skill", fqn: "public/new-name", prereqsAck: true }]);
+    // A failed identity-change delete is surfaced (not swallowed) so the caller
+    // learns the stale "public/old-name" row may linger.
+    expect(res.failed).toEqual([
+      {
+        kind: "skill",
+        fqn: "public/old-name",
+        error: {
+          name: "DatabaseUnavailable",
+          message: 'could not remove prior identity "public/old-name" before reinstall',
+        },
+      },
+    ]);
   });
 
   it("passes conflicts and flagged orphans through unchanged", async () => {

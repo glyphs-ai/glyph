@@ -161,7 +161,6 @@ export class WorkflowEntity {
   private _nodes: WorkflowNodeEntity[];
   private _edges: WorkflowEdgeEntity[];
   private readonly snapshot: WorkflowSnapshot;
-  private deleted = false;
 
   private constructor(args: WorkflowReconstituteArgs, snapshot: WorkflowSnapshot) {
     this._id = args.id;
@@ -226,14 +225,13 @@ export class WorkflowEntity {
     return this.toTerminal("cancelled", nowIso, { cancellation });
   }
 
-  markDeleted(): Result<void, WorkflowDeleteRequiresTerminal> {
+  ensureDeletable(): Result<void, WorkflowDeleteRequiresTerminal> {
     if (this.status === "running")
       return err({
         type: "WorkflowDeleteRequiresTerminal",
         workflowId: this.id,
         status: this.status,
       });
-    this.deleted = true;
     return ok(undefined);
   }
 
@@ -526,10 +524,6 @@ export class WorkflowEntity {
 
   __snapshot(): WorkflowSnapshot {
     return this.snapshot;
-  }
-
-  __isDeleted(): boolean {
-    return this.deleted;
   }
 
   get id(): WorkflowId {

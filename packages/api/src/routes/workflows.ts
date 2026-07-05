@@ -92,7 +92,6 @@ import {
 } from "../_error-policies/workflows.js";
 import { logEvent, respondError } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
-import { TaskOperationError } from "../wiring/_task-operation-error.js";
 import { contentTypeFor, streamFileAsResponse } from "./_artifact-stream.js";
 
 type WorkflowServiceResolver = (c: import("hono").Context) => WorkflowModule;
@@ -731,7 +730,7 @@ export function workflowsRoutes(
             originId: node.id,
           });
           if (inFlight.isErr()) {
-            throw new TaskOperationError(inFlight.error);
+            throw inFlight.error;
           }
           if (inFlight.value) {
             holdoutNodeIds.push(node.id);
@@ -759,13 +758,13 @@ export function workflowsRoutes(
             originId: node.id,
           });
           if (found.isErr()) {
-            throw new TaskOperationError(found.error);
+            throw found.error;
           }
           const linked = found.value;
           if (linked === null) continue;
           const deleted = await tasks.deleteTask.execute({ id: linked.id, purge });
           if (deleted.isErr()) {
-            throw new TaskOperationError(deleted.error);
+            throw deleted.error;
           }
         }
         unwrapWorkflow(

@@ -84,13 +84,6 @@ export { sessionsRoutes } from "./routes/sessions.js";
 export { tasksRoutes } from "./routes/tasks.js";
 export { workflowsRoutes } from "./routes/workflows.js";
 export { workspacesRoutes } from "./routes/workspaces.js";
-// Re-export the transport-agnostic zod schemas + wire types mirroring every
-// wire contract. The OpenAPI projection in `@glyphs-ai/server` consumes these;
-// other (non-HTTP) consumers can reuse them without an HTTP round-trip.
-export * from "./schemas/index.js";
-export { TaskOperationError } from "./wiring/_task-operation-error.js";
-export { TaskScheduleTargetError } from "./wiring/schedule-task-handler.js";
-export { WorkflowScheduleTargetError } from "./wiring/schedule-workflow-handler.js";
 export {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,

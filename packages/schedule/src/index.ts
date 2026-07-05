@@ -21,7 +21,7 @@
  */
 
 // ─── Application: use-cases, engine, ports ──────────────────────────
-export * from "./application/index.js";
+export * from "./application/schedule-public.js";
 export {
   type InvalidCronExpr,
   type InvalidTimezone,

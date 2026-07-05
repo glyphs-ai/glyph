@@ -83,7 +83,6 @@ describe("errorBody", () => {
       // directly from the DU `type` discriminator and doesn't go
       // through `errorBody`).
       // api / workflow
-      "TaskScheduleTargetError",
       "WorkspaceHasLiveTasksError",
       "InvalidWorkflowIdError",
       "InvalidWorkflowNodeIdError",

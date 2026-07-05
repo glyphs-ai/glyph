@@ -1,7 +1,7 @@
 import type { PreviewScheduleResponse, ScheduleModule } from "@glyphs-ai/schedule";
 import { errAsync, okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
-import { schedulesPreviewCronRoutes } from "../../src/routes/schedules/schedules.js";
+import { schedulesPreviewCronRoutes } from "../../../src/routes/schedules/schedules.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: route tests assert dynamic JSON envelopes
 const jsonBody = (res: Response): Promise<any> => res.json() as Promise<any>;

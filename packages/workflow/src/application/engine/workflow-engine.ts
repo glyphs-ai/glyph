@@ -145,10 +145,7 @@ export class WorkflowEngine implements WorkflowDispatchCoordinator {
       // / ready nodes were never dispatched. runner.cancel failures are swallowed
       // (best-effort; the substrate marks the node cancelled regardless).
       if (node.status === "running")
-        await ResultAsync.fromPromise(
-          runnerFor(this.runners, parseNodeKind(node.kind)).cancel(node.id),
-          (cause) => cause,
-        );
+        await runnerFor(this.runners, parseNodeKind(node.kind)).cancel(node.id);
       const workflow = await this.repo.get(workflowId);
       if (workflow.isErr()) {
         this.logger.warn(
@@ -272,18 +269,16 @@ export class WorkflowEngine implements WorkflowDispatchCoordinator {
     };
     const onTerminal =
       opts.onTerminal ?? ((result) => this.handleRunnerTerminal(workflowId, nodeId, result));
-    const dispatched = await ResultAsync.fromPromise(
-      payload.runner.dispatch({
-        workflowId: payload.workflowId,
-        nodeId: payload.nodeId,
-        spec: payload.spec,
-        onTerminal,
-      }),
-      (cause) => cause,
-    );
+    const dispatched = await payload.runner.dispatch({
+      workflowId: payload.workflowId,
+      nodeId: payload.nodeId,
+      spec: payload.spec,
+      onTerminal,
+    });
     if (dispatched.isErr()) {
-      const reason = `runner.dispatch threw: ${
-        dispatched.error instanceof Error ? dispatched.error.message : String(dispatched.error)
+      const cause = dispatched.error.cause;
+      const reason = `runner.dispatch failed: ${
+        cause instanceof Error ? cause.message : String(cause)
       }`;
       const marked = await this.markNodeTerminal(workflowId, nodeId, { status: "failed", reason });
       if (marked.isErr())

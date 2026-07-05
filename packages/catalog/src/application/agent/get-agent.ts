@@ -1,11 +1,10 @@
+import { errAsync, okAsync } from "neverthrow";
 import { z } from "zod";
 import { AgentFqnSchema } from "../../domain/agent-fqn.js";
-import type {
-  AgentNotFound,
-  AgentRepository,
-  DatabaseUnavailable,
-} from "../../domain/agent-repository.js";
+import type { AgentNotFound, DatabaseUnavailable } from "../../domain/agent-repository.js";
+import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
+import { selectAgentByFqn } from "./agent-reads.js";
 
 const DependencyRefSchema = z.object({ fqn: z.string() });
 
@@ -34,42 +33,50 @@ export type GetAgentResponse = z.infer<typeof GetAgentResponseSchema>;
 export type GetAgentError = AgentNotFound | DatabaseUnavailable;
 
 export interface GetAgentDeps {
-  readonly agentRepo: AgentRepository;
+  readonly queries: CatalogQueries;
 }
 
 export class GetAgentUseCase implements UseCase<GetAgentRequest, GetAgentResponse, GetAgentError> {
   constructor(private readonly deps: GetAgentDeps) {}
 
   execute(request: GetAgentRequest): UseCaseResult<GetAgentResponse, GetAgentError> {
-    return this.deps.agentRepo.get(request.id).map((agent) => {
-      const dependencies =
-        agent.dependencyRefs.skills.length > 0 ||
-        agent.dependencyRefs.mcps.length > 0 ||
-        agent.dependencyRefs.agents.length > 0
-          ? {
-              ...(agent.dependencyRefs.skills.length > 0
-                ? { skills: agent.dependencyRefs.skills.map((fqn) => ({ fqn })) }
-                : {}),
-              ...(agent.dependencyRefs.mcps.length > 0
-                ? { mcps: agent.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
-                : {}),
-              ...(agent.dependencyRefs.agents.length > 0
-                ? { agents: agent.dependencyRefs.agents.map((fqn) => ({ fqn })) }
-                : {}),
-            }
-          : undefined;
-      return {
-        fqn: agent.fqn,
-        origin: agent.origin,
-        description: agent.description,
-        version: agent.version,
-        ...(agent.prereqs !== undefined ? { prereqs: agent.prereqs } : {}),
-        prereqsAck: agent.prereqsAck,
-        disabledByUser: agent.disabledByUser,
-        installedAt: agent.installedAt,
-        updatedAt: agent.updatedAt,
-        ...(dependencies !== undefined ? { dependencies } : {}),
-      };
-    });
+    const { id } = request;
+    return this.deps.queries
+      .query((db): GetAgentResponse | undefined => {
+        const agent = selectAgentByFqn(db, id);
+        if (agent === undefined) return undefined;
+        const dependencies =
+          agent.dependencyRefs.skills.length > 0 ||
+          agent.dependencyRefs.mcps.length > 0 ||
+          agent.dependencyRefs.agents.length > 0
+            ? {
+                ...(agent.dependencyRefs.skills.length > 0
+                  ? { skills: agent.dependencyRefs.skills.map((fqn) => ({ fqn })) }
+                  : {}),
+                ...(agent.dependencyRefs.mcps.length > 0
+                  ? { mcps: agent.dependencyRefs.mcps.map((fqn) => ({ fqn })) }
+                  : {}),
+                ...(agent.dependencyRefs.agents.length > 0
+                  ? { agents: agent.dependencyRefs.agents.map((fqn) => ({ fqn })) }
+                  : {}),
+              }
+            : undefined;
+        return {
+          fqn: agent.fqn,
+          origin: agent.origin,
+          description: agent.description,
+          version: agent.version,
+          ...(agent.prereqs !== undefined ? { prereqs: agent.prereqs } : {}),
+          prereqsAck: agent.prereqsAck,
+          disabledByUser: agent.disabledByUser,
+          installedAt: agent.installedAt,
+          updatedAt: agent.updatedAt,
+          ...(dependencies !== undefined ? { dependencies } : {}),
+        };
+      })
+      .andThen(
+        (dto): UseCaseResult<GetAgentResponse, GetAgentError> =>
+          dto === undefined ? errAsync({ type: "AgentNotFound", fqn: id }) : okAsync(dto),
+      );
   }
 }

@@ -5,13 +5,13 @@
  * the existing fqn first, then run the same install pass and surface the
  * plan's flagged orphans (empty for a
  * fresh install). Always succeeds — per-node failures live in the summary;
- * a delete fault is swallowed (the reinstall path reconciles state anyway).
+ * a failed identity-change delete is surfaced as a failed entry for the old fqn.
  *
  * Consumes `ResolvePlanResponse` (the resolve-plan use-case's output)
  * verbatim as its Request `plan`.
  */
 
-import { ResultAsync } from "neverthrow";
+import { okAsync, ResultAsync } from "neverthrow";
 import { z } from "zod";
 import { AgentFqnSchema } from "../../domain/agent-fqn.js";
 import type { AgentRepository } from "../../domain/agent-repository.js";
@@ -90,23 +90,42 @@ export class ApplyPlanUseCase
     return ResultAsync.fromSafePromise(this.run(request.plan));
   }
 
+  /** Remove the pre-change fqn row for a root identity change (no-op if the old fqn is unparseable). */
+  private removeOldIdentity(ic: NonNullable<ResolvePlanResponse["identityChange"]>) {
+    if (ic.kind === "skill") {
+      const fqn = SkillFqnSchema.safeParse(ic.oldFqn);
+      return fqn.success ? this.deps.repos.skill.delete(fqn.data) : okAsync(undefined);
+    }
+    if (ic.kind === "agent") {
+      const fqn = AgentFqnSchema.safeParse(ic.oldFqn);
+      return fqn.success ? this.deps.repos.agent.delete(fqn.data) : okAsync(undefined);
+    }
+    const fqn = McpFqnSchema.safeParse(ic.oldFqn);
+    return fqn.success ? this.deps.repos.mcp.delete(fqn.data) : okAsync(undefined);
+  }
+
   private async run(plan: ResolvePlanResponse): Promise<ApplyPlanResponse> {
+    const failed: ApplyPlanResponse["failed"] = [];
+
+    // Root identity change: remove the old fqn before reinstalling under the new
+    // one. A delete fault is surfaced as a failed entry for the old identity so
+    // the caller learns the stale row may linger.
     const ic = plan.identityChange;
     if (ic) {
-      if (ic.kind === "skill") {
-        const fqn = SkillFqnSchema.safeParse(ic.oldFqn);
-        if (fqn.success) await this.deps.repos.skill.delete(fqn.data);
-      } else if (ic.kind === "agent") {
-        const fqn = AgentFqnSchema.safeParse(ic.oldFqn);
-        if (fqn.success) await this.deps.repos.agent.delete(fqn.data);
-      } else {
-        const fqn = McpFqnSchema.safeParse(ic.oldFqn);
-        if (fqn.success) await this.deps.repos.mcp.delete(fqn.data);
+      const removed = await this.removeOldIdentity(ic);
+      if (removed.isErr()) {
+        failed.push({
+          kind: ic.kind,
+          fqn: ic.oldFqn,
+          error: {
+            name: removed.error.type,
+            message: `could not remove prior identity "${ic.oldFqn}" before reinstall`,
+          },
+        });
       }
     }
 
     const installed: InstalledEntry[] = [];
-    const failed: ApplyPlanResponse["failed"] = [];
     const skipped: ApplyPlanResponse["skipped"] = plan.alreadyInstalled.map((node) => ({
       kind: node.kind,
       fqn: node.fqn,

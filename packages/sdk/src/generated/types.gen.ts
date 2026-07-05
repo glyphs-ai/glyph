@@ -2780,7 +2780,7 @@ export type PostApiWorkspacesByIdCatalogSkillsResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -2804,6 +2804,11 @@ export type PostApiWorkspacesByIdCatalogSkillsResponses = {
                 kind: 'origin-conflict';
                 existingOrigin: string;
             };
+        }>;
+        orphansFlagged: Array<{
+            kind: 'skill' | 'mcp';
+            fqn: string;
+            origin: string;
         }>;
     };
 };
@@ -3206,7 +3211,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -3389,7 +3394,7 @@ export type PostApiWorkspacesByIdCatalogAgentsResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -3413,6 +3418,11 @@ export type PostApiWorkspacesByIdCatalogAgentsResponses = {
                 kind: 'origin-conflict';
                 existingOrigin: string;
             };
+        }>;
+        orphansFlagged: Array<{
+            kind: 'skill' | 'mcp';
+            fqn: string;
+            origin: string;
         }>;
     };
 };
@@ -3819,7 +3829,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -4065,7 +4075,7 @@ export type PostApiWorkspacesByIdCatalogMcpsResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -4089,6 +4099,11 @@ export type PostApiWorkspacesByIdCatalogMcpsResponses = {
                 kind: 'origin-conflict';
                 existingOrigin: string;
             };
+        }>;
+        orphansFlagged: Array<{
+            kind: 'skill' | 'mcp';
+            fqn: string;
+            origin: string;
         }>;
     };
 };
@@ -4299,7 +4314,7 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';

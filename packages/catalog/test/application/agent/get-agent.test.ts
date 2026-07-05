@@ -1,12 +1,12 @@
-import { errAsync, okAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
-import { type MockProxy, mock } from "vitest-mock-extended";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GetAgentUseCase } from "../../../src/application/agent/get-agent.js";
 import { AgentEntity, type AgentEntityArgs } from "../../../src/domain/agent-entity.js";
 import { AgentFqnSchema } from "../../../src/domain/agent-fqn.js";
-import type { AgentRepository } from "../../../src/domain/agent-repository.js";
 import { McpFqnSchema } from "../../../src/domain/mcp-fqn.js";
 import { SkillFqnSchema } from "../../../src/domain/skill-fqn.js";
+import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
+import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
 
 const AGENT_ID = AgentFqnSchema.parse("public/triage");
 const asAgentFqn = (value: string) => AgentFqnSchema.parse(value);
@@ -60,18 +60,25 @@ function agentDto(entity: AgentEntity) {
   };
 }
 
-let agentRepo: MockProxy<AgentRepository>;
+let db: Db;
+let close: () => void;
+let agentRepo: DrizzleAgentRepository;
 let useCase: GetAgentUseCase;
 
 beforeEach(() => {
-  agentRepo = mock<AgentRepository>();
-  useCase = new GetAgentUseCase({ agentRepo });
+  const opened = openDb(":memory:");
+  db = opened.db;
+  close = opened.close;
+  agentRepo = new DrizzleAgentRepository({ db });
+  useCase = new GetAgentUseCase({ queries: new DrizzleCatalogQueries({ db }) });
+});
+
+afterEach(() => {
+  close();
 });
 
 describe("GetAgentUseCase — read paths", () => {
   it("propagates AgentNotFound when the agent is not installed", async () => {
-    agentRepo.get.mockReturnValue(errAsync({ type: "AgentNotFound", fqn: AGENT_ID }));
-
     const res = await useCase.execute({ id: AGENT_ID });
 
     expect(res._unsafeUnwrapErr()).toEqual({ type: "AgentNotFound", fqn: AGENT_ID });
@@ -87,7 +94,7 @@ describe("GetAgentUseCase — read paths", () => {
         agents: [asAgentFqn("public/worker")],
       },
     });
-    agentRepo.get.mockReturnValue(okAsync(entity));
+    (await agentRepo.save(entity))._unsafeUnwrap();
 
     const dto = (await useCase.execute({ id: AGENT_ID }))._unsafeUnwrap();
 
@@ -96,23 +103,12 @@ describe("GetAgentUseCase — read paths", () => {
 
   it("omits optional prereqs and dependencies when absent", async () => {
     const entity = agentEntity();
-    agentRepo.get.mockReturnValue(okAsync(entity));
+    (await agentRepo.save(entity))._unsafeUnwrap();
 
     const dto = (await useCase.execute({ id: AGENT_ID }))._unsafeUnwrap();
 
     expect(dto).toEqual(agentDto(entity));
     expect(dto).not.toHaveProperty("prereqs");
     expect(dto).not.toHaveProperty("dependencies");
-  });
-});
-
-describe("GetAgentUseCase — error channel", () => {
-  it("propagates DatabaseUnavailable from repo.get", async () => {
-    const cause = new Error("disk");
-    agentRepo.get.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
-
-    const res = await useCase.execute({ id: AGENT_ID });
-
-    expect(res._unsafeUnwrapErr()).toEqual({ type: "DatabaseUnavailable", cause });
   });
 });
