@@ -97,17 +97,6 @@ function querySerializer(query: Record<string, unknown>): string {
 }
 
 /**
- * Handle returned by {@link configureClient}: the resolved base URL.
- * `baseUrl` is needed by the SSE path in `commands/task.ts` (raw
- * streaming, which the SDK does not cover). The typed SDK operations
- * use the shared `client` singleton configured by {@link configureClient}
- * directly — no escape hatch needed.
- */
-export interface SdkClient {
-  readonly baseUrl: string;
-}
-
-/**
  * Point the shared SDK `client` singleton at `baseUrl` and pin serialization
  * to be wire-compatible with the former hand-rolled client:
  *  - `Accept: application/json` on every request (merged over the SDK's
@@ -120,12 +109,10 @@ export interface SdkClient {
  * at call time (the test suite spies on it). Trailing slashes are stripped
  * to match the former client's base-URL normalization.
  */
-export function configureClient(baseUrl: string): SdkClient {
-  const normalized = baseUrl.replace(/\/+$/, "");
+export function configureClient(baseUrl: string): void {
   client.setConfig({
-    baseUrl: normalized,
+    baseUrl: baseUrl.replace(/\/+$/, ""),
     headers: { Accept: "application/json" },
     querySerializer,
   });
-  return { baseUrl: normalized };
 }

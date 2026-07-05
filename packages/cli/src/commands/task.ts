@@ -12,6 +12,7 @@ import {
   getApiWorkspacesByIdTasks,
   getApiWorkspacesByIdTasksByTid,
   getApiWorkspacesByIdTasksByTidActivity,
+  getApiWorkspacesByIdTasksByTidActivityStream,
   postApiWorkspacesByIdTasks,
   postApiWorkspacesByIdTasksByTidCancel,
 } from "@glyphs-ai/sdk";
@@ -272,13 +273,12 @@ export async function taskActivity(
         "--before cannot be combined with --follow (--follow resumes forward only; pass --after instead)\n",
     };
   }
-  const { baseUrl } = await makeSdkClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
 
     if (opts.follow === true) {
       return await followTaskActivity(
-        baseUrl,
         workspaceId,
         taskId,
         opts.after !== undefined ? { after: opts.after } : {},
@@ -305,110 +305,93 @@ export async function taskActivity(
 
 /**
  * Live-tail an in-progress task by streaming SSE from the
- * `/activity/stream` endpoint. Each ActivityItem is printed as a
- * single NDJSON line on stdout (pipe-friendly: `... | jq -c`,
- * `... | grep error`).
+ * `/activity/stream` endpoint through the typed SDK operation. Each
+ * ActivityItem is printed as a single NDJSON line on stdout (pipe-friendly:
+ * `... | jq -c`, `... | grep error`).
  *
- * Exits 0 when the server sends `event: end` (task terminal) or the
- * stream closes cleanly. Exits non-zero on transport / framing
- * errors. SIGINT (Ctrl+C) terminates the process between frames.
+ * Exits 0 when the server sends `event: end` (task terminal) or the stream
+ * closes cleanly. Exits 1 on a per-frame `error` payload or a transport
+ * fault — the SDK stream is one-shot (reconnection is a non-goal; the user
+ * re-runs). SIGINT (Ctrl+C) terminates the process between frames.
  *
- * Resume: pass `after` to send `Last-Event-ID: <after>` so the
- * server replays from that seq. Conversely, on every clean / mid-
- * stream-error exit we print `last seq: <N>` to stderr so the next
- * invocation can resume:
+ * Resume: pass `after` to send `Last-Event-ID: <after>` so the server replays
+ * from that seq. Conversely, on every clean / mid-stream-error exit we print
+ * `last seq: <N>` to stderr so the next invocation can resume:
  *
  *   glyph task activity <task-id> --follow                       # tail from now
  *   glyph task activity <task-id> --follow --after 1234          # resume from seq 1234
  *
- * Inside Ctrl+C the process dies between frames and stderr is not
- * written; recover the last seq from stdout instead
- * (`... | tail -1 | jq .seq`) since each printed item carries its
- * own `seq`.
+ * Inside Ctrl+C the process dies between frames and stderr is not written;
+ * recover the last seq from stdout instead (`... | tail -1 | jq .seq`) since
+ * each printed item carries its own `seq`.
  */
 export async function followTaskActivity(
-  baseUrl: string,
   workspaceId: string,
   taskId: string,
   opts: { readonly after?: number } = {},
 ): Promise<CommandResult> {
-  // SSE is out of the SDK's scope (it parses/buffers JSON bodies), so the
-  // streaming path stays on raw fetch. URL + headers mirror the JSON surface's
-  // wire format: workspace-scoped path with encodeURIComponent'd ids,
-  // Accept: application/json, and Last-Event-ID only when resuming.
-  const url = `${baseUrl}/api/workspaces/${encodeURIComponent(workspaceId)}/tasks/${encodeURIComponent(taskId)}/activity/stream`;
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (opts.after !== undefined) headers["Last-Event-ID"] = String(opts.after);
-  const res = await fetch(url, { method: "GET", headers });
-  if (res.status === 404) {
+  let stdout = "";
+  // Seed lastSeq from the resume `after` so a stream that immediately ends
+  // (nothing replayed) still yields a recoverable hint — e.g. `after` was
+  // already at HEAD.
+  let lastSeq: string | undefined = opts.after !== undefined ? String(opts.after) : undefined;
+  let sawEnd = false;
+  let protocolError: string | undefined;
+  let transport: { status?: number; message: string } | undefined;
+
+  const { stream } = await getApiWorkspacesByIdTasksByTidActivityStream({
+    path: { id: workspaceId, tid: taskId },
+    // One-shot: on a drop the SDK fires onSseError and stops (no retry). The
+    // user re-runs (with `--after`) to resume — reconnection is a non-goal.
+    sseMaxRetryAttempts: 1,
+    ...(opts.after !== undefined ? { headers: { "Last-Event-ID": String(opts.after) } } : {}),
+    onSseEvent: (ev) => {
+      if (ev.id !== undefined) lastSeq = ev.id;
+      switch (ev.event) {
+        case "activity":
+          // Single-line NDJSON: re-stringify (no indent) so multi-line item
+          // content stays on one line.
+          stdout += `${JSON.stringify(ev.data)}\n`;
+          break;
+        case "end":
+          sawEnd = true;
+          break;
+        case "error":
+          protocolError = streamErrorMessage(ev.data);
+          break;
+        // "heartbeat": keep-alive only.
+      }
+    },
+    onSseError: (err) => {
+      const status = sseErrorStatus(err);
+      transport = {
+        ...(status !== undefined ? { status } : {}),
+        message: err instanceof Error ? err.message : String(err),
+      };
+    },
+  });
+  // Iterating drives the generator; all routing happens in `onSseEvent`.
+  for await (const _frame of stream) {
+    // no-op
+  }
+
+  if (transport?.status === 404) {
     return {
       exitCode: 1,
       stderr: `task ${taskId} has no streaming activity (terminal or missing)\n`,
     };
   }
-  if (!res.ok) {
-    let body = "";
-    try {
-      body = await res.text();
-    } catch {
-      // ignore
-    }
-    return { exitCode: 1, stderr: `HTTP ${res.status}: ${body || res.statusText}\n` };
+  if (protocolError !== undefined) {
+    return withResumeHint(
+      { exitCode: 1, stdout, stderr: `stream error: ${protocolError}\n` },
+      lastSeq,
+    );
   }
-  if (res.body === null) {
-    return { exitCode: 1, stderr: "server returned an empty body\n" };
-  }
-
-  // Stream + frame-split on \n\n.
-  const decoder = new TextDecoder();
-  const reader = res.body.getReader();
-  let buffer = "";
-  let stdout = "";
-  // Seed lastSeq from the resume `after` so a stream that immediately
-  // ends (no items replayed) still produces a recoverable hint —
-  // e.g. resume `after` was already at HEAD.
-  let lastSeq: string | undefined = opts.after !== undefined ? String(opts.after) : undefined;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      while (true) {
-        const frameEnd = buffer.indexOf("\n\n");
-        if (frameEnd === -1) break;
-        const frame = buffer.slice(0, frameEnd);
-        buffer = buffer.slice(frameEnd + 2);
-        const parsed = parseSseFrame(frame);
-        if (parsed === null) continue;
-        if (parsed.id !== undefined) lastSeq = parsed.id;
-        if (parsed.event === "end") {
-          return withResumeHint({ exitCode: 0, stdout }, lastSeq);
-        }
-        if (parsed.event === "error") {
-          return withResumeHint(
-            { exitCode: 1, stdout, stderr: `stream error: ${parsed.data}\n` },
-            lastSeq,
-          );
-        }
-        if (parsed.event === "activity") {
-          // Ensure single-line NDJSON: re-stringify (no indent) so
-          // multi-line item content stays on one line.
-          try {
-            const item = JSON.parse(parsed.data);
-            stdout += `${JSON.stringify(item)}\n`;
-          } catch {
-            // Forward malformed frames verbatim for debuggability.
-            stdout += `${parsed.data}\n`;
-          }
-        }
-      }
-    }
-  } finally {
-    try {
-      reader.releaseLock();
-    } catch {
-      // ignore
-    }
+  if (transport !== undefined && !sawEnd) {
+    return withResumeHint(
+      { exitCode: 1, stdout, stderr: `stream connection failed: ${transport.message}\n` },
+      lastSeq,
+    );
   }
   return withResumeHint({ exitCode: 0, stdout }, lastSeq);
 }
@@ -421,26 +404,28 @@ function withResumeHint(result: CommandResult, lastSeq: string | undefined): Com
   return { ...result, stderr: `${existing}${tail}` };
 }
 
-/** Parse a single SSE frame (event: + data: + id: lines, no comments / retry). */
-function parseSseFrame(frame: string): { event: string; data: string; id?: string } | null {
-  let event = "message";
-  let id: string | undefined;
-  const dataLines: string[] = [];
-  for (const line of frame.split("\n")) {
-    if (line.startsWith("event:")) {
-      event = line.slice(6).trim();
-    } else if (line.startsWith("data:")) {
-      dataLines.push(line.slice(5).replace(/^ /, ""));
-    } else if (line.startsWith("id:")) {
-      // id: per SSE spec — used by `tasks.activity.stream` to expose
-      // each item's monotonic `seq`. Tracking it is what makes
-      // `--after` resume work.
-      id = line.slice(3).trim();
-    }
-    // Ignore `retry:` and comments — we don't need them client-side.
+/** Extract a human message from an `error` frame's parsed `data:` payload. */
+function streamErrorMessage(data: unknown): string {
+  if (
+    data !== null &&
+    typeof data === "object" &&
+    "error" in data &&
+    typeof (data as { error: unknown }).error === "string"
+  ) {
+    return (data as { error: string }).error;
   }
-  if (dataLines.length === 0) return null;
-  return id !== undefined
-    ? { event, data: dataLines.join("\n"), id }
-    : { event, data: dataLines.join("\n") };
+  return JSON.stringify(data);
+}
+
+/**
+ * Recover the HTTP status from the SDK SSE runtime's connection error, whose
+ * message is `SSE failed: <status> <statusText>` (see the generated
+ * `serverSentEvents.gen.ts`). Lets a 404 render the "no streaming activity"
+ * message; returns undefined for non-HTTP faults (ECONNREFUSED, DNS, abort)
+ * whose messages carry no status.
+ */
+function sseErrorStatus(err: unknown): number | undefined {
+  if (!(err instanceof Error)) return undefined;
+  const m = /SSE failed: (\d{3})\b/.exec(err.message);
+  return m ? Number.parseInt(m[1] as string, 10) : undefined;
 }

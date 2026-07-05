@@ -1,10 +1,10 @@
 // Task REST client. All list / get / dispatch / delete / cancel calls use
 // generated SDK operations. Types are sliced from the SDK response shapes so
-// the dashboard stays in lockstep with the wire automatically. The SSE
-// subscription (subscribeTaskActivity) and the artifact URL builder
-// (taskArtifactUrl) keep raw browser primitives — EventSource has no SDK
-// equivalent with the same reconnection semantics, and the artifact URL is
-// a direct browser download (not a fetch call).
+// the dashboard stays in lockstep with the wire automatically. The live
+// activity stream (openActivityStream) is an SDK-backed SSE consumer wrapped
+// for reconnection by the `useReconnectingStream` hook; the artifact URL
+// builder (taskArtifactUrl) keeps a raw browser URL (a direct download, not a
+// fetch call).
 
 import type {
   GetApiWorkspacesByIdScheduledTasksData,
@@ -21,6 +21,7 @@ import {
   getApiWorkspacesByIdTasksByOrigin,
   getApiWorkspacesByIdTasksByTid,
   getApiWorkspacesByIdTasksByTidActivity,
+  getApiWorkspacesByIdTasksByTidActivityStream,
   postApiWorkspacesByIdTasks,
   postApiWorkspacesByIdTasksByTidCancel,
 } from "@glyphs-ai/sdk";
@@ -184,55 +185,87 @@ export const fetchTaskActivity = async (
 };
 
 /**
- * Subscribe to live activity for a running task. Returns a handle that can
- * be `close()`d to release the SSE connection. Each new {@link ActivityItem}
- * arriving on the wire is delivered to `onItem`; `onEnd` fires when the
- * runtime finishes streaming (task terminal) or the connection closes;
- * `onError` fires on transport / framing faults.
- *
- * Uses the browser's native `EventSource` rather than an SDK op: the SDK's
- * SSE model uses an async iterator / callback that would require rewriting
- * the reconnection semantics, for no type-safety gain on the JSON-parsed
- * frame payloads. `Last-Event-ID` reconnection is handled automatically by
- * the browser's EventSource using the `id:` field on each server frame.
+ * Callbacks for a single activity-stream connection. `onItem` receives each
+ * {@link ActivityItem} as it arrives; `onEnd` fires when the server sends the
+ * `end` sentinel (task terminal); `onError` fires on a per-frame `error`
+ * payload or a transport fault.
  */
-export interface ActivityStreamHandle {
-  close(): void;
-}
-
-export interface SubscribeTaskActivityOpts {
+export interface ActivityStreamCallbacks {
   onItem: (item: ActivityItem) => void;
   onEnd?: () => void;
   onError?: (err: Error) => void;
 }
 
-export const subscribeTaskActivity = (
+export interface OpenActivityStreamOpts {
+  /** Aborting this signal closes the connection. */
+  signal: AbortSignal;
+  /** Seq to resume after — sent as `Last-Event-ID` so the server replays forward. */
+  lastEventId?: string;
+}
+
+export interface ActivityStreamOutcome {
+  /** Highest `id:` (seq) seen — the resume point for the next reconnect. */
+  lastEventId: string | undefined;
+  /** True once the server sent the `end` sentinel (terminal; do not reconnect). */
+  ended: boolean;
+}
+
+function streamErrorMessage(data: unknown): string {
+  if (
+    data !== null &&
+    typeof data === "object" &&
+    "error" in data &&
+    typeof (data as { error: unknown }).error === "string"
+  ) {
+    return (data as { error: string }).error;
+  }
+  return "activity stream error";
+}
+
+/**
+ * Open ONE SSE connection to a task's activity stream over the typed SDK
+ * operation and drive it to completion. Resolves when the server sends the
+ * `end` sentinel, the connection closes, or `signal` aborts. The SDK stream is
+ * one-shot (`sseMaxRetryAttempts: 1`) — reconnection is the caller's policy
+ * (see the `useReconnectingStream` hook). Per-frame routing keys on the SSE
+ * `event:` name (`activity` | `heartbeat` | `end` | `error`); `heartbeat`
+ * frames are liveness only.
+ */
+export const openActivityStream = async (
   taskId: string,
-  opts: SubscribeTaskActivityOpts,
-): ActivityStreamHandle => {
-  const url = `${workspacePrefix()}/tasks/${encodeURIComponent(taskId)}/activity/stream`;
-  const es = new EventSource(url);
-  es.addEventListener("activity", (ev) => {
-    try {
-      const item = JSON.parse((ev as MessageEvent).data) as ActivityItem;
-      opts.onItem(item);
-    } catch (err) {
-      opts.onError?.(err as Error);
-    }
+  cbs: ActivityStreamCallbacks,
+  opts: OpenActivityStreamOpts,
+): Promise<ActivityStreamOutcome> => {
+  let lastEventId = opts.lastEventId;
+  let ended = false;
+  const { stream } = await getApiWorkspacesByIdTasksByTidActivityStream({
+    path: { id: requireWorkspaceId(), tid: taskId },
+    signal: opts.signal,
+    sseMaxRetryAttempts: 1,
+    ...(opts.lastEventId !== undefined ? { headers: { "Last-Event-ID": opts.lastEventId } } : {}),
+    onSseEvent: (ev) => {
+      if (ev.id !== undefined) lastEventId = ev.id;
+      switch (ev.event) {
+        case "activity":
+          cbs.onItem(ev.data as ActivityItem);
+          break;
+        case "end":
+          ended = true;
+          cbs.onEnd?.();
+          break;
+        case "error":
+          cbs.onError?.(new Error(streamErrorMessage(ev.data)));
+          break;
+        // "heartbeat": liveness only.
+      }
+    },
+    onSseError: (err) => {
+      cbs.onError?.(err instanceof Error ? err : new Error(String(err)));
+    },
   });
-  es.addEventListener("end", () => {
-    opts.onEnd?.();
-    es.close();
-  });
-  es.addEventListener("error", () => {
-    // EventSource's spec auto-reconnects; we surface the error for
-    // visibility but don't tear down. CLOSED state means truly dead
-    // (server returned 4xx, won't retry).
-    if (es.readyState === EventSource.CLOSED) {
-      opts.onError?.(new Error("SSE connection closed"));
-    }
-  });
-  return {
-    close: () => es.close(),
-  };
+  // Iterating drives the generator; all routing happens in `onSseEvent`.
+  for await (const _frame of stream) {
+    if (opts.signal.aborted) break;
+  }
+  return { lastEventId, ended };
 };

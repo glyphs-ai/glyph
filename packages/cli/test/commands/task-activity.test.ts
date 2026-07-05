@@ -2,98 +2,101 @@
  * Unit tests for `followTaskActivity` — the SSE consumer used by
  * `glyph task activity <task-id> --follow`.
  *
- * The test feeds a synthetic SSE Response (built around a
- * `ReadableStream` of UTF-8 frames) into a stubbed `globalThis.fetch`
- * and asserts:
- *  - `Last-Event-ID` is sent on the request iff the caller passes
- *    `after`.
- *  - Each printed item lands on its own NDJSON line.
- *  - `event: end` exits 0; `event: error` exits 1 with stderr.
- *  - Whenever at least one frame carried `id:`, the result's stderr
- *    ends with `last seq: <N>` so the user can resume next time.
- *
- * SSE is out of the `@glyphs-ai/sdk` scope, so `followTaskActivity`
- * uses raw `fetch`; these tests stub `globalThis.fetch` directly.
+ * `followTaskActivity` drives the typed `@glyphs-ai/sdk` stream operation
+ * (`getApiWorkspacesByIdTasksByTidActivityStream`), routing each frame on its
+ * SSE `event:` name via the operation's `onSseEvent` callback. These tests
+ * mock that operation with a scripted async generator that replays frames
+ * (invoking `onSseEvent` / `onSseError` exactly as the real runtime does) and
+ * assert:
+ *  - `Last-Event-ID` is sent iff the caller passes `after`, and the stream is
+ *    opened one-shot (`sseMaxRetryAttempts: 1`).
+ *  - Each activity frame prints its own NDJSON line; heartbeats are ignored.
+ *  - `event: end` exits 0; `event: error` exits 1 with stderr; a transport
+ *    fault exits 1.
+ *  - Whenever a frame carried `id:`, the result's stderr ends with
+ *    `last seq: <N>` so the user can resume next time.
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+interface Frame {
+  readonly event?: string;
+  readonly id?: string;
+  readonly data?: unknown;
+  /** When set, the frame is delivered via `onSseError` (a transport fault). */
+  readonly errorMessage?: string;
+}
+
+const h = vi.hoisted(() => ({
+  calls: [] as Array<Record<string, unknown>>,
+  frames: [] as Frame[],
+}));
+
+vi.mock("@glyphs-ai/sdk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@glyphs-ai/sdk")>();
+  return {
+    ...actual,
+    // biome-ignore lint/suspicious/noExplicitAny: test double mirrors the op's runtime surface.
+    getApiWorkspacesByIdTasksByTidActivityStream: (options: any) => {
+      h.calls.push(options);
+      const frames = h.frames;
+      async function* stream() {
+        for (const f of frames) {
+          if (f.errorMessage !== undefined) {
+            options.onSseError?.(new Error(f.errorMessage));
+            continue;
+          }
+          options.onSseEvent?.({ data: f.data, event: f.event, id: f.id });
+          yield f.data;
+        }
+      }
+      return Promise.resolve({ stream: stream() });
+    },
+  };
+});
+
 import { followTaskActivity } from "../../src/commands/task.js";
 
-const BASE_URL = "http://test.local";
-
-interface Captured {
-  url: string;
-  headers: Record<string, string>;
+function setFrames(frames: Frame[]): void {
+  h.frames = frames;
 }
 
-/**
- * Build a fake fetch returning a `text/event-stream` Response whose
- * body emits the given frames. Each `frame` is a complete SSE frame
- * (the function appends the trailing `\n\n`); frames are flushed in
- * separate `enqueue` calls to mirror what a real server does.
- */
-function makeSseFetch(frames: readonly string[]): {
-  fetchFn: typeof fetch;
-  captured: Captured[];
-} {
-  const captured: Captured[] = [];
-  const fetchFn: typeof fetch = async (input, init) => {
-    const headers: Record<string, string> = {};
-    if (init?.headers) {
-      for (const [k, v] of Object.entries(init.headers as Record<string, string>)) {
-        headers[k] = v;
-      }
-    }
-    captured.push({ url: String(input), headers });
-    const encoder = new TextEncoder();
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        for (const frame of frames) {
-          controller.enqueue(encoder.encode(`${frame}\n\n`));
-        }
-        controller.close();
-      },
-    });
-    return new Response(body, {
-      status: 200,
-      headers: { "content-type": "text/event-stream" },
-    });
-  };
-  return { fetchFn, captured };
+function activityFrame(seq: number, payload: object): Frame {
+  return { event: "activity", id: String(seq), data: { seq, ...payload } };
 }
 
-function activityFrame(seq: number, payload: object): string {
-  return `event: activity\nid: ${seq}\ndata: ${JSON.stringify({ seq, ...payload })}`;
-}
+beforeEach(() => {
+  h.calls = [];
+  h.frames = [];
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("followTaskActivity", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("does NOT send Last-Event-ID when called without `after`", async () => {
-    const { fetchFn, captured } = makeSseFetch(["event: end\ndata: {}"]);
-    vi.stubGlobal("fetch", fetchFn);
-    const r = await followTaskActivity(BASE_URL, "ws-1", "20260601-abcd1234");
+  it("opens the stream one-shot and sends no Last-Event-ID without `after`", async () => {
+    setFrames([{ event: "end", data: {} }]);
+    const r = await followTaskActivity("ws-1", "20260601-abcd1234");
     expect(r.exitCode).toBe(0);
-    expect(captured[0]?.headers["Last-Event-ID"]).toBeUndefined();
+    expect(h.calls[0]?.path).toEqual({ id: "ws-1", tid: "20260601-abcd1234" });
+    expect(h.calls[0]?.sseMaxRetryAttempts).toBe(1);
+    expect(h.calls[0]?.headers).toBeUndefined();
   });
 
-  it("sends Last-Event-ID: <after> when a `after` is provided", async () => {
-    const { fetchFn, captured } = makeSseFetch(["event: end\ndata: {}"]);
-    vi.stubGlobal("fetch", fetchFn);
-    await followTaskActivity(BASE_URL, "ws-1", "20260601-abcd1234", { after: 1234 });
-    expect(captured[0]?.headers["Last-Event-ID"]).toBe("1234");
+  it("sends Last-Event-ID: <after> when `after` is provided", async () => {
+    setFrames([{ event: "end", data: {} }]);
+    await followTaskActivity("ws-1", "20260601-abcd1234", { after: 1234 });
+    expect(h.calls[0]?.headers).toEqual({ "Last-Event-ID": "1234" });
   });
 
   it("emits one NDJSON line per activity frame and exits 0 on `end`", async () => {
-    const { fetchFn } = makeSseFetch([
+    setFrames([
       activityFrame(1, { kind: "stdout", text: "hello" }),
       activityFrame(2, { kind: "stdout", text: "world" }),
-      "event: end\ndata: {}",
+      { event: "end", data: {} },
     ]);
-    vi.stubGlobal("fetch", fetchFn);
-    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
+    const r = await followTaskActivity("ws-1", "tid");
     expect(r.exitCode).toBe(0);
     const lines = (r.stdout ?? "").trimEnd().split("\n");
     expect(lines).toHaveLength(2);
@@ -101,92 +104,77 @@ describe("followTaskActivity", () => {
     expect(JSON.parse(lines[1] as string)).toMatchObject({ seq: 2, text: "world" });
   });
 
+  it("ignores heartbeat frames (no output, no early exit)", async () => {
+    setFrames([
+      { event: "heartbeat", data: {} },
+      activityFrame(3, { kind: "stdout", text: "after beat" }),
+      { event: "heartbeat", data: {} },
+      { event: "end", data: {} },
+    ]);
+    const r = await followTaskActivity("ws-1", "tid");
+    expect(r.exitCode).toBe(0);
+    const lines = (r.stdout ?? "").trimEnd().split("\n");
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0] as string)).toMatchObject({ seq: 3, text: "after beat" });
+  });
+
   it("appends `last seq: <N>` to stderr after a clean end", async () => {
-    const { fetchFn } = makeSseFetch([
+    // The server's `end` frame carries no `id:`; the resume hint is the last
+    // activity's seq (`lastSeq` retains the highest seq seen).
+    setFrames([
       activityFrame(7, { kind: "stdout", text: "x" }),
       activityFrame(8, { kind: "stdout", text: "y" }),
-      "event: end\nid: 9\ndata: {}",
+      { event: "end", data: {} },
     ]);
-    vi.stubGlobal("fetch", fetchFn);
-    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
+    const r = await followTaskActivity("ws-1", "tid");
     expect(r.exitCode).toBe(0);
-    // The `end` frame's id wins because parseSseFrame updates lastSeq
-    // BEFORE branching on event type — that's the most informative
-    // resume hint (anything strictly less than 9 was already seen).
-    expect(r.stderr).toBe("last seq: 9\n");
+    expect(r.stderr).toBe("last seq: 8\n");
   });
 
   it("seeds lastSeq from the resume `after` when no frames carry id", async () => {
-    // Server replays nothing because `after` was already at HEAD; the
-    // hint should still echo the `after` value so the user can re-resume
-    // from the same point next time.
-    const { fetchFn } = makeSseFetch(["event: end\ndata: {}"]);
-    vi.stubGlobal("fetch", fetchFn);
-    const r = await followTaskActivity(BASE_URL, "ws-1", "tid", { after: 42 });
+    setFrames([{ event: "end", data: {} }]);
+    const r = await followTaskActivity("ws-1", "tid", { after: 42 });
     expect(r.stderr).toBe("last seq: 42\n");
   });
 
   it("does NOT print a resume hint when no `after` and no frames had id", async () => {
-    const { fetchFn } = makeSseFetch(["event: end\ndata: {}"]);
-    vi.stubGlobal("fetch", fetchFn);
-    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
+    setFrames([{ event: "end", data: {} }]);
+    const r = await followTaskActivity("ws-1", "tid");
     expect(r.exitCode).toBe(0);
     expect(r.stderr ?? "").toBe("");
   });
 
   it("event: error exits 1, surfaces server message, and still prints last seq", async () => {
-    const { fetchFn } = makeSseFetch([
+    setFrames([
       activityFrame(5, { kind: "stdout", text: "before fault" }),
-      `event: error\ndata: ${JSON.stringify({ error: "runtime crashed" })}`,
+      { event: "error", data: { error: "runtime crashed" } },
     ]);
-    vi.stubGlobal("fetch", fetchFn);
-    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
+    const r = await followTaskActivity("ws-1", "tid");
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("stream error:");
     expect(r.stderr).toContain("runtime crashed");
     expect(r.stderr).toContain("last seq: 5");
   });
 
-  it("404 returns exit 1 with a helpful message and no resume hint", async () => {
-    const fetchFn: typeof fetch = async () =>
-      new Response("not found", {
-        status: 404,
-        headers: { "content-type": "text/plain" },
-      });
-    vi.stubGlobal("fetch", fetchFn);
-    const r = await followTaskActivity(BASE_URL, "ws-1", "missing", { after: 99 });
+  it("maps a 404 connection failure to a helpful message with no resume hint", async () => {
+    setFrames([{ errorMessage: "SSE failed: 404 Not Found" }]);
+    const r = await followTaskActivity("ws-1", "missing", { after: 99 });
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("no streaming activity");
-    // Resume hint suppressed — no events were ever delivered.
     expect(r.stderr).not.toContain("last seq:");
   });
 
-  it("frames split across multiple chunks are reassembled correctly", async () => {
-    // Real network reads don't honour frame boundaries; the parser
-    // has to buffer until \n\n shows up. Simulate by chopping a
-    // single frame in half.
-    const fetchFn: typeof fetch = async () => {
-      const full = `${activityFrame(11, { text: "split" })}\n\nevent: end\ndata: {}\n\n`;
-      const half = Math.floor(full.length / 2);
-      const encoder = new TextEncoder();
-      const body = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(encoder.encode(full.slice(0, half)));
-          controller.enqueue(encoder.encode(full.slice(half)));
-          controller.close();
-        },
-      });
-      return new Response(body, {
-        status: 200,
-        headers: { "content-type": "text/event-stream" },
-      });
-    };
-    vi.stubGlobal("fetch", fetchFn);
-    const r = await followTaskActivity(BASE_URL, "ws-1", "tid");
-    expect(r.exitCode).toBe(0);
+  it("exits 1 with a resume hint when the connection drops mid-stream", async () => {
+    setFrames([
+      activityFrame(11, { kind: "stdout", text: "split" }),
+      { errorMessage: "SSE failed: 503 Service Unavailable" },
+    ]);
+    const r = await followTaskActivity("ws-1", "tid");
+    expect(r.exitCode).toBe(1);
     const lines = (r.stdout ?? "").trimEnd().split("\n");
     expect(lines).toHaveLength(1);
     expect(JSON.parse(lines[0] as string)).toMatchObject({ seq: 11, text: "split" });
-    expect(r.stderr).toBe("last seq: 11\n");
+    expect(r.stderr).toContain("stream connection failed");
+    expect(r.stderr).toContain("last seq: 11");
   });
 });

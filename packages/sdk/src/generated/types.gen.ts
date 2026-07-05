@@ -1138,10 +1138,105 @@ export type GetApiWorkspacesByIdTasksByTidActivityStreamErrors = {
 
 export type GetApiWorkspacesByIdTasksByTidActivityStreamResponses = {
     /**
-     * SSE stream (text/event-stream)
+     * Server-sent event stream. Each frame's `event:` names the kind (`activity` | `heartbeat` | `end` | `error`) and `data:` carries the JSON payload described by this schema.
      */
-    200: unknown;
+    200: {
+        seq: number;
+        id?: string;
+        parentSeq?: number;
+        timestamp: string;
+        kind: 'user';
+        text: string;
+        attachments?: Array<{
+            kind: 'image' | 'file';
+            mimeType?: string;
+            url?: string;
+            data?: string;
+            name?: string;
+        }>;
+    } | {
+        seq: number;
+        id?: string;
+        parentSeq?: number;
+        timestamp: string;
+        kind: 'assistant';
+        text: string;
+        model?: string;
+        tokens?: {
+            input?: number;
+            output: number;
+            cached?: number;
+            cacheWrite?: number;
+            reasoning?: number;
+            total?: number;
+        };
+        stopReason?: string;
+    } | {
+        seq: number;
+        id?: string;
+        parentSeq?: number;
+        timestamp: string;
+        kind: 'thinking';
+        text: string;
+        subject?: string;
+    } | {
+        seq: number;
+        id?: string;
+        parentSeq?: number;
+        timestamp: string;
+        kind: 'tool_call';
+        callId: string;
+        name: string;
+        args?: unknown;
+        status: 'running' | 'success' | 'error' | 'cancelled';
+        result?: unknown;
+        display?: {
+            content: string;
+            markdown?: boolean;
+        };
+        durationMs?: number;
+    } | {
+        seq: number;
+        id?: string;
+        parentSeq?: number;
+        timestamp: string;
+        kind: 'system';
+        text: string;
+        level?: 'info' | 'warn' | 'error';
+        subKind?: string;
+    } | {
+        seq: number;
+        id?: string;
+        parentSeq?: number;
+        timestamp: string;
+        kind: 'summary';
+        text?: string;
+        tokens?: {
+            input?: number;
+            output: number;
+            cached?: number;
+            cacheWrite?: number;
+            reasoning?: number;
+            total?: number;
+        };
+        stats?: {
+            filesModified?: Array<string>;
+            linesAdded?: number;
+            linesRemoved?: number;
+            toolCallsCount?: number;
+            durationMs?: number;
+            costUSD?: number;
+            model?: string;
+            premiumRequests?: number;
+        };
+    } | {
+        error: string;
+    } | {
+        [key: string]: unknown;
+    };
 };
+
+export type GetApiWorkspacesByIdTasksByTidActivityStreamResponse = GetApiWorkspacesByIdTasksByTidActivityStreamResponses[keyof GetApiWorkspacesByIdTasksByTidActivityStreamResponses];
 
 export type GetApiWorkspacesByIdScheduledTasksData = {
     body?: never;

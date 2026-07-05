@@ -259,18 +259,25 @@ export const handlers = [
     });
   }),
 
-  // SSE stream for a running task. 204 closes the EventSource cleanly so
-  // the browser does NOT enter its ~3-second reconnect loop and spam the
-  // console. can replace this with a synthetic stream that
-  // emits a couple of `event: activity` frames to exercise mergeStreamItem.
-  http.get(
-    `/api/workspaces/${W}/tasks/:taskId/activity/stream`,
-    () =>
-      new HttpResponse(null, {
-        status: 204,
-        headers: { "content-type": "text/event-stream" },
-      }),
-  ),
+  // SSE stream for a running task. Emits a heartbeat then the `end`
+  // sentinel and closes, so the SDK-backed stream connects, sees the
+  // terminal boundary, and the `useReconnectingStream` hook stops without
+  // entering its reconnect loop. Swap in `event: activity` frames (raw
+  // `ActivityItem` JSON in `data:`) to exercise `mergeStreamItem`.
+  http.get(`/api/workspaces/${W}/tasks/:taskId/activity/stream`, () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode("event: heartbeat\ndata: {}\n\n"));
+        controller.enqueue(encoder.encode("event: end\ndata: {}\n\n"));
+        controller.close();
+      },
+    });
+    return new HttpResponse(body, {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+    });
+  }),
 
   // ── schedules (workspace-scoped) ──────────────
   // List + detail + preview are read-only; PATCH (enabled toggle),

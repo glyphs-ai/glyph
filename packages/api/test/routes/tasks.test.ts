@@ -760,6 +760,118 @@ describe("tasksRoutes", () => {
     });
   });
 
+  describe("GET /:tid/activity/stream", () => {
+    it("200 streams activity frames (byte-compatible) then an end sentinel", async () => {
+      // Activity frames stay raw `data: <JSON.stringify(item)>` — the typed
+      // union added for codegen must NOT change the bytes on the wire.
+      const a = {
+        seq: 4,
+        kind: "user" as const,
+        text: "hi",
+        timestamp: "2026-06-01T00:00:02.000Z",
+      };
+      const b = {
+        seq: 5,
+        kind: "assistant" as const,
+        text: "yo",
+        timestamp: "2026-06-01T00:00:03.000Z",
+      };
+      async function* items() {
+        yield a;
+        yield b;
+      }
+      const m = stubManager({ getTaskActivityStream: vi.fn(async () => items()) });
+      const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/activity/stream`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+      const text = await res.text();
+      expect(text).toContain(`event: activity\nid: 4\ndata: ${JSON.stringify(a)}\n\n`);
+      expect(text).toContain(`event: activity\nid: 5\ndata: ${JSON.stringify(b)}\n\n`);
+      // The `end` sentinel closes the stream (empty `{}` payload).
+      expect(text.trimEnd().endsWith("event: end\ndata: {}")).toBe(true);
+    });
+
+    it("404 NoEventsYet when the manager returns null", async () => {
+      const m = stubManager({ getTaskActivityStream: vi.fn(async () => null) });
+      const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/activity/stream`);
+      expect(res.status).toBe(404);
+      const body = await jsonBody(res);
+      expect(body.code).toBe("NoEventsYet");
+    });
+
+    it("resumes from a numeric Last-Event-ID and ignores a non-numeric one", async () => {
+      async function* none() {}
+      const getTaskActivityStream = vi.fn(async () => none());
+      const m = stubManager({ getTaskActivityStream });
+      const r = tasksRoutes(() => m);
+
+      // A numeric Last-Event-ID becomes the `after` cursor so the manager
+      // replays only frames the client hasn't seen (reconnect resume).
+      await r.request(`/${sampleTask.id}/activity/stream`, { headers: { "Last-Event-ID": "42" } });
+      expect(getTaskActivityStream).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: sampleTask.id, after: 42 }),
+      );
+
+      // A non-numeric id is ignored (no `after`) rather than throwing.
+      await r.request(`/${sampleTask.id}/activity/stream`, { headers: { "Last-Event-ID": "abc" } });
+      expect(getTaskActivityStream).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ after: expect.anything() }),
+      );
+    });
+
+    it("emits heartbeat keep-alive frames while the activity iterator is idle", async () => {
+      // Heartbeats prove a live-but-quiet stream isn't dead. Drive the
+      // 15s keep-alive timer with fake timers while the iterator is parked.
+      vi.useFakeTimers();
+      try {
+        let release!: () => void;
+        const gate = new Promise<void>((r) => {
+          release = r;
+        });
+        async function* idleThenEnd() {
+          yield { seq: 7, kind: "system" as const, level: "info" as const, timestamp: "t" };
+          await gate;
+        }
+        const m = stubManager({ getTaskActivityStream: vi.fn(async () => idleThenEnd()) });
+        const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/activity/stream`);
+        const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+        const dec = new TextDecoder();
+
+        const first = await reader.read();
+        expect(dec.decode(first.value)).toContain("event: activity\nid: 7\n");
+
+        // Idle for one heartbeat interval → a keep-alive frame appears.
+        await vi.advanceTimersByTimeAsync(15_000);
+        const beat = await reader.read();
+        expect(dec.decode(beat.value)).toBe("event: heartbeat\ndata: {}\n\n");
+
+        // Releasing the gate ends the iterator → end sentinel, then close.
+        release();
+        const end = await reader.read();
+        expect(dec.decode(end.value)).toBe("event: end\ndata: {}\n\n");
+        const done = await reader.read();
+        expect(done.done).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("emits an error frame (not end) when the activity iterator throws mid-stream", async () => {
+      // The inner iterator-catch surfaces the failure as an `error` frame
+      // ({@link StreamErrorSchema} `{ error }`) instead of a silent close.
+      async function* boom() {
+        yield { seq: 1, kind: "system" as const, level: "info" as const, timestamp: "t" };
+        throw new Error("iterator exploded");
+      }
+      const m = stubManager({ getTaskActivityStream: vi.fn(async () => boom()) });
+      const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/activity/stream`);
+      const text = await res.text();
+      expect(text).toContain("event: activity\nid: 1\n");
+      expect(text).toContain('event: error\ndata: {"error":"iterator exploded"}\n\n');
+      expect(text).not.toContain("event: end");
+    });
+  });
+
   // ─── Cancel route + delete 409 + 503 mappings ───────────────────────
   describe("POST /:tid/cancel", () => {
     it("200 + cancelled Task on the happy path", async () => {
