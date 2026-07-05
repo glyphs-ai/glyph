@@ -147,9 +147,7 @@ export function TaskView({
         </div>
       )}
 
-      {task && tab === "overview" && (
-        <OverviewTab task={task} activity={activity} onSwitchTab={setTab} />
-      )}
+      {task && tab === "overview" && <OverviewTab task={task} onSwitchTab={setTab} />}
       {task && tab === "activity" && (
         <ErrorBoundary label="Activity tab">
           <ActivityTab

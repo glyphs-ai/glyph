@@ -20,9 +20,9 @@ import type { McpNotFound } from "../../domain/mcp-repository.js";
 import type { SkillNotFound } from "../../domain/skill-repository.js";
 import type { Db } from "../../infrastructure/drizzle/catalog-db.js";
 import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
-import { selectAgentByFqn, selectAllAgents } from "../agent/agent-reads.js";
-import { selectMcpByFqn } from "../mcp/mcp-reads.js";
-import { selectAllSkills, selectSkillByFqn } from "../skill/skill-reads.js";
+import { selectAgentByFqn, selectAgentByOrigin, selectAllAgents } from "../agent/agent-reads.js";
+import { selectMcpByFqn, selectMcpByOrigin } from "../mcp/mcp-reads.js";
+import { selectAllSkills, selectSkillByFqn, selectSkillByOrigin } from "../skill/skill-reads.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import {
   type CatalogConflict,
@@ -88,6 +88,10 @@ export const ResolvePlanResponseSchema = z.object({
   orphans: z.array(OrphanSchema),
   identityChange: IdentityChangeSchema.optional(),
   upToDate: z.boolean(),
+  /** True when the root origin is already installed (install path only). The
+   *  caller should direct the user to sync instead of install. When set, the
+   *  dep tree was NOT resolved (skipped for performance). */
+  rootAlreadyInstalled: z.boolean().optional(),
 });
 export type ResolvePlanResponse = z.infer<typeof ResolvePlanResponseSchema>;
 /** Wire alias — the plan DTO consumers and `apply-plan` pass around. */
@@ -144,8 +148,32 @@ export class ResolvePlanUseCase
   constructor(private readonly deps: ResolvePlanDeps) {}
 
   execute(request: ResolvePlanRequest): UseCaseResult<ResolvePlanResponse, ResolvePlanError> {
-    return this.rootOrigin(request).andThen((origin) =>
-      ResultAsync.fromSafePromise(this.build(request.kind, origin)),
+    const parsed = ResolvePlanRequestSchema.parse(request);
+    // Install path (origin provided): if the root is already installed,
+    // short-circuit without resolving the dep tree — tell the caller to use
+    // sync instead. This avoids the full upstream network walk for large
+    // agents when the user accidentally re-installs an existing entry.
+    if (parsed.origin !== undefined) {
+      return this.deps.queries
+        .query((db) => this.isOriginInstalled(db, parsed.kind, parsed.origin!))
+        .andThen((installed): ResultAsync<ResolvePlanResponse, ResolvePlanError> => {
+          if (installed) {
+            return okAsync({
+              rootOrigin: parsed.origin!,
+              rootKind: parsed.kind,
+              toInstall: [],
+              alreadyInstalled: [],
+              conflicts: [],
+              orphans: [],
+              upToDate: true,
+              rootAlreadyInstalled: true,
+            });
+          }
+          return ResultAsync.fromSafePromise(this.build(parsed.kind, parsed.origin!));
+        });
+    }
+    return this.rootOrigin(parsed).andThen((origin) =>
+      ResultAsync.fromSafePromise(this.build(parsed.kind, origin)),
     );
   }
 
@@ -168,6 +196,13 @@ export class ResolvePlanUseCase
           return errAsync<string, ResolvePlanError>({ type: "AgentNotFound", fqn: raw });
         return errAsync<string, ResolvePlanError>({ type: "McpNotFound", fqn: raw });
       });
+  }
+
+  /** Check if an origin is already installed locally (any kind). */
+  private isOriginInstalled(db: Db, kind: CatalogKind, origin: string): boolean {
+    if (kind === "skill") return selectSkillByOrigin(db, origin) !== undefined;
+    if (kind === "agent") return selectAgentByOrigin(db, origin) !== undefined;
+    return selectMcpByOrigin(db, origin) !== undefined;
   }
 
   private async build(kind: CatalogKind, origin: string): Promise<ResolvePlanResponse> {

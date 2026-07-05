@@ -88,8 +88,8 @@ export const fixtureTasks: TaskRecord[] = [
     startedAt: "2026-05-24T18:00:00.250Z",
     endedAt: "2026-05-24T18:02:30.000Z",
     failure: {
-      kind: "exited",
-      exit_code: 1,
+      kind: "execution",
+      exitCode: 1,
       message: "Vitest exited with code 1 (3 tests failing).",
     },
   },
@@ -195,8 +195,8 @@ export const fixtureTasks: TaskRecord[] = [
     startedAt: "2026-05-26T19:00:01.000Z",
     endedAt: "2026-05-26T19:00:42.000Z",
     failure: {
-      kind: "exited",
-      exit_code: 2,
+      kind: "execution",
+      exitCode: 2,
       message: "Cache root /var/cache/glyph was read-only (permission denied).",
     },
   },
@@ -396,7 +396,7 @@ export const fixtureTasks: TaskRecord[] = [
     createdAt: "2026-05-26T00:00:00.000Z",
     startedAt: "2026-05-26T00:00:01.000Z",
     endedAt: "2026-05-26T01:00:00.000Z",
-    failure: { kind: "exited", exit_code: 1, message: "Coordinator hit an unrecoverable error." },
+    failure: { kind: "execution", exitCode: 1, message: "Coordinator hit an unrecoverable error." },
   },
   {
     id: WF_IDS.tasks.brandCoord0,

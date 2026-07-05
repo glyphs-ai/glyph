@@ -27,9 +27,7 @@ describe("OverviewTab", () => {
       status: "succeeded",
       success: { output: "Done. PR opened at **https://example/pr/1**." },
     });
-    const { container } = render(
-      <OverviewTab task={task} activity={null} onSwitchTab={onSwitchTab} />,
-    );
+    const { container } = render(<OverviewTab task={task} onSwitchTab={onSwitchTab} />);
     // Summary card present with markdown body.
     expect(screen.getByText("Summary")).toBeTruthy();
     expect(container.querySelector(".md")).toBeTruthy();
@@ -43,7 +41,7 @@ describe("OverviewTab", () => {
 
   it("State 2: succeeded with empty output → No-summary note + Details card", () => {
     const task = makeTask({ status: "succeeded", success: { output: "" } });
-    render(<OverviewTab task={task} activity={null} onSwitchTab={vi.fn()} />);
+    render(<OverviewTab task={task} onSwitchTab={vi.fn()} />);
     expect(screen.getByText(/No summary was produced/)).toBeTruthy();
     expect(screen.getByText("Details")).toBeTruthy();
     expect(screen.queryByText("Summary")).toBeNull();
@@ -52,10 +50,10 @@ describe("OverviewTab", () => {
   it("State 3: failed → failure callout + Details card", () => {
     const task = makeTask({
       status: "failed",
-      failure: { kind: "exited", exit_code: 2, message: "boom" },
+      failure: { kind: "execution", exitCode: 2, message: "boom" },
     });
-    render(<OverviewTab task={task} activity={null} onSwitchTab={vi.fn()} />);
-    expect(screen.getByText(/Failure · exited/)).toBeTruthy();
+    render(<OverviewTab task={task} onSwitchTab={vi.fn()} />);
+    expect(screen.getByText(/Failure · execution/)).toBeTruthy();
     expect(screen.getByText("boom")).toBeTruthy();
     expect(screen.getByText("exit 2")).toBeTruthy();
     expect(screen.getByText("Details")).toBeTruthy();
@@ -67,14 +65,14 @@ describe("OverviewTab", () => {
       status: "cancelled",
       cancellation: { kind: "user", message: "user pressed cancel" },
     });
-    render(<OverviewTab task={task} activity={null} onSwitchTab={vi.fn()} />);
+    render(<OverviewTab task={task} onSwitchTab={vi.fn()} />);
     expect(screen.getByText("user pressed cancel")).toBeTruthy();
     expect(screen.getByText("Details")).toBeTruthy();
   });
 
   it("State 5: running → activity hint + Details card", () => {
     const task = makeTask({ status: "running" });
-    render(<OverviewTab task={task} activity={null} onSwitchTab={vi.fn()} />);
+    render(<OverviewTab task={task} onSwitchTab={vi.fn()} />);
     expect(screen.getByText(/Task is running/)).toBeTruthy();
     expect(screen.getByText("Details")).toBeTruthy();
     expect(screen.queryByText("Summary")).toBeNull();
@@ -86,7 +84,7 @@ describe("OverviewTab", () => {
       details: "",
       success: { output: "ok" },
     });
-    render(<OverviewTab task={task} activity={null} onSwitchTab={vi.fn()} />);
+    render(<OverviewTab task={task} onSwitchTab={vi.fn()} />);
     expect(screen.getByText("Summary")).toBeTruthy();
     expect(screen.queryByText("Details")).toBeNull();
   });

@@ -1,9 +1,11 @@
 import type {
   GetApiWorkspacesByIdCatalogAgentsResponse,
+  GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponse,
   GetApiWorkspacesByIdCatalogMcpsResponse,
   GetApiWorkspacesByIdCatalogSkillsResponse,
   PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses,
   PostApiWorkspacesByIdCatalogAgentsData,
+  PostApiWorkspacesByIdCatalogAgentsResolveResponse,
   PostApiWorkspacesByIdCatalogAgentsResponse,
   PostApiWorkspacesByIdCatalogAgentsResponses,
   PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses,
@@ -21,6 +23,7 @@ import {
   getApiWorkspacesByIdCatalogAgentsByScopeByName,
   getApiWorkspacesByIdCatalogAgentsByScopeByNameFiles,
   getApiWorkspacesByIdCatalogMcps,
+  getApiWorkspacesByIdCatalogMcpsByScopeByName,
   getApiWorkspacesByIdCatalogOverview,
   getApiWorkspacesByIdCatalogSkills,
   getApiWorkspacesByIdCatalogSkillsByScopeByName,
@@ -28,9 +31,14 @@ import {
   postApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqs,
   postApiWorkspacesByIdCatalogAgentsByScopeByNameDisable,
   postApiWorkspacesByIdCatalogAgentsByScopeByNameEnable,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolve,
+  postApiWorkspacesByIdCatalogAgentsResolve,
+  postApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolve,
   postApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqs,
+  postApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolve,
+  postApiWorkspacesByIdCatalogSkillsResolve,
 } from "@glyphs-ai/sdk";
-import { fetchJson, jsonInit, mutateJson, workspacePrefix } from "./http.js";
+import { workspacePrefix } from "./http.js";
 import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 
 // Local type aliases for catalog shapes (previously exported from sdk/wire.ts).
@@ -256,138 +264,66 @@ export const installMcp = async (src: InstallSource): Promise<InstallResult> =>
   );
 
 /**
- * Resolve manifest returned by `POST /catalog/{kind}/resolve` (install)
- * and `POST /catalog/{kind}/{scope}/{name}/sync/resolve` (sync). Read-only
- * preview of the dep graph the operation will create. Used by the
- * dashboard's two-phase install/sync dialog.
- *
- * Sync-only fields (`isSync`, `upToDate`, `identityChange`, `orphans`)
- * are populated by the sync resolve endpoint; install resolve leaves
- * them at their no-op defaults.
+ * Resolve manifest returned by `POST /catalog/{kind}/resolve` (install) and
+ * `POST /catalog/{kind}/{scope}/{name}/sync/resolve` (sync). All six resolve
+ * endpoints return the same shape; we derive the type from the agent install
+ * resolve response which is representative.
  */
-interface ResolveNodeBase {
-  kind: "skill" | "agent" | "mcp";
-  origin: string;
-  fqn: string;
-  status:
-    | "new"
-    | "will-sync"
-    | "already-installed"
-    | "up-to-date"
-    | "identity-changed"
-    | "would-conflict"
-    | "fetch-failed"
-    | "parse-failed";
-  depFqns: string[];
-  identityChange?: { oldFqn: string; newFqn: string };
-  error?: { name: string; message: string };
-}
-
-interface SkillResolveNode extends ResolveNodeBase {
-  kind: "skill";
-  shortName: string;
-  /** Scope as it'll appear in the catalog (frontmatter or `public` default). */
-  scope: string;
-}
-
-interface AgentResolveNode extends ResolveNodeBase {
-  kind: "agent";
-  shortName: string;
-  scope: string;
-}
-
-interface McpResolveNode extends ResolveNodeBase {
-  kind: "mcp";
-  specName: string;
-}
-
-export type ResolveNode = SkillResolveNode | AgentResolveNode | McpResolveNode;
-
-export interface OrphanManifestEntry {
-  kind: "skill" | "mcp";
-  fqn: string;
-  origin: string;
-}
-
-export interface ResolveManifest {
-  rootOrigin: string;
-  rootFqn: string;
-  isSync: boolean;
-  /**
-   * Single-use token returned only by sync resolves. The dashboard
-   * stores it across the preview-then-apply UX and ships it back on
-   * `apply*Sync(fqn, planToken)`; the server replays the exact
-   * preview-time plan rather than re-resolving (which would silently
-   * apply a fresh, possibly-different closure).
-   *
-   * Server TTL is currently 5 min. If the user lets the preview sit
-   * too long, apply returns 410 and the dashboard should re-preview.
-   *
-   * Absent on install resolves — install is naturally idempotent
-   * since the user re-supplies the same origin.
-   */
-  planToken?: string;
-  upToDate: boolean;
-  identityChange?: { kind: "skill" | "agent" | "mcp"; oldFqn: string; newFqn: string };
-  orphans: OrphanManifestEntry[];
-  nodes: ResolveNode[];
-}
+export type ResolveManifest = NonNullable<PostApiWorkspacesByIdCatalogAgentsResolveResponse>;
+export type ResolveNode = ResolveManifest["nodes"][number];
+export type OrphanManifestEntry = ResolveManifest["orphans"][number];
 
 /**
  * Resolve an install (`POST /catalog/{kind}/resolve`) — returns the
  * read-only `ResolveManifest` so the user can preview the tree before
  * committing.
- *
- * Kept on the raw JSON helper: the generated response projects each
- * `nodes[]` entry with the wire's own field names, which the dashboard's
- * `ResolveNode` shape does not line up with one-for-one, so the named
- * `ResolveManifest` return type is preserved via the helper's generic.
  */
-export const resolveSkillInstall = (src: InstallSource): Promise<ResolveManifest> =>
-  mutateJson<ResolveManifest>(
-    `${catalogPrefix()}/skills/resolve`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallSkillRequest),
+export const resolveSkillInstall = async (src: InstallSource): Promise<ResolveManifest> =>
+  unwrap(
+    await postApiWorkspacesByIdCatalogSkillsResolve({
+      path: { id: requireWorkspaceId() },
+      body: { origin: buildOriginFromSource(src) },
+    }),
   );
 
-export const resolveAgentInstall = (src: InstallSource): Promise<ResolveManifest> =>
-  mutateJson<ResolveManifest>(
-    `${catalogPrefix()}/agents/resolve`,
-    jsonInit("POST", { origin: buildOriginFromSource(src) } satisfies InstallAgentRequest),
+export const resolveAgentInstall = async (src: InstallSource): Promise<ResolveManifest> =>
+  unwrap(
+    await postApiWorkspacesByIdCatalogAgentsResolve({
+      path: { id: requireWorkspaceId() },
+      body: { origin: buildOriginFromSource(src) },
+    }),
   );
 
 /**
- * Resolve a sync from upstream for an already-installed entry. The
- * server reads the entry's local origin from the row; the dashboard
- * passes only the local fqn / mcp name as `{scope}/{name}` path params.
- *
- * Sync resolve emits a richer manifest than install resolve:
- *  - `upToDate` short-circuits the apply button when nothing changed
- *  - `identityChange` warns when upstream renamed under the same URL
- *  - `orphans` lists deps that the new closure dropped
- *
- * On the raw JSON helper for the same reason as {@link resolveSkillInstall}.
+ * Resolve a sync from upstream for an already-installed entry. Returns a
+ * richer manifest than install resolve: `upToDate` short-circuits the apply
+ * button, `identityChange` warns when upstream renamed under the same URL,
+ * `orphans` lists deps the new closure dropped.
  */
-export const resolveSkillSync = (fqn: string): Promise<ResolveManifest> => {
+export const resolveSkillSync = async (fqn: string): Promise<ResolveManifest> => {
   const { scope, name } = splitFqn(fqn);
-  return mutateJson<ResolveManifest>(
-    `${catalogPrefix()}/skills/${encodeURIComponent(scope)}/${encodeURIComponent(name)}/sync/resolve`,
-    { method: "POST" },
+  return unwrap(
+    await postApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolve({
+      path: { id: requireWorkspaceId(), scope, name },
+    }),
   );
 };
 
-export const resolveAgentSync = (fqn: string): Promise<ResolveManifest> => {
+export const resolveAgentSync = async (fqn: string): Promise<ResolveManifest> => {
   const { scope, name } = splitFqn(fqn);
-  return mutateJson<ResolveManifest>(
-    `${catalogPrefix()}/agents/${encodeURIComponent(scope)}/${encodeURIComponent(name)}/sync/resolve`,
-    { method: "POST" },
+  return unwrap(
+    await postApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolve({
+      path: { id: requireWorkspaceId(), scope, name },
+    }),
   );
 };
 
-export const resolveMcpSync = (name: string): Promise<ResolveManifest> => {
+export const resolveMcpSync = async (name: string): Promise<ResolveManifest> => {
   const { scope, name: shortName } = splitFqn(name);
-  return mutateJson<ResolveManifest>(
-    `${catalogPrefix()}/mcps/${encodeURIComponent(scope)}/${encodeURIComponent(shortName)}/sync/resolve`,
-    { method: "POST" },
+  return unwrap(
+    await postApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolve({
+      path: { id: requireWorkspaceId(), scope, name: shortName },
+    }),
   );
 };
 
@@ -501,22 +437,15 @@ export const deleteMcp = async (name: string): Promise<void> => {
   );
 };
 
-export interface McpDetail {
-  name: string;
-  origin: string;
-  orphaned: boolean;
-  /** Raw JSON content as stored on disk (preserves user formatting). */
-  content: string;
-}
+/** Wire shape for an installed MCP detail (fqn, origin, orphaned, content). */
+export type McpDetail = GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponse;
 
-export const getMcp = (name: string): Promise<McpDetail> => {
+export const getMcp = async (name: string): Promise<McpDetail> => {
   const { scope, name: shortName } = splitFqn(name);
-  // Raw JSON helper: the generated MCP detail response names its fields
-  // differently from the dashboard's `McpDetail`, so the named return type
-  // is preserved via the helper's generic.
-  return fetchJson<McpDetail>(
-    `${catalogPrefix()}/mcps/${encodeURIComponent(scope)}/${encodeURIComponent(shortName)}`,
-    "mcp",
+  return unwrap(
+    await getApiWorkspacesByIdCatalogMcpsByScopeByName({
+      path: { id: requireWorkspaceId(), scope, name: shortName },
+    }),
   );
 };
 

@@ -2916,6 +2916,7 @@ export type PostApiWorkspacesByIdCatalogSkillsResolveResponses = {
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -3175,6 +3176,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses 
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -3530,6 +3532,7 @@ export type PostApiWorkspacesByIdCatalogAgentsResolveResponses = {
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -3793,6 +3796,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses 
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -4278,6 +4282,7 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses = 
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;

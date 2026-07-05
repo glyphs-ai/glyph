@@ -1011,7 +1011,7 @@ export const handlers = [
           shortName: fqn.split("/").pop() ?? fqn,
           scope: "public",
           status: "up-to-date",
-          depFqns: [],
+          dependencyOrigins: [],
         },
       ],
     });
@@ -1047,7 +1047,7 @@ export const handlers = [
           shortName: fqn.split("/").pop() ?? fqn,
           scope: "public",
           status: "up-to-date",
-          depFqns: [],
+          dependencyOrigins: [],
         },
       ],
     });

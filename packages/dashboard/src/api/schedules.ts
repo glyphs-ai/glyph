@@ -1,7 +1,8 @@
 // Schedules REST client. Mirrors the per-kind schedule routes the server
-// exposes. List / get / preview / delete / run use the generated SDK ops;
-// create / patch stay on the raw JSON helpers since those bodies are
-// hand-validated on the server (typed `never` in the generated ops).
+// exposes; every call goes through the generated SDK operations. List / get /
+// preview / delete / run / create / patch all use the typed ops. The
+// dashboard merges the two per-kind list endpoints and injects a `kind`
+// discriminant into each target for local filtering / routing.
 
 import type {
   GetApiWorkspacesByIdSchedulesPreviewCronResponse,
@@ -23,10 +24,13 @@ import {
   getApiWorkspacesByIdSchedulesWorkflow,
   getApiWorkspacesByIdSchedulesWorkflowBySid,
   getApiWorkspacesByIdSchedulesWorkflowBySidPreview,
+  patchApiWorkspacesByIdSchedulesTaskBySid,
+  patchApiWorkspacesByIdSchedulesWorkflowBySid,
+  postApiWorkspacesByIdSchedulesTask,
   postApiWorkspacesByIdSchedulesTaskBySidRun,
+  postApiWorkspacesByIdSchedulesWorkflow,
   postApiWorkspacesByIdSchedulesWorkflowBySidRun,
 } from "@glyphs-ai/sdk";
-import { jsonInit, mutateJson, workspacePrefix } from "./http.js";
 import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 import type { WorkflowHeader } from "./workflows.js";
 
@@ -159,9 +163,11 @@ export const patchSchedule = async (
   scheduleId: string,
   body: PatchTaskScheduleRequest,
 ): Promise<ScheduleView> => {
-  const raw = await mutateJson<RawTaskSchedule>(
-    `${workspacePrefix()}/schedules/task/${encodeURIComponent(scheduleId)}`,
-    jsonInit("PATCH", body as object),
+  const raw = unwrap(
+    await patchApiWorkspacesByIdSchedulesTaskBySid({
+      path: { id: requireWorkspaceId(), sid: scheduleId },
+      body,
+    }),
   );
   return addTaskKind(raw);
 };
@@ -170,9 +176,11 @@ export const patchWorkflowSchedule = async (
   scheduleId: string,
   body: PatchWorkflowScheduleRequest,
 ): Promise<ScheduleView> => {
-  const raw = await mutateJson<RawWorkflowSchedule>(
-    `${workspacePrefix()}/schedules/workflow/${encodeURIComponent(scheduleId)}`,
-    jsonInit("PATCH", body as object),
+  const raw = unwrap(
+    await patchApiWorkspacesByIdSchedulesWorkflowBySid({
+      path: { id: requireWorkspaceId(), sid: scheduleId },
+      body,
+    }),
   );
   return addWorkflowKind(raw);
 };
@@ -217,9 +225,8 @@ export const runSchedule = async (
 
 /** Create a task-kind schedule. */
 export const createSchedule = async (body: CreateTaskScheduleRequest): Promise<ScheduleView> => {
-  const raw = await mutateJson<RawTaskSchedule>(
-    `${workspacePrefix()}/schedules/task`,
-    jsonInit("POST", body),
+  const raw = unwrap(
+    await postApiWorkspacesByIdSchedulesTask({ path: { id: requireWorkspaceId() }, body }),
   );
   return addTaskKind(raw);
 };
@@ -228,9 +235,8 @@ export const createSchedule = async (body: CreateTaskScheduleRequest): Promise<S
 export const createWorkflowSchedule = async (
   body: CreateWorkflowScheduleRequest,
 ): Promise<ScheduleView> => {
-  const raw = await mutateJson<RawWorkflowSchedule>(
-    `${workspacePrefix()}/schedules/workflow`,
-    jsonInit("POST", body),
+  const raw = unwrap(
+    await postApiWorkspacesByIdSchedulesWorkflow({ path: { id: requireWorkspaceId() }, body }),
   );
   return addWorkflowKind(raw);
 };

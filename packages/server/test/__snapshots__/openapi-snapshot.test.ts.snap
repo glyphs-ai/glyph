@@ -1401,6 +1401,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "planToken": {
                       "type": "string",
                     },
+                    "rootAlreadyInstalled": {
+                      "type": "boolean",
+                    },
                     "rootFqn": {
                       "type": "string",
                     },
@@ -2934,6 +2937,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "planToken": {
                       "type": "string",
                     },
+                    "rootAlreadyInstalled": {
+                      "type": "boolean",
+                    },
                     "rootFqn": {
                       "type": "string",
                     },
@@ -4078,6 +4084,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "planToken": {
                       "type": "string",
                     },
+                    "rootAlreadyInstalled": {
+                      "type": "boolean",
+                    },
                     "rootFqn": {
                       "type": "string",
                     },
@@ -5001,6 +5010,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     },
                     "planToken": {
                       "type": "string",
+                    },
+                    "rootAlreadyInstalled": {
+                      "type": "boolean",
                     },
                     "rootFqn": {
                       "type": "string",
@@ -6228,6 +6240,9 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     },
                     "planToken": {
                       "type": "string",
+                    },
+                    "rootAlreadyInstalled": {
+                      "type": "boolean",
                     },
                     "rootFqn": {
                       "type": "string",

@@ -147,7 +147,7 @@ describe("GetUpstreamTreeUseCase — source graph", () => {
     expect(graph.conflicts[0]?.reason.kind).toBe("parse-failed");
   });
 
-  it("records a parse conflict for a dependency cycle", async () => {
+  it("handles a dependency cycle by deduplicating (both nodes fetched, no conflict)", async () => {
     skillSource.load.mockImplementation((origin) => {
       if (origin === "file:/skill/a")
         return okAsync(skillManifest("a", { skills: ["file:/skill/b"] }));
@@ -160,14 +160,9 @@ describe("GetUpstreamTreeUseCase — source graph", () => {
       await useCase.execute({ kind: "skill", origin: "file:/skill/a" })
     )._unsafeUnwrap();
 
+    // BFS dedup: both nodes are fetched exactly once; the back-edge is
+    // silently skipped because the target is already in `seen`. No conflict.
     expect(graph.nodes.map((n) => n.fqn).sort()).toEqual(["public/a", "public/b"]);
-    expect(graph.conflicts).toEqual([
-      expect.objectContaining({
-        kind: "skill",
-        origin: "file:/skill/a",
-        fqn: null,
-        reason: expect.objectContaining({ kind: "parse-failed" }),
-      }),
-    ]);
+    expect(graph.conflicts).toEqual([]);
   });
 });

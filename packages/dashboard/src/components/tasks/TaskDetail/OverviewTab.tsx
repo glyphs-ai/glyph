@@ -1,17 +1,11 @@
 import type { ReactNode } from "react";
-import type { TaskActivity, TaskFailure, TaskRecord } from "../../../api";
-import { formatAbsolute, formatRelative } from "../../../utils/time";
+import type { TaskFailure, TaskRecord } from "../../../api";
 import { MarkdownSummary } from "./MarkdownSummary";
 
 export interface OverviewTabProps {
   task: TaskRecord;
-  /** Latest activity payload (poll/SSE). Used to surface the last
-   *  observed agent activity timestamp when the task ended as an
-   *  orphan — that timestamp is the operator's best clue as to when
-   *  the server died. */
-  activity: TaskActivity | null;
   /** Switch the parent detail panel to another tab. Used by the
-   *  "Jump to Activity" link on the enriched failure callout. */
+   *  "Jump to Activity" link on the failure callout and no-summary note. */
   onSwitchTab: (tab: "activity") => void;
 }
 
@@ -36,13 +30,13 @@ export interface OverviewTabProps {
  * scrolls independently. When both Summary and Details are present they
  * share the space 50/50; otherwise Details fills the remaining height.
  */
-export function OverviewTab({ task, activity, onSwitchTab }: OverviewTabProps) {
+export function OverviewTab({ task, onSwitchTab }: OverviewTabProps) {
   const output = typeof task.success?.output === "string" ? task.success.output.trim() : "";
   const hasSummary = output.length > 0;
   const details = task.details?.trim() ?? "";
   const hasDetails = details.length > 0;
 
-  const strip = renderStateStrip({ task, activity, onSwitchTab, hasSummary });
+  const strip = renderStateStrip({ task, onSwitchTab, hasSummary });
 
   return (
     <div className="overview-tab">
@@ -71,24 +65,15 @@ export function OverviewTab({ task, activity, onSwitchTab }: OverviewTabProps) {
  */
 function renderStateStrip({
   task,
-  activity,
   onSwitchTab,
   hasSummary,
 }: {
   task: TaskRecord;
-  activity: TaskActivity | null;
   onSwitchTab: (tab: "activity") => void;
   hasSummary: boolean;
 }): ReactNode {
   if (task.failure) {
-    return (
-      <FailureStrip
-        failure={task.failure}
-        task={task}
-        activity={activity}
-        onSwitchTab={onSwitchTab}
-      />
-    );
+    return <FailureStrip failure={task.failure} onSwitchTab={onSwitchTab} />;
   }
   if (task.cancellation) {
     return (
@@ -146,40 +131,28 @@ function OverviewCard({
 
 /**
  * Render a failure callout with a one-line headline + the structured
- * `failure` payload from `@glyphs-ai/task` types. The orphan-failure
- * branch includes the last-activity timestamp because it is the
- * operator's best clue about when the server died.
+ * `failure` payload. The `execution` kind shows an exit-code or signal chip
+ * when the field is present.
  */
 function FailureStrip({
   failure,
-  task,
-  activity,
   onSwitchTab,
 }: {
   failure: TaskFailure;
-  task: TaskRecord;
-  activity: TaskActivity | null;
   onSwitchTab: (tab: "activity") => void;
 }) {
-  const lastActivity = pickLastActivityTimestamp(activity, task);
   return (
     <div className="alert alert--error overview-tab__failure-callout">
       <div className="overview-tab__failure-head">
         <strong>Failure · {failure.kind}</strong>
-        {failure.kind === "exited" && (
-          <span className="overview-tab__failure-chip">exit {failure.exit_code}</span>
+        {failure.kind === "execution" && failure.exitCode !== undefined && (
+          <span className="overview-tab__failure-chip">exit {failure.exitCode}</span>
         )}
-        {failure.kind === "signal" && (
+        {failure.kind === "execution" && failure.signal !== undefined && (
           <span className="overview-tab__failure-chip">signal {failure.signal}</span>
         )}
       </div>
       <p className="overview-tab__failure-message">{failure.message}</p>
-      {failure.kind === "orphan" && lastActivity && (
-        <p className="overview-tab__failure-meta muted">
-          Last activity {formatRelative(lastActivity)}{" "}
-          <span title={lastActivity}>at {formatAbsolute(lastActivity)}</span>
-        </p>
-      )}
       <div className="overview-tab__failure-actions">
         <button type="button" className="link-button" onClick={() => onSwitchTab("activity")}>
           Jump to Activity ↗
@@ -187,22 +160,4 @@ function FailureStrip({
       </div>
     </div>
   );
-}
-
-/**
- * Best-effort "last activity" timestamp:
- *   1. newest seq in the loaded activity page (if any);
- *   2. otherwise `endedAt`, then `startedAt`, then `createdAt`.
- * The activity payload is paginated — when the user hasn't yet
- * scrolled to the head, the newest item we have may not be the
- * newest item overall, but it's still a meaningful lower bound on
- * "when did this task last produce output".
- */
-function pickLastActivityTimestamp(activity: TaskActivity | null, task: TaskRecord): string | null {
-  const items = activity?.activity ?? [];
-  if (items.length > 0) {
-    const newest = items[items.length - 1];
-    if (newest?.timestamp) return newest.timestamp;
-  }
-  return task.endedAt ?? task.startedAt ?? task.createdAt ?? null;
 }

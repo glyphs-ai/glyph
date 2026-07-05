@@ -81,6 +81,10 @@ export const ResolveManifestSchema = z.object({
   planToken: z.string().optional(),
   /** True iff a sync where root + all deps are unchanged and no orphans. */
   upToDate: z.boolean(),
+  /** True when the install path's root origin is already installed; the caller
+   *  should direct the user to sync instead of install. When set the dep tree
+   *  was NOT resolved (skipped for performance). */
+  rootAlreadyInstalled: z.boolean().optional(),
   /** Set when the upstream fqn differs from the local row's fqn. */
   identityChange: z
     .object({ kind: CatalogKindSchema, oldFqn: z.string(), newFqn: z.string() })
@@ -120,6 +124,7 @@ export function planToManifest(
     rootFqn: rootNode?.fqn ?? "",
     isSync,
     upToDate: plan.upToDate,
+    ...(plan.rootAlreadyInstalled ? { rootAlreadyInstalled: true } : {}),
     ...(planToken !== undefined ? { planToken } : {}),
     ...(plan.identityChange !== undefined ? { identityChange: plan.identityChange } : {}),
     orphans: plan.orphans.map((orphan) => ({

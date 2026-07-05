@@ -53,40 +53,50 @@ export class GetUpstreamTreeUseCase
   private async walk(root: GetUpstreamTreeRequest): Promise<ResolvedGraph> {
     const nodes = new Map<string, ResolvedNode>();
     const conflicts: CatalogConflict[] = [];
-    const inStack = new Set<string>();
-    const visited = new Set<string>();
+    const seen = new Set<string>();
 
-    const visit = async (kind: CatalogKind, origin: string): Promise<void> => {
-      if (inStack.has(origin)) {
-        conflicts.push({
-          kind,
-          origin,
-          fqn: null,
-          reason: {
-            kind: "parse-failed",
-            cause: new Error(`cyclic dependency: ${[...inStack, origin].join(" -> ")}`),
-          },
-        });
-        return;
-      }
-      if (visited.has(origin)) return;
-      inStack.add(origin);
-      const resolved = await this.load(kind, origin);
-      if ("reason" in resolved) {
-        conflicts.push(resolved);
-        inStack.delete(origin);
-        visited.add(origin);
-        return;
-      }
-      for (const o of resolved.dependencyRefs.mcps) await visit("mcp", o);
-      for (const o of resolved.dependencyRefs.skills) await visit("skill", o);
-      for (const o of resolved.dependencyRefs.agents) await visit("agent", o);
-      nodes.set(origin, resolved);
-      inStack.delete(origin);
-      visited.add(origin);
-    };
+    // BFS: fetch each level of the dep graph in parallel. `seen` ensures
+    // every origin is fetched at most once (dedup + cycle-safe).
+    type FrontierEntry = { kind: CatalogKind; origin: string };
+    let frontier: FrontierEntry[] = [{ kind: root.kind, origin: root.origin }];
+    seen.add(root.origin);
 
-    await visit(root.kind, root.origin);
+    while (frontier.length > 0) {
+      const results = await Promise.all(
+        frontier.map(({ kind, origin }) =>
+          this.load(kind, origin).then((result) => ({ origin, result })),
+        ),
+      );
+
+      const next: FrontierEntry[] = [];
+      for (const { origin, result } of results) {
+        if ("reason" in result) {
+          conflicts.push(result);
+          continue;
+        }
+        nodes.set(origin, result);
+        for (const o of result.dependencyRefs.mcps) {
+          if (!seen.has(o)) {
+            seen.add(o);
+            next.push({ kind: "mcp", origin: o });
+          }
+        }
+        for (const o of result.dependencyRefs.skills) {
+          if (!seen.has(o)) {
+            seen.add(o);
+            next.push({ kind: "skill", origin: o });
+          }
+        }
+        for (const o of result.dependencyRefs.agents) {
+          if (!seen.has(o)) {
+            seen.add(o);
+            next.push({ kind: "agent", origin: o });
+          }
+        }
+      }
+      frontier = next;
+    }
+
     return { nodes: [...nodes.values()], conflicts };
   }
 

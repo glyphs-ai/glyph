@@ -173,9 +173,7 @@ describe("ResolvePlanUseCase — diffing", () => {
     getTreeExecute.mockReturnValue(okAsync(upstream));
     await saveSkill(skillEntity("public/root", "file:/skill/root"));
 
-    const plan = (
-      await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
-    )._unsafeUnwrap();
+    const plan = (await useCase.execute({ kind: "skill", fqn: "public/root" }))._unsafeUnwrap();
 
     expect(plan.toInstall).toEqual([]);
     expect(plan.alreadyInstalled).toEqual([
@@ -204,9 +202,7 @@ describe("ResolvePlanUseCase — diffing", () => {
     await saveSkill(skillEntity("public/root", "file:/skill/root", { skills: ["public/child"] }));
     await saveSkill(skillEntity("public/child", "file:/skill/child"));
 
-    const plan = (
-      await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
-    )._unsafeUnwrap();
+    const plan = (await useCase.execute({ kind: "skill", fqn: "public/root" }))._unsafeUnwrap();
 
     expect(plan.toInstall.map((n) => [n.fqn, n.disposition, n.wasAlreadyInstalled])).toEqual([
       ["public/child", "will-sync", true],
@@ -241,9 +237,7 @@ describe("ResolvePlanUseCase — diffing", () => {
     await saveSkill(skillEntity("public/child", "file:/skill/child"));
     await saveMcp(mcpEntity("azure/mcp", "file:/mcp/azure"));
 
-    const plan = (
-      await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
-    )._unsafeUnwrap();
+    const plan = (await useCase.execute({ kind: "skill", fqn: "public/root" }))._unsafeUnwrap();
 
     expect(plan.orphans).toEqual([
       { kind: "skill", fqn: "public/child", origin: "file:/skill/child" },
@@ -267,9 +261,7 @@ describe("ResolvePlanUseCase — diffing", () => {
     await saveSkill(skillEntity("public/child", "file:/skill/child"));
     await saveSkill(skillEntity("public/other", "file:/skill/other", { skills: ["public/child"] }));
 
-    const plan = (
-      await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
-    )._unsafeUnwrap();
+    const plan = (await useCase.execute({ kind: "skill", fqn: "public/root" }))._unsafeUnwrap();
 
     expect(plan.orphans).toEqual([]);
   });
@@ -283,9 +275,7 @@ describe("ResolvePlanUseCase — diffing", () => {
     );
     await saveSkill(skillEntity("public/old-name", "file:/skill/entry", { version: "1.0.0" }));
 
-    const plan = (
-      await useCase.execute({ kind: "skill", origin: "file:/skill/entry" })
-    )._unsafeUnwrap();
+    const plan = (await useCase.execute({ kind: "skill", fqn: "public/old-name" }))._unsafeUnwrap();
 
     expect(plan.identityChange).toEqual({
       kind: "skill",
