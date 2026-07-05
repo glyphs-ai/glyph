@@ -36,7 +36,6 @@ import {
   type WorkflowNodeRunner,
   type WorkflowNodeTerminalResult,
 } from "@glyphs-ai/workflow";
-import { openTestWorkflowDb } from "@glyphs-ai/workflow/testing";
 import { okAsync } from "neverthrow";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -121,10 +120,9 @@ interface Harness {
 async function makeHarness(): Promise<Harness> {
   const coord = makeAutoSucceedRunner("coord", { gated: true });
   const worker = makeAutoSucceedRunner("worker", { gated: false });
-  const dbHandle = openTestWorkflowDb();
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-e2e-coord-"));
   const module = await composeWorkflowModule({
-    db: dbHandle.db,
+    dbFile: ":memory:",
     workspaceDir,
     runners: {
       coordinator: coord,
@@ -155,7 +153,6 @@ async function makeHarness(): Promise<Harness> {
     worker,
     async cleanup() {
       await module.close();
-      dbHandle.close();
       rmSync(workspaceDir, { recursive: true, force: true });
     },
   };

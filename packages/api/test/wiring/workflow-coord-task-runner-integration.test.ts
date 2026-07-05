@@ -27,7 +27,6 @@ import {
   type WorkflowModule,
   type WorkflowNodeRunner,
 } from "@glyphs-ai/workflow";
-import { openTestWorkflowDb } from "@glyphs-ai/workflow/testing";
 import { okAsync } from "neverthrow";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -146,9 +145,8 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
     },
   };
 
-  const dbHandle = openTestWorkflowDb();
   const module = await composeWorkflowModule({
-    db: dbHandle.db,
+    dbFile: ":memory:",
     workspaceDir,
     runners: {
       coordinator: coordRunner,
@@ -175,7 +173,6 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
     async cleanup() {
       await coordRunner.dispose();
       await module.close();
-      dbHandle.close();
       rmSync(workspaceDir, { recursive: true, force: true });
     },
   };
