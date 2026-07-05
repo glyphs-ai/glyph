@@ -12,6 +12,19 @@ vi.mock("../../../src/hooks/useTaskDetail", () => ({
   }),
 }));
 
+// The pane resolves a node id to its latest task via `findTaskByOrigin`
+// before mounting the TaskView. Stub it so the nav pill (rendered in every
+// resolution state) is present synchronously without a real fetch.
+vi.mock("../../../src/api", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/api")>("../../../src/api");
+  return {
+    ...actual,
+    findTaskByOrigin: vi.fn(async (_origin: string, originId: string) => ({
+      id: `task-${originId}`,
+    })),
+  };
+});
+
 import { WorkflowNodeTaskPane } from "../../../src/pages/workflows/WorkflowNodeTaskPane";
 
 function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {

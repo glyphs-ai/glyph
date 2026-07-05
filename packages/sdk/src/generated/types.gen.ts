@@ -697,6 +697,75 @@ export type PostApiWorkspacesByIdTasksResponses = {
 
 export type PostApiWorkspacesByIdTasksResponse = PostApiWorkspacesByIdTasksResponses[keyof PostApiWorkspacesByIdTasksResponses];
 
+export type GetApiWorkspacesByIdTasksByOriginData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        origin: string;
+        originId: string;
+    };
+    url: '/api/workspaces/{id}/tasks/by-origin';
+};
+
+export type GetApiWorkspacesByIdTasksByOriginErrors = {
+    /**
+     * Missing or malformed query
+     */
+    400: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdTasksByOriginResponses = {
+    /**
+     * Latest task for the origin pair, or null
+     */
+    200: {
+        id: string;
+        agent: string;
+        brief: string;
+        details?: string;
+        origin: string;
+        originId?: string;
+        status: 'running' | 'succeeded' | 'failed' | 'cancelled';
+        metadata: {
+            [key: string]: unknown;
+        };
+        createdAt: string;
+        startedAt: string;
+        endedAt?: string;
+        success?: {
+            output: string | null;
+            artifacts?: Array<string>;
+        };
+        failure?: {
+            kind: 'execution';
+            exitCode?: number;
+            signal?: string;
+            message: string;
+        } | {
+            kind: 'internal';
+            message: string;
+        } | {
+            kind: 'cascade';
+            message: string;
+        };
+        cancellation?: {
+            kind: 'user';
+            message: string;
+        } | {
+            kind: 'cascade';
+            message: string;
+        };
+    } | null;
+};
+
+export type GetApiWorkspacesByIdTasksByOriginResponse = GetApiWorkspacesByIdTasksByOriginResponses[keyof GetApiWorkspacesByIdTasksByOriginResponses];
+
 export type DeleteApiWorkspacesByIdTasksByTidData = {
     body?: never;
     path: {

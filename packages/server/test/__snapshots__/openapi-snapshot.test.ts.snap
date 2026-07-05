@@ -9474,6 +9474,240 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
+    "/api/workspaces/{id}/tasks/by-origin": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "origin",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "originId",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "agent": {
+                      "type": "string",
+                    },
+                    "brief": {
+                      "type": "string",
+                    },
+                    "cancellation": {
+                      "oneOf": [
+                        {
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "user",
+                              ],
+                              "type": "string",
+                            },
+                            "message": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "message",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "cascade",
+                              ],
+                              "type": "string",
+                            },
+                            "message": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "message",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "createdAt": {
+                      "type": "string",
+                    },
+                    "details": {
+                      "type": "string",
+                    },
+                    "endedAt": {
+                      "type": "string",
+                    },
+                    "failure": {
+                      "oneOf": [
+                        {
+                          "properties": {
+                            "exitCode": {
+                              "type": "number",
+                            },
+                            "kind": {
+                              "enum": [
+                                "execution",
+                              ],
+                              "type": "string",
+                            },
+                            "message": {
+                              "type": "string",
+                            },
+                            "signal": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "message",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "internal",
+                              ],
+                              "type": "string",
+                            },
+                            "message": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "message",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "cascade",
+                              ],
+                              "type": "string",
+                            },
+                            "message": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "message",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "id": {
+                      "pattern": "^\\d{8}-[0-9a-f]{8}$",
+                      "type": "string",
+                    },
+                    "metadata": {
+                      "additionalProperties": {},
+                      "type": "object",
+                    },
+                    "origin": {
+                      "type": "string",
+                    },
+                    "originId": {
+                      "type": "string",
+                    },
+                    "startedAt": {
+                      "type": "string",
+                    },
+                    "status": {
+                      "enum": [
+                        "running",
+                        "succeeded",
+                        "failed",
+                        "cancelled",
+                      ],
+                      "type": "string",
+                    },
+                    "success": {
+                      "properties": {
+                        "artifacts": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "output": {
+                          "type": [
+                            "string",
+                            "null",
+                          ],
+                        },
+                      },
+                      "required": [
+                        "output",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "agent",
+                    "brief",
+                    "origin",
+                    "status",
+                    "metadata",
+                    "createdAt",
+                    "startedAt",
+                  ],
+                  "type": [
+                    "object",
+                    "null",
+                  ],
+                },
+              },
+            },
+            "description": "Latest task for the origin pair, or null",
+          },
+          "400": {
+            "description": "Missing or malformed query",
+          },
+          "500": {
+            "description": "Internal error",
+          },
+        },
+        "summary": "Find the latest task by (origin, originId)",
+        "tags": [
+          "tasks",
+        ],
+      },
+    },
     "/api/workspaces/{id}/tasks/{tid}": {
       "delete": {
         "parameters": [

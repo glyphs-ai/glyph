@@ -5,6 +5,7 @@ import {
   type ActivityResult,
   CancelTaskResponseSchema,
   DispatchTaskResponseSchema,
+  FindLatestByOriginResponseSchema,
   GetTaskActivityRequestSchema,
   GetTaskResponseSchema,
   ListTasksRequestSchema,
@@ -245,6 +246,42 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
           return c.json(task, 201);
         },
         (err) => respondTaskError(c, err, { route: "tasks" }),
+      );
+    },
+  );
+
+  // ── GET /by-origin — reverse-lookup the latest task by (origin, originId) ──
+  // A literal-segment route registered BEFORE `/{tid}` so it is not captured
+  // as a task id. Exposes the task read-model's `findLatestByOrigin` primitive
+  // so an integration surface (e.g. the dashboard drilling from a workflow
+  // worker node) can resolve one of its own entity ids to that entity's latest
+  // task without the workflow BC ever knowing about tasks — the (origin,
+  // originId) pair is task-owned. Returns the task, or `null` when none has
+  // been dispatched for that pair yet.
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/by-origin",
+      tags: ["tasks"],
+      summary: "Find the latest task by (origin, originId)",
+      request: {
+        query: z.object({ origin: z.string().min(1), originId: z.string().min(1) }),
+      },
+      responses: {
+        200: jsonResponse(
+          FindLatestByOriginResponseSchema,
+          "Latest task for the origin pair, or null",
+        ),
+        400: errorResponse("Missing or malformed query"),
+        500: errorResponse("Internal error"),
+      },
+    }),
+    async (c) => {
+      const { origin, originId } = c.req.valid("query");
+      const res = await resolve(c).findLatestByOrigin.execute({ origin, originId });
+      return res.match(
+        (task) => c.json(task),
+        (err) => respondTaskError(c, err, { route: "tasks.findByOrigin" }),
       );
     },
   );

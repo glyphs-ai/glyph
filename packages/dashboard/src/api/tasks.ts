@@ -6,7 +6,10 @@
 // the underlying log stay inside the runtime adapter; the dashboard never
 // sees them.
 
+import type { GetApiWorkspacesByIdTasksByOriginResponse } from "@glyphs-ai/sdk";
+import { getApiWorkspacesByIdTasksByOrigin } from "@glyphs-ai/sdk";
 import { extractError, fetchJson, jsonInit, mutate, mutateJson, workspacePrefix } from "./http.js";
+import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 
 export type TaskStatus = "running" | "succeeded" | "failed" | "cancelled";
 
@@ -169,6 +172,25 @@ export const listScheduledTasks = (opts: ListScheduledTasksOpts = {}): Promise<T
 
 export const getTask = (taskId: string): Promise<TaskRecord> =>
   fetchJson<TaskRecord>(`${workspacePrefix()}/tasks/${encodeURIComponent(taskId)}`, "task");
+
+/**
+ * Resolve the latest task for an `(origin, originId)` pair, or `null` when
+ * none has been dispatched yet. The `(origin, originId)` linkage is owned by
+ * the task read-model; callers navigating from one of their own entities
+ * (e.g. a workflow worker node → its underlying task) pass their entity id as
+ * `originId`. The workflow surface never exposes a task id — the node id is
+ * resolved to a task here, through the task surface.
+ */
+export const findTaskByOrigin = async (
+  origin: string,
+  originId: string,
+): Promise<GetApiWorkspacesByIdTasksByOriginResponse> =>
+  unwrap(
+    await getApiWorkspacesByIdTasksByOrigin({
+      path: { id: requireWorkspaceId() },
+      query: { origin, originId },
+    }),
+  );
 
 /**
  * Build the URL the browser should hit to download a task artifact by its

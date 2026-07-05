@@ -77,6 +77,7 @@ export {
   type FindLatestByOriginRequest,
   FindLatestByOriginRequestSchema,
   type FindLatestByOriginResponse,
+  FindLatestByOriginResponseSchema,
 } from "./application/find-latest-by-origin.js";
 export {
   type GetTaskError,
