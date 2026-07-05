@@ -45,7 +45,7 @@ export function WorkflowList({
     const running: WorkflowHeader[] = [];
     const completed: WorkflowHeader[] = [];
     for (const w of workflows) {
-      const g = statusGroup(w.status, w.awaitingHumanCount);
+      const g = statusGroup(w.status);
       if (g === "awaiting") awaiting.push(w);
       else if (g === "running") running.push(w);
       else completed.push(w);
@@ -102,7 +102,6 @@ export function WorkflowList({
                     onMenuOpenChange={(open) => onMenuOpenChange(open ? w.id : null)}
                     posinset={idx + 1}
                     setsize={arr.length}
-                    awaitingHumanCount={w.awaitingHumanCount}
                   />
                 ))}
               </ul>

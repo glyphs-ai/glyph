@@ -5,13 +5,14 @@
  * parser, and the `--spec-file` subgraph-body validator.
  */
 
-import type {
-  AddSubgraphRequest,
-  AddSubgraphRequestEdge,
-  AddSubgraphRequestNode,
-  WorkflowNodeKind,
-  WorkflowNodeRef,
-} from "@glyphs-ai/sdk";
+import type { PostApiWorkspacesByIdWorkflowsByWfidSubgraphData } from "@glyphs-ai/sdk";
+
+type SubgraphBody = PostApiWorkspacesByIdWorkflowsByWfidSubgraphData["body"];
+type SubgraphNode = SubgraphBody["nodes"][number];
+type SubgraphEdge = SubgraphBody["edges"][number];
+type SubgraphNodeRef = SubgraphEdge["from"];
+
+export type WorkflowNodeKind = SubgraphNode["kind"];
 
 export const KNOWN_NODE_KINDS: readonly WorkflowNodeKind[] = ["coordinator", "worker", "human"];
 export const KNOWN_FINISH_OUTCOMES: readonly ("succeeded" | "failed")[] = ["succeeded", "failed"];
@@ -44,7 +45,7 @@ export function parseParents(raw: string | undefined): string[] {
 
 export function validateAddSubgraphRequest(
   raw: unknown,
-): { ok: true; body: AddSubgraphRequest } | { ok: false; error: string } {
+): { ok: true; body: SubgraphBody } | { ok: false; error: string } {
   if (!isPlainObject(raw)) {
     return {
       ok: false,
@@ -60,7 +61,7 @@ export function validateAddSubgraphRequest(
     };
   }
 
-  const nodes: AddSubgraphRequestNode[] = [];
+  const nodes: SubgraphNode[] = [];
   for (let i = 0; i < nodesRaw.length; i += 1) {
     const node = nodesRaw[i];
     if (!isPlainObject(node)) return { ok: false, error: `nodes[${i}] must be an object` };
@@ -109,7 +110,7 @@ export function validateAddSubgraphRequest(
     });
   }
 
-  const edges: AddSubgraphRequestEdge[] = [];
+  const edges: SubgraphEdge[] = [];
   for (let i = 0; i < edgesRaw.length; i += 1) {
     const edge = edgesRaw[i];
     if (!isPlainObject(edge)) return { ok: false, error: `edges[${i}] must be an object` };
@@ -126,23 +127,23 @@ export function validateAddSubgraphRequest(
 function validateNodeRefInput(
   raw: unknown,
   path: string,
-): { ok: true; value: WorkflowNodeRef } | { ok: false; error: string } {
+): { ok: true; value: SubgraphNodeRef } | { ok: false; error: string } {
   if (!isPlainObject(raw)) return { ok: false, error: `${path} must be an object` };
-  const keys = Object.keys(raw);
-  if (keys.length !== 1) {
-    return { ok: false, error: `${path} must have exactly one key: nodeId or tempId` };
+  const kind = raw.kind;
+  if (kind === "existing") {
+    return typeof raw.id === "string" && raw.id.length > 0
+      ? { ok: true, value: { kind: "existing", id: raw.id } }
+      : { ok: false, error: `${path}.id must be a non-empty string` };
   }
-  if ("nodeId" in raw) {
-    return typeof raw.nodeId === "string" && raw.nodeId.length > 0
-      ? { ok: true, value: { nodeId: raw.nodeId } }
-      : { ok: false, error: `${path}.nodeId must be a non-empty string` };
-  }
-  if ("tempId" in raw) {
+  if (kind === "temp") {
     return typeof raw.tempId === "string" && raw.tempId.length > 0
-      ? { ok: true, value: { tempId: raw.tempId } }
+      ? { ok: true, value: { kind: "temp", tempId: raw.tempId } }
       : { ok: false, error: `${path}.tempId must be a non-empty string` };
   }
-  return { ok: false, error: `${path} must have key nodeId or tempId` };
+  return {
+    ok: false,
+    error: `${path}.kind must be "existing" or "temp"`,
+  };
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

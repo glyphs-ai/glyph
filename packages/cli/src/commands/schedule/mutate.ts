@@ -5,13 +5,19 @@
  * partial updates.
  */
 
-import type { GetApiWorkspacesByIdSchedulesBySidResponse } from "@glyphs-ai/sdk";
+import type {
+  GetApiWorkspacesByIdSchedulesTaskBySidResponse,
+  GetApiWorkspacesByIdSchedulesWorkflowBySidResponse,
+} from "@glyphs-ai/sdk";
 import {
-  deleteApiWorkspacesByIdSchedulesBySid,
-  getApiWorkspacesByIdSchedulesBySid,
+  deleteApiWorkspacesByIdSchedulesTaskBySid,
+  deleteApiWorkspacesByIdSchedulesWorkflowBySid,
+  getApiWorkspacesByIdSchedulesTaskBySid,
+  getApiWorkspacesByIdSchedulesWorkflowBySid,
   patchApiWorkspacesByIdSchedulesTaskBySid,
   patchApiWorkspacesByIdSchedulesWorkflowBySid,
-  postApiWorkspacesByIdSchedulesBySidRun,
+  postApiWorkspacesByIdSchedulesTaskBySidRun,
+  postApiWorkspacesByIdSchedulesWorkflowBySidRun,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, pickFormat } from "../../output.js";
@@ -48,30 +54,22 @@ async function patchEnabled(
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    // Detect the schedule's kind so we route to the correct patch endpoint.
-    const found = unwrap(
-      await getApiWorkspacesByIdSchedulesBySid({
-        path: { id: workspaceId, sid: scheduleId },
-      }),
-    );
-    const kind = found.target?.kind ?? "task";
     const path = { id: workspaceId, sid: scheduleId };
-    // The patch endpoint is kind-specific (task vs workflow); branch so
-    // the response typing matches the URL we actually hit.
-    const updated =
-      kind === "workflow"
-        ? unwrap(
-            await patchApiWorkspacesByIdSchedulesWorkflowBySid({
-              path,
-              body: { enabled },
-            }),
-          )
-        : unwrap(
-            await patchApiWorkspacesByIdSchedulesTaskBySid({
-              path,
-              body: { enabled },
-            }),
-          );
+    const taskResult = await patchApiWorkspacesByIdSchedulesTaskBySid({
+      path,
+      body: { enabled },
+    });
+    let updated: unknown;
+    if (taskResult.response?.status === 404) {
+      updated = unwrap(
+        await patchApiWorkspacesByIdSchedulesWorkflowBySid({
+          path,
+          body: { enabled },
+        }),
+      );
+    } else {
+      updated = unwrap(taskResult);
+    }
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(updated) };
     return { exitCode: 0, stdout: `schedule ${scheduleId} ${verb}\n` };
@@ -93,12 +91,22 @@ export async function scheduleRm(
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const result = unwrap(
-      await deleteApiWorkspacesByIdSchedulesBySid({
-        path: { id: workspaceId, sid: scheduleId },
-      }),
-    );
-    const n = result.deletedDispatchCount;
+    const taskResult = await deleteApiWorkspacesByIdSchedulesTaskBySid({
+      path: { id: workspaceId, sid: scheduleId },
+    });
+    let deletedDispatchCount: number;
+    if (taskResult.response?.status === 404) {
+      const result = unwrap(
+        await deleteApiWorkspacesByIdSchedulesWorkflowBySid({
+          path: { id: workspaceId, sid: scheduleId },
+        }),
+      );
+      deletedDispatchCount = result.deletedDispatchCount;
+    } else {
+      const result = unwrap(taskResult);
+      deletedDispatchCount = result.deletedDispatchCount;
+    }
+    const n = deletedDispatchCount;
     const suffix =
       n === 0 ? "" : n === 1 ? " (and 1 historical dispatch)" : ` (and ${n} historical dispatches)`;
     return { exitCode: 0, stdout: `schedule ${scheduleId} removed${suffix}\n` };
@@ -120,14 +128,24 @@ export async function scheduleRun(
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const result = unwrap(
-      await postApiWorkspacesByIdSchedulesBySidRun({
-        path: { id: workspaceId, sid: scheduleId },
-      }),
-    );
+    const taskResult = await postApiWorkspacesByIdSchedulesTaskBySidRun({
+      path: { id: workspaceId, sid: scheduleId },
+    });
+    let dispatchId: string;
+    if (taskResult.response?.status === 404) {
+      const result = unwrap(
+        await postApiWorkspacesByIdSchedulesWorkflowBySidRun({
+          path: { id: workspaceId, sid: scheduleId },
+        }),
+      );
+      dispatchId = result.dispatchId;
+    } else {
+      const result = unwrap(taskResult);
+      dispatchId = result.dispatchId;
+    }
     const fmt = pickFormat(opts, "table");
-    if (fmt === "json") return { exitCode: 0, stdout: formatJson(result) };
-    return { exitCode: 0, stdout: `${result.dispatchId}\n` };
+    if (fmt === "json") return { exitCode: 0, stdout: formatJson({ dispatchId }) };
+    return { exitCode: 0, stdout: `${dispatchId}\n` };
   } catch (err) {
     return formatError(err);
   }
@@ -235,12 +253,12 @@ export async function schedulePatch(
     // replace (small atomic shape), so a partial trigger update
     // (--cron OR --tz, but not both) still requires one GET to fill
     // the other field. This is the only remaining GET-merge case.
-    let current: GetApiWorkspacesByIdSchedulesBySidResponse | undefined;
+    let current: GetApiWorkspacesByIdSchedulesTaskBySidResponse | undefined;
     const needCurrentForTrigger =
       touchesTrigger && !(opts.cron !== undefined && opts.tz !== undefined);
     if (needCurrentForTrigger) {
       current = unwrap(
-        await getApiWorkspacesByIdSchedulesBySid({
+        await getApiWorkspacesByIdSchedulesTaskBySid({
           path: { id: workspaceId, sid: scheduleId },
         }),
       );
@@ -379,12 +397,12 @@ export async function schedulePatchWorkflow(
   try {
     const workspaceId = await resolveWorkspace(opts);
 
-    let current: GetApiWorkspacesByIdSchedulesBySidResponse | undefined;
+    let current: GetApiWorkspacesByIdSchedulesWorkflowBySidResponse | undefined;
     const needCurrentForTrigger =
       touchesTrigger && !(opts.cron !== undefined && opts.tz !== undefined);
     if (needCurrentForTrigger) {
       current = unwrap(
-        await getApiWorkspacesByIdSchedulesBySid({
+        await getApiWorkspacesByIdSchedulesWorkflowBySid({
           path: { id: workspaceId, sid: scheduleId },
         }),
       );

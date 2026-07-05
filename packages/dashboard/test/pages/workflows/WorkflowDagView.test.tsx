@@ -7,6 +7,7 @@ function makeNode(overrides: Partial<WorkflowNode> = {}): WorkflowNode {
   return {
     id: "n-default",
     workflowId: "wf-1",
+    kind: "worker",
     status: "running",
     phase: 0,
     spec: { kind: "worker", agent: "official/engineer", brief: "default brief" },
@@ -25,9 +26,7 @@ function makeDag(nodes: WorkflowNode[]): WorkflowDag {
       origin: "standalone",
       coordinatorAgent: "official/engineer",
       metadata: {},
-      awaitingHumanCount: 0,
       createdAt: "2026-05-28T00:00:00.000Z",
-      iterationCount: 0,
     },
     nodes,
     edges: [],
@@ -147,6 +146,7 @@ describe("WorkflowDagView — kind-driven styling and content", () => {
         dag={makeDag([
           makeNode({
             id: "n-coord",
+            kind: "coordinator",
             phase: 0,
             spec: { kind: "coordinator", agent: "official/engineer" },
           }),
@@ -332,7 +332,6 @@ describe("WorkflowDagView  node activation", () => {
           makeNode({
             id: "n-a",
             phase: 0,
-            taskId: "task-a",
             spec: { kind: "worker", agent: "official/engineer", brief: "a" },
           }),
         ])}
@@ -346,7 +345,7 @@ describe("WorkflowDagView  node activation", () => {
     expect(onSelectNode.mock.calls[0]?.[0]?.id).toBe("n-a");
   });
 
-  it("does not fire onSelectNode when the node has no taskId (aria-disabled)", () => {
+  it("fires onSelectNode for any node (all nodes are now interactive)", () => {
     const onSelectNode = vi.fn();
     render(
       <WorkflowDagView
@@ -361,9 +360,8 @@ describe("WorkflowDagView  node activation", () => {
       />,
     );
     const node = screen.getByTestId("dag-node-n-no-task");
-    expect(node.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(node);
-    expect(onSelectNode).not.toHaveBeenCalled();
+    expect(onSelectNode).toHaveBeenCalled();
   });
 
   it("paints the matching node with aria-current='true' + .dag-node--selected when selectedNodeId is set", () => {
@@ -373,7 +371,6 @@ describe("WorkflowDagView  node activation", () => {
           makeNode({
             id: "n-a",
             phase: 0,
-            taskId: "task-a",
             spec: { kind: "worker", agent: "official/engineer", brief: "a" },
           }),
           makeNode({
@@ -381,7 +378,6 @@ describe("WorkflowDagView  node activation", () => {
             phase: 0,
             metadata: {},
             createdAt: "2026-05-28T00:01:00.000Z",
-            taskId: "task-b",
             spec: { kind: "worker", agent: "official/engineer", brief: "b" },
           }),
         ])}
@@ -401,7 +397,7 @@ describe("WorkflowDagView  node activation", () => {
       <WorkflowDagView
         dag={{
           ...makeDag([makeNode({ id: "n-a", phase: 0 }), makeNode({ id: "n-b", phase: 1 })]),
-          edges: [{ from: "n-a", to: "n-b" }],
+          edges: [{ workflowId: "wf-1", from: "n-a", to: "n-b" }],
         }}
       />,
     );

@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -15,6 +14,7 @@ import {
   type ServerConfig,
   type WorkflowHeader,
 } from "../api";
+import type { AgentEntry } from "../api/catalog.js";
 import { DetailSkeleton } from "../components/common/DetailSkeleton";
 import { EmptyState } from "../components/common/EmptyState";
 import { ListSkeleton } from "../components/common/ListSkeleton";
@@ -390,7 +390,10 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
     // while the new delete is in flight.
     setDeleteNotice(null);
     try {
-      const { deletedDispatchCount } = await deleteSchedule(deleteTarget.id);
+      const { deletedDispatchCount } = await deleteSchedule(
+        deleteTarget.id,
+        deleteTarget.target.kind,
+      );
       if (!mounted.current) return;
       if (selectedId === deleteTarget.id) {
         // Atomic clear so a stale fireTaskId / fireWorkflowId can't
@@ -556,7 +559,7 @@ export function SchedulesPage({ agents, currentWorkspaceId, config }: SchedulesP
       setBusyByScheduleId((prev) => ({ ...prev, [target.id]: "run" }));
       setError(null);
       try {
-        await runSchedule(target.id);
+        await runSchedule(target.id, target.target.kind);
         if (!mounted.current) return;
         if (target.id === effectiveSelectedId) {
           setRecentFiresToken((n) => n + 1);

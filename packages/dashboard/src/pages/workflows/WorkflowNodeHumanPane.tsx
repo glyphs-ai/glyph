@@ -253,8 +253,10 @@ function HumanRespondForm({ node, spec, choices }: HumanRespondFormProps) {
     setSubmitting(true);
     setError(null);
     const body: RespondHumanNodeRequest = {
-      ...(selectedChoiceId !== null && { choiceId: selectedChoiceId }),
-      ...(input.trim().length > 0 && { input: input.trim() }),
+      response: {
+        ...(selectedChoiceId !== null && { choiceId: selectedChoiceId }),
+        ...(input.trim().length > 0 && { input: input.trim() }),
+      },
     };
     try {
       await respondHumanNode(node.workflowId, node.id, body);

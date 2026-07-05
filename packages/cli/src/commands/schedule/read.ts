@@ -8,9 +8,12 @@ import {
   type GetApiWorkspacesByIdScheduledTasksData,
   getApiWorkspacesByIdScheduledTasks,
   getApiWorkspacesByIdScheduledWorkflows,
-  getApiWorkspacesByIdSchedules,
-  getApiWorkspacesByIdSchedulesBySid,
-  getApiWorkspacesByIdSchedulesBySidPreview,
+  getApiWorkspacesByIdSchedulesTask,
+  getApiWorkspacesByIdSchedulesTaskBySid,
+  getApiWorkspacesByIdSchedulesTaskBySidPreview,
+  getApiWorkspacesByIdSchedulesWorkflow,
+  getApiWorkspacesByIdSchedulesWorkflowBySid,
+  getApiWorkspacesByIdSchedulesWorkflowBySidPreview,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, formatTable, pickFormat } from "../../output.js";
@@ -35,43 +38,52 @@ export async function scheduleList(opts: ScheduleListOpts = {}): Promise<Command
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const query: { agent?: string; enabled?: "true" | "false" } = {};
-    if (opts.agent !== undefined) query.agent = opts.agent;
-    if (opts.enabled !== undefined) query.enabled = opts.enabled as "true" | "false";
-    const list = unwrap(
-      await getApiWorkspacesByIdSchedules({
+    const enabledQuery = opts.enabled as "true" | "false" | undefined;
+    const [taskResult, wfResult] = await Promise.all([
+      getApiWorkspacesByIdSchedulesTask({
         path: { id: workspaceId },
-        query,
+        query: {
+          ...(opts.agent !== undefined ? { agent: opts.agent } : {}),
+          ...(enabledQuery !== undefined ? { enabled: enabledQuery } : {}),
+        },
       }),
-    );
+      getApiWorkspacesByIdSchedulesWorkflow({
+        path: { id: workspaceId },
+        query: {
+          ...(opts.agent !== undefined ? { coordinatorAgent: opts.agent } : {}),
+          ...(enabledQuery !== undefined ? { enabled: enabledQuery } : {}),
+        },
+      }),
+    ]);
+    const taskList = unwrap(taskResult);
+    const wfList = unwrap(wfResult);
     const fmt = pickFormat(opts, "table");
-    if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
+    const allItems = [
+      ...taskList.map((s) => ({
+        id: s.id,
+        name: s.name,
+        kind: "task" as const,
+        agent: s.target.agent,
+        expr: s.trigger.expr,
+        tz: s.trigger.tz,
+        enabled: s.enabled,
+      })),
+      ...wfList.map((s) => ({
+        id: s.id,
+        name: s.name,
+        kind: "workflow" as const,
+        agent: s.target.coordinatorAgent,
+        expr: s.trigger.expr,
+        tz: s.trigger.tz,
+        enabled: s.enabled,
+      })),
+    ];
+    if (fmt === "json") return { exitCode: 0, stdout: formatJson(allItems) };
     return {
       exitCode: 0,
       stdout: formatTable(
         ["id", "name", "kind", "agent", "cron", "tz", "enabled"],
-        list.map((s) => {
-          const target = s.target as {
-            kind: string;
-            agent?: string;
-            coordinatorAgent?: string;
-          };
-          const agentCol =
-            target.kind === "task"
-              ? (target.agent ?? "")
-              : target.kind === "workflow"
-                ? (target.coordinatorAgent ?? "")
-                : "";
-          return [
-            s.id ?? "",
-            s.name ?? "",
-            target.kind ?? "",
-            agentCol,
-            s.trigger?.kind === "cron" ? (s.trigger.expr ?? "") : "",
-            s.trigger?.kind === "cron" ? (s.trigger.tz ?? "") : "",
-            String(s.enabled),
-          ];
-        }),
+        allItems.map((s) => [s.id, s.name, s.kind, s.agent, s.expr, s.tz, String(s.enabled)]),
       ),
     };
   } catch (err) {
@@ -92,24 +104,24 @@ export async function scheduleShow(
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const found = unwrap(
-      await getApiWorkspacesByIdSchedulesBySid({
-        path: { id: workspaceId, sid: scheduleId },
-      }),
-    );
-    const fmt = pickFormat(opts, "table");
-    if (fmt === "json") return { exitCode: 0, stdout: formatJson(found) };
-    // Surface `describe` (the derived zh_CN cron text the server
-    // adds to GET /:sid) right after `name` so it lands above the
-    // structured `trigger` / `target` JSON blobs in the table view.
-    const { id: foundId, name, describe, ...rest } = found;
-    const stdout = formatRecord({
-      id: foundId,
-      name,
-      describe: describe ?? "(no description)",
-      ...rest,
+    const taskResult = await getApiWorkspacesByIdSchedulesTaskBySid({
+      path: { id: workspaceId, sid: scheduleId },
     });
-    return { exitCode: 0, stdout };
+    const fmt = pickFormat(opts, "table");
+    if (taskResult.response?.status === 404) {
+      const found = unwrap(
+        await getApiWorkspacesByIdSchedulesWorkflowBySid({
+          path: { id: workspaceId, sid: scheduleId },
+        }),
+      );
+      if (fmt === "json") return { exitCode: 0, stdout: formatJson(found) };
+      const { id, name, describe, ...rest } = found;
+      return { exitCode: 0, stdout: formatRecord({ id, name, describe, ...rest }) };
+    }
+    const found = unwrap(taskResult);
+    if (fmt === "json") return { exitCode: 0, stdout: formatJson(found) };
+    const { id, name, describe, ...rest } = found;
+    return { exitCode: 0, stdout: formatRecord({ id, name, describe, ...rest }) };
   } catch (err) {
     return formatError(err);
   }
@@ -134,14 +146,21 @@ export async function schedulePreview(
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const query: { n?: string } = {};
-    if (opts.n !== undefined) query.n = String(opts.n);
-    const preview = unwrap(
-      await getApiWorkspacesByIdSchedulesBySidPreview({
-        path: { id: workspaceId, sid: scheduleId },
-        query,
-      }),
-    );
+    const query: { n?: number } = {};
+    if (opts.n !== undefined) query.n = opts.n;
+    const taskResult = await getApiWorkspacesByIdSchedulesTaskBySidPreview({
+      path: { id: workspaceId, sid: scheduleId },
+      query,
+    });
+    const preview =
+      taskResult.response?.status === 404
+        ? unwrap(
+            await getApiWorkspacesByIdSchedulesWorkflowBySidPreview({
+              path: { id: workspaceId, sid: scheduleId },
+              query,
+            }),
+          )
+        : unwrap(taskResult);
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(preview) };
     const lines = [preview.describe, ...preview.nextRuns.map((ts) => `  ${ts}`)];

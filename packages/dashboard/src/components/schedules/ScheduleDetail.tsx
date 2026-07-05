@@ -1,4 +1,3 @@
-import type { ScheduleTarget } from "@glyphs-ai/sdk";
 import { type ReactNode, useEffect, useState } from "react";
 import {
   getSchedule,
@@ -7,6 +6,7 @@ import {
   type SchedulePreview,
   type WorkflowHeader,
 } from "../../api";
+import type { ScheduleTarget } from "../../api/schedules.js";
 import { formatAbsolute, formatRelative } from "../../utils/time";
 import { ScheduleRecentFires } from "./ScheduleRecentFires";
 import { targetAgent, targetBrief, targetDetails, targetRuntime } from "./shared";

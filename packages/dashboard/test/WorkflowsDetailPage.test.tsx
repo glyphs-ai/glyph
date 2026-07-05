@@ -1,8 +1,8 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowDag, WorkflowHeader } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");
@@ -41,9 +41,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
-    iterationCount: 3,
     ...overrides,
   };
 }
@@ -55,6 +53,7 @@ function makeDag(wf: WorkflowHeader): WorkflowDag {
       {
         id: "node-1",
         workflowId: wf.id,
+        kind: "coordinator" as const,
         status: wf.status === "running" ? "running" : "succeeded",
         phase: 0,
         spec: { kind: "coordinator", agent: wf.coordinatorAgent },
@@ -98,7 +97,7 @@ describe("WorkflowsPage — detail header", () => {
   const agents = [makeAgent("official/engineer")];
 
   it("renders the header (brief, status badge, coordinator, phases) for the selected workflow", async () => {
-    const wf = makeWorkflow({ id: "wf-1", brief: "Headline brief", iterationCount: 7 });
+    const wf = makeWorkflow({ id: "wf-1", brief: "Headline brief" });
     mockListWorkflows.mockResolvedValue([wf]);
     mockGetWorkflow.mockResolvedValue(wf);
     // DAG with two distinct phases. Both nodes are still running, so

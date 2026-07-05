@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useMemo } from "react";
-import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../api";
+import type { WorkflowDag, WorkflowHeader } from "../../api";
 import { TaskView } from "../../components/task-view";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
 import { orderNodesForNav } from "./workflow-nav-utils.js";
@@ -49,22 +49,18 @@ export function WorkflowNodeTaskPane({
   onNavigate,
 }: WorkflowNodeTaskPaneProps) {
   const orderedNodes = useMemo(() => {
-    // For the task pane, only nodes with a taskId are navigable.
-    return orderNodesForNav(dag).filter(
-      (n): n is WorkflowNode & { taskId: string } => n.taskId !== undefined,
-    );
+    return orderNodesForNav(dag).filter((n) => n.kind !== "human");
   }, [dag]);
   const currentIndex = useMemo(
-    () => orderedNodes.findIndex((n) => n.taskId === nodeTaskId),
+    () => orderedNodes.findIndex((n) => n.id === nodeTaskId),
     [orderedNodes, nodeTaskId],
   );
   const found = currentIndex !== -1;
 
-  const prevId =
-    found && currentIndex > 0 ? (orderedNodes[currentIndex - 1]?.taskId ?? null) : null;
+  const prevId = found && currentIndex > 0 ? (orderedNodes[currentIndex - 1]?.id ?? null) : null;
   const nextId =
     found && currentIndex < orderedNodes.length - 1
-      ? (orderedNodes[currentIndex + 1]?.taskId ?? null)
+      ? (orderedNodes[currentIndex + 1]?.id ?? null)
       : null;
 
   if (dag === null) {

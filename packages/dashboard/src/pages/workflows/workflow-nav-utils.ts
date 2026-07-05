@@ -12,10 +12,8 @@ import type { WorkflowDag, WorkflowNode } from "../../api";
  */
 export function orderNodesForNav(dag: WorkflowDag | null): WorkflowNode[] {
   if (dag === null) return [];
-  return dag.nodes
-    .filter((n) => n.taskId !== undefined || n.spec.kind === "human")
-    .sort((a, b) => {
-      if (a.phase !== b.phase) return a.phase - b.phase;
-      return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
-    });
+  return dag.nodes.sort((a, b) => {
+    if (a.phase !== b.phase) return a.phase - b.phase;
+    return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+  });
 }

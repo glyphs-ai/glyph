@@ -201,10 +201,9 @@ function FireWorkflowView({
 
   const handleSelectNode = useCallback(
     (node: WorkflowNode) => {
-      if (node.spec.kind === "human") {
+      if (node.kind === "human") {
         onSelectNode(node.id);
       } else {
-        if (node.taskId === undefined) return;
         onSelectNode(node.id);
       }
     },
@@ -235,7 +234,7 @@ function FireWorkflowView({
   if (fireNodeId !== null && dag !== null) {
     const node = dag.nodes.find((n) => n.id === fireNodeId);
     if (node !== undefined) {
-      if (node.spec.kind === "human") {
+      if (node.kind === "human") {
         return (
           <WorkflowNodeHumanPane
             key={`${fireWorkflowId}:human:${fireNodeId}`}
@@ -247,23 +246,19 @@ function FireWorkflowView({
           />
         );
       }
-      if (node.taskId !== undefined) {
-        return (
-          <WorkflowNodeTaskPane
-            key={`${fireWorkflowId}:${fireNodeId}`}
-            workflow={workflow}
-            dag={dag}
-            nodeTaskId={node.taskId}
-            pollIntervalMs={4000}
-            onBack={onBackFromNode}
-            onNavigate={(nextTaskId: string) => {
-              // Find the node with this taskId and navigate to its node id.
-              const target = dag.nodes.find((n) => n.taskId === nextTaskId);
-              if (target) onSelectNode(target.id);
-            }}
-          />
-        );
-      }
+      return (
+        <WorkflowNodeTaskPane
+          key={`${fireWorkflowId}:${fireNodeId}`}
+          workflow={workflow}
+          dag={dag}
+          nodeTaskId={node.id}
+          pollIntervalMs={4000}
+          onBack={onBackFromNode}
+          onNavigate={(nextNodeId: string) => {
+            onSelectNode(nextNodeId);
+          }}
+        />
+      );
     }
   }
 

@@ -1,6 +1,6 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import type { ReactNode } from "react";
 import type { SchedulePreview } from "../../api";
+import type { AgentEntry } from "../../api/catalog.js";
 import { coordEligibleAgents } from "../workflows/shared";
 import { PresetEditor } from "./PresetEditor";
 import type { ScheduleFormPatch, ScheduleFormState } from "./schedule-form-shared";

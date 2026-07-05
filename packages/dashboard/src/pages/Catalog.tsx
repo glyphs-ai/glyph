@@ -1,6 +1,6 @@
-import type { AgentEntry, CatalogKind, SkillEntry } from "@glyphs-ai/sdk";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { InstallSource, McpItem } from "../api";
+import type { AgentEntry, CatalogKind, SkillEntry } from "../api/catalog.js";
 import { DetailDialog } from "../components/DetailDialog";
 import { EntryGrid } from "../components/EntryGrid";
 import { HeaderActions } from "../components/HeaderActions";

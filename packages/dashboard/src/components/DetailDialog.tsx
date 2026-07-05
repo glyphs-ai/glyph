@@ -1,4 +1,3 @@
-import type { BlockedReason } from "@glyphs-ai/sdk";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -25,6 +24,7 @@ import {
   resolveSkillSync,
   type SkillDetail,
 } from "../api";
+import type { BlockedReason } from "../api/catalog.js";
 import { type EntityKind, KIND_ICON, KIND_TAG, KIND_TITLE } from "../kind-meta";
 import { KIND_TAB } from "../pages/catalog/catalog-verbs";
 import { splitFqnForDisplay } from "../utils/fqn";

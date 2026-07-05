@@ -1,10 +1,10 @@
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { createSchedule, createWorkflowSchedule, type ScheduleView } from "../../api";
 import type {
   AgentEntry,
   CreateTaskScheduleRequest,
   CreateWorkflowScheduleRequest,
-} from "@glyphs-ai/sdk";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { createSchedule, createWorkflowSchedule, type ScheduleView } from "../../api";
+} from "../../api/index.js";
 import { Modal } from "../Modal";
 import { coordEligibleAgents } from "../workflows/shared";
 import { presetToCron, validatePreset } from "./cron-presets";

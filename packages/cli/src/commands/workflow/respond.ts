@@ -4,7 +4,7 @@
  * `./_shared.ts`.
  */
 
-import type { RespondHumanNodeRequest } from "@glyphs-ai/sdk";
+import type { PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData } from "@glyphs-ai/sdk";
 import { postApiWorkspacesByIdWorkflowsByWfidNodesByNidRespond } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, pickFormat } from "../../output.js";
@@ -40,9 +40,11 @@ export async function workflowRespond(
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: RespondHumanNodeRequest = {
-      ...(opts.choiceId !== undefined ? { choiceId: opts.choiceId } : {}),
-      ...(opts.input !== undefined ? { input: opts.input } : {}),
+    const body: PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData["body"] = {
+      response: {
+        ...(opts.choiceId !== undefined ? { choiceId: opts.choiceId } : {}),
+        ...(opts.input !== undefined ? { input: opts.input } : {}),
+      },
     };
     const updated = unwrap(
       await postApiWorkspacesByIdWorkflowsByWfidNodesByNidRespond({

@@ -1,90 +1,76 @@
-// Schedules REST client. Mirrors the schedule routes the server exposes
-// (`schedule.create`, `schedule.update`, `schedule.list`, etc.). All
-// schedule fields — target, trigger, runtime, and metadata — are editable
-// from both the dashboard (Create/EditScheduleModal) and the CLI; server
-// handlers live in `packages/server/src/routes/schedules.ts`.
-//
-// Mutation routes are URL-discriminated by `target.kind`:
-// `POST /schedules/task` + `PATCH /schedules/task/:scheduleId` for the task
-// kind. The PATCH body uses RFC 7396 deep-merge semantics on
-// `target` (siblings preserved; `null` deletes `details` / `runtime`)
-// and wholesale-replace on `trigger`.
-//
-// Adapters whose response embeds the opaque `{ kind, data }` schedule
-// `target` envelope (every `ScheduleView` / `ScheduleDetail` reader and
-// writer) stay on the typed raw-fetch helpers: the server hand-validates
-// those write bodies (typed `never` in the generated ops) and the OpenAPI
-// projection widens `target.data` to optional, which does not assign to the
-// domain `ScheduleTarget` (`data` required) the dashboard is typed against.
-// The envelope-free routes (preview, run, delete, scheduled-workflows) use
-// the generated SDK operations.
+// Schedules REST client. Mirrors the per-kind schedule routes the server
+// exposes. List / get / preview / delete / run use the generated SDK ops;
+// create / patch stay on the raw JSON helpers since those bodies are
+// hand-validated on the server (typed `never` in the generated ops).
 
 import type {
-  CreateTaskScheduleRequest,
-  CreateWorkflowScheduleRequest,
-  PatchTaskScheduleRequest,
-  PatchWorkflowScheduleRequest,
-  PreviewScheduleResult,
-  Schedule,
-  ScheduleTarget,
-  WorkflowHeader,
+  GetApiWorkspacesByIdSchedulesPreviewCronResponse,
+  GetApiWorkspacesByIdSchedulesTaskResponse,
+  GetApiWorkspacesByIdSchedulesWorkflowResponse,
+  PatchApiWorkspacesByIdSchedulesTaskBySidData,
+  PatchApiWorkspacesByIdSchedulesWorkflowBySidData,
+  PostApiWorkspacesByIdSchedulesTaskData,
+  PostApiWorkspacesByIdSchedulesWorkflowData,
 } from "@glyphs-ai/sdk";
 import {
-  deleteApiWorkspacesByIdSchedulesBySid,
+  deleteApiWorkspacesByIdSchedulesTaskBySid,
+  deleteApiWorkspacesByIdSchedulesWorkflowBySid,
   getApiWorkspacesByIdScheduledWorkflows,
-  getApiWorkspacesByIdSchedulesBySidPreview,
   getApiWorkspacesByIdSchedulesPreviewCron,
-  postApiWorkspacesByIdSchedulesBySidRun,
+  getApiWorkspacesByIdSchedulesTask,
+  getApiWorkspacesByIdSchedulesTaskBySid,
+  getApiWorkspacesByIdSchedulesTaskBySidPreview,
+  getApiWorkspacesByIdSchedulesWorkflow,
+  getApiWorkspacesByIdSchedulesWorkflowBySid,
+  getApiWorkspacesByIdSchedulesWorkflowBySidPreview,
+  postApiWorkspacesByIdSchedulesTaskBySidRun,
+  postApiWorkspacesByIdSchedulesWorkflowBySidRun,
 } from "@glyphs-ai/sdk";
-import { fetchJson, jsonInit, mutateJson, workspacePrefix } from "./http.js";
+import { jsonInit, mutateJson, workspacePrefix } from "./http.js";
 import { requireWorkspaceId, unwrap } from "./sdk-client.js";
+import type { WorkflowHeader } from "./workflows.js";
 
-/**
- * Wire-shape view of a schedule as the dashboard sees it. The server
- * projects the substrate's opaque `{ kind, data }` envelope to a
- * flat per-kind shape on the way out (`projectScheduleHeader`); the
- * dashboard supports both the task and workflow kinds, so we type
- * `target` as the full wire union.
- */
-export type ScheduleView = Omit<Schedule, "target"> & {
-  target: ScheduleTarget;
-  fireStats?: {
-    awaitingCount: number;
-    runningCount: number;
-  };
+// Internal raw row types from the per-kind list endpoints.
+type RawTaskSchedule = GetApiWorkspacesByIdSchedulesTaskResponse[number];
+type RawWorkflowSchedule = GetApiWorkspacesByIdSchedulesWorkflowResponse[number];
+
+// Exported target types with `kind` added for dashboard-side discrimination.
+export type TaskScheduleTarget = RawTaskSchedule["target"] & { readonly kind: "task" };
+export type WorkflowScheduleTarget = RawWorkflowSchedule["target"] & { readonly kind: "workflow" };
+export type ScheduleTarget = TaskScheduleTarget | WorkflowScheduleTarget;
+
+export type TaskScheduleView = Omit<RawTaskSchedule, "target"> & { target: TaskScheduleTarget };
+export type WorkflowScheduleView = Omit<RawWorkflowSchedule, "target"> & {
+  target: WorkflowScheduleTarget;
 };
 
 /**
- * Response shape for `GET /schedules/:scheduleId` — the entity plus the
- * server-computed cronstrue description (`describe`). The dashboard
- * never re-derives `describe` client-side; cronstrue isn't a
- * dashboard dep and the server is the single source of truth for
- * the locale + format (zh_CN, per the route handler).
+ * Wire-shape view of a schedule as the dashboard sees it. The server
+ * exposes per-kind list endpoints (`/schedules/task`, `/schedules/workflow`);
+ * the dashboard merges both and injects a `kind` discriminant into each
+ * target for local filtering / routing.
  */
-export interface ScheduleDetail extends ScheduleView {
-  describe: string;
-}
+export type ScheduleView = TaskScheduleView | WorkflowScheduleView;
 
 /**
- * Body for `PATCH /schedules/task/:scheduleId` — RFC 7396 deep-merge for
- * `target`, wholesale-replace for `trigger`, scalar-set for
- * `name` / `enabled`. Mirrors the shared `PatchTaskScheduleRequest`
- * route contract. Declared locally rather than re-exported from
- * `@glyphs-ai/schedule` because the dashboard imports types only.
- *
- * - `name` / `enabled` — set if present, otherwise keep.
- * - `trigger` — wholesale replace; absent means keep.
- * - `target.agent` / `brief` — set if present; `null` rejected by the
- *   server (required fields; omit to keep).
- * - `target.details` / `runtime` — string sets; `null` deletes;
- *   absent keeps. `target.kind` MUST NOT be set (URL discriminates).
- *
- * Re-exported from the SDK as the single source of truth for the
- * wire shape — the dashboard does not redeclare it.
+ * Response shape for `GET /schedules/{kind}/{sid}` — the entity plus the
+ * server-computed cronstrue description (`describe`).
  */
-export type { PatchTaskScheduleRequest as PatchScheduleRequest } from "@glyphs-ai/sdk";
+export type ScheduleDetail = ScheduleView & { describe: string };
 
-/** Response shape for `GET /schedules/:scheduleId/preview?n=N`. */
+// Request body types.
+export type PatchTaskScheduleRequest = PatchApiWorkspacesByIdSchedulesTaskBySidData["body"];
+export type PatchWorkflowScheduleRequest = PatchApiWorkspacesByIdSchedulesWorkflowBySidData["body"];
+export type CreateTaskScheduleRequest = PostApiWorkspacesByIdSchedulesTaskData["body"];
+export type CreateWorkflowScheduleRequest = PostApiWorkspacesByIdSchedulesWorkflowData["body"];
+export type PreviewScheduleResult = GetApiWorkspacesByIdSchedulesPreviewCronResponse;
+
+// Legacy alias kept so call sites that use `PatchScheduleRequest` do not need changes.
+export type PatchScheduleRequest = PatchTaskScheduleRequest;
+// Legacy alias for the task-kind create body.
+export type CreateScheduleRequest = CreateTaskScheduleRequest;
+
+/** Response shape for `GET /schedules/{kind}/{sid}/preview?n=N`. */
 export type SchedulePreview = PreviewScheduleResult;
 
 export interface ListSchedulesOpts {
@@ -94,19 +80,51 @@ export interface ListSchedulesOpts {
   enabled?: boolean;
 }
 
-export const listSchedules = (opts: ListSchedulesOpts = {}): Promise<ScheduleView[]> => {
-  const qs = new URLSearchParams();
-  if (opts.agent !== undefined) qs.set("agent", opts.agent);
-  if (opts.enabled !== undefined) qs.set("enabled", opts.enabled ? "true" : "false");
-  const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
-  return fetchJson<ScheduleView[]>(`${workspacePrefix()}/schedules${suffix}`, "schedules");
+// Helpers to inject the kind discriminant into raw API responses.
+function addTaskKind(raw: RawTaskSchedule): TaskScheduleView {
+  return { ...raw, target: { kind: "task" as const, ...raw.target } };
+}
+function addWorkflowKind(raw: RawWorkflowSchedule): WorkflowScheduleView {
+  return { ...raw, target: { kind: "workflow" as const, ...raw.target } };
+}
+
+export const listSchedules = async (opts: ListSchedulesOpts = {}): Promise<ScheduleView[]> => {
+  const id = requireWorkspaceId();
+  const enabledParam =
+    opts.enabled !== undefined
+      ? ((opts.enabled ? "true" : "false") as "true" | "false")
+      : undefined;
+  const [taskResult, wfResult] = await Promise.all([
+    getApiWorkspacesByIdSchedulesTask({
+      path: { id },
+      query: { agent: opts.agent, enabled: enabledParam },
+    }),
+    getApiWorkspacesByIdSchedulesWorkflow({
+      path: { id },
+      query: { coordinatorAgent: opts.agent, enabled: enabledParam },
+    }),
+  ]);
+  return [...unwrap(taskResult).map(addTaskKind), ...unwrap(wfResult).map(addWorkflowKind)];
 };
 
-export const getSchedule = (scheduleId: string): Promise<ScheduleDetail> =>
-  fetchJson<ScheduleDetail>(
-    `${workspacePrefix()}/schedules/${encodeURIComponent(scheduleId)}`,
-    "schedule",
-  );
+export const getSchedule = async (
+  scheduleId: string,
+  kind?: "task" | "workflow",
+): Promise<ScheduleDetail> => {
+  const id = requireWorkspaceId();
+  if (kind === "workflow") {
+    const result = await getApiWorkspacesByIdSchedulesWorkflowBySid({
+      path: { id, sid: scheduleId },
+    });
+    const raw = unwrap(result) as RawWorkflowSchedule & { describe: string };
+    return addWorkflowKind(raw) as ScheduleDetail;
+  }
+  const result = await getApiWorkspacesByIdSchedulesTaskBySid({
+    path: { id, sid: scheduleId },
+  });
+  const raw = unwrap(result) as RawTaskSchedule & { describe: string };
+  return addTaskKind(raw) as ScheduleDetail;
+};
 
 export interface PreviewScheduleOpts {
   /** Number of upcoming fire times to compute. Server clamps to `[1, 100]` and defaults to 3. */
@@ -116,83 +134,106 @@ export interface PreviewScheduleOpts {
 export const previewSchedule = async (
   scheduleId: string,
   opts: PreviewScheduleOpts = {},
+  kind?: "task" | "workflow",
 ): Promise<SchedulePreview> => {
-  const query: { n?: string } = {};
-  if (opts.n !== undefined) query.n = String(opts.n);
+  const id = requireWorkspaceId();
+  const query: { n?: number } = {};
+  if (opts.n !== undefined) query.n = opts.n;
+  if (kind === "workflow") {
+    return unwrap(
+      await getApiWorkspacesByIdSchedulesWorkflowBySidPreview({
+        path: { id, sid: scheduleId },
+        query,
+      }),
+    );
+  }
   return unwrap(
-    await getApiWorkspacesByIdSchedulesBySidPreview({
-      path: { id: requireWorkspaceId(), sid: scheduleId },
+    await getApiWorkspacesByIdSchedulesTaskBySidPreview({
+      path: { id, sid: scheduleId },
       query,
     }),
   );
 };
 
-export const patchSchedule = (
+export const patchSchedule = async (
   scheduleId: string,
   body: PatchTaskScheduleRequest,
-): Promise<ScheduleView> =>
-  mutateJson<ScheduleView>(
+): Promise<ScheduleView> => {
+  const raw = await mutateJson<RawTaskSchedule>(
     `${workspacePrefix()}/schedules/task/${encodeURIComponent(scheduleId)}`,
     jsonInit("PATCH", body as object),
   );
+  return addTaskKind(raw);
+};
 
-export const patchWorkflowSchedule = (
+export const patchWorkflowSchedule = async (
   scheduleId: string,
   body: PatchWorkflowScheduleRequest,
-): Promise<ScheduleView> =>
-  mutateJson<ScheduleView>(
+): Promise<ScheduleView> => {
+  const raw = await mutateJson<RawWorkflowSchedule>(
     `${workspacePrefix()}/schedules/workflow/${encodeURIComponent(scheduleId)}`,
     jsonInit("PATCH", body as object),
   );
+  return addWorkflowKind(raw);
+};
 
 export const deleteSchedule = async (
   scheduleId: string,
-): Promise<{ deletedDispatchCount: number }> =>
-  unwrap(
-    await deleteApiWorkspacesByIdSchedulesBySid({
-      path: { id: requireWorkspaceId(), sid: scheduleId },
+  kind: "task" | "workflow",
+): Promise<{ deletedDispatchCount: number }> => {
+  const id = requireWorkspaceId();
+  if (kind === "workflow") {
+    return unwrap(
+      await deleteApiWorkspacesByIdSchedulesWorkflowBySid({
+        path: { id, sid: scheduleId },
+      }),
+    );
+  }
+  return unwrap(
+    await deleteApiWorkspacesByIdSchedulesTaskBySid({
+      path: { id, sid: scheduleId },
     }),
   );
+};
 
-export const runSchedule = async (scheduleId: string): Promise<{ dispatchId: string }> =>
-  unwrap(
-    await postApiWorkspacesByIdSchedulesBySidRun({
-      path: { id: requireWorkspaceId(), sid: scheduleId },
+export const runSchedule = async (
+  scheduleId: string,
+  kind: "task" | "workflow",
+): Promise<{ dispatchId: string }> => {
+  const id = requireWorkspaceId();
+  if (kind === "workflow") {
+    return unwrap(
+      await postApiWorkspacesByIdSchedulesWorkflowBySidRun({
+        path: { id, sid: scheduleId },
+      }),
+    );
+  }
+  return unwrap(
+    await postApiWorkspacesByIdSchedulesTaskBySidRun({
+      path: { id, sid: scheduleId },
     }),
   );
+};
 
-/**
- * Body for `POST /api/workspaces/:workspaceId/schedules/task` — mirrors the
- * server route's accepted shape
- * (`packages/server/src/routes/schedules.ts` `app.post("/task")`).
- * URL-discriminated by `target.kind` (no `kind` field on the body).
- * The dashboard's "New schedule" modal is the first surface to use
- * this; the CLI's `glyph schedule create` sends the same wire shape
- * directly. The `target.brief` + optional `target.details` pair mirrors
- * `@glyphs-ai/task` `DispatchOpts`.
- *
- * Re-exported from the SDK so the dashboard always tracks the
- * canonical wire shape.
- */
-export type { CreateTaskScheduleRequest as CreateScheduleRequest } from "@glyphs-ai/sdk";
-
-/**
- * Create a task-kind schedule. Surfaces server-side validation errors
- * verbatim (typed envelope `{ error, code }`) via the shared
- * `ApiError` — the modal renders these inline so the user sees, e.g.,
- * "Invalid cron expression: …" rather than a generic "schedule create: 400".
- */
-export const createSchedule = (body: CreateTaskScheduleRequest): Promise<ScheduleView> =>
-  mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/task`, jsonInit("POST", body));
-
-/** Body for `POST /schedules/workflow` — re-exported from the SDK. */
-export type { CreateWorkflowScheduleRequest } from "@glyphs-ai/sdk";
+/** Create a task-kind schedule. */
+export const createSchedule = async (body: CreateTaskScheduleRequest): Promise<ScheduleView> => {
+  const raw = await mutateJson<RawTaskSchedule>(
+    `${workspacePrefix()}/schedules/task`,
+    jsonInit("POST", body),
+  );
+  return addTaskKind(raw);
+};
 
 /** Create a workflow-kind schedule. */
-export const createWorkflowSchedule = (
+export const createWorkflowSchedule = async (
   body: CreateWorkflowScheduleRequest,
-): Promise<ScheduleView> =>
-  mutateJson<ScheduleView>(`${workspacePrefix()}/schedules/workflow`, jsonInit("POST", body));
+): Promise<ScheduleView> => {
+  const raw = await mutateJson<RawWorkflowSchedule>(
+    `${workspacePrefix()}/schedules/workflow`,
+    jsonInit("POST", body),
+  );
+  return addWorkflowKind(raw);
+};
 
 /**
  * List workflows launched by schedules, optionally filtered to one
@@ -239,8 +280,8 @@ export const previewCron = async (
   args: PreviewCronArgs,
   signal?: AbortSignal,
 ): Promise<SchedulePreview> => {
-  const query: { expr: string; tz: string; n?: string } = { expr: args.expr, tz: args.tz };
-  if (args.n !== undefined) query.n = String(args.n);
+  const query: { expr: string; tz: string; n?: number } = { expr: args.expr, tz: args.tz };
+  if (args.n !== undefined) query.n = args.n;
   return unwrap(
     await getApiWorkspacesByIdSchedulesPreviewCron({
       path: { id: requireWorkspaceId() },

@@ -115,10 +115,8 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: iso(-180),
     startedAt: iso(-180),
-    iterationCount: 3,
   },
   {
     id: "20260608-5a7b9c1f",
@@ -129,10 +127,8 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 1,
     createdAt: iso(-60),
     startedAt: iso(-60),
-    iterationCount: 2,
   },
   {
     id: "20260607-2e4b8cad",
@@ -143,11 +139,9 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     origin: "standalone",
     coordinatorAgent: "official/reviewer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: iso(-1440),
     startedAt: iso(-1440),
     endedAt: iso(-1320),
-    iterationCount: 2,
   },
   {
     id: "20260606-3d5c9dbe",
@@ -157,11 +151,9 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: iso(-2880),
     startedAt: iso(-2880),
     endedAt: iso(-2820),
-    iterationCount: 1,
   },
   {
     id: "20260605-4e6dabcf",
@@ -172,18 +164,11 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     origin: "standalone",
     coordinatorAgent: "official/designer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: iso(-4320),
     startedAt: iso(-4320),
     endedAt: iso(-4200),
-    iterationCount: 2,
   },
-  // Schedule-launched workflow fires. Each `originId` matches
-  // the workflow-kind entry in `fixtureSchedules` (`sched-release-workflow`)
-  // so the per-schedule "Recent fires" panel on the schedule detail
-  // surface renders workflow rows. The succeeded + running pair keeps the
-  // WorkflowStatusBadge variants exercised in mock mode and gives the
-  // FireWorkflowDetailPane a real header + DAG to drill into.
+  // Schedule-launched workflow fires.
   {
     id: "20260527-9f1a0b01",
     brief: "Coordinate the nightly release train",
@@ -194,11 +179,9 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     coordinatorAgent: "official/engineer",
     originId: "sched-release-workflow",
     metadata: { firedAt: "2026-05-27T18:00:00.000Z" },
-    awaitingHumanCount: 0,
     createdAt: iso(-360),
     startedAt: iso(-360),
     endedAt: iso(-330),
-    iterationCount: 2,
   },
   {
     id: "20260527-9f1a0b02",
@@ -210,10 +193,8 @@ export const fixtureWorkflows: readonly WorkflowHeader[] = [
     coordinatorAgent: "official/engineer",
     originId: "sched-release-workflow",
     metadata: { firedAt: "2026-05-27T22:00:00.000Z" },
-    awaitingHumanCount: 0,
     createdAt: iso(-30),
     startedAt: iso(-30),
-    iterationCount: 1,
   },
 ];
 
@@ -223,10 +204,10 @@ const dagRunningMultistage: WorkflowDag = {
     {
       id: NODE_ID_MIG_COORD_0,
       workflowId: "20260608-1f3a7b9c",
+      kind: "coordinator",
       status: "succeeded",
       phase: 0,
-      taskId: TASK_ID_MIG_COORD_0,
-      spec: { kind: "coordinator", agent: "official/engineer" },
+      spec: { agent: "official/engineer" },
       metadata: {},
       createdAt: iso(-180),
       readyAt: iso(-180),
@@ -236,11 +217,10 @@ const dagRunningMultistage: WorkflowDag = {
     {
       id: NODE_ID_MIG_TASK_1A,
       workflowId: "20260608-1f3a7b9c",
+      kind: "worker",
       status: "succeeded",
       phase: 1,
-      taskId: TASK_ID_MIG_TASK_1A,
       spec: {
-        kind: "worker",
         agent: "official/engineer",
         brief: "Replace session middleware with OAuth in packages/server",
         runtime: "copilot",
@@ -254,10 +234,10 @@ const dagRunningMultistage: WorkflowDag = {
     {
       id: NODE_ID_MIG_COORD_2,
       workflowId: "20260608-1f3a7b9c",
+      kind: "coordinator",
       status: "succeeded",
       phase: 2,
-      taskId: TASK_ID_MIG_COORD_2,
-      spec: { kind: "coordinator", agent: "official/engineer" },
+      spec: { agent: "official/engineer" },
       metadata: {},
       createdAt: iso(-89),
       readyAt: iso(-89),
@@ -267,11 +247,10 @@ const dagRunningMultistage: WorkflowDag = {
     {
       id: NODE_ID_MIG_TASK_3A,
       workflowId: "20260608-1f3a7b9c",
+      kind: "worker",
       status: "running",
       phase: 3,
-      taskId: TASK_ID_MIG_TASK_3A,
       spec: {
-        kind: "worker",
         agent: "official/reviewer",
         brief: "Run the auth integration suite + summarise failures",
         runtime: "claude",
@@ -283,9 +262,9 @@ const dagRunningMultistage: WorkflowDag = {
     },
   ],
   edges: [
-    { from: NODE_ID_MIG_COORD_0, to: NODE_ID_MIG_TASK_1A },
-    { from: NODE_ID_MIG_TASK_1A, to: NODE_ID_MIG_COORD_2 },
-    { from: NODE_ID_MIG_COORD_2, to: NODE_ID_MIG_TASK_3A },
+    { from: NODE_ID_MIG_COORD_0, to: NODE_ID_MIG_TASK_1A, workflowId: "20260608-1f3a7b9c" },
+    { from: NODE_ID_MIG_TASK_1A, to: NODE_ID_MIG_COORD_2, workflowId: "20260608-1f3a7b9c" },
+    { from: NODE_ID_MIG_COORD_2, to: NODE_ID_MIG_TASK_3A, workflowId: "20260608-1f3a7b9c" },
   ],
 };
 
@@ -295,10 +274,10 @@ const dagSucceededSimple: WorkflowDag = {
     {
       id: NODE_ID_LOG_COORD_0,
       workflowId: "20260607-2e4b8cad",
+      kind: "coordinator",
       status: "succeeded",
       phase: 0,
-      taskId: TASK_ID_LOG_COORD_0,
-      spec: { kind: "coordinator", agent: "official/reviewer" },
+      spec: { agent: "official/reviewer" },
       metadata: {},
       createdAt: iso(-1440),
       readyAt: iso(-1440),
@@ -308,11 +287,10 @@ const dagSucceededSimple: WorkflowDag = {
     {
       id: NODE_ID_LOG_TASK_1A,
       workflowId: "20260607-2e4b8cad",
+      kind: "worker",
       status: "succeeded",
       phase: 1,
-      taskId: TASK_ID_LOG_TASK_1A,
       spec: {
-        kind: "worker",
         agent: "official/engineer",
         brief: "Replace console.log calls in packages/catalog",
       },
@@ -325,11 +303,10 @@ const dagSucceededSimple: WorkflowDag = {
     {
       id: NODE_ID_LOG_TASK_1B,
       workflowId: "20260607-2e4b8cad",
+      kind: "worker",
       status: "succeeded",
       phase: 1,
-      taskId: TASK_ID_LOG_TASK_1B,
       spec: {
-        kind: "worker",
         agent: "official/engineer",
         brief: "Add structured-logger happy-path tests",
       },
@@ -341,8 +318,8 @@ const dagSucceededSimple: WorkflowDag = {
     },
   ],
   edges: [
-    { from: NODE_ID_LOG_COORD_0, to: NODE_ID_LOG_TASK_1A },
-    { from: NODE_ID_LOG_COORD_0, to: NODE_ID_LOG_TASK_1B },
+    { from: NODE_ID_LOG_COORD_0, to: NODE_ID_LOG_TASK_1A, workflowId: "20260607-2e4b8cad" },
+    { from: NODE_ID_LOG_COORD_0, to: NODE_ID_LOG_TASK_1B, workflowId: "20260607-2e4b8cad" },
   ],
 };
 
@@ -352,10 +329,10 @@ const dagFailedEarly: WorkflowDag = {
     {
       id: NODE_ID_BUMP_COORD_0,
       workflowId: "20260606-3d5c9dbe",
+      kind: "coordinator",
       status: "failed",
       phase: 0,
-      taskId: TASK_ID_BUMP_COORD_0,
-      spec: { kind: "coordinator", agent: "official/engineer" },
+      spec: { agent: "official/engineer" },
       metadata: {},
       createdAt: iso(-2880),
       readyAt: iso(-2880),
@@ -372,10 +349,10 @@ const dagCancelledLate: WorkflowDag = {
     {
       id: NODE_ID_BRAND_COORD_0,
       workflowId: "20260605-4e6dabcf",
+      kind: "coordinator",
       status: "succeeded",
       phase: 0,
-      taskId: TASK_ID_BRAND_COORD_0,
-      spec: { kind: "coordinator", agent: "official/designer" },
+      spec: { agent: "official/designer" },
       metadata: {},
       createdAt: iso(-4320),
       readyAt: iso(-4320),
@@ -385,11 +362,10 @@ const dagCancelledLate: WorkflowDag = {
     {
       id: NODE_ID_BRAND_TASK_1A,
       workflowId: "20260605-4e6dabcf",
+      kind: "worker",
       status: "cancelled",
       phase: 1,
-      taskId: TASK_ID_BRAND_TASK_1A,
       spec: {
-        kind: "worker",
         agent: "official/designer",
         brief: "Draft hero section copy + image layout",
       },
@@ -400,7 +376,9 @@ const dagCancelledLate: WorkflowDag = {
       endedAt: iso(-4200),
     },
   ],
-  edges: [{ from: NODE_ID_BRAND_COORD_0, to: NODE_ID_BRAND_TASK_1A }],
+  edges: [
+    { from: NODE_ID_BRAND_COORD_0, to: NODE_ID_BRAND_TASK_1A, workflowId: "20260605-4e6dabcf" },
+  ],
 };
 
 const dagAwaitingHuman: WorkflowDag = {
@@ -409,10 +387,10 @@ const dagAwaitingHuman: WorkflowDag = {
     {
       id: NODE_ID_APPROVE_COORD_0,
       workflowId: "20260608-5a7b9c1f",
+      kind: "coordinator",
       status: "succeeded",
       phase: 0,
-      taskId: TASK_ID_APPROVE_COORD_0,
-      spec: { kind: "coordinator", agent: "official/engineer" },
+      spec: { agent: "official/engineer" },
       metadata: {},
       createdAt: iso(-60),
       readyAt: iso(-60),
@@ -422,10 +400,10 @@ const dagAwaitingHuman: WorkflowDag = {
     {
       id: NODE_ID_APPROVE_HUMAN_1,
       workflowId: "20260608-5a7b9c1f",
+      kind: "human",
       status: "running",
       phase: 1,
       spec: {
-        kind: "human",
         prompt: "Approve the multi-region rollout plan?",
         promptStyle: "plain",
       },
@@ -437,10 +415,10 @@ const dagAwaitingHuman: WorkflowDag = {
     {
       id: NODE_ID_APPROVE_HUMAN_2,
       workflowId: "20260608-5a7b9c1f",
+      kind: "human",
       status: "running",
       phase: 1,
       spec: {
-        kind: "human",
         prompt: [
           "## Rollout window",
           "",
@@ -466,8 +444,8 @@ const dagAwaitingHuman: WorkflowDag = {
     },
   ],
   edges: [
-    { from: NODE_ID_APPROVE_COORD_0, to: NODE_ID_APPROVE_HUMAN_1 },
-    { from: NODE_ID_APPROVE_COORD_0, to: NODE_ID_APPROVE_HUMAN_2 },
+    { from: NODE_ID_APPROVE_COORD_0, to: NODE_ID_APPROVE_HUMAN_1, workflowId: "20260608-5a7b9c1f" },
+    { from: NODE_ID_APPROVE_COORD_0, to: NODE_ID_APPROVE_HUMAN_2, workflowId: "20260608-5a7b9c1f" },
   ],
 };
 
@@ -477,9 +455,10 @@ const dagReleaseFire1: WorkflowDag = {
     {
       id: NODE_ID_RELEASE_FIRE1_COORD,
       workflowId: "20260527-9f1a0b01",
+      kind: "coordinator",
       status: "succeeded",
       phase: 0,
-      spec: { kind: "coordinator", agent: "official/engineer" },
+      spec: { agent: "official/engineer" },
       metadata: {},
       createdAt: iso(-360),
       readyAt: iso(-360),
@@ -496,9 +475,10 @@ const dagReleaseFire2: WorkflowDag = {
     {
       id: NODE_ID_RELEASE_FIRE2_COORD,
       workflowId: "20260527-9f1a0b02",
+      kind: "coordinator",
       status: "running",
       phase: 0,
-      spec: { kind: "coordinator", agent: "official/engineer" },
+      spec: { agent: "official/engineer" },
       metadata: {},
       createdAt: iso(-30),
       readyAt: iso(-30),

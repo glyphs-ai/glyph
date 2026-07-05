@@ -30,9 +30,6 @@ import {
   workflowFinish,
   workflowList,
   workflowNodeShow,
-  workflowRemoveEdge,
-  workflowRemoveNode,
-  workflowReplaceSpec,
   workflowRm,
   workflowShow,
 } from "../../src/commands/workflow.js";
@@ -498,7 +495,6 @@ describe("workflowNodeShow — happy path", () => {
     expect(r.stdout).toContain(NODE_SHOW_NID);
     expect(r.stdout).toContain("worker");
     expect(r.stdout).toContain("official/engineer");
-    expect(r.stdout).toContain("20260601-zzzz9999");
   });
 
   it("--json emits the projected node as formatted JSON", async () => {
@@ -914,14 +910,9 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
 
 const NID = "20260601-bbbbbbbb";
 const NID2 = "20260601-cccccccc";
-const NODES_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/nodes`;
-const EDGES_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/edges`;
 const SUBGRAPH_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/subgraph`;
 const FINISH_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/finish`;
 const CANCEL_NODE_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/nodes/${NID}/cancel`;
-const REMOVE_NODE_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/nodes/${NID}`;
-const REMOVE_EDGE_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/edges/${NID}/${NID2}`;
-const REPLACE_SPEC_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/nodes/${NID}/spec`;
 
 const sampleNode = {
   id: NID,
@@ -941,10 +932,13 @@ async function writeSpec(payload: unknown): Promise<string> {
 // ─── add-node ─────────────────────────────────────────────────────────
 
 describe("workflowAddNode", () => {
-  it("POSTs /nodes with kind + spec + parents from --spec-file and --parent-node-ids", async () => {
+  it("POSTs /subgraph (add-node) with kind + spec + parents from --spec-file and --parent-node-ids", async () => {
     const specFile = await writeSpec({ agent: "writer", brief: "draft" });
     const { calls } = stubFetchMulti([
-      { status: 200, body: JSON.stringify({ nodeId: NID, phase: 2 }) },
+      {
+        status: 200,
+        body: JSON.stringify({ insertedNodes: [{ tempId: "n0", nodeId: NID, phase: 2 }] }),
+      },
     ]);
     const r = await workflowAddNode(WFID, {
       ...commonOpts(),
@@ -955,11 +949,17 @@ describe("workflowAddNode", () => {
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe("POST");
-    expect(calls[0]?.url).toBe(NODES_URL);
+    expect(calls[0]?.url).toBe(SUBGRAPH_URL);
     expect(calls[0]?.body).toEqual({
-      kind: "worker",
-      spec: { agent: "writer", brief: "draft" },
-      parents: ["p1", "p2"],
+      nodes: [
+        {
+          tempId: "n0",
+          kind: "worker",
+          spec: { agent: "writer", brief: "draft" },
+          existingParents: ["p1", "p2"],
+        },
+      ],
+      edges: [],
     });
   });
 
@@ -1018,16 +1018,19 @@ describe("workflowAddNode", () => {
 // ─── add-edge ─────────────────────────────────────────────────────────
 
 describe("workflowAddEdge", () => {
-  it("POSTs /edges with {fromNodeId, toNodeId} from --from-node-id / --to-node-id", async () => {
+  it("POSTs /subgraph (add-edge) with existing-node refs from --from-node-id / --to-node-id", async () => {
     const { calls } = stubFetchMulti([
-      { status: 200, body: JSON.stringify({ fromNodeId: NID, toNodeId: NID2, toPhase: 2 }) },
+      { status: 200, body: JSON.stringify({ insertedNodes: [] }) },
     ]);
     const r = await workflowAddEdge(WFID, NID, NID2, { ...commonOpts() });
     expect(r.exitCode, r.stderr).toBe(0);
-    expect(r.stdout).toContain("toPhase 2");
+    expect(r.stdout).toContain(`${NID} → ${NID2}`);
     expect(calls[0]?.method).toBe("POST");
-    expect(calls[0]?.url).toBe(EDGES_URL);
-    expect(calls[0]?.body).toEqual({ fromNodeId: NID, toNodeId: NID2 });
+    expect(calls[0]?.url).toBe(SUBGRAPH_URL);
+    expect(calls[0]?.body).toEqual({
+      nodes: [],
+      edges: [{ from: { kind: "existing", id: NID }, to: { kind: "existing", id: NID2 } }],
+    });
   });
 
   it("rejects missing --to-node-id with exit 2, no fetch", async () => {
@@ -1044,7 +1047,7 @@ describe("workflowAddSubgraph", () => {
   it("POSTs /subgraph with the payload read from --spec-file", async () => {
     const payload = {
       nodes: [{ tempId: "t1", kind: "worker", spec: {} }],
-      edges: [{ from: { nodeId: NID }, to: { tempId: "t1" } }],
+      edges: [{ from: { kind: "existing", id: NID }, to: { kind: "temp", tempId: "t1" } }],
     };
     const specFile = await writeSpec(payload);
     const { calls } = stubFetchMulti([
@@ -1068,73 +1071,6 @@ describe("workflowAddSubgraph", () => {
     const specFile = await writeSpec(["wrong shape"]);
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = await workflowAddSubgraph(WFID, { ...commonOpts(), specFile });
-    expect(r.exitCode).toBe(2);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-});
-
-// ─── remove-node ──────────────────────────────────────────────────────
-
-describe("workflowRemoveNode", () => {
-  it("DELETEs /nodes/:nid and exits 0 on 204", async () => {
-    const { calls } = stubFetchMulti([{ status: 204, body: "" }]);
-    const r = await workflowRemoveNode(WFID, NID, { ...commonOpts() });
-    expect(r.exitCode, r.stderr).toBe(0);
-    expect(calls[0]?.method).toBe("DELETE");
-    expect(calls[0]?.url).toBe(REMOVE_NODE_URL);
-  });
-
-  it("surfaces 409 WorkflowRemoveNodeOrphansChildError via exit 4", async () => {
-    stubFetchMulti([
-      {
-        status: 409,
-        body: JSON.stringify({
-          error: "orphan",
-          code: "WorkflowRemoveNodeOrphansChildError",
-        }),
-      },
-    ]);
-    const r = await workflowRemoveNode(WFID, NID, { ...commonOpts() });
-    expect(r.exitCode).toBe(4);
-    expect(r.stderr).toContain("WorkflowRemoveNodeOrphansChildError");
-  });
-});
-
-// ─── remove-edge ──────────────────────────────────────────────────────
-
-describe("workflowRemoveEdge", () => {
-  it("DELETEs /edges/:from/:to and exits 0 on 204", async () => {
-    const { calls } = stubFetchMulti([{ status: 204, body: "" }]);
-    const r = await workflowRemoveEdge(WFID, NID, NID2, { ...commonOpts() });
-    expect(r.exitCode, r.stderr).toBe(0);
-    expect(calls[0]?.method).toBe("DELETE");
-    expect(calls[0]?.url).toBe(REMOVE_EDGE_URL);
-  });
-
-  it("rejects missing --from-node-id with exit 2, no fetch", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const r = await workflowRemoveEdge(WFID, "", NID2, { ...commonOpts() });
-    expect(r.exitCode).toBe(2);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-});
-
-// ─── replace-spec ─────────────────────────────────────────────────────
-
-describe("workflowReplaceSpec", () => {
-  it("PATCHes /nodes/:nid/spec with {newSpec} from --spec-file", async () => {
-    const specFile = await writeSpec({ agent: "writer", brief: "rev" });
-    const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify(sampleNode) }]);
-    const r = await workflowReplaceSpec(WFID, NID, { ...commonOpts(), specFile });
-    expect(r.exitCode, r.stderr).toBe(0);
-    expect(calls[0]?.method).toBe("PATCH");
-    expect(calls[0]?.url).toBe(REPLACE_SPEC_URL);
-    expect(calls[0]?.body).toEqual({ newSpec: { agent: "writer", brief: "rev" } });
-  });
-
-  it("rejects missing --spec-file with exit 2", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const r = await workflowReplaceSpec(WFID, NID, { ...commonOpts(), specFile: "" });
     expect(r.exitCode).toBe(2);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -1180,7 +1116,7 @@ describe("workflowFinish", () => {
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.url).toBe(FINISH_URL);
-    expect(calls[0]?.body).toEqual({ kind: "succeeded", success: { output: null } });
+    expect(calls[0]?.body).toEqual({ outcome: "succeeded", success: { output: null } });
     expect(r.stdout).toContain("succeeded");
   });
 
@@ -1197,7 +1133,7 @@ describe("workflowFinish", () => {
     });
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls[0]?.body).toEqual({
-      kind: "succeeded",
+      outcome: "succeeded",
       success: { output: "All sub-runs green." },
     });
   });
@@ -1215,7 +1151,7 @@ describe("workflowFinish", () => {
     });
     expect(r.exitCode, r.stderr).toBe(0);
     expect(calls[0]?.body).toEqual({
-      kind: "failed",
+      outcome: "failed",
       failure: { kind: "coordinator", message: "budget exhausted" },
     });
   });

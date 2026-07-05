@@ -1,8 +1,8 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleDetail as ScheduleDetailType, ScheduleView } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");
@@ -80,7 +80,8 @@ const SAMPLE_WF_VIEW: ScheduleView = {
   nextFireAt: "2026-05-30T02:00:00.000Z",
   createdAt: "2026-05-01T00:00:00Z",
   updatedAt: "2026-05-20T00:00:00Z",
-};
+  fireStats: { awaitingCount: 0, runningCount: 0 },
+} as ScheduleView;
 
 const SAMPLE_WF_DETAIL: ScheduleDetailType = { ...SAMPLE_WF_VIEW, describe: "every day at 02:00" };
 
@@ -103,11 +104,9 @@ const WF_FIRE = {
   origin: "schedule",
   coordinatorAgent: "official/engineer",
   metadata: { scheduleId: "sched-wf" },
-  awaitingHumanCount: 0,
   createdAt: "2026-05-28T02:00:00Z",
   startedAt: "2026-05-28T02:00:01Z",
   endedAt: "2026-05-28T02:05:00Z",
-  iterationCount: 1,
 };
 
 /**

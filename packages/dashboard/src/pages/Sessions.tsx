@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -12,6 +11,7 @@ import {
   spawnSession,
   type WorkspaceListItem,
 } from "../api";
+import type { AgentEntry } from "../api/catalog.js";
 import { EmptyState } from "../components/common/EmptyState";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon, RefreshIcon } from "../components/Icons";

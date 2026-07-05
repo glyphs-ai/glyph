@@ -125,9 +125,10 @@ function commonOpts() {
 
 const CREATE_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/workflow`;
 const PATCH_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/workflow/${SID}`;
-const GET_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/${SID}`;
+const GET_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/workflow/${SID}`;
 const LIST_WF_URL = `${SERVER_URL}/api/workspaces/${WSID}/scheduled-workflows`;
-const SCHEDULES_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules`;
+const TASK_SCHEDULES_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/task`;
+const WORKFLOW_SCHEDULES_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/workflow`;
 
 // ─── create-workflow ─────────────────────────────────────────────────────
 
@@ -372,13 +373,15 @@ describe("scheduleListWorkflows — table output", () => {
 describe("scheduleList — workflow-kind projection", () => {
   it("surfaces coordinatorAgent in the agent column and 'workflow' as the kind", async () => {
     const { calls } = stubFetchMulti([
+      { status: 200, body: JSON.stringify([]) },
       { status: 200, body: JSON.stringify([sampleWorkflowSchedule]) },
     ]);
     const r = await scheduleList({ ...commonOpts() });
     expect(r.exitCode, r.stderr).toBe(0);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.method).toBe("GET");
-    expect(calls[0]?.url).toBe(SCHEDULES_URL);
+    expect(calls).toHaveLength(2);
+    const urls = calls.map((c) => c?.url ?? "");
+    expect(urls.some((u) => u.startsWith(TASK_SCHEDULES_URL))).toBe(true);
+    expect(urls.some((u) => u.startsWith(WORKFLOW_SCHEDULES_URL))).toBe(true);
     const out = r.stdout ?? "";
     expect(out).toContain("workflow");
     expect(out).toContain("official/architect");

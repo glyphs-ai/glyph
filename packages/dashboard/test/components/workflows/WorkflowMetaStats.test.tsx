@@ -15,7 +15,6 @@ function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
     ...overrides,
   };
@@ -25,6 +24,7 @@ function makeNode(id: string, phase: number, status: NodeStatus): WorkflowNode {
   return {
     id,
     workflowId: "wf-meta",
+    kind: "worker",
     phase,
     status,
     spec: { kind: "worker", agent: "official/engineer", brief: id },

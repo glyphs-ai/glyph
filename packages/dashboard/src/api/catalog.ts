@@ -1,19 +1,16 @@
 import type {
-  Agent,
-  AgentEntry,
-  BlockedReason,
-  InstallAgentRequest,
-  InstallSkillRequest,
-  Mcp,
-  MissingDep,
+  GetApiWorkspacesByIdCatalogAgentsResponse,
+  GetApiWorkspacesByIdCatalogMcpsResponse,
+  GetApiWorkspacesByIdCatalogSkillsResponse,
   PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogAgentsData,
+  PostApiWorkspacesByIdCatalogAgentsResponse,
   PostApiWorkspacesByIdCatalogAgentsResponses,
   PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses,
   PostApiWorkspacesByIdCatalogMcpsResponses,
   PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses,
+  PostApiWorkspacesByIdCatalogSkillsData,
   PostApiWorkspacesByIdCatalogSkillsResponses,
-  Skill,
-  SkillEntry,
 } from "@glyphs-ai/sdk";
 import {
   client,
@@ -35,6 +32,18 @@ import {
 } from "@glyphs-ai/sdk";
 import { fetchJson, jsonInit, mutateJson, workspacePrefix } from "./http.js";
 import { requireWorkspaceId, unwrap } from "./sdk-client.js";
+
+// Local type aliases for catalog shapes (previously exported from sdk/wire.ts).
+export type AgentEntry = GetApiWorkspacesByIdCatalogAgentsResponse[number];
+export type Agent = AgentEntry["agent"];
+export type SkillEntry = GetApiWorkspacesByIdCatalogSkillsResponse[number];
+export type Skill = SkillEntry["skill"];
+export type Mcp = GetApiWorkspacesByIdCatalogMcpsResponse[number];
+export type CatalogKind = PostApiWorkspacesByIdCatalogAgentsResponse["installed"][number]["kind"];
+export type BlockedReason = NonNullable<AgentEntry["blockedReason"]>;
+export type MissingDep = NonNullable<SkillEntry["missingDeps"]>[number];
+export type InstallAgentRequest = PostApiWorkspacesByIdCatalogAgentsData["body"];
+export type InstallSkillRequest = PostApiWorkspacesByIdCatalogSkillsData["body"];
 
 export interface OverviewData {
   counts: {

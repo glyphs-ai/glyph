@@ -1,6 +1,6 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { describe, expect, it } from "vitest";
 import type { TaskRecord } from "../../../src/api";
+import type { AgentEntry } from "../../../src/api/catalog.js";
 import { agentDetailUrl, computeAgentRuntimeViews } from "../../../src/pages/Runtime/agent-runtime";
 
 function makeAgent(fqn: string): AgentEntry {

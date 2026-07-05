@@ -1,6 +1,6 @@
-import type { CatalogKind } from "@glyphs-ai/sdk";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import type { InstallProvider, InstallSource, ResolveManifest } from "../../api";
+import type { CatalogKind } from "../../api/catalog.js";
 import { Modal } from "../../components/Modal";
 import { ResolveTree } from "../../components/ResolveTree";
 import { CATALOG_VERBS } from "./catalog-verbs";

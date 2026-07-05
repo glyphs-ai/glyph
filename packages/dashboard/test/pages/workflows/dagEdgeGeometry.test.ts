@@ -26,6 +26,7 @@ function makeNode(overrides: Partial<WorkflowNode>): WorkflowNode {
   return {
     id: "n-default",
     workflowId: "wf-1",
+    kind: "worker",
     status: "running",
     phase: 0,
     spec: { kind: "worker", agent: "official/engineer", brief: "x" },
@@ -79,9 +80,9 @@ describe("resolveEdges", () => {
     const phases = groupByPhase([makeNode({ id: "a", phase: 0 }), makeNode({ id: "b", phase: 1 })]);
     const slots = buildSlotMap(phases);
     const edges: WorkflowEdge[] = [
-      { from: "a", to: "b" },
-      { from: "a", to: "missing" },
-      { from: "missing", to: "b" },
+      { workflowId: "wf-1", from: "a", to: "b" },
+      { workflowId: "wf-1", from: "a", to: "missing" },
+      { workflowId: "wf-1", from: "missing", to: "b" },
     ];
     const segs = resolveEdges(edges, slots);
     expect(segs).toHaveLength(1);

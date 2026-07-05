@@ -1,8 +1,8 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CatalogData, ServerConfig, SessionView, TaskRecord } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 import {
   BreadcrumbContext,
   type BreadcrumbValue,

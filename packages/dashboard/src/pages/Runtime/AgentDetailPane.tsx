@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -10,6 +9,7 @@ import {
   type SessionView,
   type TaskRecord,
 } from "../../api";
+import type { AgentEntry } from "../../api/catalog.js";
 import { AgentAvatar } from "../../components/agents/AgentAvatar";
 import { AgentFqn } from "../../components/agents/AgentFqn";
 import { CreateModal } from "../../components/sessions/CreateModal";

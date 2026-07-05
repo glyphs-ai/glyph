@@ -1,6 +1,6 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { type FormEvent, useEffect, useState } from "react";
 import type { CreateSessionOpts } from "../../api";
+import type { AgentEntry } from "../../api/catalog.js";
 import { Modal } from "../Modal";
 
 export interface CreateModalProps {

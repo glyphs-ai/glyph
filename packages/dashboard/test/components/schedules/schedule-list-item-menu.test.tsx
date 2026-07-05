@@ -12,11 +12,11 @@
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ScheduleView } from "../../../src/api";
+import type { ScheduleView, TaskScheduleView } from "../../../src/api";
 import { ScheduleListItem } from "../../../src/components/schedules/ScheduleListItem";
 import { installRectSpy } from "../../_helpers/rectSpy";
 
-function makeView(overrides: Partial<ScheduleView> = {}): ScheduleView {
+function makeView(overrides: Partial<TaskScheduleView> = {}): ScheduleView {
   return {
     id: "sched-a",
     name: "Sample schedule",
@@ -32,7 +32,7 @@ function makeView(overrides: Partial<ScheduleView> = {}): ScheduleView {
     createdAt: "2026-05-01T00:00:00Z",
     updatedAt: "2026-05-20T00:00:00Z",
     ...overrides,
-  };
+  } as ScheduleView;
 }
 
 function makeHandlers() {

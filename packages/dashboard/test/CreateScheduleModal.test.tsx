@@ -1,7 +1,7 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleView } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 // Mock the API module so the modal hits in-test mocks for both
 // `previewCron` (debounced live preview) and `createSchedule`

@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -9,6 +8,7 @@ import {
   type ServerConfig,
   type TaskRecord,
 } from "../api";
+import type { AgentEntry } from "../api/catalog.js";
 import { DetailSkeleton } from "../components/common/DetailSkeleton";
 import { EmptyState } from "../components/common/EmptyState";
 import { ListSkeleton } from "../components/common/ListSkeleton";

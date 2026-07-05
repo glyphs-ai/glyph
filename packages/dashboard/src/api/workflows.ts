@@ -1,18 +1,13 @@
 import type {
-  CancelWorkflowRequest,
-  CreateWorkflowRequest,
+  GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponse,
+  GetApiWorkspacesByIdWorkflowsByWfidDagResponse,
+  GetApiWorkspacesByIdWorkflowsByWfidResponse,
+  GetApiWorkspacesByIdWorkflowsData,
+  PostApiWorkspacesByIdWorkflowsByWfidCancelData,
   PostApiWorkspacesByIdWorkflowsByWfidCancelResponses,
+  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData,
+  PostApiWorkspacesByIdWorkflowsData,
   PostApiWorkspacesByIdWorkflowsResponses,
-  RespondHumanNodeRequest,
-  WorkflowArtifact,
-  WorkflowArtifactsResponse,
-  WorkflowDag,
-  WorkflowEdge,
-  WorkflowHeader,
-  WorkflowHumanNodeSpec,
-  WorkflowListQuery,
-  WorkflowNode,
-  WorkflowNodeSpec,
 } from "@glyphs-ai/sdk";
 import {
   client,
@@ -24,19 +19,30 @@ import {
 import { fetchJson, jsonInit, mutateJson, workspacePrefix } from "./http.js";
 import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 
-export type {
-  CancelWorkflowRequest,
-  CreateWorkflowRequest,
-  RespondHumanNodeRequest,
-  WorkflowArtifact,
-  WorkflowArtifactsResponse,
-  WorkflowDag,
-  WorkflowEdge,
-  WorkflowHeader,
-  WorkflowHumanNodeSpec,
-  WorkflowListQuery,
-  WorkflowNode,
-  WorkflowNodeSpec,
+// Local type aliases for workflow shapes (previously exported from sdk/wire.ts).
+export type WorkflowHeader = GetApiWorkspacesByIdWorkflowsByWfidResponse;
+export type WorkflowDag = GetApiWorkspacesByIdWorkflowsByWfidDagResponse;
+export type WorkflowNode = WorkflowDag["nodes"][number];
+export type WorkflowEdge = WorkflowDag["edges"][number];
+export type WorkflowNodeSpec = WorkflowNode["spec"];
+export type WorkflowArtifactsResponse = GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponse;
+export type WorkflowArtifact = WorkflowArtifactsResponse["artifacts"][number];
+export type WorkflowListQuery = NonNullable<GetApiWorkspacesByIdWorkflowsData["query"]>;
+export type CreateWorkflowRequest = NonNullable<PostApiWorkspacesByIdWorkflowsData["body"]>;
+export type CancelWorkflowRequest = NonNullable<
+  PostApiWorkspacesByIdWorkflowsByWfidCancelData["body"]
+>;
+export type RespondHumanNodeRequest = NonNullable<
+  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData["body"]
+>;
+
+// Concrete spec type for human nodes. WorkflowNode["spec"] is `unknown`
+// so Extract<unknown, ...> resolves to never; we declare the shape directly.
+export type WorkflowHumanNodeSpec = {
+  kind: "human";
+  prompt: string;
+  promptStyle?: "plain" | "markdown";
+  choices?: readonly { id: string; label: string }[];
 };
 
 export const listWorkflows = async (
@@ -58,13 +64,6 @@ export const getWorkflow = async (workflowId: string): Promise<WorkflowHeader> =
     }),
   );
 
-/**
- * Workflow DAG. Stays on the typed raw-fetch helper rather than the
- * generated `*Dag` operation: the OpenAPI projection widens each node's
- * `spec` to an optional union member, which does not assign to the domain
- * `WorkflowNodeSpec` (`spec` required) the dashboard's DAG components are
- * typed against. The raw helper preserves the exact `WorkflowDag` shape.
- */
 export const getWorkflowDag = (workflowId: string): Promise<WorkflowDag> =>
   fetchJson<WorkflowDag>(
     `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/dag`,
@@ -157,15 +156,6 @@ export const listWorkflowArtifacts = async (
 export const workflowArtifactUrl = (workflowId: string, subPath: string): string =>
   `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/artifacts/${encodeURIComponent(subPath)}`;
 
-/**
- * Respond to a human-kind workflow node that is in `running` status.
- * Returns the updated node wire shape.
- *
- * Stays on the typed raw-fetch helper: the server hand-validates the
- * request body (typed `never` in the generated op), and the response's
- * `spec` widens to an optional union member that does not assign to the
- * domain `WorkflowNode` the dashboard is typed against.
- */
 export const respondHumanNode = (
   workflowId: string,
   nodeId: string,

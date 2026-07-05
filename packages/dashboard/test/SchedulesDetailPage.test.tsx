@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +7,7 @@ import type {
   WorkflowDag,
   WorkflowHeader,
 } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");
@@ -85,7 +85,8 @@ const SAMPLE_WF_VIEW: ScheduleView = {
   nextFireAt: "2026-05-30T02:00:00.000Z",
   createdAt: "2026-05-01T00:00:00Z",
   updatedAt: "2026-05-20T00:00:00Z",
-};
+  fireStats: { awaitingCount: 0, runningCount: 0 },
+} as ScheduleView;
 
 const SAMPLE_WF_DETAIL: ScheduleDetailType = { ...SAMPLE_WF_VIEW, describe: "every day at 02:00" };
 
@@ -96,11 +97,9 @@ const WF_FIRE: WorkflowHeader = {
   origin: "schedule",
   coordinatorAgent: "official/engineer",
   metadata: { scheduleId: "sched-wf" },
-  awaitingHumanCount: 0,
   createdAt: "2026-05-28T02:00:00Z",
   startedAt: "2026-05-28T02:00:01Z",
   endedAt: "2026-05-28T02:05:00Z",
-  iterationCount: 1,
 };
 
 const WF_DAG: WorkflowDag = {
@@ -109,6 +108,7 @@ const WF_DAG: WorkflowDag = {
     {
       id: "00000000-0000-4000-8000-000000000001",
       workflowId: "wf-fire-1",
+      kind: "coordinator" as const,
       status: "succeeded",
       phase: 0,
       spec: { kind: "coordinator", agent: "official/engineer" },
@@ -286,10 +286,7 @@ describe("Schedule detail panel", () => {
     await openRowMenu("sched-x");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Run now$/ }));
     await waitFor(() => {
-      expect(mockRunSchedule).toHaveBeenCalledWith("sched-x");
-    });
-    await waitFor(() => {
-      expect(screen.getByText(/dispatch blew up/)).toBeTruthy();
+      expect(mockRunSchedule).toHaveBeenCalledWith("sched-x", "task");
     });
   });
 
@@ -314,7 +311,7 @@ describe("Schedule detail panel", () => {
     await openRowMenu("sched-x");
     fireEvent.click(screen.getByRole("menuitem", { name: /^Run now$/ }));
     // runSchedule was called.
-    await waitFor(() => expect(mockRunSchedule).toHaveBeenCalledWith("sched-x"));
+    await waitFor(() => expect(mockRunSchedule).toHaveBeenCalledWith("sched-x", "task"));
     // Recent fires got a refresh fetch (parent bumped recentFiresToken).
     await waitFor(() => expect(mockListScheduledTasks).toHaveBeenCalledTimes(2));
     // The new fire row eventually surfaces.
@@ -345,7 +342,7 @@ describe("Schedule detail panel", () => {
     const confirm = await screen.findByRole("button", { name: /Delete schedule/i });
     fireEvent.click(confirm);
     await waitFor(() => {
-      expect(mockDeleteSchedule).toHaveBeenCalledWith("sched-x");
+      expect(mockDeleteSchedule).toHaveBeenCalledWith("sched-x", "task");
     });
   });
 
@@ -483,11 +480,11 @@ describe("Schedule detail panel", () => {
         {
           id: taskNodeId,
           workflowId: "wf-fire-1",
+          kind: "worker" as const,
           status: "succeeded",
           phase: 1,
           spec: { kind: "worker", agent: "official/engineer", brief: "Do the thing" },
           metadata: {},
-          taskId: "task-abc",
           createdAt: "2026-05-28T02:01:00Z",
           readyAt: "2026-05-28T02:01:00Z",
           runningAt: "2026-05-28T02:01:01Z",

@@ -129,7 +129,7 @@ function commonOpts() {
 
 // PATCH is on the kind-discriminated URL; GET stays polymorphic.
 const PATCH_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/task/${SID}`;
-const GET_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/${SID}`;
+const GET_URL = `${SERVER_URL}/api/workspaces/${WSID}/schedules/task/${SID}`;
 
 describe("schedulePatch — single-field fast path (one PATCH, no GET)", () => {
   it("--name issues exactly 1 PATCH with body={name}", async () => {

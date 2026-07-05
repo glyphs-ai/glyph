@@ -5,7 +5,10 @@
  * `../../registrars/workflow.ts`.
  */
 
-import type { CancelWorkflowRequest, CreateWorkflowRequest } from "@glyphs-ai/sdk";
+import type {
+  PostApiWorkspacesByIdWorkflowsByWfidCancelData,
+  PostApiWorkspacesByIdWorkflowsData,
+} from "@glyphs-ai/sdk";
 import {
   deleteApiWorkspacesByIdWorkflowsByWfid,
   getApiWorkspacesByIdWorkflows,
@@ -20,7 +23,7 @@ import { formatError, formatJson, formatTable, pickFormat } from "../../output.j
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
 import { unwrap } from "../../sdk-client.js";
-import { agentForSpec, renderHeader } from "./_shared.js";
+import { agentForSpec, renderHeader, specKind } from "./_shared.js";
 
 // --- list --------------------------------------------------------------
 export interface WorkflowListOpts extends WorkspaceFlagOpts {
@@ -102,7 +105,7 @@ export async function workflowCreate(opts: WorkflowCreateOpts): Promise<CommandR
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: CreateWorkflowRequest = {
+    const body: PostApiWorkspacesByIdWorkflowsData["body"] = {
       brief: opts.brief,
       coordinatorAgent: opts.coordAgent,
       ...(opts.details !== undefined ? { details: opts.details } : {}),
@@ -171,7 +174,7 @@ export async function workflowNodeShow(
       ["id", node.id],
       ["workflowId", node.workflowId],
       ["phase", String(node.phase)],
-      ["kind", node.spec.kind],
+      ["kind", specKind(node.spec)],
       ["status", node.status],
       ["agent", agentForSpec(node.spec)],
       ["createdAt", node.createdAt],
@@ -179,7 +182,6 @@ export async function workflowNodeShow(
     if (node.readyAt !== undefined) rows.push(["readyAt", node.readyAt]);
     if (node.runningAt !== undefined) rows.push(["runningAt", node.runningAt]);
     if (node.endedAt !== undefined) rows.push(["endedAt", node.endedAt]);
-    if (node.taskId !== undefined) rows.push(["taskId", node.taskId]);
     return {
       exitCode: 0,
       stdout: `${formatTable(
@@ -214,7 +216,13 @@ export async function workflowDag(
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(dag) };
     const nodesTable = formatTable(
       ["phase", "nodeId", "kind", "status", "agent"],
-      dag.nodes.map((n) => [String(n.phase), n.id, n.spec.kind, n.status, agentForSpec(n.spec)]),
+      dag.nodes.map((n) => [
+        String(n.phase),
+        n.id,
+        specKind(n.spec),
+        n.status,
+        agentForSpec(n.spec),
+      ]),
     );
     const edgeLines =
       dag.edges.length === 0
@@ -257,7 +265,7 @@ export async function workflowCancel(
   await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const body: CancelWorkflowRequest = {
+    const body: PostApiWorkspacesByIdWorkflowsByWfidCancelData["body"] = {
       cancellation: { kind: "user", message: opts.message ?? "" },
     };
     const updated = unwrap(

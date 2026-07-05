@@ -38,10 +38,9 @@ describe("useWorkflowArtifacts", () => {
       artifacts: [
         {
           kind: "workflow-summary",
-          path: "x.md",
+          relPath: "x.md",
           size: 1,
           modifiedAt: "2026-05-28T00:00:00.000Z",
-          mimeBucket: "text",
         },
       ],
     } satisfies WorkflowArtifactsResponse);
@@ -86,10 +85,9 @@ describe("useWorkflowArtifacts", () => {
       artifacts: [
         {
           kind: "workflow-summary",
-          path: "fresh.md",
+          relPath: "fresh.md",
           size: 2,
           modifiedAt: "2026-05-28T00:00:00.000Z",
-          mimeBucket: "text",
         },
       ],
     });
@@ -101,7 +99,7 @@ describe("useWorkflowArtifacts", () => {
     // Trigger the workflow swap → second fetch is in flight + completes
     // before we resolve the first.
     rerender({ id: "wf-2" });
-    await waitFor(() => expect(result.current.artifacts?.artifacts?.[0]?.path).toBe("fresh.md"));
+    await waitFor(() => expect(result.current.artifacts?.artifacts?.[0]?.relPath).toBe("fresh.md"));
 
     // Now resolve the original (stale) fetch — `seq` is no longer
     // equal to the request's, so the result must be ignored.
@@ -109,16 +107,15 @@ describe("useWorkflowArtifacts", () => {
       artifacts: [
         {
           kind: "workflow-summary",
-          path: "stale.md",
+          relPath: "stale.md",
           size: 9,
           modifiedAt: "2026-05-28T00:00:00.000Z",
-          mimeBucket: "text",
         },
       ],
     });
     await act(async () => {
       await Promise.resolve();
     });
-    expect(result.current.artifacts?.artifacts?.[0]?.path).toBe("fresh.md");
+    expect(result.current.artifacts?.artifacts?.[0]?.relPath).toBe("fresh.md");
   });
 });

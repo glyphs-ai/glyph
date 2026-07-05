@@ -57,7 +57,7 @@ type FetchState =
  * `nodes/<nid>/`) is what tells the server which root to look in.
  */
 function artifactSubPath(a: WorkflowArtifact): string {
-  return a.kind === "workflow-summary" ? `summary/${a.path}` : `nodes/${a.nodeId}/${a.path}`;
+  return a.kind === "workflow-summary" ? `summary/${a.relPath}` : `nodes/${a.nodeId}/${a.relPath}`;
 }
 
 /**
@@ -356,7 +356,7 @@ function flattenEntries(artifacts: readonly WorkflowArtifact[], dag: WorkflowDag
   for (const a of sortArtifacts(summary)) {
     out.push({
       value: artifactSubPath(a),
-      label: filenameOf(a.path),
+      label: filenameOf(a.relPath),
       group: "Workflow",
       subPath: artifactSubPath(a),
       nodeId: null,
@@ -373,7 +373,7 @@ function flattenEntries(artifacts: readonly WorkflowArtifact[], dag: WorkflowDag
     for (const a of sortArtifacts(list)) {
       out.push({
         value: artifactSubPath(a),
-        label: filenameOf(a.path),
+        label: filenameOf(a.relPath),
         group: label,
         subPath: artifactSubPath(a),
         nodeId,
@@ -386,7 +386,7 @@ function flattenEntries(artifacts: readonly WorkflowArtifact[], dag: WorkflowDag
     for (const a of sortArtifacts(list)) {
       out.push({
         value: artifactSubPath(a),
-        label: filenameOf(a.path),
+        label: filenameOf(a.relPath),
         group: label,
         subPath: artifactSubPath(a),
         nodeId,
@@ -429,15 +429,10 @@ function buildNodeBucketIndex(dag: WorkflowDag | null): ReadonlyMap<string, read
     return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
   });
   for (const node of ordered) {
-    const spec = node.spec;
-    if (
-      (spec.kind !== "coordinator" && spec.kind !== "worker") ||
-      !("agent" in spec) ||
-      typeof spec.agent !== "string"
-    ) {
-      continue;
-    }
-    const key = `${spec.agent}|${node.phase}`;
+    if (node.kind !== "coordinator" && node.kind !== "worker") continue;
+    const specAgent = (node.spec as { agent?: string } | null | undefined)?.agent;
+    if (typeof specAgent !== "string") continue;
+    const key = `${specAgent}|${node.phase}`;
     const bucket = out.get(key);
     if (bucket === undefined) out.set(key, [node.id]);
     else bucket.push(node.id);
@@ -458,18 +453,16 @@ function nodeGroupLabel(
   if (dag === null) return `Node ${short}`;
   const node = dag.nodes.find((n) => n.id === nodeId);
   if (node === undefined) return `Node ${short}`;
-  const spec = node.spec;
-  if (
-    (spec.kind === "coordinator" || spec.kind === "worker") &&
-    "agent" in spec &&
-    typeof spec.agent === "string"
-  ) {
-    const base = `${spec.agent} · ${formatPhaseLabel(node.phase)}`;
-    const bucket = bucketIndex.get(`${spec.agent}|${node.phase}`);
-    if (bucket === undefined || bucket.length <= 1) return base;
-    const position = bucket.indexOf(nodeId);
-    if (position < 0) return base;
-    return `${base} · #${position + 1}`;
+  if (node.kind === "coordinator" || node.kind === "worker") {
+    const specAgent = (node.spec as { agent?: string } | null | undefined)?.agent;
+    if (typeof specAgent === "string") {
+      const base = `${specAgent} · ${formatPhaseLabel(node.phase)}`;
+      const bucket = bucketIndex.get(`${specAgent}|${node.phase}`);
+      if (bucket === undefined || bucket.length <= 1) return base;
+      const position = bucket.indexOf(nodeId);
+      if (position < 0) return base;
+      return `${base} · #${position + 1}`;
+    }
   }
   return `Node ${short}`;
 }
@@ -485,7 +478,7 @@ function dagNodeOrder(dag: WorkflowDag | null): string[] {
 }
 
 function sortArtifacts<T extends WorkflowArtifact>(list: readonly T[]): T[] {
-  return [...list].sort((a, b) => a.path.localeCompare(b.path));
+  return [...list].sort((a, b) => a.relPath.localeCompare(b.relPath));
 }
 
 function filenameOf(p: string): string {
@@ -509,12 +502,12 @@ function lookupModifiedAt(
   if (artifacts === null) return null;
   for (const a of artifacts) {
     if (a.kind === "workflow-summary") {
-      if (entry.nodeId === null && `summary/${a.path}` === entry.subPath) {
+      if (entry.nodeId === null && `summary/${a.relPath}` === entry.subPath) {
         return a.modifiedAt;
       }
       continue;
     }
-    if (entry.nodeId === a.nodeId && `nodes/${a.nodeId}/${a.path}` === entry.subPath) {
+    if (entry.nodeId === a.nodeId && `nodes/${a.nodeId}/${a.relPath}` === entry.subPath) {
       return a.modifiedAt;
     }
   }

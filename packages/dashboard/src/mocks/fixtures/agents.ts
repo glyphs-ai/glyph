@@ -1,4 +1,4 @@
-import type { Agent, AgentEntry } from "@glyphs-ai/sdk";
+import type { Agent, AgentEntry } from "../../api/catalog.js";
 
 const NOW = "2026-05-20T08:00:00.000Z";
 

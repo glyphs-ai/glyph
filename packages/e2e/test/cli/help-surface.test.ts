@@ -248,26 +248,23 @@ describe.skipIf(!BIN_AVAILABLE)("CLI help surface", () => {
       Workflow operations (workspace-scoped DAG runs)
 
       Options:
-        -h, --help                                      Display this message
+        -h, --help                                     Display this message
 
       Commands:
-        list [options]                                  List workflows in the current workspace
-        create [options]                                Seed a new workflow + its initial coordinator node
-        show [options] <workflow-id>                    Print one workflow's header (status, iterationCount, timestamps)
-        node-show [options] <workflow-id> <node-id>     Print one workflow node's projected wire shape (with taskId enrichment)
-        dag [options] <workflow-id>                     Print the full DAG snapshot (header + nodes + edges)
-        cancel [options] <workflow-id>                  Cancel a running workflow (flips status → cancelled, reconciles non-terminal nodes)
-        rm [options] <workflow-id>                      Remove a terminal workflow
-        add-node [options] <workflow-id>                Coord-only: insert one node attached to one or more existing parents
-        add-subgraph [options] <workflow-id>            Coord-only: insert N nodes + intra-batch edges atomically
-        add-edge [options] <workflow-id>                Coord-only: add a single edge between two existing nodes
-        remove-node [options] <workflow-id> <node-id>   Coord-only: delete a not_started node (and its adjacent edges)
-        remove-edge [options] <workflow-id>             Coord-only: delete a single edge (to-node must be not_started, ≥1 parent retained)
-        replace-spec [options] <workflow-id> <node-id>  Coord-only: re-validate + replace a node's opaque spec (kind cannot change)
-        cancel-node [options] <workflow-id> <node-id>   Coord-only: cancel a single worker node (coord-kind targets are rejected with 409)
-        finish [options] <workflow-id>                  Coord-only: flip the workflow terminal (outcome: succeeded | failed)
-        respond [options] <workflow-id> <node-id>       Respond to a human-kind node that is waiting for input
-        help [command]                                  display help for command"
+        list [options]                                 List workflows in the current workspace
+        create [options]                               Seed a new workflow + its initial coordinator node
+        show [options] <workflow-id>                   Print one workflow's header (status, iterationCount, timestamps)
+        node-show [options] <workflow-id> <node-id>    Print one workflow node's projected wire shape (with taskId enrichment)
+        dag [options] <workflow-id>                    Print the full DAG snapshot (header + nodes + edges)
+        cancel [options] <workflow-id>                 Cancel a running workflow (flips status → cancelled, reconciles non-terminal nodes)
+        rm [options] <workflow-id>                     Remove a terminal workflow
+        add-node [options] <workflow-id>               Coord-only: insert one node attached to one or more existing parents
+        add-subgraph [options] <workflow-id>           Coord-only: insert N nodes + intra-batch edges atomically
+        add-edge [options] <workflow-id>               Coord-only: add a single edge between two existing nodes
+        cancel-node [options] <workflow-id> <node-id>  Coord-only: cancel a single worker node (coord-kind targets are rejected with 409)
+        finish [options] <workflow-id>                 Coord-only: flip the workflow terminal (outcome: succeeded | failed)
+        respond [options] <workflow-id> <node-id>      Respond to a human-kind node that is waiting for input
+        help [command]                                 display help for command"
     `);
   });
 

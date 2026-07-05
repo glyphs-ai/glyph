@@ -1,8 +1,8 @@
-import type { AgentEntry } from "@glyphs-ai/sdk";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleView } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 /**
  * State-matrix lock-in for the Schedules page (two-pane). Covers the four

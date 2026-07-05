@@ -285,7 +285,7 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
                     </div>
                   );
                 }
-                const interactive = node.taskId !== undefined || kind === "human";
+                const interactive = true;
                 return (
                   <button
                     key={node.id}
@@ -294,13 +294,7 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
                     className={className}
                     data-node-id={node.id}
                     data-testid={`dag-node-${node.id}`}
-                    title={
-                      interactive
-                        ? kind === "human"
-                          ? `Open human node ${idShort}`
-                          : `Open task ${node.taskId}`
-                        : title
-                    }
+                    title={kind === "human" ? `Open human node ${idShort}` : `Open node ${idShort}`}
                     aria-current={isSelected ? "true" : undefined}
                     aria-disabled={interactive ? undefined : true}
                     onClick={() => {
@@ -327,47 +321,24 @@ export function WorkflowDagView({ dag, selectedNodeId, onSelectNode }: WorkflowD
  * placeholder rather than an empty span (visual stability).
  */
 function extractAgent(node: WorkflowNode): string {
-  const spec = node.spec;
-  if (spec.kind === "human") return "Human gate";
-  if (
-    (spec.kind === "coordinator" || spec.kind === "worker") &&
-    "agent" in spec &&
-    typeof spec.agent === "string"
-  ) {
-    return spec.agent;
-  }
+  if (node.kind === "human") return "Human gate";
+  const spec = node.spec as { agent?: string } | undefined;
+  if (typeof spec?.agent === "string") return spec.agent;
   return "—";
 }
 
-/**
- * Worker/human brief extraction. Worker nodes carry a user-authored single
- * line in `spec.brief` that names what the task is doing; human nodes
- * carry `spec.prompt` (the question being asked); coordinator nodes have
- * no brief (they are auto-spawned by the substrate and their identity is
- * already named by the agent FQN), so this returns `null` for them.
- * Returning null lets the caller skip rendering the brief row entirely
- * rather than reserving empty vertical space.
- */
 function extractBrief(node: WorkflowNode): string | null {
-  const spec = node.spec;
-  if (spec.kind === "worker" && "brief" in spec && typeof spec.brief === "string") {
-    return spec.brief;
+  if (node.kind === "worker") {
+    const spec = node.spec as { brief?: string } | undefined;
+    if (typeof spec?.brief === "string") return spec.brief;
   }
-  if (spec.kind === "human" && "prompt" in spec && typeof spec.prompt === "string") {
-    return spec.prompt;
+  if (node.kind === "human") {
+    const spec = node.spec as { prompt?: string } | undefined;
+    if (typeof spec?.prompt === "string") return spec.prompt;
   }
   return null;
 }
 
-/**
- * Project the node spec's discriminator down to the dashboard's
- * styling vocabulary. The contracts wire shape carries kind ONLY on
- * `spec.kind` (the substrate's opaque envelope is flattened by the
- * server-side projection); unknown kinds fall back to
- * `"worker"` so the visual still renders a recognisable node.
- */
 function nodeKind(node: WorkflowNode): "coordinator" | "worker" | "human" {
-  if (node.spec.kind === "coordinator") return "coordinator";
-  if (node.spec.kind === "human") return "human";
-  return "worker";
+  return node.kind;
 }
