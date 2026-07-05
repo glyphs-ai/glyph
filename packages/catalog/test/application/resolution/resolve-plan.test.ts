@@ -187,9 +187,7 @@ describe("ResolvePlanUseCase — diffing", () => {
     expect(plan.alreadyInstalled.map((n) => [n.fqn, n.disposition])).toEqual([
       ["public/child", "up-to-date"],
     ]);
-    expect(plan.toInstall.map((n) => [n.fqn, n.disposition])).toEqual([
-      ["public/root", "new"],
-    ]);
+    expect(plan.toInstall.map((n) => [n.fqn, n.disposition])).toEqual([["public/root", "new"]]);
   });
 
   it("marks an unchanged installed closure up-to-date", async () => {

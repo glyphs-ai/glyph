@@ -118,7 +118,7 @@ export class AzureDevOpsFetcher implements Fetcher {
       ResultAsync.fromPromise<Buffer, SourceUnavailable>(
         (async () => {
           const cred = await resolveDefaultAdoToken(parsed.org, parsed.repo);
-          const fullPath = parsed.path.replace(/\/+$/, "") + "/" + relPath;
+          const fullPath = `${parsed.path.replace(/\/+$/, "")}/${relPath}`;
           return this.fetchItemRaw(parsed.org, parsed.project, parsed.repo, fullPath, cred);
         })(),
         (cause) => ({ type: "SourceUnavailable", origin, cause }),

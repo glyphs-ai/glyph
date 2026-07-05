@@ -11,7 +11,7 @@
  * `Source<T>` ports.
  */
 
-import { errAsync, okAsync, type ResultAsync } from "neverthrow";
+import { errAsync, type ResultAsync } from "neverthrow";
 import type { OriginInvalid, SourceUnavailable } from "../../../domain/source.js";
 import { AzureDevOpsFetcher } from "./ado/azure-devops-fetcher.js";
 import type { Fetcher } from "./fetcher.js";
