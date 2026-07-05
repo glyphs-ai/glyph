@@ -167,6 +167,31 @@ describe("ResolvePlanUseCase — diffing", () => {
     expect(plan.upToDate).toBe(false);
   });
 
+  it("marks a dep as up-to-date when already installed from same origin (shared dep)", async () => {
+    // skillB is already installed as a dependency of something else
+    await saveSkill(skillEntity("public/child", "file:/skill/child"));
+
+    getUpstreamTreeExecute.mockReturnValue(
+      okAsync(
+        graph([
+          node("skill", "file:/skill/child", "public/child"),
+          node("agent", "file:/agent/root", "public/root", { skills: ["file:/skill/child"] }),
+        ]),
+      ),
+    );
+
+    const plan = (
+      await useCase.execute({ kind: "agent", origin: "file:/agent/root" })
+    )._unsafeUnwrap();
+
+    expect(plan.alreadyInstalled.map((n) => [n.fqn, n.disposition])).toEqual([
+      ["public/child", "up-to-date"],
+    ]);
+    expect(plan.toInstall.map((n) => [n.fqn, n.disposition])).toEqual([
+      ["public/root", "new"],
+    ]);
+  });
+
   it("marks an unchanged installed closure up-to-date", async () => {
     const upstream = graph([node("skill", "file:/skill/root", "public/root")]);
     getUpstreamTreeExecute.mockReturnValue(okAsync(upstream));

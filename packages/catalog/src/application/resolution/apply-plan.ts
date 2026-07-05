@@ -136,23 +136,71 @@ export class ApplyPlanUseCase
     for (const node of [...plan.toInstall, ...plan.alreadyInstalled])
       originToFqn.set(node.origin, node.fqn);
 
-    for (const node of plan.toInstall) {
-      const failedDep = node.deps.find((origin) => poisoned.has(origin));
-      if (failedDep !== undefined) {
-        skipped.push({ kind: node.kind, fqn: node.fqn, reason: "dep-failed" });
-        poisoned.add(node.origin);
-        continue;
+    // Group nodes into layers for parallel install. Nodes within a layer have
+    // no inter-dependencies and can be fetched + installed concurrently.
+    const layers = this.toLayers(plan.toInstall);
+
+    for (const layer of layers) {
+      // Skip/poison nodes whose deps already failed (from prior layers).
+      const ready: PlanNode[] = [];
+      for (const node of layer) {
+        if (node.deps.some((origin) => poisoned.has(origin))) {
+          skipped.push({ kind: node.kind, fqn: node.fqn, reason: "dep-failed" });
+          poisoned.add(node.origin);
+        } else {
+          ready.push(node);
+        }
       }
-      const outcome = await this.installNode(node, originToFqn);
-      if ("error" in outcome) {
-        failed.push({ kind: node.kind, fqn: node.fqn, error: outcome.error });
-        poisoned.add(node.origin);
-      } else {
-        installed.push(outcome.installed);
+
+      // Install all ready nodes in the layer concurrently.
+      const outcomes = await Promise.all(
+        ready.map(async (node) => ({ node, outcome: await this.installNode(node, originToFqn) })),
+      );
+
+      for (const { node, outcome } of outcomes) {
+        if ("error" in outcome) {
+          failed.push({ kind: node.kind, fqn: node.fqn, error: outcome.error });
+          poisoned.add(node.origin);
+        } else {
+          installed.push(outcome.installed);
+        }
       }
     }
 
     return { installed, skipped, failed, conflicts: plan.conflicts, orphansFlagged: plan.orphans };
+  }
+
+  /**
+   * Partition toInstall into topological layers. Layer 0 contains nodes whose
+   * deps are all outside toInstall (already-installed or external). Layer N+1
+   * contains nodes whose toInstall-deps are all in layers 0..N.
+   */
+  private toLayers(toInstall: readonly PlanNode[]): PlanNode[][] {
+    const toInstallOrigins = new Set(toInstall.map((n) => n.origin));
+    const nodeByOrigin = new Map(toInstall.map((n) => [n.origin, n]));
+    const assigned = new Map<string, number>();
+    const layers: PlanNode[][] = [];
+
+    const getLayer = (node: PlanNode): number => {
+      const cached = assigned.get(node.origin);
+      if (cached !== undefined) return cached;
+      let maxDep = -1;
+      for (const dep of node.deps) {
+        if (!toInstallOrigins.has(dep)) continue;
+        const depNode = nodeByOrigin.get(dep);
+        if (depNode) maxDep = Math.max(maxDep, getLayer(depNode));
+      }
+      const level = maxDep + 1;
+      assigned.set(node.origin, level);
+      return level;
+    };
+
+    for (const node of toInstall) {
+      const level = getLayer(node);
+      while (layers.length <= level) layers.push([]);
+      layers[level]!.push(node);
+    }
+    return layers;
   }
 
   private async installNode(

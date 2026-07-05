@@ -224,10 +224,16 @@ export class ResolvePlanUseCase
       nodes: [],
       conflicts: [],
     });
+    // Augment the tree-walked local graph with upstream deps that happen to be
+    // installed elsewhere (e.g. skillB installed as dep of agentC, now also
+    // needed by agentA). Without this, the diff sees them as "new".
+    const augmented = (
+      await this.deps.queries.query((db) => this.augmentWithInstalled(db, upstream, local))
+    ).unwrapOr(local);
     const reverseDepIndex = (
       await this.deps.queries.query((db) => this.reverseDepIndex(db, origin))
     ).unwrapOr(new Set<string>());
-    const diff = this.diff(upstream, local, origin, kind, reverseDepIndex);
+    const diff = this.diff(upstream, augmented, origin, kind, reverseDepIndex);
     const settled =
       diff.toInstall.length === 0 &&
       upstream.conflicts.length === 0 &&
@@ -350,5 +356,66 @@ export class ResolvePlanUseCase
       addOrigins("agent", agent.dependencyRefs.agents);
     }
     return referenced;
+  }
+
+  /**
+   * For each upstream node not already in the local tree, check if it's
+   * installed anywhere in the catalog. If so, add it to the local graph so
+   * the diff correctly marks it as "up-to-date" or "will-sync" instead of
+   * "new". This handles shared deps (e.g. skillB installed via agentC, now
+   * also required by agentA).
+   */
+  private augmentWithInstalled(
+    db: Db,
+    upstream: ResolvedGraph,
+    local: ResolvedGraph,
+  ): ResolvedGraph {
+    const localOrigins = new Set(local.nodes.map((n) => n.origin));
+    const extra: ResolvedNode[] = [];
+    for (const node of upstream.nodes) {
+      if (localOrigins.has(node.origin)) continue;
+      const installed = this.lookupInstalled(db, node.kind, node.origin);
+      if (installed) extra.push(installed);
+    }
+    if (extra.length === 0) return local;
+    return { nodes: [...local.nodes, ...extra], conflicts: local.conflicts };
+  }
+
+  private lookupInstalled(db: Db, kind: CatalogKind, origin: string): ResolvedNode | null {
+    if (kind === "skill") {
+      const s = selectSkillByOrigin(db, origin);
+      if (s)
+        return {
+          kind: "skill",
+          origin,
+          fqn: s.fqn,
+          version: s.version,
+          content: "",
+          dependencyRefs: { skills: [], mcps: [], agents: [] },
+        };
+    } else if (kind === "agent") {
+      const a = selectAgentByOrigin(db, origin);
+      if (a)
+        return {
+          kind: "agent",
+          origin,
+          fqn: a.fqn,
+          version: a.version,
+          content: "",
+          dependencyRefs: { skills: [], mcps: [], agents: [] },
+        };
+    } else {
+      const m = selectMcpByOrigin(db, origin);
+      if (m)
+        return {
+          kind: "mcp",
+          origin,
+          fqn: m.fqn,
+          version: "",
+          content: m.spec,
+          dependencyRefs: { skills: [], mcps: [], agents: [] },
+        };
+    }
+    return null;
   }
 }
