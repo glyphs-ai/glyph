@@ -10,7 +10,7 @@
  *     via the `EX_USAGE` mapping in `index.ts:run`.
  *   - per-action prelude checks (mutex combos, numeric validation,
  *     newline-in-brief) — return `{ exitCode: 2, stderr }` before
- *     `makeClient` issues any request.
+ *     `makeSdkClient` issues any request.
  * Running in-process avoids repeated CLI cold boots while preserving
  * the argv-surface assertions.
  *
@@ -28,7 +28,7 @@ import { runCli } from "./_helpers/run-cli.js";
 // One shared tmpdir for every case — none of these tests need an
 // isolated home (they all reject before reading any state from it).
 // GLYPH_HOME just has to point somewhere with no `runtime.json` so
-// `makeClient` falls through to the DEFAULT_BASE_URL without surprises.
+// `makeSdkClient` falls through to the DEFAULT_BASE_URL without surprises.
 let home: string;
 
 beforeAll(async () => {

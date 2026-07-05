@@ -1,5 +1,5 @@
-import type { BlockedReason, MissingDep } from "@glyphs-ai/contracts";
 import type { ReactNode } from "react";
+import type { BlockedReason, MissingDep } from "../api/catalog.js";
 import { type EntityKind, KIND_ICON, KIND_TAG } from "../kind-meta";
 import { splitFqnForDisplay } from "../utils/fqn";
 import { TrashIcon } from "./Icons";

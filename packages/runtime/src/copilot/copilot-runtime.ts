@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { open, readFile, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import {
-  RuntimeDoesNotSupportRemoteError,
+import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import type {
+  RuntimeActivityReadFailed,
+  RuntimeHeadlessLaunchFailed,
+  RuntimeLaunchFailed,
   RuntimeProvisionFailed,
-  RuntimeReadActivityInvalidArgs,
-  RuntimeReadMetadataFailed,
   RuntimeStateDeletionFailed,
 } from "../errors.js";
 import type { PlaceholderContext } from "../placeholders.js";
@@ -233,18 +234,17 @@ export class CopilotRuntime implements Runtime {
     this.headlessDeps = opts.headlessDeps ?? {};
   }
 
-  async provision(opts: ProvisionOpts): Promise<{ runtimeSessionId: string }> {
+  provision(
+    opts: ProvisionOpts,
+  ): ResultAsync<{ runtimeSessionId: string }, RuntimeProvisionFailed> {
     const placeholders: PlaceholderContext = {
       workspaceDir: opts.workspaceDir,
       sharedDir: this.sharedDir,
     };
-    try {
-      await provisionCopilotWorkdir(opts.workdir, opts.agent, opts.catalog, placeholders);
-    } catch (err) {
-      throw new RuntimeProvisionFailed(this.kind, opts.workdir, err as Error);
-    }
-    const runtimeSessionId = generateCopilotSessionId(this.randomUUID);
-    return { runtimeSessionId };
+    return ResultAsync.fromPromise(
+      provisionCopilotWorkdir(opts.workdir, opts.agent, opts.catalog, placeholders),
+      (cause): RuntimeProvisionFailed => ({ type: "RuntimeProvisionFailed", cause }),
+    ).map(() => ({ runtimeSessionId: generateCopilotSessionId(this.randomUUID) }));
   }
 
   /**
@@ -259,8 +259,9 @@ export class CopilotRuntime implements Runtime {
    * subsequent launch hits the "already covered" early return and
    * performs only a cheap read.
    *
-   * If the trust write fails, the launch fails (`TrustRegistrationFailed`
-   * propagates). That is the right behaviour: spawning Copilot anyway
+   * If the trust write fails, the launch fails (the raw fault folds into
+   * the `RuntimeLaunchFailed` atom). That is the right behaviour: spawning
+   * Copilot anyway
    * would just stall on the blocking "Confirm folder trust" prompt
    * inside the freshly-spawned terminal, which is much worse UX than a
    * surfaced error in the dashboard.
@@ -271,73 +272,78 @@ export class CopilotRuntime implements Runtime {
    * still runs; that is not a security concern because workspaceDir is
    * controlled by the caller (server, not user input).
    */
-  async buildInteractiveLaunch(
+  buildInteractiveLaunch(
     runtimeSessionId: string | null,
     opts: BuildInteractiveLaunchOpts,
-  ): Promise<LaunchCommand> {
+  ): ResultAsync<LaunchCommand, RuntimeLaunchFailed> {
     if (opts.remote === true && this.capabilities.remoteSession !== true) {
-      // Defensive: shouldn't fire because we set the capability above,
-      // but the cross-runtime contract requires runtimes to refuse
+      // The cross-runtime contract requires runtimes to refuse
       // unsupported flags rather than silently dropping them.
-      throw new RuntimeDoesNotSupportRemoteError(this.kind);
+      return errAsync({
+        type: "RuntimeLaunchFailed",
+        cause: new Error(`runtime "${this.kind}" does not support remote sessions`),
+      });
     }
-    await ensureDirTrusted(opts.workspaceDir, this.copilotConfigPath);
-    // Pass the id through the validator so a tampered persisted record
-    // can't smuggle shell metacharacters into the displayed
-    // `--session-id=<id>` string.
-    const id = safeCopilotId(runtimeSessionId);
-    const cmd = buildCopilotLaunchCommand(id, opts);
-    // Runtime owns the cross-cutting env base (`GLYPH_SERVER`,
-    // `GLYPH_SHARED_DIR`, ...). T1 managers layer their own
-    // work-context env on top of what we return here. We do NOT
-    // honour `subprocessEnvScrub` on this path: interactive launches
-    // hand off to a user shell which inherits the parent env
-    // wholesale, and `cmd /k` / pwsh `$env:` prefixes can only SET
-    // values, not unset them. The base is string-only by
-    // `CopilotRuntimeConfig` contract.
-    //
-    // Spread `cmd.env` first so any env contributed by the inner
-    // launch builder is preserved. Base overrides on key collision
-    // because the runtime is the canonical owner of the cross-cutting
-    // keys.
-    return { ...cmd, env: { ...cmd.env, ...this.subprocessEnvBase } };
+    // The only I/O on this path is the trust preflight; it touches
+    // `~/.copilot/config.json` and may throw (lock timeout, permission,
+    // atomic-write fault). A raw fault folds into the atom here; the
+    // rest — id validation + command assembly — is pure.
+    return ResultAsync.fromPromise(
+      ensureDirTrusted(opts.workspaceDir, this.copilotConfigPath),
+      (cause): RuntimeLaunchFailed => ({ type: "RuntimeLaunchFailed", cause }),
+    ).map(() => {
+      // Pass the id through the validator so a tampered persisted record
+      // can't smuggle shell metacharacters into the displayed
+      // `--session-id=<id>` string.
+      const id = safeCopilotId(runtimeSessionId);
+      const cmd = buildCopilotLaunchCommand(id, opts);
+      // Runtime owns the cross-cutting env base (`GLYPH_SERVER`,
+      // `GLYPH_SHARED_DIR`, ...). T1 managers layer their own
+      // work-context env on top of what we return here. We do NOT
+      // honour `subprocessEnvScrub` on this path: interactive launches
+      // hand off to a user shell which inherits the parent env
+      // wholesale, and `cmd /k` / pwsh `$env:` prefixes can only SET
+      // values, not unset them. The base is string-only by
+      // `CopilotRuntimeConfig` contract.
+      //
+      // Spread `cmd.env` first so any env contributed by the inner
+      // launch builder is preserved. Base overrides on key collision
+      // because the runtime is the canonical owner of the cross-cutting
+      // keys.
+      return { ...cmd, env: { ...cmd.env, ...this.subprocessEnvBase } };
+    });
   }
 
-  async readMetadata(runtimeSessionId: string): Promise<RuntimeSessionMetadata | null> {
+  readMetadata(runtimeSessionId: string): ResultAsync<RuntimeSessionMetadata | null, never> {
     const id = safeCopilotId(runtimeSessionId);
-    if (id === null) {
-      // Malformed id: no copilot state to read. Defensive — defends
-      // against tampered persisted state the same way the other
-      // observability methods do.
-      return null;
-    }
-    try {
-      const meta = await readCopilotWorkspaceYaml(this.copilotStateDir, id);
-      if (meta === null) return null;
-      return {
-        title: meta.title,
-        userTitled: meta.userTitled,
-        lastActiveAt: meta.lastActiveAt,
-      };
-    } catch (err) {
-      throw new RuntimeReadMetadataFailed(this.kind, id, err as Error);
-    }
+    // Malformed id: no copilot state to read. Defensive — defends
+    // against tampered persisted state the same way the other
+    // observability methods do.
+    if (id === null) return okAsync(null);
+    return (
+      ResultAsync.fromPromise(readCopilotWorkspaceYaml(this.copilotStateDir, id), (e: unknown) => e)
+        .map((meta) =>
+          meta === null
+            ? null
+            : { title: meta.title, userTitled: meta.userTitled, lastActiveAt: meta.lastActiveAt },
+        )
+        // Best-effort: a read fault is indistinguishable from "no metadata"
+        // to the caller; both resolve to `null` rather than failing.
+        .orElse(() => okAsync(null))
+    );
   }
 
-  async deleteState(runtimeSessionId: string): Promise<void> {
+  deleteState(runtimeSessionId: string): ResultAsync<void, RuntimeStateDeletionFailed> {
     const id = safeCopilotId(runtimeSessionId);
-    if (id === null) return;
+    if (id === null) return okAsync(undefined);
     // Drop in-memory buffer FIRST so any in-flight readActivity returns
-    // null promptly. (Best-effort: the map is process-local and not
-    // shared across instances; recoverOrphaned-style multi-instance
-    // setups are out of scope here.)
+    // null promptly. (Best-effort: the map is process-local.)
     this.sessionBuffers.delete(id);
     const dir = path.join(this.copilotStateDir, id);
-    try {
-      await rm(dir, { recursive: true, force: true });
-    } catch (err) {
-      throw new RuntimeStateDeletionFailed(this.kind, id, err as Error);
-    }
+    return ResultAsync.fromPromise(
+      rm(dir, { recursive: true, force: true }),
+      (cause): RuntimeStateDeletionFailed => ({ type: "RuntimeStateDeletionFailed", cause }),
+    );
   }
 
   /**
@@ -350,7 +356,9 @@ export class CopilotRuntime implements Runtime {
    * server writes its `events.jsonl` — kept for recoverOrphaned and
    * external tooling, not used on the hot path).
    */
-  async launchHeadless(opts: LaunchHeadlessOpts): Promise<RuntimeHandle> {
+  launchHeadless(
+    opts: LaunchHeadlessOpts,
+  ): ResultAsync<RuntimeHandle, RuntimeHeadlessLaunchFailed> {
     // Merge the runtime-owned env base with the caller's per-launch
     // additions. Caller env wins on key collision. Then translate
     // `subprocessEnvScrub` into `undefined` overrides for `mergeEnv`
@@ -361,24 +369,26 @@ export class CopilotRuntime implements Runtime {
     for (const key of this.subprocessEnvScrub) {
       if (!(key in mergedEnv)) mergedEnv[key] = undefined;
     }
-    return launchCopilotHeadless(
-      {
-        workdir: opts.workdir,
-        agent: opts.agent,
-        catalog: opts.catalog,
-        prompt: opts.prompt,
-        workspaceDir: opts.workspaceDir,
-        subprocessEnv: mergedEnv,
-      },
-      {
-        copilotStateDir: this.copilotStateDir,
-        sharedDir: this.sharedDir,
-        registerSession: (sessionId, buffer) => {
-          this.sessionBuffers.set(sessionId, buffer);
+    return ResultAsync.fromSafePromise(
+      launchCopilotHeadless(
+        {
+          workdir: opts.workdir,
+          agent: opts.agent,
+          catalog: opts.catalog,
+          prompt: opts.prompt,
+          workspaceDir: opts.workspaceDir,
+          subprocessEnv: mergedEnv,
         },
-        ...this.headlessDeps,
-      },
-    );
+        {
+          copilotStateDir: this.copilotStateDir,
+          sharedDir: this.sharedDir,
+          registerSession: (sessionId, buffer) => {
+            this.sessionBuffers.set(sessionId, buffer);
+          },
+          ...this.headlessDeps,
+        },
+      ),
+    ).andThen((result) => result);
   }
 
   /**
@@ -410,10 +420,10 @@ export class CopilotRuntime implements Runtime {
    *     `limit` items immediately preceding the cut, still sorted by
    *     `seq` ASC. Used by GUI consumers loading older history when
    *     the user scrolls up past the initial tail-window.
-   *   - Both → `RuntimeReadActivityInvalidArgs`. The route layer
-   *     should reject before calling the runtime; this is a
-   *     defensive guard against in-process callers bypassing the
-   *     route.
+   *   - Both → a `RuntimeActivityReadFailed` atom (caller precondition,
+   *     refused before any disk I/O). The route layer should reject
+   *     before calling the runtime; this guards in-process callers
+   *     bypassing the route.
    *
    * Items are sequenced 0..N-1 across the WHOLE log (not just the
    * returned page) — `seq` is the canonical pagination cursor and
@@ -421,15 +431,29 @@ export class CopilotRuntime implements Runtime {
    * derive `hasOlder` / `hasNewer` from the page window
    * (`activity[0].seq > 0`, `activity[last].seq < totalItems - 1`).
    */
-  async readActivity(
+  readActivity(
+    runtimeSessionId: string,
+    opts: ReadActivityOpts = {},
+  ): ResultAsync<ActivityResult | null, RuntimeActivityReadFailed> {
+    if (opts.before !== undefined && opts.after !== undefined) {
+      // Caller-side precondition, not an I/O fault — refuse before
+      // touching disk. The route layer should reject first; this guards
+      // in-process callers that bypass the route.
+      return errAsync({
+        type: "RuntimeActivityReadFailed",
+        cause: new Error("readActivity: `before` and `after` are mutually exclusive"),
+      });
+    }
+    return ResultAsync.fromPromise(
+      this.#readActivity(runtimeSessionId, opts),
+      (cause): RuntimeActivityReadFailed => ({ type: "RuntimeActivityReadFailed", cause }),
+    );
+  }
+
+  async #readActivity(
     runtimeSessionId: string,
     opts: ReadActivityOpts = {},
   ): Promise<ActivityResult | null> {
-    if (opts.before !== undefined && opts.after !== undefined) {
-      throw new RuntimeReadActivityInvalidArgs(
-        "readActivity: `before` and `after` are mutually exclusive",
-      );
-    }
     const id = safeCopilotId(runtimeSessionId);
     if (id === null) return null;
 
@@ -555,16 +579,23 @@ export class CopilotRuntime implements Runtime {
    * recorded session has no assistant items yet (the run just started,
    * agent only emitted tool calls so far, …).
    */
-  async getLastAgentActivity(runtimeSessionId: string): Promise<AgentActivity | null> {
-    const result = await this.readActivity(runtimeSessionId);
-    if (result === null) return null;
-    for (let i = result.activity.length - 1; i >= 0; i--) {
-      const item = result.activity[i];
-      if (item !== undefined && item.kind === "assistant") {
-        return { text: item.text, timestamp: item.timestamp };
-      }
-    }
-    return null;
+  getLastAgentActivity(runtimeSessionId: string): ResultAsync<AgentActivity | null, never> {
+    return (
+      this.readActivity(runtimeSessionId)
+        .map((result): AgentActivity | null => {
+          if (result === null) return null;
+          for (let i = result.activity.length - 1; i >= 0; i--) {
+            const item = result.activity[i];
+            if (item !== undefined && item.kind === "assistant") {
+              return { text: item.text, timestamp: item.timestamp };
+            }
+          }
+          return null;
+        })
+        // Best-effort: an activity-read fault resolves to `null` rather
+        // than failing — the latest agent utterance is display polish.
+        .orElse(() => okAsync(null))
+    );
   }
 
   /**

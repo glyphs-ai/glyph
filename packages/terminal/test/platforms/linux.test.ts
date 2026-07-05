@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { spawnTerminalWith } from "../../src/dispatch.js";
-import { type LaunchCommand, NoTerminalFoundError } from "../../src/index.js";
+import { NoTerminalFoundError } from "../../src/_errors.js";
+import type { LaunchCommand } from "../../src/index.js";
+import { spawnTerminalWith } from "../../src/local-spawner.js";
 import { makeDeps, sample } from "../_helpers.js";
 
 describe("spawnTerminalWith > linux", () => {

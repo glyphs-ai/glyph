@@ -3,10 +3,15 @@
  * task-kind or workflow-kind cron schedule.
  */
 
-import { makeClient, resolveWorkspace } from "../../connect.js";
+import {
+  postApiWorkspacesByIdSchedulesTask,
+  postApiWorkspacesByIdSchedulesWorkflow,
+} from "@glyphs-ai/sdk";
+import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatRecord, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
+import { unwrap } from "../../sdk-client.js";
 
 // --- create ------------------------------------------------------------
 export interface ScheduleCreateOpts extends WorkspaceFlagOpts {
@@ -51,7 +56,7 @@ export async function scheduleCreate(opts: ScheduleCreateOpts): Promise<CommandR
   if (typeof opts.tz !== "string" || opts.tz.trim() === "") {
     return { exitCode: 2, stderr: "missing required --tz <iana>\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     // No `kind` field -- the URL (`POST /schedules/task`) declares it.
@@ -72,10 +77,12 @@ export async function scheduleCreate(opts: ScheduleCreateOpts): Promise<CommandR
       trigger: { kind: "cron" as const, expr: opts.cron, tz: opts.tz },
       enabled: !opts.disabled,
     };
-    const created = await client.call("schedules.task.create", {
-      params: { id: workspaceId },
-      body,
-    });
+    const created = unwrap(
+      await postApiWorkspacesByIdSchedulesTask({
+        path: { id: workspaceId },
+        body,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     const stdout = fmt === "json" ? formatJson(created) : formatRecord({ ...created });
     return { exitCode: 0, stdout };
@@ -126,7 +133,7 @@ export async function scheduleCreateWorkflow(
   if (typeof opts.tz !== "string" || opts.tz.trim() === "") {
     return { exitCode: 2, stderr: "missing required --tz <iana>\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
     const target: {
@@ -144,10 +151,12 @@ export async function scheduleCreateWorkflow(
       trigger: { kind: "cron" as const, expr: opts.cron, tz: opts.tz },
       enabled: !opts.disabled,
     };
-    const created = await client.call("schedules.workflow.create", {
-      params: { id: workspaceId },
-      body,
-    });
+    const created = unwrap(
+      await postApiWorkspacesByIdSchedulesWorkflow({
+        path: { id: workspaceId },
+        body,
+      }),
+    );
     const fmt = pickFormat(opts, "table");
     const stdout = fmt === "json" ? formatJson(created) : formatRecord({ ...created });
     return { exitCode: 0, stdout };

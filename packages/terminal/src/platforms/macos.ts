@@ -1,5 +1,5 @@
+import { TerminalSpawnFailedError } from "../_errors.js";
 import { shExportPrefix, shQuote, waitForEarlyFailure } from "../_shared.js";
-import { TerminalSpawnFailedError } from "../errors.js";
 import type { LaunchCommand, SpawnTerminalDeps, SpawnTerminalResult } from "../types.js";
 
 /**

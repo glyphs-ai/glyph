@@ -27,9 +27,7 @@ function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
-    iterationCount: 0,
     ...overrides,
   };
 }
@@ -38,6 +36,7 @@ function makeNode(overrides: Partial<WorkflowNode> = {}): WorkflowNode {
   return {
     id: "n-default",
     workflowId: "wf-1",
+    kind: "worker",
     status: "running",
     phase: 0,
     spec: { kind: "worker", agent: "official/engineer", brief: "x" },
@@ -56,9 +55,7 @@ function makeDag(nodes: WorkflowNode[]): WorkflowDag {
       origin: "standalone",
       coordinatorAgent: "official/engineer",
       metadata: {},
-      awaitingHumanCount: 0,
       createdAt: "2026-05-28T00:00:00.000Z",
-      iterationCount: 0,
     },
     nodes,
     edges: [],
@@ -111,19 +108,16 @@ describe("ArtifactsTab — dropdown UX", () => {
     const artifacts: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
-        path: "report.md",
+        relPath: "report.md",
         size: 100,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
       {
         kind: "node",
         nodeId: "n-a",
-        taskId: "t-a",
-        path: "logs.txt",
+        relPath: "logs.txt",
         size: 200,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
     ];
 
@@ -161,11 +155,9 @@ describe("ArtifactsTab — dropdown UX", () => {
       {
         kind: "node",
         nodeId: "n-12345-extra-bytes-here",
-        taskId: "t-x",
-        path: "logs.txt",
+        relPath: "logs.txt",
         size: 200,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
     ];
 
@@ -192,10 +184,9 @@ describe("ArtifactsTab — dropdown UX", () => {
     const artifacts: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
-        path: "report.md",
+        relPath: "report.md",
         size: 100,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
     ];
 
@@ -223,10 +214,9 @@ describe("ArtifactsTab — dropdown UX", () => {
     const artifacts: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
-        path: "report.md",
+        relPath: "report.md",
         size: 100,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
     ];
 
@@ -262,11 +252,9 @@ describe("ArtifactsTab — node group label (agent · Phase + disambiguator)", (
       {
         kind: "node",
         nodeId: "n-rev",
-        taskId: "t-rev",
-        path: "verdict.json",
+        relPath: "verdict.json",
         size: 100,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
     ];
 
@@ -311,20 +299,16 @@ describe("ArtifactsTab — node group label (agent · Phase + disambiguator)", (
       {
         kind: "node",
         nodeId: "n-rev-early",
-        taskId: "t-1",
-        path: "verdict.json",
+        relPath: "verdict.json",
         size: 100,
         modifiedAt: "2026-05-28T00:01:00.000Z",
-        mimeBucket: "text",
       },
       {
         kind: "node",
         nodeId: "n-rev-late",
-        taskId: "t-2",
-        path: "verdict.json",
+        relPath: "verdict.json",
         size: 100,
         modifiedAt: "2026-05-28T00:02:00.000Z",
-        mimeBucket: "text",
       },
     ];
 
@@ -366,11 +350,9 @@ describe("ArtifactsTab — node group label (agent · Phase + disambiguator)", (
       {
         kind: "node",
         nodeId: "n-only",
-        taskId: "t-only",
-        path: "report.md",
+        relPath: "report.md",
         size: 100,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
     ];
 
@@ -407,10 +389,9 @@ describe("ArtifactsTab — bytes-fetch is keyed on (subPath + modifiedAt), not e
     const artifacts1: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
-        path: "report.md",
+        relPath: "report.md",
         size: 100,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
     ];
 
@@ -441,10 +422,9 @@ describe("ArtifactsTab — bytes-fetch is keyed on (subPath + modifiedAt), not e
     const artifacts2: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
-        path: "report.md",
+        relPath: "report.md",
         size: 100,
         modifiedAt: "2026-05-28T00:00:00.000Z",
-        mimeBucket: "text",
       },
     ];
     rerender(
@@ -468,10 +448,9 @@ describe("ArtifactsTab — bytes-fetch is keyed on (subPath + modifiedAt), not e
     const artifacts3: WorkflowArtifact[] = [
       {
         kind: "workflow-summary",
-        path: "report.md",
+        relPath: "report.md",
         size: 100,
         modifiedAt: "2026-05-28T00:01:00.000Z",
-        mimeBucket: "text",
       },
     ];
     rerender(

@@ -1,170 +1,162 @@
-/**
- * Compile-time public API guard for `@glyphs-ai/schedule`.
- *
- * WHAT this file does:
- *   Uses Vitest's `expectTypeOf<T>()` to lock the pkg's public surface
- *   at the TYPE level. Every public method on the service class, every
- *   exported error class, every exported DTO shape, and the
- *   `describeCron` helper get a `expectTypeOf(...)` assertion below.
- *
- * WHY it is valuable:
- *   Silent renames (`registerKind` → `addKind`), accidental method
- *   removals, DTO-field drift, and dropping a per-kind error class all
- *   break downstream pkgs at compile time — but only the downstream
- *   pkg's typecheck sees the failure, which means breakage surfaces in
- *   a sibling PR (or worse, in `dashboard`) instead of in the pkg that
- *   caused it. This guard pulls the failure forward:
- *   `pnpm --filter @glyphs-ai/schedule typecheck` fails the moment the
- *   public surface drifts, BEFORE the downstream consumer notices.
- *
- * WHEN it runs:
- *   - At `pnpm typecheck` time: every `expectTypeOf` assertion is
- *     evaluated by tsc — that is where the real check happens.
- *   - At `pnpm test` time: the file loads and the `describe(...)` /
- *     `it(...)` bodies execute, but `expectTypeOf` is a no-op at
- *     runtime — vitest reports the cases as passing trivially.
- *   - `expectTypeOf` has zero runtime cost; the cost is paid once at
- *     compile time.
- *
- * HOW to extend it:
- *   Every time you ADD / RENAME / REMOVE a public method on the
- *   service, an exported error class, or an exported DTO field,
- *   update the matching `expectTypeOf` line in the SAME PR. Review
- *   enforces the coupling — a public-surface change without a guard
- *   update is a missing assertion.
- *
- * Worked example: see `packages/catalog/test/public-api-guard.test.ts`
- * for a fully-populated version locking 25+ methods and 19 error
- * classes on a real BC.
- */
-
 import type { Logger } from "pino";
 import { describe, expectTypeOf, it } from "vitest";
 import {
+  type CreateScheduleError,
+  type CreateScheduleRequest,
+  type CreateScheduleResponse,
+  type CreateScheduleUseCase,
   composeScheduleModule,
+  type DatabaseUnavailable,
+  type DeleteScheduleError,
+  type DeleteScheduleRequest,
+  type DeleteScheduleResponse,
+  type DeleteScheduleUseCase,
+  type DrizzleScheduleQueries,
+  type DrizzleScheduleRepository,
   describeCron,
-  InvalidCronExprError,
-  InvalidJsonPathError,
-  InvalidScheduleIdError,
-  InvalidTimezoneError,
-  type PreviewScheduleResult,
-  type Schedule,
-  ScheduleEnabledError,
-  ScheduleError,
-  ScheduleHasInFlightError,
-  ScheduleKindAlreadyRegisteredError,
+  type GetScheduleRequest,
+  type GetScheduleResponse,
+  type GetScheduleUseCase,
+  generateScheduleId,
+  type InvalidCronExpr,
+  type InvalidScheduleId,
+  type InvalidScheduleKindName,
+  type InvalidScheduleName,
+  type InvalidTimezone,
+  type ListSchedulesError,
+  type ListSchedulesRequest,
+  type ListSchedulesUseCase,
+  nextRuns,
+  type PatchScheduleError,
+  type PatchScheduleRequest,
+  type PatchScheduleUseCase,
+  type PreviewScheduleRequest,
+  type PreviewScheduleResponse,
+  type PreviewScheduleUseCase,
+  type RunScheduleRequest,
+  type RunScheduleResponse,
+  type RunScheduleUseCase,
+  type ScheduleEnabled,
+  type ScheduleEngine,
+  type ScheduleEntity,
+  type ScheduleHasInFlight,
+  type ScheduleId,
+  ScheduleIdSchema,
+  type ScheduleKindAlreadyRegistered,
   type ScheduleKindHandler,
-  ScheduleKindMismatchError,
-  ScheduleKindNotRegisteredError,
-  ScheduleKindRegistryFrozenError,
-  ScheduleNotFoundError,
-  type ScheduleService,
+  type ScheduleKindMismatch,
+  type ScheduleKindNotRegistered,
+  type ScheduleKindRegistryFrozen,
+  type ScheduleModule,
+  type ScheduleModuleOptions,
+  type ScheduleNotFound,
+  type ScheduleRepository,
   type ScheduleTargetEnvelope,
+  ScheduleTargetEnvelopeSchema,
   type ScheduleTrigger,
+  ScheduleTriggerSchema,
+  type TargetValidationFailed,
+  validateCron,
+  validateTimezone,
 } from "../src/index.js";
 
 describe("@glyphs-ai/schedule public API guard", () => {
-  it("exports the concrete error classes with their canonical constructor signatures", () => {
-    const errs: Error[] = [
-      new ScheduleError("boom"),
-      new ScheduleError("boom", { cause: new Error("upstream") }),
-      new ScheduleNotFoundError("sid"),
-      new InvalidScheduleIdError("bad"),
-      new InvalidCronExprError("* * * *", "too few fields"),
-      new InvalidTimezoneError("Mars/Olympus"),
-      new ScheduleEnabledError("sid"),
-      new ScheduleHasInFlightError("sid"),
-      new ScheduleKindMismatchError("sid", "task", "workflow"),
-      new ScheduleKindAlreadyRegisteredError("task"),
-      new ScheduleKindNotRegisteredError("task"),
-      new ScheduleKindNotRegisteredError("task", "custom message"),
-      new ScheduleKindRegistryFrozenError("workflow"),
-      new InvalidJsonPathError("$..bad"),
-    ];
-    expectTypeOf(errs[0]!).toExtend<Error>();
-  });
-
   it("preserves the public DTO shapes", () => {
-    // Schedule wire DTO — projected by the server to a kind-specific
-    // shape; a rename here breaks both the projection and the dashboard.
-    expectTypeOf<Schedule>().toHaveProperty("id");
-    expectTypeOf<Schedule>().toHaveProperty("name");
-    expectTypeOf<Schedule>().toHaveProperty("trigger");
-    expectTypeOf<Schedule>().toHaveProperty("target");
-    expectTypeOf<Schedule>().toHaveProperty("enabled");
-    expectTypeOf<Schedule>().toHaveProperty("createdAt");
-    expectTypeOf<Schedule>().toHaveProperty("updatedAt");
-
-    // Opaque envelope persisted for every row.
+    expectTypeOf<CreateScheduleRequest>().toHaveProperty("name");
+    expectTypeOf<CreateScheduleRequest>().toHaveProperty("trigger");
+    expectTypeOf<CreateScheduleRequest>().toHaveProperty("target");
+    expectTypeOf<CreateScheduleResponse>().toHaveProperty("id");
+    expectTypeOf<GetScheduleRequest>().toHaveProperty("id");
+    expectTypeOf<GetScheduleResponse>().toEqualTypeOf<CreateScheduleResponse | null>();
+    expectTypeOf<ListSchedulesRequest>().toHaveProperty("enabled");
+    expectTypeOf<PatchScheduleRequest>().toHaveProperty("expectedKind");
+    expectTypeOf<DeleteScheduleRequest>().toHaveProperty("id");
+    expectTypeOf<DeleteScheduleResponse>().toHaveProperty("deletedDispatchCount");
+    expectTypeOf<RunScheduleRequest>().toHaveProperty("id");
+    expectTypeOf<RunScheduleResponse>().toHaveProperty("dispatchId");
+    expectTypeOf<PreviewScheduleRequest>().toHaveProperty("expr");
+    expectTypeOf<PreviewScheduleResponse>().toHaveProperty("nextRuns");
     expectTypeOf<ScheduleTargetEnvelope>().toHaveProperty("kind");
     expectTypeOf<ScheduleTargetEnvelope>().toHaveProperty("data");
-
-    // Trigger discriminator — only "cron" today.
     expectTypeOf<ScheduleTrigger>().toHaveProperty("kind");
     expectTypeOf<ScheduleTrigger>().toHaveProperty("expr");
     expectTypeOf<ScheduleTrigger>().toHaveProperty("tz");
+  });
 
-    // Open-registry per-kind handler — the substrate calls these by
-    // name; renaming any method silently breaks every registered handler.
+  it("preserves the Result-native error atom surface", () => {
+    expectTypeOf<InvalidScheduleId>().toHaveProperty("type");
+    expectTypeOf<InvalidCronExpr>().toHaveProperty("reason");
+    expectTypeOf<InvalidTimezone>().toHaveProperty("tz");
+    expectTypeOf<InvalidScheduleName>().toHaveProperty("type");
+    expectTypeOf<InvalidScheduleKindName>().toHaveProperty("type");
+    expectTypeOf<ScheduleEnabled>().toHaveProperty("id");
+    expectTypeOf<ScheduleHasInFlight>().toHaveProperty("id");
+    expectTypeOf<ScheduleKindMismatch>().toHaveProperty("expected");
+    expectTypeOf<ScheduleKindNotRegistered>().toHaveProperty("kind");
+    expectTypeOf<TargetValidationFailed>().toHaveProperty("cause");
+    expectTypeOf<ScheduleNotFound>().toHaveProperty("id");
+    expectTypeOf<DatabaseUnavailable>().toHaveProperty("cause");
+    expectTypeOf<CreateScheduleError>().toHaveProperty("type");
+    expectTypeOf<PatchScheduleError>().toHaveProperty("type");
+    expectTypeOf<DeleteScheduleError>().toHaveProperty("type");
+    expectTypeOf<ListSchedulesError>().toHaveProperty("type");
+  });
+
+  it("preserves the open-registry handler port and lifecycle error atoms", () => {
     expectTypeOf<ScheduleKindHandler>().toHaveProperty("validate");
     expectTypeOf<ScheduleKindHandler>().toHaveProperty("mergePatch");
     expectTypeOf<ScheduleKindHandler>().toHaveProperty("dispatch");
     expectTypeOf<ScheduleKindHandler>().toHaveProperty("hasInFlightForSchedule");
     expectTypeOf<ScheduleKindHandler>().toHaveProperty("deleteForSchedule");
-
-    // preview() return shape — dashboard renders both fields.
-    expectTypeOf<PreviewScheduleResult>().toHaveProperty("describe");
-    expectTypeOf<PreviewScheduleResult>().toHaveProperty("nextRuns");
+    expectTypeOf<ScheduleKindAlreadyRegistered>().toHaveProperty("type");
+    expectTypeOf<ScheduleKindNotRegistered>().toHaveProperty("type");
+    expectTypeOf<ScheduleKindRegistryFrozen>().toHaveProperty("type");
   });
 
-  it("preserves the ScheduleService class and its public method names", () => {
-    expectTypeOf<ScheduleService>().toHaveProperty("registerKind");
-    expectTypeOf<ScheduleService>().toHaveProperty("get");
-    expectTypeOf<ScheduleService>().toHaveProperty("list");
-    expectTypeOf<ScheduleService>().toHaveProperty("create");
-    expectTypeOf<ScheduleService>().toHaveProperty("patch");
-    expectTypeOf<ScheduleService>().toHaveProperty("delete");
-    expectTypeOf<ScheduleService>().toHaveProperty("run");
-    expectTypeOf<ScheduleService>().toHaveProperty("preview");
-    expectTypeOf<ScheduleService>().toHaveProperty("recover");
-    expectTypeOf<ScheduleService>().toHaveProperty("shutdown");
-    expectTypeOf<ScheduleService["create"]>().parameters.toEqualTypeOf<
-      [
-        {
-          readonly name: string;
-          readonly trigger: ScheduleTrigger;
-          readonly target: ScheduleTargetEnvelope;
-          readonly enabled?: boolean;
-        },
-      ]
-    >();
-    expectTypeOf<ScheduleService["patch"]>().parameters.toEqualTypeOf<
-      [
-        string,
-        {
-          readonly name?: string;
-          readonly trigger?: ScheduleTrigger;
-          readonly enabled?: boolean;
-          readonly target?: { readonly patch: unknown };
-          readonly expectedKind?: string;
-        },
-      ]
-    >();
-    expectTypeOf<ScheduleService["preview"]>().parameters.toEqualTypeOf<
-      [{ readonly expr: string; readonly tz: string; readonly n?: number }]
-    >();
-  });
-
-  it("preserves the re-exported describeCron helper", () => {
+  it("preserves the domain + infrastructure helpers", () => {
+    expectTypeOf(generateScheduleId).toBeFunction();
+    expectTypeOf<ScheduleId>().toBeString();
+    expectTypeOf(ScheduleIdSchema).toHaveProperty("parse");
+    expectTypeOf(validateCron).toBeFunction();
+    expectTypeOf(validateTimezone).toBeFunction();
+    expectTypeOf(nextRuns).returns.toEqualTypeOf<string[]>();
     expectTypeOf(describeCron).toBeFunction();
+    expectTypeOf(ScheduleTargetEnvelopeSchema).toHaveProperty("parse");
+    expectTypeOf(ScheduleTriggerSchema).toHaveProperty("parse");
+    expectTypeOf<typeof ScheduleEntity>().toHaveProperty("create");
+    expectTypeOf<typeof ScheduleEntity>().toHaveProperty("rehydrate");
+    expectTypeOf<ScheduleRepository>().toHaveProperty("get");
+    expectTypeOf<typeof DrizzleScheduleRepository>().toHaveProperty("prototype");
+    expectTypeOf<typeof DrizzleScheduleQueries>().toHaveProperty("prototype");
   });
 
   it("preserves the composition surface", () => {
-    expectTypeOf(composeScheduleModule).parameters.toEqualTypeOf<
-      [{ readonly dbFile: string; readonly logger?: Logger }]
-    >();
+    expectTypeOf(composeScheduleModule).parameters.toEqualTypeOf<[ScheduleModuleOptions]>();
+    expectTypeOf(composeScheduleModule).returns.resolves.toEqualTypeOf<ScheduleModule>();
+    expectTypeOf<ScheduleModuleOptions>().toMatchTypeOf<{ readonly logger?: Logger }>();
+    expectTypeOf<ScheduleModule>().toHaveProperty("engine");
+    expectTypeOf<ScheduleModule>().toHaveProperty("close");
+    expectTypeOf<ScheduleModule>().toHaveProperty("createSchedule");
+    expectTypeOf<ScheduleModule>().toHaveProperty("patchSchedule");
+    expectTypeOf<ScheduleModule>().toHaveProperty("deleteSchedule");
+    expectTypeOf<ScheduleModule>().toHaveProperty("runSchedule");
+    expectTypeOf<ScheduleModule>().toHaveProperty("getSchedule");
+    expectTypeOf<ScheduleModule>().toHaveProperty("listSchedules");
+    expectTypeOf<ScheduleModule>().toHaveProperty("previewSchedule");
+  });
 
-    expectTypeOf<Awaited<ReturnType<typeof composeScheduleModule>>>().toHaveProperty("service");
-    expectTypeOf<Awaited<ReturnType<typeof composeScheduleModule>>>().toHaveProperty("close");
+  it("read + write use-cases expose an execute(request) method", () => {
+    expectTypeOf<CreateScheduleUseCase>().toHaveProperty("execute");
+    expectTypeOf<PatchScheduleUseCase>().toHaveProperty("execute");
+    expectTypeOf<DeleteScheduleUseCase>().toHaveProperty("execute");
+    expectTypeOf<RunScheduleUseCase>().toHaveProperty("execute");
+    expectTypeOf<GetScheduleUseCase>().toHaveProperty("execute");
+    expectTypeOf<ListSchedulesUseCase>().toHaveProperty("execute");
+    expectTypeOf<PreviewScheduleUseCase>().toHaveProperty("execute");
+    expectTypeOf<ScheduleEngine>().toHaveProperty("registerKind");
+    expectTypeOf<ScheduleEngine>().toHaveProperty("recover");
+    expectTypeOf<ScheduleEngine>().toHaveProperty("shutdown");
+    expectTypeOf<ScheduleEngine>().toHaveProperty("arm");
+    expectTypeOf<ScheduleEngine>().toHaveProperty("cancel");
   });
 });

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { type Application, composeApplication } from "@glyphs-ai/api";
-import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
-import type { WorkspaceService } from "@glyphs-ai/workspace";
+import { CopilotRuntime, InMemoryRuntimeRegistry, type RuntimeRegistry } from "@glyphs-ai/runtime";
+import type { WorkspaceModule, WorkspaceName } from "@glyphs-ai/workspace";
 import type { Logger } from "pino";
 
 /**
@@ -10,7 +10,7 @@ import type { Logger } from "pino";
  */
 export interface ServerTestSubsystem {
   readonly application: Application;
-  readonly service: WorkspaceService;
+  readonly workspace: WorkspaceModule;
   readonly runtimeRegistry: RuntimeRegistry;
   readonly defaultWorkspaceParent: string;
   /** Close the workspace registry's sqlite connection and every per-workspace context. */
@@ -21,20 +21,19 @@ export async function setupTestSubsystem(opts: {
   readonly scratch: string;
   readonly logger?: Logger;
 }): Promise<ServerTestSubsystem> {
-  const runtimeRegistry = new RuntimeRegistry();
+  const runtimeRegistry = new InMemoryRuntimeRegistry();
   runtimeRegistry.register(
     new CopilotRuntime({ copilotConfigPath: path.join(opts.scratch, "copilot-config.json") }),
   );
   const defaultWorkspaceParent = path.join(opts.scratch, "default-workspaces");
   const composition = await composeApplication({
-    workspace: { dbFile: ":memory:" },
+    workspace: { dbUrl: ":memory:", defaultWorkspaceParent },
     runtimeRegistry,
-    defaultWorkspaceParent,
     ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
   });
   return {
     application: composition,
-    service: composition.workspaceService,
+    workspace: composition.workspace,
     runtimeRegistry,
     defaultWorkspaceParent,
     async close() {
@@ -55,12 +54,12 @@ export async function teardownTestSubsystem(sys: ServerTestSubsystem): Promise<v
 
 export async function registerTestWorkspace(
   sys: ServerTestSubsystem,
-  args: { readonly id: string; readonly workspaceDir: string; readonly name: string },
+  args: { readonly workspaceDir: string; readonly name: string },
 ): Promise<string> {
-  const result = await sys.service.register({
-    id: args.id,
+  const result = await sys.workspace.registerWorkspace.execute({
     workspaceDir: args.workspaceDir,
-    name: args.name,
+    name: args.name as WorkspaceName,
   });
-  return result.id;
+  if (result.isErr()) throw new Error(`register failed: ${JSON.stringify(result.error)}`);
+  return result.value.id;
 }

@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +8,7 @@ import type {
   TaskRecord,
   WorkspaceListItem,
 } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 import {
   WorkspaceShellContext,
   type WorkspaceShellContextValue,

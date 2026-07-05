@@ -50,8 +50,8 @@ export const fetchJson = async <T>(path: string, label: string): Promise<T> => {
 };
 
 /**
- * Structured error thrown by {@link mutate}, {@link mutateJson}, and
- * {@link fetchJsonWithErrorBody} on a non-OK response. Extends `Error`
+ * Structured error thrown by {@link mutate} and {@link mutateJson} on a
+ * non-OK response. Extends `Error`
  * so UI surfaces can use `instanceof Error` / `err.message`; the
  * message field carries the server-provided `error` text (or the
  * bare HTTP status as fallback).
@@ -156,18 +156,3 @@ export const jsonInit = (method: string, body: object): RequestInit => ({
   headers: { "content-type": "application/json" },
   body: JSON.stringify(body),
 });
-
-/**
- * Like `fetchJson` but preserves the server's error body on a non-OK
- * response. Used by `previewCron` so the inline preview
- * surface can render the server's "Invalid cron expression: …"
- * string verbatim rather than the generic "label: status" form.
- *
- * Accepts an optional `signal` for request cancellation; rejections
- * from an aborted fetch surface as `DOMException { name: "AbortError" }`.
- */
-export async function fetchJsonWithErrorBody<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const r = await fetch(path, signal ? { signal } : undefined);
-  if (r.status === 202 || !r.ok) throw await buildApiError(r);
-  return (await r.json()) as T;
-}

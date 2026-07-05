@@ -2,156 +2,159 @@
 
 > **Tier:** T1 (Modes). See the [tier model](../../docs/architecture.md#tier-model).
 
-`TaskService` for autonomous (headless) agent runs. A *task* is a
-one-shot autonomous agent invocation: you give it an agent name, a
-short single-line `brief`, and an optional multi-line `details` body;
-the runtime spawns the agent, the agent works unattended, and you
-read the result when it finishes. The task package models a T1
-entity alongside session and workflow: sessions are interactive
-workdirs users enter, while workflow dispatches task rows with
-`origin: "workflow"`.
+T1 headless task execution module. A *task* is a one-shot autonomous agent run:
+you give it an agent name, a short single-line `brief`, and an optional
+multi-line `details` body; the runtime (contract:
+[`@glyphs-ai/runtime`](../runtime)) spawns the agent unattended, and you
+read the terminal verdict — `succeeded` / `failed` / `cancelled` — plus
+the agent's output and artifacts when it finishes. Sits alongside
+[`@glyphs-ai/session`](../session) (interactive) and
+[`@glyphs-ai/workflow`](../workflow) (multi-task DAG); workflow nodes
+dispatch task rows with `origin: "workflow"`.
 
-The `TaskEntity` class with state-machine methods is internal to this
-package; external consumers see the `Task` DTO returned by
-`TaskService` reads/writes.
+Schema-first, Result-based, discriminated-union errors, no throws across
+the package boundary. Every use-case implements
+`UseCase<Request, Response, Error>` and returns
+`UseCaseResult = ResultAsync<Response, Error>`.
+
+## What it does
+
+- **Dispatch** a headless run: resolve + readiness-check the agent, pick a
+  task-capable runtime, materialize the on-disk task contract, spawn the
+  subprocess, and supervise it to a terminal verdict.
+- **Supervise** every live subprocess in-memory (the `TaskSupervisor`):
+  classify the exit into a terminal status, collect the agent's output +
+  `artifact/` files, persist the transition, and reconcile crashed tasks
+  on boot via `recoverOrphanedTasks`.
+- **Observe** a task: `getTask` (with a live `lastActiveAt` refresh for
+  running tasks), `listTasks` (indexed filters), and the runtime activity
+  surface (`getTaskActivity` one-shot + `getTaskActivityStream` live tail).
+- **End** a task: `cancelTask` (best-effort SIGTERM, awaits the terminal
+  persistence) and `deleteTask` (record removal, optional background purge
+  of the workdir + runtime state).
+- **Integrate**: origin-keyed reverse-lookups (`hasInFlightByOrigin`,
+  `listInFlightByOrigin`, `findLatestByOrigin`, `deleteTerminalByOrigin`,
+  `aggregateByOrigin`) for the schedule / workflow wiring. Tasks are
+  origin-agnostic: a caller passes its own `(origin, originId)` (e.g. the
+  workflow wiring passes `origin: "workflow"` + the node id); the task layer
+  never special-cases any origin string.
 
 ## Layout
 
+Domain → application → infrastructure; imports flow one way and `index.ts`
+only re-exports the per-use-case request / response / error contracts,
+the curated domain surface, and `composeTaskModule`.
+
 ```
 packages/task/src/
-  schema.ts                Drizzle table def (private; only types exported)
-  errors.ts                Domain error classes (exported)
-  types.ts                 Public DTOs (Task, status, opts shapes)
-  validate.ts              id regex + assertValidTaskId + generators
-  task-repository.ts       Drizzle CRUD (private; never exported)
-  task-entity.ts           TaskEntity state machine (private)
-  task-service.ts          TaskService facade - dispatch/get/list/cancel/delete/getTaskActivity
-  task-service/            Internal concern modules composed by the facade:
-                           agent-resolver.ts (catalog/runtime resolution),
-                           dispatch.ts (per-dispatch spawn + exit-watcher wiring),
-                           mutations.ts (cancel/delete/recover write-side),
-                           queries.ts (read-side), activity-stream.ts (runtime
-                           activity surface), shutdown.ts (lifecycle hooks),
-                           terminal.ts (applyTerminal, decideTerminal,
-                           collectSuccessPayload terminal-transition orchestrator),
-                           _helpers.ts (shared private utilities: LiveTask, safeRm).
-  task-meta.ts             readTaskRuntimeMetadata (runtime hook)
-  framing.ts               DEFAULT_TASK_FRAMING_PROMPT + formatTaskMd helpers +
-                           TASK_FILENAME / TASK_TEMP_SUBDIR / TASK_ARTIFACT_SUBDIR
-                           on-disk contract constants + assertFramingPromptIsSafe
-  paths.ts                 safeJoinUnderRoot path-traversal guard
-  ports.ts                 AgentResolverPort + AgentEntry / BlockedReason /
-                           BlockedDep / MissingDep (structural catalog contract)
-  workdir.ts               listWorkdirFiles workdir-artifact enumerator
-  migrations.ts            applyTaskMigrations (drizzle migration applier)
-  compose.ts               composeTaskModule({ dbFile, agentResolver, contentSource, runtimeRegistry, ... })
-  testing.ts               openTestTaskDb helper (via /testing subpath)
-  index.ts                 public barrel
-drizzle/                   generated SQL migrations (committed)
-drizzle.config.ts          drizzle-kit config
+  domain/                    pure: no imports outside neverthrow / zod
+    task-id.ts               branded TaskId + format schema
+    task-status.ts           status enum + TerminalStatus + terminal-status list
+    task-origin.ts           who launched the task (open string discriminator)
+    task-success.ts          succeeded-payload value schema
+    task-failure.ts          failed-payload value schema (execution / internal / cascade)
+    task-cancellation.ts     cancelled-payload value schema (user / cascade)
+    task-entity.ts           TaskEntity FSM (two-door: create / fromStored)
+    task-repository.ts       persistence port + its error atoms
+    task-sandbox.ts          on-disk sandbox (workdir) port + its error atoms (reserve/materialize/list/remove)
+  application/
+    ports/
+      agent-resolver.ts      catalog-agent resolution port + atoms
+      live-process-registry.ts  live-subprocess index port + atoms
+    supervision/             stateful lifecycle concern (CATEGORY container):
+      task-supervisor.ts       orchestrates dispatch pipeline / cancel / shutdown /
+                               background purge; delegates live handles to the registry.
+                               Owns the runDispatch input contracts (RunDispatchArgs /
+                               LaunchableRuntime / DEFAULT_RUNTIME) + the ManagerShuttingDown
+                               lifecycle atom
+      in-memory-live-process-registry.ts  in-memory LiveProcessRegistry impl —
+                               pure coordination (watch / kill / drain), no third-party IO
+      terminal-decision.ts     pure exit -> terminal-status classifier
+      index.ts                 barrel (TaskSupervisor + registry + supervisor contracts)
+    use-case.ts              UseCase<Req,Res,Err> + UseCaseResult = ResultAsync
+    dispatch-task.ts · cancel-task.ts · delete-task.ts · get-task.ts ·
+    list-tasks.ts · get-task-activity.ts · get-task-activity-stream.ts ·
+    recover-orphaned-tasks.ts · resolve-artifact-path.ts · and the five
+    origin query use-cases (each owns its Request + Response Zod schema +
+    Error atoms inline — no shared DTO or error module)
+    index.ts                 curated domain surface (TaskId, value schemas, error atoms)
+  infrastructure/
+    drizzle/                 task-db / schema / migrations / mapper / repository
+    file/local-task-sandbox.ts  LocalTaskSandbox (node:fs); owns the on-disk
+                             TASK.md / temp / artifact contract
+  task-module.ts          composeTaskModule -> TaskModule (DI container)
+  index.ts                   public barrel
+drizzle/                     generated SQL migrations (committed)
+drizzle.config.ts            drizzle-kit config
 ```
-
-`task-service/` is the **SPLIT sub-layout**: present here because `task-service.ts` outgrew the split threshold (>= 600 LOC AND >= 3 cohesive concerns). Most packages should stay flat (no sibling subdir); see [`docs/pkg-template.md § Splitting big files via facade + sibling subdir`](../../docs/pkg-template.md#splitting-big-files-via-facade--sibling-subdir) for the full hard-rule list and the on-disk reference example at [`packages/_template/_examples/split-layout/`](../_template/_examples/split-layout/).
 
 ## On-disk
 
+Each task has two stores: queryable metadata in a SQLite row, and an
+on-disk workdir for the agent's product.
+
 ```
 <workspace>/
- workspace.db           # SQLite `tasks` table: one row per task
+ workspace.db              # SQLite `tasks` table: one row per task
  tasks/
-     <id>/              # workdir for task <id>
-         TASK.md        # `brief` + `details` written by TaskService
-         temp/          # agent scratch space; never surfaced to users
-         artifact/      # user-visible files collected at terminal time
-         AGENTS.md      # baked by the runtime provisioner
-                       # plus any other files the agent produced
+     <id>/                 # workdir for task <id>
+         TASK.md           # `# <brief>` + `details`, written at dispatch
+         temp/             # agent scratch space; never surfaced to users
+         artifact/         # user-visible files collected at terminal time
+         AGENTS.md         # baked by the runtime provisioner
+                           # plus any other files the agent produced
 ```
 
-`<id>` is a short date-prefixed identifier `YYYYMMDD-xxxxxxxx`. The
-workdir contains no metadata sidecar; `runtime`, `agent`, `status`,
-`brief`, `origin`, and similar query fields all come from the row in
-`tasks`. `TaskService` writes `TASK.md` and creates `temp/` plus
-`artifact/` before spawning the runtime. Agents may use `temp/` for
-intermediate files and should place downloadable deliverables under
-`artifact/`.
+`<id>` is a short date-prefixed identifier `YYYYMMDD-xxxxxxxx`
+(e.g. `20260508-9dfbdf05`). The workdir has no metadata sidecar;
+`runtime`, `agent`, `status`, `brief`, `origin`, and the query fields all
+come from the row in `tasks`. The user's `brief`/`details` live in
+`TASK.md` (never in the spawn argv) so a user-supplied LF cannot truncate
+the CLI's argument list on Windows `cmd.exe`; the runtime receives a fixed
+single-line ASCII framing prompt that tells the agent to read it.
 
 ## Public API
+
+`composeTaskModule` is the DI container a host builds once and dispatches
+through. Each use-case is a `<useCase>.execute(request)` returning a
+`ResultAsync<Response, Error>`.
 
 ```ts
 import { composeTaskModule } from "@glyphs-ai/task";
 
-const { service, close } = await composeTaskModule({
-  dbFile: "/abs/workspace.db",
-  agentResolver: catalog,                  // AgentResolverPort
-  contentSource: catalog,                   // AgentContentSource
-  runtimeRegistry,                         // RuntimeRegistry
+const tasks = await composeTaskModule({
+  dbFile: "/abs/path/to/workspace.db",
+  agentResolver,            // AgentResolver — adapter over @glyphs-ai/catalog
+  contentSource,            // AgentContentSource — catalog bytes for the launch
+  runtimeRegistry,          // RuntimeRegistry from @glyphs-ai/runtime
   workspaceDir: "/abs/workspace-dir",
   workspaceId: "<uuid>",
 });
 
-await service.recoverOrphaned();          // sweep crashed-before tasks once at boot
-const task = await service.dispatch({
-  agent: "writer",
-  brief: "Draft the post",
-  details: "Tone: warm. Length: ~600 words.",
-});
+await tasks.recoverOrphanedTasks.execute({}); // sweep crashed-before tasks once at boot
 
-await service.list();                                       // Task[]
-await service.list({ statuses: ["running"], agent: "writer" });
-await service.get(task.id);                                 // Task | null
-await service.liveCount();                                  // number — in-flight + live
-await service.hasInFlightByOrigin({ origin: "schedule", originId: scheduleId });
-await service.deleteTerminalByOrigin({ origin: "schedule", originId: scheduleId });
-await service.cancel(task.id);                              // best-effort SIGTERM
-await service.delete(task.id, { purge: false });
-const abs = await service.resolveArtifactPath(task.id, "report.html");
+const task = (
+  await tasks.dispatchTask.execute({
+    agent: "writer",
+    brief: "Draft the post",
+    details: "Tone: warm. Length: ~600 words.",
+  })
+)._unsafeUnwrap();
 
-// Activity streaming
-const items = await service.getTaskActivity(task.id, { limit: 50 });
-const stream = await service.getTaskActivityStream(task.id, { signal });
-if (stream !== null) {
-  for await (const item of stream) {
-    // SSE-style tail
-  }
-}
+await tasks.listTasks.execute({ status: "running", agent: "writer" }); // ListTasksResponse
+await tasks.getTask.execute({ id: task.id }); // GetTaskResponse (task view | null)
+await tasks.cancelTask.execute({ id: task.id }); // best-effort SIGTERM
+await tasks.deleteTask.execute({ id: task.id, purge: false });
+await tasks.resolveArtifactPath.execute({ id: task.id, name: "report.html" });
 
-await service.shutdown();                  // kill + drain live subprocesses
-service.close();                           // release manager-owned resources (no-op today)
-await close();                             // composeTaskModule cleanup: closes DB
-```
+// Activity: one-shot + live tail.
+await tasks.getTaskActivity.execute({ id: task.id, limit: 50 });
+const stream = (await tasks.getTaskActivityStream.execute({ id: task.id, signal }))._unsafeUnwrap();
+if (stream !== null) for await (const item of stream) { /* SSE-style tail */ }
 
-### Helpers (framing / paths / metadata / port contract)
-
-These are all top-level exports from `@glyphs-ai/task` for callers that need
-to interact with the on-disk task contract or implement the
-`AgentResolverPort`:
-
-```ts
-import {
-  // file-based task brief + artifact contract
-  TASK_FILENAME,            // "TASK.md"
-  TASK_TEMP_SUBDIR,         // "temp"
-  TASK_ARTIFACT_SUBDIR,     // "artifact"
-  DEFAULT_TASK_FRAMING_PROMPT,
-  assertFramingPromptIsSafe,
-  formatTaskMd,             // render `# <brief>\n\n<details>\n`
-  // workdir + path helpers
-  listWorkdirFiles,         // enumerate `<workdir>/<subdir>` recursively
-  safeJoinUnderRoot,        // path-traversal-safe join
-  // runtime metadata projection
-  readTaskRuntimeMetadata,
-  type TaskRuntimeMetadata,
-  // structural catalog port (implement to plug a different catalog)
-  type AgentResolverPort,
-  type AgentEntry,
-  type BlockedReason,
-  type BlockedDep,
-  type MissingDep,
-  // id helpers
-  assertValidTaskId,
-  generateTaskId,
-  TASK_ID_RE,
-} from "@glyphs-ai/task";
+tasks.liveCount();          // in-flight dispatches + live subprocesses
+await tasks.shutdown();     // kill + drain live subprocesses
+await tasks.close();        // module cleanup: closes the DB
 ```
 
 ## State machine
@@ -162,46 +165,46 @@ Statuses are persisted on the row:
 running → succeeded | failed | cancelled
 ```
 
-`dispatch` creates the task directly in `running` and immediately starts
-the runtime subprocess; the eventual exit folds into a terminal status
-(`succeeded`, `failed`, or `cancelled` — the latter only via
-`TaskService.cancel(id)`). The service supervises every live subprocess
-in-memory and reconciles to disk on shutdown via `recoverOrphaned`.
+`dispatchTask` creates the task directly in `running` and immediately
+spawns the runtime subprocess; the eventual exit folds into a terminal
+status. `cancelled` is produced only by `cancelTask`; `failed` covers a
+non-zero exit / signal, a manager-side fault, server shutdown, or
+orphan recovery. `TaskEntity` is the FSM — each transition returns a fresh
+entity or an `InvalidTransition` atom.
 
 ## Env layering
 
-`TaskService` does NOT own the cross-cutting subprocess env
-(`GLYPH_SERVER`, `GLYPH_SHARED_DIR`). The runtime adapter owns
-it via `CopilotRuntimeConfig.subprocessEnvBase`; the task service
-layers per-task work-context env (`GLYPH_WORKSPACE`,
-`GLYPH_WORK_KIND=task`, `GLYPH_WORK_ID=<id>`,
-`GLYPH_WORK_DIR=<workdir>`) on top of whatever the runtime
-returned. Scrub-style overrides (`GLYPH_HOME` deleted from
-inheritance) live in `CopilotRuntimeConfig.subprocessEnvScrub` and
-are honoured on the headless launch path by `mergeEnv`.
+This package does NOT own the cross-cutting subprocess env
+(`GLYPH_SERVER`, `GLYPH_SHARED_DIR`, …); the runtime adapter owns it via
+`CopilotRuntimeConfig.subprocessEnvBase`. Dispatch layers per-task
+work-context env (`GLYPH_WORKSPACE`, `GLYPH_WORKSPACE_DIR`,
+`GLYPH_WORK_KIND=task`, `GLYPH_WORK_ID=<id>`, `GLYPH_WORK_DIR=<workdir>`)
+on top. A caller-supplied `subprocessEnv` that collides with one of those
+five kernel keys is rejected pre-spawn (`DispatchKernelEnvCollision`).
 
 ## Errors
 
-- `TaskError`: base class for the errors below; consumers narrow with `instanceof`
-- `TaskNotFoundError`: unknown id
-- `InvalidTaskIdError`: id regex failed
-- `CorruptedTaskError`: row failed validation on read
-- `AgentNotFoundError`: agent FQN not in catalog
-- `AgentResolutionFailedError`: catalog itself misbehaved while resolving the agent (vs `AgentNotFoundError`, which is a clean miss)
-- `InvalidTransition`: illegal state-machine transition
-- `EntryNotReadyError`: agent or dependency is not ready to dispatch
-- `ManagerShuttingDownError`: dispatch refused during shutdown
-- `RuntimeDoesNotSupportTasksError`: runtime is interactive-only
-- `TaskIdAllocationFailedError`: id generator exhausted retries
+Task use-cases return discriminated-union error objects through
+`ResultAsync`, for example:
+
+- `TaskNotFound` — unknown task id
+- `InvalidTransition` — impossible FSM transition for the current status
+- `AgentNotFound` / `AgentResolutionFailed` / `EntryNotReady` — launch
+  target cannot be resolved or is not ready
+- `RuntimeDoesNotSupportTasks` / `RuntimeHeadlessLaunchFailed` — runtime
+  selection or subprocess launch failure
+- `WorkdirReservationFailed` / `WorkdirMaterializationFailed` /
+  `DatabaseUnavailable` — filesystem or persistence failure
 
 ## Testing
 
 ```sh
+pnpm --filter @glyphs-ai/task typecheck
 pnpm --filter @glyphs-ai/task test
 ```
 
-Vitest runs in `forks` pool (better-sqlite3's native binding
-segfaults on worker-thread teardown on Windows).
+Vitest runs in `forks` pool (better-sqlite3's native binding segfaults on
+worker-thread teardown on Windows).
 
 ## License
 

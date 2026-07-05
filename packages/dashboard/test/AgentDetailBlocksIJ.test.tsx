@@ -1,8 +1,8 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionView, TaskRecord } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 import { avatarColorForFqn, monogramForLabel } from "../src/components/agents/AgentAvatar";
 import { AgentDetailPane } from "../src/pages/Runtime/AgentDetailPane";
 

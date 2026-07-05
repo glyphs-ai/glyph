@@ -1,4 +1,4 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry } from "../../api/catalog.js";
 import { SearchIcon } from "../common/SearchIcon";
 import { ALL_AGENTS, ALL_RUNTIMES, TIME_PRESETS, type TimePreset } from "./shared";
 

@@ -24,9 +24,7 @@ function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
-    iterationCount: 0,
     ...overrides,
   };
 }
@@ -38,12 +36,12 @@ function makeDag(wf: WorkflowHeader): WorkflowDag {
       {
         id: "n1",
         workflowId: wf.id,
+        kind: "worker" as const,
         status: "running",
         phase: 0,
         spec: { kind: "worker", agent: "official/engineer", brief: "x" },
         metadata: {},
         createdAt: wf.createdAt,
-        taskId: "task-1",
       },
     ],
     edges: [],
@@ -167,7 +165,6 @@ describe("WorkflowView — Artifacts tab badge", () => {
         {
           kind: "node",
           nodeId: "n1",
-          taskId: "task-1",
           path: "log.txt",
           size: 200,
           modifiedAt: "2026-05-28T00:00:00.000Z",

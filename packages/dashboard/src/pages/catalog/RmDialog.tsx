@@ -1,4 +1,4 @@
-import type { CatalogKind } from "@glyphs-ai/contracts";
+import type { CatalogKind } from "../../api/catalog.js";
 import { Modal } from "../../components/Modal";
 import { CATALOG_VERBS } from "./catalog-verbs";
 

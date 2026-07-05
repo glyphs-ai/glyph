@@ -10,14 +10,43 @@ import {
 
 interface FetchCallSpy {
   url: string;
-  init: RequestInit | undefined;
+  method: string;
+  body: string | null;
 }
 
 let calls: FetchCallSpy[] = [];
 
+// The SDK adapters invoke `fetch(new Request(url, init))` (a single Request
+// arg), while the raw-fetch adapters still call `fetch(url, init)`. The spy
+// normalises both into `{ url, method, body }`, and resolves the absolute
+// URL the `Request` constructor produces (relative paths are resolved
+// against the happy-dom document origin) back to the path + query the
+// assertions below pin.
+function toRelative(u: string): string {
+  try {
+    const parsed = new URL(u);
+    return parsed.pathname + parsed.search;
+  } catch {
+    return u;
+  }
+}
+
 function installFetch(response: unknown, status = 200): void {
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ url: String(input), init });
+    if (input instanceof Request) {
+      const body = await input.clone().text();
+      calls.push({
+        url: toRelative(input.url),
+        method: input.method,
+        body: body === "" ? null : body,
+      });
+    } else {
+      calls.push({
+        url: toRelative(String(input)),
+        method: init?.method ?? "GET",
+        body: init?.body != null ? String(init.body) : null,
+      });
+    }
     return new Response(JSON.stringify(response), {
       status,
       headers: { "content-type": "application/json" },
@@ -114,8 +143,8 @@ describe("createWorkflow — POST body shape", () => {
       coordinatorAgent: "official/engineer",
     });
     expect(calls[0]?.url).toBe("/api/workspaces/ws-test-uuid/workflows");
-    expect(calls[0]?.init?.method).toBe("POST");
-    const body = JSON.parse(String(calls[0]?.init?.body));
+    expect(calls[0]?.method).toBe("POST");
+    const body = JSON.parse(calls[0]?.body ?? "null");
     expect(body).toEqual({
       brief: "Do the thing",
       details: "extra context",
@@ -129,8 +158,8 @@ describe("cancelWorkflow — POST /cancel", () => {
     installFetch({ id: "wf-1" });
     await cancelWorkflow("wf-1", { cancellation: { kind: "user", message: "" } });
     expect(calls[0]?.url).toBe("/api/workspaces/ws-test-uuid/workflows/wf-1/cancel");
-    expect(calls[0]?.init?.method).toBe("POST");
-    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+    expect(calls[0]?.method).toBe("POST");
+    expect(JSON.parse(calls[0]?.body ?? "null")).toEqual({
       cancellation: { kind: "user", message: "" },
     });
   });
@@ -138,7 +167,7 @@ describe("cancelWorkflow — POST /cancel", () => {
   it("includes the message when one is provided", async () => {
     installFetch({ id: "wf-1" });
     await cancelWorkflow("wf-1", { cancellation: { kind: "user", message: "superseded" } });
-    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+    expect(JSON.parse(calls[0]?.body ?? "null")).toEqual({
       cancellation: { kind: "user", message: "superseded" },
     });
   });

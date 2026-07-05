@@ -56,3 +56,20 @@ export function buildInstallOrigin(
   }
   return { origin: file.startsWith("file:") ? file : `file:${file}` };
 }
+
+/**
+ * Split a catalog resource FQN into its `{scope}/{name}` path segments.
+ *
+ * Catalog resources are addressed by a two-segment `{scope}/{name}`
+ * route (e.g. `official/git-pr`). The FQN carries exactly one slash
+ * separating the scope from the short name; split on that first slash so
+ * each half can be passed as a discrete typed `path` param to the
+ * generated SDK ops (which percent-encode each segment individually).
+ */
+export function splitCatalogFqn(fqn: string): { scope: string; name: string } {
+  const slash = fqn.indexOf("/");
+  if (slash === -1) {
+    return { scope: fqn, name: "" };
+  }
+  return { scope: fqn.slice(0, slash), name: fqn.slice(slash + 1) };
+}

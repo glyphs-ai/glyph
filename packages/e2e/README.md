@@ -14,7 +14,6 @@ test/
   architecture/
     inter-service-imports.test.ts    # T0/T1 pkgs only type-import sibling T0/T1
     split-convention.test.ts         # facade + sibling-subdir split discipline
-    test-layout-convention.test.ts   # test path mirrors src path
     tier-invisibility.test.ts        # app consumers only see allowlisted surfaces
   cli/
     bundle-smoke.test.ts             # single-file `bundle/glyph.js` (opt-in: BUNDLE_SMOKE=1)
@@ -32,10 +31,10 @@ not by their origin package.
 
 Architecture audits follow the canonical tier model: T0 foundations are
 workspace, runtime, schedule, terminal, and catalog; T1 modes are
-session, task, and workflow; T2 is contracts + api; T3 is server; and
-T_top is dashboard + cli. Top-level apps consume workflow through
-contracts and server routes, not by importing `@glyphs-ai/workflow`
-directly.
+session, task, and workflow; T2 is api + sdk; T3 is server; and
+T_top is dashboard + cli. Top-level apps consume workflow through the
+`@glyphs-ai/sdk` client and server routes, not by importing
+`@glyphs-ai/workflow` directly.
 
 ## Why a separate package
 

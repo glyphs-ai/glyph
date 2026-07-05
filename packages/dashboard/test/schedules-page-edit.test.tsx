@@ -1,8 +1,8 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleDetail as ScheduleDetailType, ScheduleView } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");

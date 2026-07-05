@@ -2,8 +2,7 @@
  * Structural enforcement of the "T0/T1 packages only type-import from
  * sibling T0/T1 packages" rule documented in `docs/pkg-template.md §
  * Type placement convention` (decision rule #4). Sibling to
- * `test-layout-convention.test.ts` (which audits test-file location)
- * and `tier-invisibility.test.ts` (which audits top-level consumer fences).
+ * `tier-invisibility.test.ts` (which audits top-level consumer fences).
  *
  * Rule (from docs/pkg-template.md § decision rule 4):
  *
@@ -26,7 +25,7 @@
  * scenarios. This audit targets production code (and its non-test
  * fixtures) only.
  *
- * Importing from `@glyphs-ai/contracts`, `@glyphs-ai/api`,
+ * Importing from `@glyphs-ai/api`,
  * `@glyphs-ai/dev-conventions`, `@glyphs-ai/server`, `@glyphs-ai/cli`,
  * `@glyphs-ai/dashboard`, or any other non-T0/T1 pkg is OUT OF SCOPE
  * — the rule constrains only the closed set of bounded-context pkgs.
@@ -46,8 +45,7 @@
  * exceptions to decision rule #4. It is empty — T0/T1 packages have no
  * accepted cross-BC value imports — so the audit pins it as empty with a
  * single guard rather than running sort / rationale / stale / idle
- * checks over a zero-length list. The canonical discipline checks for a
- * populated allowlist live in `test-layout-convention.test.ts`.
+ * checks over a zero-length list.
  */
 
 import { readFileSync } from "node:fs";
@@ -164,8 +162,7 @@ describe("inter-service value-imports are forbidden", () => {
     // The codebase has zero excused cross-domain value imports, so the
     // sort / rationale / stale / idle discipline a populated allowlist
     // needs would run over a zero-length list. Pin the invariant
-    // directly instead; test-layout-convention.test.ts keeps the
-    // canonical discipline checks for its populated allowlist.
+    // directly instead.
     expect(ALLOWED_VIOLATIONS).toEqual([]);
   });
 });

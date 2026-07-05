@@ -3,7 +3,8 @@
 // `/api/workspaces/:workspaceId/...` tree so they have no `workspacePrefix()`
 // dependency.
 
-import { fetchJson } from "./http.js";
+import { getApiConfig, getApiHealth, getApiRuntimes } from "@glyphs-ai/sdk";
+import { unwrap } from "./sdk-client.js";
 
 /**
  * Wire shape returned by `GET /api/runtimes`. Mirrors the server's
@@ -17,13 +18,12 @@ export interface RuntimeInfo {
   capabilities: Record<string, unknown>;
 }
 
-export const listRuntimes = (): Promise<RuntimeInfo[]> =>
-  fetchJson<RuntimeInfo[]>("/api/runtimes", "runtimes");
+export const listRuntimes = async (): Promise<RuntimeInfo[]> => unwrap(await getApiRuntimes());
 
 export interface ServerConfig {
   glyphHome: string;
   /** Currently-selected workspace id (UUID) on the server registry, or null. */
-  currentWorkspace: string | null;
+  currentWorkspaceId: string | null;
   host: string;
   port: number;
   /** Native path separator on the server's OS. */
@@ -38,8 +38,7 @@ export interface ServerConfig {
   };
 }
 
-export const getConfig = (): Promise<ServerConfig> =>
-  fetchJson<ServerConfig>("/api/config", "config");
+export const getConfig = async (): Promise<ServerConfig> => unwrap(await getApiConfig());
 
 /**
  * Mirrors the server's `HealthResponse` (defined in
@@ -57,5 +56,4 @@ export interface HealthResponse {
   serverNow: string;
 }
 
-export const getHealth = (): Promise<HealthResponse> =>
-  fetchJson<HealthResponse>("/api/health", "health");
+export const getHealth = async (): Promise<HealthResponse> => unwrap(await getApiHealth());

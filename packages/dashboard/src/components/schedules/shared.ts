@@ -3,12 +3,13 @@
  * (`pages/Schedules.tsx`, `components/schedules/*.tsx`).
  */
 
+import type { ScheduleView } from "../../api";
 import type {
   ScheduleTarget,
   TaskScheduleTarget,
   WorkflowScheduleTarget,
-} from "@glyphs-ai/contracts";
-import type { ScheduleView } from "../../api";
+  WorkflowScheduleView,
+} from "../../api/schedules.js";
 
 export const DEFAULT_SCHEDULE_KIND = "task";
 export type ScheduleKindFilter = "task" | "workflow";
@@ -86,8 +87,9 @@ export function matchesWorkflowActivityFilter(
   activityFilter: WorkflowActivityFilter,
 ): boolean {
   if (schedule.target.kind !== "workflow" || activityFilter === "all") return true;
-  const awaitingCount = schedule.fireStats?.awaitingCount ?? 0;
-  const runningCount = schedule.fireStats?.runningCount ?? 0;
+  const wf = schedule as WorkflowScheduleView;
+  const awaitingCount = wf.fireStats?.awaitingCount ?? 0;
+  const runningCount = wf.fireStats?.runningCount ?? 0;
   if (activityFilter === "awaiting") return awaitingCount > 0;
   if (activityFilter === "running") return runningCount > 0;
   return schedule.enabled && awaitingCount === 0 && runningCount === 0;

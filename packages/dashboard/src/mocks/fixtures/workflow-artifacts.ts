@@ -32,7 +32,7 @@ import { fixtureWorkflowMockIds } from "./workflows";
  *
  * `modifiedAt` timestamps are inline-pinned for stable snapshots.
  */
-const { nodes: N, tasks: T } = fixtureWorkflowMockIds;
+const { nodes: N } = fixtureWorkflowMockIds;
 const EPOCH = Date.parse("2026-05-28T00:00:00.000Z");
 const iso = (offsetMinutes: number): string =>
   new Date(EPOCH + offsetMinutes * 60_000).toISOString();
@@ -43,42 +43,35 @@ export const fixtureWorkflowArtifacts: ReadonlyMap<string, readonly WorkflowArti
     [
       {
         kind: "workflow-summary",
-        path: "summary.html",
+        relPath: "summary.html",
         size: 5_812,
         modifiedAt: iso(-60),
-        mimeBucket: "text",
       },
       {
         kind: "workflow-summary",
-        path: "report.md",
+        relPath: "report.md",
         size: 4123,
         modifiedAt: iso(-65),
-        mimeBucket: "text",
       },
       {
         kind: "workflow-summary",
-        path: "snapshots/phase-2-summary.png",
+        relPath: "snapshots/phase-2-summary.png",
         size: 38_117,
         modifiedAt: iso(-70),
-        mimeBucket: "image",
       },
       {
         kind: "node",
         nodeId: N.migTask1a,
-        taskId: T.migTask1a,
-        path: "diff-summary.md",
+        relPath: "diff-summary.md",
         size: 2410,
         modifiedAt: iso(-90),
-        mimeBucket: "text",
       },
       {
         kind: "node",
         nodeId: N.migTask1a,
-        taskId: T.migTask1a,
-        path: "logs.txt",
+        relPath: "logs.txt",
         size: 18_990,
         modifiedAt: iso(-90),
-        mimeBucket: "text",
       },
     ] as readonly WorkflowArtifact[],
   ],
@@ -88,20 +81,16 @@ export const fixtureWorkflowArtifacts: ReadonlyMap<string, readonly WorkflowArti
       {
         kind: "node",
         nodeId: N.logTask1a,
-        taskId: T.logTask1a,
-        path: "patch.md",
+        relPath: "patch.md",
         size: 6321,
         modifiedAt: iso(-1330),
-        mimeBucket: "text",
       },
       {
         kind: "node",
         nodeId: N.logTask1b,
-        taskId: T.logTask1b,
-        path: "test-output.json",
+        relPath: "test-output.json",
         size: 1011,
         modifiedAt: iso(-1325),
-        mimeBucket: "text",
       },
     ] as readonly WorkflowArtifact[],
   ],
@@ -111,10 +100,9 @@ export const fixtureWorkflowArtifacts: ReadonlyMap<string, readonly WorkflowArti
     [
       {
         kind: "workflow-summary",
-        path: "summary.html",
+        relPath: "summary.html",
         size: 5_120,
         modifiedAt: iso(-4200),
-        mimeBucket: "text",
       },
     ] as readonly WorkflowArtifact[],
   ],

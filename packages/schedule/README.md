@@ -84,7 +84,6 @@ packages/schedule/
     ├── schedule-repository.ts Drizzle CRUD + preflight (private)
     ├── schedule-service.ts   ScheduleService + open kind registry
     ├── schema.ts             Drizzle table definition (private)
-    ├── testing.ts            openTestScheduleDb() in-memory test helper
     ├── types.ts              Schedule, ScheduleKindHandler, envelope, service opts
     └── validate.ts           generateScheduleId + assertValidScheduleId
 ```

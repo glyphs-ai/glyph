@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Codegen each entity pkg's `src/migrations.ts` from the SQL files
+ * Codegen each entity pkg's configured migrations module from the SQL files
  * in `drizzle/`. The generated file imports nothing at module scope —
  * just literal strings + `MigrationMeta[]` + `applyXxxMigrations()` —
  * so it works uniformly in every JS execution path glyph uses:
@@ -8,11 +8,14 @@
  * integration test seams.
  *
  * Source of truth: `packages/<pkg>/drizzle/*.sql`.
- * Generated:       `packages/<pkg>/src/migrations.ts` (committed).
+ * Generated:       `PKGS[].migrationsFile`, for example
+ *                  `packages/task/src/infrastructure/drizzle/task-migrations.ts`.
+ *                  Packages without `migrationsFile` default to
+ *                  `packages/<pkg>/src/migrations.ts` (committed).
  *
  * Hooked into `pnpm bundle` (prebuild) and each pkg's `db:generate`
  * (postgenerate) so it never goes stale. CI also runs it and fails
- * if `migrations.ts` doesn't match.
+ * if the configured migrations module doesn't match.
  */
 
 import { createHash } from "node:crypto";
@@ -23,27 +26,69 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const PKGS = [
-  { dir: "workspace", entity: "Workspace", tableSuffix: "workspace" },
-  { dir: "session", entity: "Session", tableSuffix: "session" },
-  { dir: "task", entity: "Task", tableSuffix: "task" },
-  { dir: "catalog", entity: "Catalog", tableSuffix: "catalog" },
-  { dir: "workflow", entity: "Workflow", tableSuffix: "workflow" },
-  { dir: "schedule", entity: "Schedule", tableSuffix: "schedule" },
+  {
+    dir: "workspace",
+    entity: "Workspace",
+    tableSuffix: "workspace",
+    driver: "libsql",
+    migrationsFile: "src/infrastructure/drizzle/workspace-migrations.ts",
+  },
+  { dir: "session", entity: "Session", tableSuffix: "session", migrationsFile: "src/infrastructure/drizzle/session-migrations.ts" },
+  {
+    dir: "task",
+    entity: "Task",
+    tableSuffix: "task",
+    migrationsFile: "src/infrastructure/drizzle/task-migrations.ts",
+    journalNote:
+      "This package's journal table is `__drizzle_migrations_task`; its\n * migrations share one lineage with the `tasks` schema in a shared\n * workspace.db.",
+  },
+  {
+    dir: "catalog",
+    entity: "Catalog",
+    tableSuffix: "catalog",
+    migrationsFile: "src/infrastructure/drizzle/catalog-migrations.ts",
+  },
+  {
+    dir: "workflow",
+    entity: "Workflow",
+    tableSuffix: "workflow",
+    migrationsFile: "src/infrastructure/drizzle/workflow-migrations.ts",
+  },
+  {
+    dir: "schedule",
+    entity: "Schedule",
+    tableSuffix: "schedule",
+    migrationsFile: "src/infrastructure/drizzle/schedule-migrations.ts",
+  },
   // Template uses placeholder tokens substituted by scripts/new-pkg.mjs.
   // `__PKG__` resolves to the kebab-case pkg name (e.g. "event-bus") at
   // scaffold time, giving e.g. `__drizzle_migrations_event-bus`. SQLite
   // identifiers with hyphens are valid when quoted; drizzle's
   // `sql.identifier()` quotes automatically.
-  { dir: "_template", entity: "__Entity__", tableSuffix: "__PKG__" },
+  {
+    dir: "_template",
+    entity: "__Entity__",
+    tableSuffix: "__PKG__",
+    migrationsFile: "src/infrastructure/drizzle/__entity-kebab__-migrations.ts",
+  },
 ];
 
 function escapeForTemplateLiteral(s) {
   return s.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
-for (const { dir, entity, tableSuffix } of PKGS) {
+for (const { dir, entity, tableSuffix, migrationsFile, journalNote, driver } of PKGS) {
+  const isLibsql = driver === "libsql";
+  const dbTypeImport = isLibsql
+    ? `import type { Client } from "@libsql/client";`
+    : `import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";`;
+  const dbType = isLibsql ? "LibSQLDatabase" : "BetterSQLite3Database";
+  const migratorPath = isLibsql ? "drizzle-orm/libsql/migrator" : "drizzle-orm/better-sqlite3/migrator";
   const drizzleDir = join(repoRoot, "packages", dir, "drizzle");
-  const outFile = join(repoRoot, "packages", dir, "src", "migrations.ts");
+  // Packages may place generated migrations under their current
+  // infrastructure layout; packages without `migrationsFile` default to
+  // `src/migrations.ts`.
+  const outFile = join(repoRoot, "packages", dir, ...(migrationsFile ?? "src/migrations.ts").split("/"));
 
   let files = [];
   try {
@@ -66,7 +111,7 @@ for (const { dir, entity, tableSuffix } of PKGS) {
 // biome-ignore-all format: keep generator output stable across runs.
 // biome-ignore-all lint: generated, may include unused/long lines.
 
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+${dbTypeImport}
 import type { MigrationMeta } from "drizzle-orm/migrator";
 
 `;
@@ -82,10 +127,55 @@ import type { MigrationMeta } from "drizzle-orm/migrator";
   }
   body += `];\n\n`;
 
-  body += `/**
+  // Optional per-package exception rationale appended to the migrationsTable
+  // paragraph — used when a package's journal suffix intentionally differs
+  // from its directory name (kept out of other packages' output when absent).
+  const journalNoteBlock = journalNote ? `\n *\n * ${journalNote}` : "";
+
+  body += isLibsql
+    ? `/**
+ * Apply migrations against a libsql \`client\` using \`batch(..., "write")\`,
+ * which runs each migration's statements atomically on the *single* client
+ * connection. This is deliberately NOT drizzle's \`migrate()\` (from
+ * \`${migratorPath}\`): that opens a separate interactive-transaction
+ * connection, which a plain \`:memory:\` url cannot share (every libsql
+ * connection is its own in-memory db) — so drizzle's migrator can only run
+ * against a file. Batch keeps a single connection, so the same applier works
+ * for both file and \`:memory:\` (tests), with no leaked transaction handle.
+ *
+ * **Per-pkg journal table**: \`__drizzle_migrations_${tableSuffix}\`. Each
+ * entity pkg owns its own table so co-tenant pkgs in one SQLite file apply
+ * independently; the \`created_at\` watermark skips already-applied
+ * migrations.${journalNoteBlock}
+ */
+export async function apply${entity}Migrations(client: Client): Promise<void> {
+  await client.execute(
+    "CREATE TABLE IF NOT EXISTS __drizzle_migrations_${tableSuffix} (id INTEGER PRIMARY KEY, hash text NOT NULL, created_at numeric)",
+  );
+  const applied = await client.execute(
+    "SELECT created_at FROM __drizzle_migrations_${tableSuffix} ORDER BY created_at DESC LIMIT 1",
+  );
+  const lastRow = applied.rows.at(0);
+  const lastMillis = lastRow !== undefined ? Number(lastRow.created_at) : -1;
+  for (const migration of MIGRATIONS) {
+    if (lastMillis >= migration.folderMillis) continue;
+    await client.batch(
+      [
+        ...migration.sql,
+        {
+          sql: "INSERT INTO __drizzle_migrations_${tableSuffix} (hash, created_at) VALUES (?, ?)",
+          args: [migration.hash, migration.folderMillis],
+        },
+      ],
+      "write",
+    );
+  }
+}
+`
+    : `/**
  * Run drizzle's official migration applier against \`db\`. Thin typed
  * shim over drizzle's \`@internal\` \`dialect\` + \`session\` props (same
- * props drizzle's own \`migrate()\` from \`drizzle-orm/better-sqlite3/migrator\`
+ * props drizzle's own \`migrate()\` from \`${migratorPath}\`
  * touches) so consumers don't repeat the cast.
  *
  * **Per-pkg \`migrationsTable\`**: \`__drizzle_migrations_${tableSuffix}\`.
@@ -94,10 +184,10 @@ import type { MigrationMeta } from "drizzle-orm/migrator";
  * check — drizzle's own bookkeeping is namespaced by table, so per-pkg
  * tables let migrations apply independently. Every glyph pkg follows
  * the \`__drizzle_migrations_<pkg>\` convention; deviating from it would
- * silently re-apply migrations or skip them.
+ * silently re-apply migrations or skip them.${journalNoteBlock}
  */
 export function apply${entity}Migrations<T extends Record<string, unknown>>(
-  db: BetterSQLite3Database<T>,
+  db: ${dbType}<T>,
 ): void {
   const internals = db as unknown as {
     dialect: { migrate(m: readonly MigrationMeta[], s: unknown, c?: { migrationsTable: string }): void };
@@ -112,6 +202,6 @@ export function apply${entity}Migrations<T extends Record<string, unknown>>(
   mkdirSync(dirname(outFile), { recursive: true });
   writeFileSync(outFile, header + body, "utf8");
   console.log(
-    `inline-migrations: wrote packages/${dir}/src/migrations.ts (${entries.length} migration${entries.length === 1 ? "" : "s"})`,
+    `inline-migrations: wrote packages/${dir}/${migrationsFile ?? "src/migrations.ts"} (${entries.length} migration${entries.length === 1 ? "" : "s"})`,
   );
 }

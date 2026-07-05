@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ApiError,
@@ -6,6 +5,7 @@ import {
   createWorkflow,
   type WorkflowHeader,
 } from "../../api";
+import type { AgentEntry } from "../../api/catalog.js";
 import { Modal } from "../Modal";
 import { coordEligibleAgents } from "./shared";
 

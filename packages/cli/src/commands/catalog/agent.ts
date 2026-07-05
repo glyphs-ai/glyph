@@ -4,19 +4,33 @@
  * workspace-scoped catalog agents HTTP surface.
  */
 
-import { makeClient, resolveWorkspace } from "../../connect.js";
+import {
+  deleteApiWorkspacesByIdCatalogAgentsByScopeByName,
+  getApiWorkspacesByIdCatalogAgents,
+  getApiWorkspacesByIdCatalogAgentsByScopeByName,
+  getApiWorkspacesByIdCatalogAgentsByScopeByNameAnchor,
+  postApiWorkspacesByIdCatalogAgents,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqs,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameDisable,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameEnable,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameSync,
+  postApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolve,
+  postApiWorkspacesByIdCatalogAgentsResolve,
+} from "@glyphs-ai/sdk";
+import { makeSdkClient, resolveWorkspace } from "../../connect.js";
 import { formatError, formatJson, formatTable, pickFormat } from "../../output.js";
 import type { WorkspaceFlagOpts } from "../../registrars/_shared.js";
 import type { CommandResult } from "../../result.js";
-import { buildInstallOrigin, type InstallSourceFlags } from "./_helpers.js";
+import { unwrap } from "../../sdk-client.js";
+import { buildInstallOrigin, type InstallSourceFlags, splitCatalogFqn } from "./_helpers.js";
 
 export type CatalogAgentListOpts = WorkspaceFlagOpts;
 
 export async function catalogAgentList(opts: CatalogAgentListOpts = {}): Promise<CommandResult> {
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const list = await client.call("catalog.agents.list", { params: { id: workspaceId } });
+    const list = unwrap(await getApiWorkspacesByIdCatalogAgents({ path: { id: workspaceId } }));
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
     return {
@@ -38,13 +52,15 @@ export async function catalogAgentResolve(opts: CatalogAgentResolveOpts): Promis
   if ("error" in built) {
     return { exitCode: 2, stderr: `${built.error}\n` };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const plan = await client.call("catalog.agents.resolve", {
-      params: { id: workspaceId },
-      body: { origin: built.origin },
-    });
+    const plan = unwrap(
+      await postApiWorkspacesByIdCatalogAgentsResolve({
+        path: { id: workspaceId },
+        body: { origin: built.origin },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(plan) };
   } catch (err) {
     return formatError(err);
@@ -63,20 +79,25 @@ export async function catalogAgentShow(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
+    const { scope, name: shortName } = splitCatalogFqn(name);
     if (opts.anchor === true) {
       // Dedicated anchor endpoint. Same rationale as
       // `catalogSkillShow` above.
-      const res = await client.call("catalog.agents.anchor.get", {
-        params: { id: workspaceId, name },
-      });
+      const res = unwrap(
+        await getApiWorkspacesByIdCatalogAgentsByScopeByNameAnchor({
+          path: { id: workspaceId, scope, name: shortName },
+        }),
+      );
       return { exitCode: 0, stdout: res.content };
     }
-    const agent = await client.call("catalog.agents.get", {
-      params: { id: workspaceId, name },
-    });
+    const agent = unwrap(
+      await getApiWorkspacesByIdCatalogAgentsByScopeByName({
+        path: { id: workspaceId, scope, name: shortName },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(agent) };
   } catch (err) {
     return formatError(err);
@@ -90,13 +111,15 @@ export async function catalogAgentInstall(opts: CatalogAgentInstallOpts): Promis
   if ("error" in built) {
     return { exitCode: 2, stderr: `${built.error}\n` };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const result = await client.call("catalog.agents.install", {
-      params: { id: workspaceId },
-      body: { origin: built.origin },
-    });
+    const result = unwrap(
+      await postApiWorkspacesByIdCatalogAgents({
+        path: { id: workspaceId },
+        body: { origin: built.origin },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(result) };
   } catch (err) {
     return formatError(err);
@@ -112,12 +135,17 @@ export async function catalogAgentRm(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    await client.call("catalog.agents.delete", {
-      params: { id: workspaceId, name },
-    });
+    const { scope, name: shortName } = splitCatalogFqn(name);
+    // unwrap() even though the value is unused: it preserves the
+    // throw-on-non-2xx behavior (a 404 must surface, not be swallowed).
+    unwrap(
+      await deleteApiWorkspacesByIdCatalogAgentsByScopeByName({
+        path: { id: workspaceId, scope, name: shortName },
+      }),
+    );
     return { exitCode: 0, stdout: `agent ${name} removed\n` };
   } catch (err) {
     return formatError(err);
@@ -134,12 +162,15 @@ export async function catalogAgentSyncResolve(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const plan = await client.call("catalog.agents.sync.resolve", {
-      params: { id: workspaceId, name },
-    });
+    const { scope, name: shortName } = splitCatalogFqn(name);
+    const plan = unwrap(
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolve({
+        path: { id: workspaceId, scope, name: shortName },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(plan) };
   } catch (err) {
     return formatError(err);
@@ -160,13 +191,16 @@ export async function catalogAgentSync(
   if (typeof planToken !== "string" || planToken.trim() === "") {
     return { exitCode: 2, stderr: "--plan-token is required (mint with `agent sync-resolve`)\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const result = await client.call("catalog.agents.sync", {
-      params: { id: workspaceId, name },
-      body: { planToken },
-    });
+    const { scope, name: shortName } = splitCatalogFqn(name);
+    const result = unwrap(
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameSync({
+        path: { id: workspaceId, scope, name: shortName },
+        body: { planToken },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(result) };
   } catch (err) {
     return formatError(err);
@@ -183,12 +217,15 @@ export async function catalogAgentAckPrereqs(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const agent = await client.call("catalog.agents.prereqs.acknowledge", {
-      params: { id: workspaceId, name },
-    });
+    const { scope, name: shortName } = splitCatalogFqn(name);
+    const agent = unwrap(
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqs({
+        path: { id: workspaceId, scope, name: shortName },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(agent) };
   } catch (err) {
     return formatError(err);
@@ -209,12 +246,15 @@ export async function catalogAgentEnable(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const agent = await client.call("catalog.agents.enable", {
-      params: { id: workspaceId, name },
-    });
+    const { scope, name: shortName } = splitCatalogFqn(name);
+    const agent = unwrap(
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameEnable({
+        path: { id: workspaceId, scope, name: shortName },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(agent) };
   } catch (err) {
     return formatError(err);
@@ -224,8 +264,8 @@ export async function catalogAgentEnable(
 export type CatalogAgentDisableOpts = WorkspaceFlagOpts;
 
 /**
- * Disable an agent. Pending tasks still drain; new dispatches fail
- * with `EntryNotReadyError` (`disabledByUser`). Re-enable via
+ * Disable an agent. Pending tasks still drain; new dispatches return
+ * `EntryNotReady` (`disabledByUser`). Re-enable via
  * {@link catalogAgentEnable}.
  */
 export async function catalogAgentDisable(
@@ -235,12 +275,15 @@ export async function catalogAgentDisable(
   if (typeof name !== "string" || name.trim() === "") {
     return { exitCode: 2, stderr: "agent name is required\n" };
   }
-  const client = await makeClient(opts);
+  await makeSdkClient(opts);
   try {
     const workspaceId = await resolveWorkspace(opts);
-    const agent = await client.call("catalog.agents.disable", {
-      params: { id: workspaceId, name },
-    });
+    const { scope, name: shortName } = splitCatalogFqn(name);
+    const agent = unwrap(
+      await postApiWorkspacesByIdCatalogAgentsByScopeByNameDisable({
+        path: { id: workspaceId, scope, name: shortName },
+      }),
+    );
     return { exitCode: 0, stdout: formatJson(agent) };
   } catch (err) {
     return formatError(err);

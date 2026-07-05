@@ -43,8 +43,8 @@ const samplePngBlob: Blob = await fetch(samplePngUrl).then((r) => r.blob());
 
 /**
  * Bodies served by the artifact handler. Key is `<taskId>/<basename>` —
- * the basename matches what `success.artifacts` declares for each task
- * after `extractArtifacts()` strips the absolute-path prefix.
+ * the relPath matches what `success.artifacts` declares for each task
+ * (the artifact's path relative to the task's `artifact/` dir).
  */
 export const artifactBodies = new Map<string, ArtifactPayload>([
   ["single-html/sample.html", { contentType: "text/html", body: sampleHtml }],

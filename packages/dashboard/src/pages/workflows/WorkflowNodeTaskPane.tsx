@@ -1,5 +1,5 @@
-import { type ReactNode, useCallback, useMemo } from "react";
-import type { WorkflowDag, WorkflowHeader, WorkflowNode } from "../../api";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { findTaskByOrigin, type WorkflowDag, type WorkflowHeader } from "../../api";
 import { TaskView } from "../../components/task-view";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
 import { orderNodesForNav } from "./workflow-nav-utils.js";
@@ -49,22 +49,18 @@ export function WorkflowNodeTaskPane({
   onNavigate,
 }: WorkflowNodeTaskPaneProps) {
   const orderedNodes = useMemo(() => {
-    // For the task pane, only nodes with a taskId are navigable.
-    return orderNodesForNav(dag).filter(
-      (n): n is WorkflowNode & { taskId: string } => n.taskId !== undefined,
-    );
+    return orderNodesForNav(dag).filter((n) => n.kind !== "human");
   }, [dag]);
   const currentIndex = useMemo(
-    () => orderedNodes.findIndex((n) => n.taskId === nodeTaskId),
+    () => orderedNodes.findIndex((n) => n.id === nodeTaskId),
     [orderedNodes, nodeTaskId],
   );
   const found = currentIndex !== -1;
 
-  const prevId =
-    found && currentIndex > 0 ? (orderedNodes[currentIndex - 1]?.taskId ?? null) : null;
+  const prevId = found && currentIndex > 0 ? (orderedNodes[currentIndex - 1]?.id ?? null) : null;
   const nextId =
     found && currentIndex < orderedNodes.length - 1
-      ? (orderedNodes[currentIndex + 1]?.taskId ?? null)
+      ? (orderedNodes[currentIndex + 1]?.id ?? null)
       : null;
 
   if (dag === null) {
@@ -111,7 +107,7 @@ export function WorkflowNodeTaskPane({
     <aside className="tasks-pane__detail" data-testid="workflow-node-pane">
       <NodeTaskView
         key={nodeTaskId}
-        nodeTaskId={nodeTaskId}
+        nodeId={nodeTaskId}
         pollIntervalMs={pollIntervalMs}
         headerTrailing={pill}
       />
@@ -224,26 +220,118 @@ function WorkflowNodeNav({
 }
 
 interface NodeTaskViewProps {
-  nodeTaskId: string;
+  nodeId: string;
   pollIntervalMs: number;
   headerTrailing?: ReactNode;
 }
 
 /**
- * Inner remount-keyed view that owns the `useTaskDetail` hook. Same
- * pattern as `FireTaskView`.
+ * Inner remount-keyed view that resolves a workflow worker node to its
+ * latest underlying task, then owns the `useTaskDetail` hook for that task.
+ *
+ * A workflow node id is NOT a task id: the coordinator spawns a task per
+ * worker node (retries spawn fresh tasks), and the `(origin: "workflow",
+ * originId: nodeId)` linkage is owned by the task read-model. We resolve the
+ * node id to its latest task via {@link findTaskByOrigin}, then feed the real
+ * task id to `useTaskDetail`. Same remount-keyed pattern as `FireTaskView`.
  */
-function NodeTaskView({ nodeTaskId, pollIntervalMs, headerTrailing }: NodeTaskViewProps) {
-  const { task, activity, activityError, loadOlder } = useTaskDetail(nodeTaskId, pollIntervalMs);
+function NodeTaskView({ nodeId, pollIntervalMs, headerTrailing }: NodeTaskViewProps) {
+  const [resolvedTaskId, setResolvedTaskId] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(true);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  // Monotonic request id so a slow resolve from a previous node cannot
+  // overwrite the current node's resolution after a fast node switch.
+  const seqRef = useRef(0);
+
+  useEffect(() => {
+    const seq = ++seqRef.current;
+    setResolving(true);
+    setResolveError(null);
+    setResolvedTaskId(null);
+    findTaskByOrigin("workflow", nodeId)
+      .then((task) => {
+        if (seq !== seqRef.current) return;
+        setResolvedTaskId(task?.id ?? null);
+        setResolving(false);
+      })
+      .catch((err: unknown) => {
+        if (seq !== seqRef.current) return;
+        setResolveError(err instanceof Error ? err.message : String(err));
+        setResolving(false);
+      });
+  }, [nodeId]);
+
+  const { task, activity, activityError, loadOlder } = useTaskDetail(
+    resolvedTaskId,
+    pollIntervalMs,
+  );
   const handleLoadOlder = useCallback(() => loadOlder(), [loadOlder]);
+
+  if (resolving) {
+    return (
+      <NodeTaskStatus headerTrailing={headerTrailing}>
+        <p className="muted" style={{ padding: 16 }}>
+          Loading task…
+        </p>
+      </NodeTaskStatus>
+    );
+  }
+
+  if (resolveError !== null) {
+    return (
+      <NodeTaskStatus headerTrailing={headerTrailing}>
+        <div className="empty" style={{ padding: 16 }}>
+          <p className="empty__title">Couldn't load task</p>
+          <p className="empty__hint">{resolveError}</p>
+        </div>
+      </NodeTaskStatus>
+    );
+  }
+
+  if (resolvedTaskId === null) {
+    return (
+      <NodeTaskStatus headerTrailing={headerTrailing}>
+        <div className="empty" style={{ padding: 16 }} data-testid="workflow-node-no-task">
+          <p className="empty__title">No task yet</p>
+          <p className="empty__hint">
+            This node hasn't dispatched a task yet — it may still be waiting on its parents.
+          </p>
+        </div>
+      </NodeTaskStatus>
+    );
+  }
+
   return (
     <TaskView
       task={task}
-      requestedTaskId={nodeTaskId}
+      requestedTaskId={resolvedTaskId}
       activity={activity}
       activityError={activityError}
       onLoadOlder={handleLoadOlder}
       headerTrailing={headerTrailing}
     />
+  );
+}
+
+/**
+ * Wrapper that keeps the node-navigation pill (`headerTrailing`) visible
+ * while the node's task is still resolving, absent, or errored — the pill
+ * is inter-node navigation and must not disappear just because the current
+ * node's task hasn't loaded.
+ */
+function NodeTaskStatus({
+  headerTrailing,
+  children,
+}: {
+  headerTrailing?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      {headerTrailing !== undefined ? (
+        <div className="tasks-pane__detail-headerbar">{headerTrailing}</div>
+      ) : null}
+      {children}
+    </div>
   );
 }

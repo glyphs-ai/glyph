@@ -1,15 +1,15 @@
 /**
  * Tests for `makeCoordNodeRunner`. Mirrors the structure of the
  * sibling worker runner tests
- * (`workflow-worker-task-runner.test.ts`) — same `vi`-based `TaskService` /
- * `CatalogService` stubs, same `vi.useFakeTimers()` pattern for the
+ * (`workflow-worker-task-runner.test.ts`) — same `vi`-based `TaskModule` /
+ * `CatalogAgentLookup` stubs, same `vi.useFakeTimers()` pattern for the
  * poll-tick scenarios, same `fakeTaskRow` helper.
  *
  * The kind-specific concerns the coord runner owns and these tests
  * exercise:
  *
  *   - validate: strict coord spec shape + agent-existence lookup
- *     (`AgentNotFoundError` / `AgentResolutionFailedError`)
+ *     (`AgentNotFound` / `AgentResolutionFailed` task unions)
  *   - dispatch: reads the workflow header via `getService` thunk;
  *     synthesises `origin: 'workflow'` + canonical
  *     node id in the typed `origin_id` column (reverse-lookup); conditional
@@ -17,23 +17,45 @@
  *   - poll loop status→terminal mapping (`succeeded` / `failed` /
  *     `cancelled` / `null` task), runner-local error budget exhaustion
  *   - hasInFlightForNode delegation to
- *     `tasks.hasInFlightForWorkflowNode`
- *   - cancel reverse-lookup + per-task `tasks.cancel(...)`,
+ *     `tasks.hasInFlightByOrigin.execute`
+ *   - cancel reverse-lookup + per-task `tasks.cancelTask.execute(...)`,
  *     best-effort behaviour when a per-task cancel throws
  *   - dispose clears every armed interval (no `setInterval` leaks)
  */
 
-import type { CatalogService } from "@glyphs-ai/catalog";
-import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { TaskModule } from "@glyphs-ai/task";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
+import type { ResultAsync } from "neverthrow";
+import { errAsync, okAsync } from "neverthrow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  COORD_FRAMING_PROMPT_COPILOT,
   DEFAULT_COORD_MAX_POLL_ERRORS,
   DEFAULT_COORD_POLL_INTERVAL_MS,
   makeCoordNodeRunner,
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "../../src/wiring/workflow-coord-task-runner.js";
+
+async function errCause<T>(
+  resultAsync: ResultAsync<T, { readonly cause: unknown }>,
+): Promise<unknown> {
+  const result = await resultAsync;
+  expect(result.isErr()).toBe(true);
+  return result._unsafeUnwrapErr().cause;
+}
+
+describe("COORD_FRAMING_PROMPT_COPILOT", () => {
+  it("is single-line printable ASCII (safe as a cmd.exe /c argv element)", () => {
+    // cmd.exe treats an LF inside a `/c` payload as a statement separator, so
+    // the shipped coord framing prompt must stay single-line printable ASCII.
+    // task re-validates the forwarded prompt on every dispatch; this pins
+    // the invariant on the shipped default at test time.
+    expect(COORD_FRAMING_PROMPT_COPILOT).toMatch(/^[\x20-\x7e]+$/);
+  });
+});
+
+type CatalogAgentLookup = Parameters<typeof makeCoordNodeRunner>[0]["catalog"];
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal Task stub for status-mapping tests; full Task type not needed.
 function fakeTaskRow(overrides: Partial<{ id: string; status: string }> = {}): any {
@@ -81,7 +103,7 @@ function stubDeps(
     // biome-ignore lint/suspicious/noExplicitAny: stub return shape mirrors fakeWorkflowRow.
     getWorkflowReturn?: any;
     getWorkflowThrows?: Error;
-    serviceFromThunk?: WorkflowService | null | undefined;
+    serviceFromThunk?: WorkflowModule | null | undefined;
   } = {},
 ) {
   const getAgent = vi.fn(async (_fqn: string) => {
@@ -95,33 +117,39 @@ function stubDeps(
       ? { name: "default-agent", dependencies: { agents: [{ fqn: "w" }] } }
       : opts.agent;
   });
-  const dispatch = vi.fn(async () => opts.dispatchReturn ?? fakeTaskRow({ id: "task-id-1" }));
-  const get = vi.fn(async (_id: string) => {
-    if (opts.getThrows !== undefined) throw opts.getThrows;
-    return opts.getReturn !== undefined ? opts.getReturn : fakeTaskRow();
+  const dispatch = vi.fn(() => okAsync(opts.dispatchReturn ?? fakeTaskRow({ id: "task-id-1" })));
+  const get = vi.fn((_req: { id: string }) => {
+    if (opts.getThrows !== undefined) {
+      return errAsync({ type: "DatabaseUnavailable" as const, cause: opts.getThrows });
+    }
+    return okAsync(opts.getReturn !== undefined ? opts.getReturn : fakeTaskRow());
   });
-  const hasInFlightForWorkflowNode = vi.fn(async () => opts.hasInFlightReturn ?? false);
-  const listInFlightForWorkflowNode = vi.fn(async () => {
-    if (opts.listInFlightThrows !== undefined) throw opts.listInFlightThrows;
-    return opts.listInFlightReturn ?? [];
+  const hasInFlightForWorkflowNode = vi.fn(() => okAsync(opts.hasInFlightReturn ?? false));
+  const listInFlightForWorkflowNode = vi.fn(() => {
+    if (opts.listInFlightThrows !== undefined) {
+      return errAsync({ type: "DatabaseUnavailable" as const, cause: opts.listInFlightThrows });
+    }
+    return okAsync(opts.listInFlightReturn ?? []);
   });
-  const cancel = vi.fn(async (_id: string) => {});
-  const catalog = { getAgent } as unknown as CatalogService;
+  const cancel = vi.fn((_req: { id: string }) => okAsync(fakeTaskRow()));
+  const catalog = { getAgent } as unknown as CatalogAgentLookup;
   const tasks = {
-    dispatch,
-    get,
-    hasInFlightForWorkflowNode,
-    listInFlightForWorkflowNode,
-    cancel,
-  } as unknown as TaskService;
+    dispatchTask: { execute: dispatch },
+    getTask: { execute: get },
+    hasInFlightByOrigin: { execute: hasInFlightForWorkflowNode },
+    listInFlightByOrigin: { execute: listInFlightForWorkflowNode },
+    cancelTask: { execute: cancel },
+  } as unknown as TaskModule;
 
-  const getWorkflow = vi.fn(async (_id: string) => {
+  const getWorkflow = vi.fn((_request: { workflowId: string }) => {
     if (opts.getWorkflowThrows !== undefined) throw opts.getWorkflowThrows;
-    return opts.getWorkflowReturn !== undefined ? opts.getWorkflowReturn : fakeWorkflowRow();
+    return okAsync(
+      opts.getWorkflowReturn !== undefined ? opts.getWorkflowReturn : fakeWorkflowRow(),
+    );
   });
-  const fakeService = { getWorkflow } as unknown as WorkflowService;
+  const fakeService = { getWorkflow: { execute: getWorkflow } } as unknown as WorkflowModule;
   const serviceFromThunk = "serviceFromThunk" in opts ? opts.serviceFromThunk : fakeService;
-  const getService = vi.fn(() => serviceFromThunk as unknown as WorkflowService);
+  const getService = vi.fn(() => serviceFromThunk as unknown as WorkflowModule);
 
   return {
     catalog,
@@ -152,7 +180,6 @@ const DISPATCH_OPTS_BASE = {
   workflowId: "20260101-deadbeef",
   nodeId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
   spec: { agent: "coord-agent" } as unknown,
-  nodeDir: "/tmp/node-dir",
 };
 
 /**
@@ -174,7 +201,7 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    const result = await r.validate({ agent: "x" }, NODE_VALIDATE_CTX);
+    const result = (await r.validate({ agent: "x" }, NODE_VALIDATE_CTX))._unsafeUnwrap();
     expect(result).toEqual({ agent: "x" });
     expect(deps.getAgent).toHaveBeenCalledWith("x");
     await r.dispose();
@@ -188,8 +215,13 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({}, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowCoordSpecError);
-    await expect(r.validate({}, NODE_VALIDATE_CTX)).rejects.toThrow(/agent/);
+    expect(await errCause(r.validate({}, NODE_VALIDATE_CTX))).toBeInstanceOf(
+      WorkflowCoordSpecError,
+    );
+    expect(await errCause(r.validate({}, NODE_VALIDATE_CTX))).toHaveProperty(
+      "message",
+      expect.stringMatching(/agent/),
+    );
     await r.dispose();
   });
 
@@ -201,10 +233,13 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ agent: "" }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordSpecError,
     );
-    await expect(r.validate({ agent: "" }, NODE_VALIDATE_CTX)).rejects.toThrow(/non-empty/);
+    expect(await errCause(r.validate({ agent: "" }, NODE_VALIDATE_CTX))).toHaveProperty(
+      "message",
+      expect.stringMatching(/non-empty/),
+    );
     await r.dispose();
   });
 
@@ -216,7 +251,7 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "   " }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ agent: "   " }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordSpecError,
     );
     await r.dispose();
@@ -230,7 +265,7 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "x", extra: 1 }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ agent: "x", extra: 1 }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordSpecError,
     );
     await r.dispose();
@@ -244,7 +279,7 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate(null, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate(null, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordSpecError,
     );
     await r.dispose();
@@ -258,7 +293,9 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate("x", NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowCoordSpecError);
+    expect(await errCause(r.validate("x", NODE_VALIDATE_CTX))).toBeInstanceOf(
+      WorkflowCoordSpecError,
+    );
     await r.dispose();
   });
 
@@ -270,11 +307,13 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate([], NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(WorkflowCoordSpecError);
+    expect(await errCause(r.validate([], NODE_VALIDATE_CTX))).toBeInstanceOf(
+      WorkflowCoordSpecError,
+    );
     await r.dispose();
   });
 
-  it("U9: throws AgentNotFoundError when catalog returns null", async () => {
+  it("U9: throws AgentNotFound DU when catalog returns null", async () => {
     const deps = stubDeps({ agent: null });
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
@@ -282,13 +321,14 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "missing" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
-      AgentNotFoundError,
-    );
+    expect(await errCause(r.validate({ agent: "missing" }, NODE_VALIDATE_CTX))).toMatchObject({
+      type: "AgentNotFound",
+      agent: "missing",
+    });
     await r.dispose();
   });
 
-  it("U10: throws AgentResolutionFailedError wrapping the cause when catalog throws", async () => {
+  it("U10: throws AgentResolutionFailed DU carrying the cause when catalog throws", async () => {
     const cause = new Error("catalog down");
     const deps = stubDeps({ getAgentThrows: cause });
     const r = makeCoordNodeRunner({
@@ -297,19 +337,10 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    let captured: unknown;
-    try {
-      await r.validate({ agent: "x" }, NODE_VALIDATE_CTX);
-    } catch (err) {
-      captured = err;
-    }
-    expect(captured).toBeInstanceOf(AgentResolutionFailedError);
-    // AgentResolutionFailedError exposes the original error; assert
-    // the wrapping carried the cause.
-    const wrapped = captured as AgentResolutionFailedError & { cause?: unknown };
-    expect(wrapped.cause === cause || (wrapped as unknown as { err?: unknown }).err === cause).toBe(
-      true,
-    );
+    const captured = await errCause(r.validate({ agent: "x" }, NODE_VALIDATE_CTX));
+    expect(captured).toMatchObject({ type: "AgentResolutionFailed", agent: "x" });
+    // The AgentResolutionFailed atom carries the original error as `cause`.
+    expect((captured as { cause?: unknown }).cause).toBe(cause);
     await r.dispose();
   });
 
@@ -335,7 +366,9 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    const result = await r.validate({ agent: "capable-coord" }, NODE_VALIDATE_CTX);
+    const result = (
+      await r.validate({ agent: "capable-coord" }, NODE_VALIDATE_CTX)
+    )._unsafeUnwrap();
     expect(result).toEqual({ agent: "capable-coord" });
     await r.dispose();
   });
@@ -354,11 +387,12 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX)).rejects.toBeInstanceOf(
+    expect(await errCause(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX))).toBeInstanceOf(
       WorkflowCoordAgentNotCapableError,
     );
-    await expect(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX)).rejects.toThrow(
-      /dispatch menu|dependencies\.agents/,
+    expect(await errCause(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX))).toHaveProperty(
+      "message",
+      expect.stringMatching(/dispatch menu|dependencies\.agents/),
     );
     await r.dispose();
   });
@@ -377,15 +411,15 @@ describe("makeCoordNodeRunner — validate", () => {
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    await expect(
-      r.validate({ agent: "empty-menu-coord" }, NODE_VALIDATE_CTX),
-    ).rejects.toBeInstanceOf(WorkflowCoordAgentNotCapableError);
+    expect(
+      await errCause(r.validate({ agent: "empty-menu-coord" }, NODE_VALIDATE_CTX)),
+    ).toBeInstanceOf(WorkflowCoordAgentNotCapableError);
     await r.dispose();
   });
 });
 
 describe("makeCoordNodeRunner — dispatch", () => {
-  it("U11: reads workflow header via getService and calls tasks.dispatch with brief+details from header", async () => {
+  it("U11: reads workflow header via getService and calls tasks.dispatchTask.execute with brief+details from header", async () => {
     const deps = stubDeps({
       getWorkflowReturn: fakeWorkflowRow({ brief: "wf brief", details: "wf details" }),
       // biome-ignore lint/suspicious/noExplicitAny: stub return shape mirrors fakeTaskRow.
@@ -398,12 +432,14 @@ describe("makeCoordNodeRunner — dispatch", () => {
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100_000, // never poll during this test
     });
-    const result = await r.dispatch({
-      ...DISPATCH_OPTS_BASE,
-      onTerminal: () => {},
-    });
+    const result = (
+      await r.dispatch({
+        ...DISPATCH_OPTS_BASE,
+        onTerminal: () => {},
+      })
+    )._unsafeUnwrap();
     expect(deps.getService).toHaveBeenCalledTimes(1);
-    expect(deps.getWorkflow).toHaveBeenCalledWith("20260101-deadbeef");
+    expect(deps.getWorkflow).toHaveBeenCalledWith({ workflowId: "20260101-deadbeef" });
     expect(deps.dispatch).toHaveBeenCalledWith({
       agent: "coord-agent",
       brief: "wf brief",
@@ -550,12 +586,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100_000,
     });
-    let captured: unknown;
-    try {
-      await r.dispatch({ ...DISPATCH_OPTS_BASE, onTerminal: () => {} });
-    } catch (err) {
-      captured = err;
-    }
+    const captured = await errCause(r.dispatch({ ...DISPATCH_OPTS_BASE, onTerminal: () => {} }));
     expect(captured).toBeInstanceOf(Error);
     expect((captured as Error).message).toContain("composeWorkflowModule");
     expect(deps.dispatch).not.toHaveBeenCalled();
@@ -684,7 +715,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
     await r.dispose();
   });
 
-  it("U18: maps tasks.get → null → onTerminal({status:'failed', reason:'task not found'})", async () => {
+  it("U18: maps tasks.getTask.execute → null → onTerminal({status:'failed', reason:'task not found'})", async () => {
     const deps = stubDeps({ getReturn: null });
     const onTerminal = vi.fn();
     const r = makeCoordNodeRunner({
@@ -706,7 +737,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
 });
 
 describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => {
-  it("U19: hasInFlightForNode delegates to tasks.hasInFlightForWorkflowNode", async () => {
+  it("U19: hasInFlightForNode delegates to tasks.hasInFlightByOrigin.execute", async () => {
     const deps = stubDeps({ hasInFlightReturn: true });
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
@@ -714,15 +745,18 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
       getService: deps.getService,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
-    const result = await r.hasInFlightForNode("deadbeef-cafe-4bab-89ab-cafebabe1234");
+    const result = (
+      await r.hasInFlightForNode("deadbeef-cafe-4bab-89ab-cafebabe1234")
+    )._unsafeUnwrap();
     expect(result).toBe(true);
-    expect(deps.hasInFlightForWorkflowNode).toHaveBeenCalledWith(
-      "deadbeef-cafe-4bab-89ab-cafebabe1234",
-    );
+    expect(deps.hasInFlightForWorkflowNode).toHaveBeenCalledWith({
+      origin: "workflow",
+      originId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
+    });
     await r.dispose();
   });
 
-  it("U20: cancel reverse-looks-up via tasks.listInFlightForWorkflowNode and calls tasks.cancel for each + clears any local interval", async () => {
+  it("U20: cancel reverse-looks-up via tasks.listInFlightByOrigin.execute and calls tasks.cancelTask.execute for each + clears any local interval", async () => {
     vi.useFakeTimers();
     try {
       const deps = stubDeps({
@@ -743,12 +777,13 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
       const pollsBeforeCancel = deps.get.mock.calls.length;
       expect(pollsBeforeCancel).toBeGreaterThanOrEqual(1);
       await r.cancel("deadbeef-cafe-4bab-89ab-cafebabe1234");
-      expect(deps.listInFlightForWorkflowNode).toHaveBeenCalledWith(
-        "deadbeef-cafe-4bab-89ab-cafebabe1234",
-      );
+      expect(deps.listInFlightForWorkflowNode).toHaveBeenCalledWith({
+        origin: "workflow",
+        originId: "deadbeef-cafe-4bab-89ab-cafebabe1234",
+      });
       expect(deps.cancel).toHaveBeenCalledTimes(2);
-      expect(deps.cancel).toHaveBeenCalledWith("t-a");
-      expect(deps.cancel).toHaveBeenCalledWith("t-b");
+      expect(deps.cancel).toHaveBeenCalledWith({ id: "t-a" });
+      expect(deps.cancel).toHaveBeenCalledWith({ id: "t-b" });
       // Interval cleared by cancel — further timer advance must not
       // produce additional polls.
       await vi.advanceTimersByTimeAsync(500);
@@ -759,14 +794,17 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
     }
   });
 
-  it("U21: cancel survives tasks.cancel throwing on one task (best-effort, continues)", async () => {
+  it("U21: cancel survives tasks.cancelTask.execute throwing on one task (best-effort, continues)", async () => {
     const deps = stubDeps({
       listInFlightReturn: [fakeTaskRow({ id: "t-a" }), fakeTaskRow({ id: "t-b" })],
     });
-    // biome-ignore lint/suspicious/noExplicitAny: test-only override of the stubbed facade.
-    (deps.tasks as any).cancel = vi.fn(async (id: string) => {
-      if (id === "t-a") throw new Error("cancel boom");
+    const cancel = vi.fn((req: { id: string }) => {
+      if (req.id === "t-a") {
+        return errAsync({ type: "DatabaseUnavailable" as const, cause: new Error("cancel boom") });
+      }
+      return okAsync(fakeTaskRow({ id: req.id }));
     });
+    (deps.tasks.cancelTask as unknown as { execute: typeof cancel }).execute = cancel;
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
@@ -775,8 +813,7 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
     });
     // Should NOT throw; the runner logs and continues.
     await r.cancel("deadbeef-cafe-4bab-89ab-cafebabe1234");
-    // biome-ignore lint/suspicious/noExplicitAny: test-only access to the overridden mock.
-    expect((deps.tasks as any).cancel).toHaveBeenCalledTimes(2);
+    expect(cancel).toHaveBeenCalledTimes(2);
     await r.dispose();
   });
 

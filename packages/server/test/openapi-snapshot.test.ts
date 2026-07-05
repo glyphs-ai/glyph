@@ -14,28 +14,32 @@
  * API surface, never the version string, drives the diff.
  */
 
-import { type Application, listRoutes, type WorkspaceContext } from "@glyphs-ai/api";
-import type { CatalogService } from "@glyphs-ai/catalog";
-import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
-import type { ScheduleService } from "@glyphs-ai/schedule";
-import type { SessionService } from "@glyphs-ai/session";
-import type { TaskService } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import type { Application, WorkspaceContext } from "@glyphs-ai/api";
+import {
+  catalogRoutes,
+  configRoutes,
+  healthRoutes,
+  injectWorkspaceIdParam,
+  runtimesRoutes,
+  scheduledTasksRoutes,
+  scheduledWorkflowsRoutes,
+  schedulesPreviewCronRoutes,
+  schedulesTaskRoutes,
+  schedulesWorkflowRoutes,
+  sessionsRoutes,
+  tasksRoutes,
+  workflowsRoutes,
+  workspacesRoutes,
+} from "@glyphs-ai/api";
+import type { CatalogModule } from "@glyphs-ai/catalog";
+import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
+import type { ScheduleModule } from "@glyphs-ai/schedule";
+import type { TaskModule } from "@glyphs-ai/task";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { describe, expect, it } from "vitest";
-import { createApiApp } from "../src/routes/_openapi.js";
-import { catalogRoutes } from "../src/routes/catalog/index.js";
-import { configRoutes } from "../src/routes/config.js";
-import { healthRoutes } from "../src/routes/health.js";
-import { runtimesRoutes } from "../src/routes/runtimes.js";
-import { scheduledTasksRoutes } from "../src/routes/scheduled-tasks.js";
-import { scheduledWorkflowsRoutes } from "../src/routes/scheduled-workflows.js";
-import { schedulesRoutes } from "../src/routes/schedules.js";
-import { sessionsRoutes } from "../src/routes/sessions.js";
-import { tasksRoutes } from "../src/routes/tasks.js";
-import { workflowsRoutes } from "../src/routes/workflows.js";
-import { workspacesRoutes } from "../src/routes/workspaces.js";
+import { createApiApp, registerOpenApiDoc } from "../src/routes/_openapi.js";
 
 /**
  * Mirror of `runServer`'s mount tree, parameterised over deps so the
@@ -61,7 +65,7 @@ function buildOpenApiAppForTest(): OpenAPIHono {
     }),
   );
 
-  const runtimeRegistry = new RuntimeRegistry();
+  const runtimeRegistry = new InMemoryRuntimeRegistry();
   runtimeRegistry.register(new CopilotRuntime({ sharedDir: "/tmp/shared" }));
   app.route("/api/runtimes", runtimesRoutes(runtimeRegistry));
 
@@ -97,11 +101,19 @@ function buildOpenApiAppForTest(): OpenAPIHono {
 
   const schedulesApp = createApiApp();
   schedulesApp.route(
-    "/:id/schedules",
-    schedulesRoutes(
+    "/:id/schedules/task",
+    schedulesTaskRoutes(() => stubScheduleService()),
+  );
+  schedulesApp.route(
+    "/:id/schedules/workflow",
+    schedulesWorkflowRoutes(
       () => stubScheduleService(),
       () => stubWorkflowService(),
     ),
+  );
+  schedulesApp.route(
+    "/:id/schedules/preview-cron",
+    schedulesPreviewCronRoutes(() => stubScheduleService()),
   );
   app.route("/api/workspaces", schedulesApp);
 
@@ -119,7 +131,7 @@ function buildOpenApiAppForTest(): OpenAPIHono {
   const catalogApp = createApiApp();
   catalogApp.route(
     "/:id/catalog",
-    catalogRoutes(() => stubCatalogFacade()),
+    catalogRoutes(() => stubCatalogModule()),
   );
   app.route("/api/workspaces", catalogApp);
 
@@ -129,49 +141,38 @@ function buildOpenApiAppForTest(): OpenAPIHono {
 describe("openapi spec", () => {
   it("assembled /api/openapi.json matches the committed snapshot", () => {
     const app = buildOpenApiAppForTest();
-    const doc = app.getOpenAPI31Document({
-      openapi: "3.1.0",
-      info: { title: "@glyphs-ai/server", version: "0.0.0" },
-    });
-    expect(doc).toMatchSnapshot();
-  });
-
-  it("documents one operation per registered route", () => {
-    const app = buildOpenApiAppForTest();
-    const doc = app.getOpenAPI31Document({
-      openapi: "3.1.0",
-      info: { title: "@glyphs-ai/server", version: "0.0.0" },
-    });
-    const operationCount = Object.values(doc.paths ?? {}).reduce(
-      (sum, item) =>
-        sum +
-        Object.keys(item as Record<string, unknown>).filter((k) =>
-          ["get", "post", "patch", "delete", "put"].includes(k),
-        ).length,
-      0,
+    const doc = injectWorkspaceIdParam(
+      app.getOpenAPI31Document({
+        openapi: "3.1.0",
+        info: { title: "@glyphs-ai/server", version: "0.0.0" },
+      }),
     );
-    // The OpenAPI surface mirrors the route manifest exactly: every
-    // handler is registered via `app.openapi(...)`, so the count of
-    // documented operations equals the manifest's route count.
-    expect(operationCount).toBe(listRoutes().length);
+    expect(doc).toMatchSnapshot();
   });
 
   it("GET /api/openapi.json serves the assembled 3.1 document", async () => {
     const app = buildOpenApiAppForTest();
-    app.doc31("/api/openapi.json", {
+    registerOpenApiDoc(app, "/api/openapi.json", {
       openapi: "3.1.0",
       info: { title: "@glyphs-ai/server", version: "0.0.0" },
     });
     const res = await app.request("/api/openapi.json");
     expect(res.status).toBe(200);
-    const doc = (await res.json()) as { openapi: string; paths: Record<string, unknown> };
+    const doc = (await res.json()) as {
+      openapi: string;
+      paths: Record<string, Record<string, { parameters?: Array<{ name: string; in: string }> }>>;
+    };
     expect(doc.openapi).toBe("3.1.0");
     expect(doc.paths["/api/health"]).toBeDefined();
+    // The mount-level workspace `id` is injected into every nested
+    // operation's parameters (see `injectWorkspaceIdParam`).
+    const nested = doc.paths["/api/workspaces/{id}/workflows"]?.get;
+    expect(nested?.parameters?.some((p) => p.name === "id" && p.in === "path")).toBe(true);
   });
 
   it("GET /api/docs serves Swagger UI", async () => {
     const app = buildOpenApiAppForTest();
-    app.doc31("/api/openapi.json", {
+    registerOpenApiDoc(app, "/api/openapi.json", {
       openapi: "3.1.0",
       info: { title: "@glyphs-ai/server", version: "0.0.0" },
     });
@@ -203,42 +204,42 @@ function stubApplication(): Application {
   });
 }
 
-function stubSessionManager(): SessionService {
-  return new Proxy({} as SessionService, {
+function stubSessionManager(): WorkspaceContext["sessions"] {
+  return new Proxy({} as WorkspaceContext["sessions"], {
     get() {
       throw new Error("stubSessionManager: not callable");
     },
   });
 }
 
-function stubTaskManager(): TaskService {
-  return new Proxy({} as TaskService, {
+function stubTaskManager(): TaskModule {
+  return new Proxy({} as TaskModule, {
     get() {
       throw new Error("stubTaskManager: not callable");
     },
   });
 }
 
-function stubScheduleService(): ScheduleService {
-  return new Proxy({} as ScheduleService, {
+function stubScheduleService(): ScheduleModule {
+  return new Proxy({} as ScheduleModule, {
     get() {
-      throw new Error("stubScheduleService: not callable");
+      throw new Error("stubScheduleModule: not callable");
     },
   });
 }
 
-function stubWorkflowService(): WorkflowService {
-  return new Proxy({} as WorkflowService, {
+function stubWorkflowService(): WorkflowModule {
+  return new Proxy({} as WorkflowModule, {
     get() {
       throw new Error("stubWorkflowService: not callable");
     },
   });
 }
 
-function stubCatalogFacade(): CatalogService {
-  return new Proxy({} as CatalogService, {
+function stubCatalogModule(): CatalogModule {
+  return new Proxy({} as CatalogModule, {
     get() {
-      throw new Error("stubCatalogFacade: not callable");
+      throw new Error("stubCatalogModule: not callable");
     },
   });
 }

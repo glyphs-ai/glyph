@@ -5,7 +5,7 @@
  *   Uses Vitest's `expectTypeOf<T>()` to lock the pkg's public surface
  *   at the TYPE level. `@glyphs-ai/runtime` has no central Service class
  *   — its public surface is a SET of exported classes (`CopilotRuntime`,
- *   `RuntimeRegistry`), free functions
+ *   `InMemoryRuntimeRegistry`), free functions
  *   (`assertCopilotSdkResolvable`, `launchCopilotHeadless`,
  *   `substitutePlaceholders`, `substitutePlaceholdersDeep`,
  *   `flattenSkillName`, `isPathCovered`, `generateCopilotSessionId`,
@@ -45,6 +45,7 @@
  * classes on a larger package surface.
  */
 
+import type { ResultAsync } from "neverthrow";
 import { describe, expectTypeOf, it } from "vitest";
 import {
   type ActivityItem,
@@ -64,7 +65,7 @@ import {
   type EventBuffer,
   flattenSkillName,
   generateCopilotSessionId,
-  InvalidMcpJson,
+  InMemoryRuntimeRegistry,
   isCopilotSessionId,
   isPathCovered,
   type LaunchCommand,
@@ -79,17 +80,16 @@ import {
   type ReadActivityOpts,
   type ResolvedAgent,
   type Runtime,
+  type RuntimeActivityReadFailed,
   type RuntimeCapabilities,
-  RuntimeDoesNotSupportRemoteError,
   type RuntimeExit,
   type RuntimeHandle,
-  RuntimeHeadlessLaunchFailed,
-  RuntimeProvisionFailed,
-  RuntimeReadActivityInvalidArgs,
-  RuntimeReadMetadataFailed,
-  RuntimeRegistry,
+  type RuntimeHeadlessLaunchFailed,
+  type RuntimeLaunchFailed,
+  type RuntimeProvisionFailed,
+  type RuntimeRegistry,
   type RuntimeSessionMetadata,
-  RuntimeStateDeletionFailed,
+  type RuntimeStateDeletionFailed,
   type SHARED_SUBDIR,
   type StreamActivityOpts,
   type SummaryItem,
@@ -102,29 +102,36 @@ import {
   type TokenUsage,
   type ToolCallItem,
   type TruncationInfo,
-  TrustRegistrationFailed,
   UnknownPlaceholderError,
-  UnknownRuntimeError,
+  type UnknownRuntime,
   type UserItem,
 } from "../src/index.js";
 
 describe("@glyphs-ai/runtime public API guard", () => {
-  it("exports the concrete error classes with their canonical constructor signatures", () => {
+  it("exports the runtime error atoms as discriminated-union types", () => {
+    // The runtime surfaces failures as DU atom VALUES flowing through
+    // neverthrow `Result`, not thrown classes. Each atom is identified by
+    // its `type` discriminant; locking the discriminants here pins the
+    // error vocabulary consumers switch on.
+    expectTypeOf<UnknownRuntime["type"]>().toEqualTypeOf<"UnknownRuntime">();
+    expectTypeOf<RuntimeProvisionFailed["type"]>().toEqualTypeOf<"RuntimeProvisionFailed">();
+    expectTypeOf<RuntimeLaunchFailed["type"]>().toEqualTypeOf<"RuntimeLaunchFailed">();
+    expectTypeOf<
+      RuntimeHeadlessLaunchFailed["type"]
+    >().toEqualTypeOf<"RuntimeHeadlessLaunchFailed">();
+    expectTypeOf<RuntimeActivityReadFailed["type"]>().toEqualTypeOf<"RuntimeActivityReadFailed">();
+    expectTypeOf<
+      RuntimeStateDeletionFailed["type"]
+    >().toEqualTypeOf<"RuntimeStateDeletionFailed">();
+  });
+
+  it("exports the remaining concrete error classes (boot + placeholder faults)", () => {
+    // Two faults stay thrown classes: the boot-time SDK preflight
+    // (outside the Result flow — it fails server startup) and placeholder
+    // substitution (consumed internally by provision).
     const errs: Error[] = [
-      // Runtime-generic errors (`../src/errors.ts`).
-      new UnknownRuntimeError("copilot"),
-      new RuntimeReadMetadataFailed("copilot", "sid", new Error("upstream")),
-      new RuntimeStateDeletionFailed("copilot", "sid", new Error("upstream")),
-      new RuntimeProvisionFailed("copilot", "/workdir", new Error("upstream")),
-      new RuntimeHeadlessLaunchFailed("copilot", "/workdir", new Error("upstream")),
-      new RuntimeDoesNotSupportRemoteError("gemini"),
-      new RuntimeReadActivityInvalidArgs("before and after are mutually exclusive"),
-      // Placeholder substitution.
-      new UnknownPlaceholderError("typoDir", "mcp:public/playwright"),
-      // Copilot-specific errors (`../src/copilot/errors.ts`).
-      new InvalidMcpJson("public/playwright", new Error("upstream")),
       new CopilotSdkUnavailableError(new Error("ERR_MODULE_NOT_FOUND")),
-      new TrustRegistrationFailed("/cfg.json", "/workspace", new Error("upstream")),
+      new UnknownPlaceholderError("typoDir", "mcp:public/playwright"),
     ];
     expectTypeOf(errs[0]!).toExtend<Error>();
   });
@@ -136,13 +143,21 @@ describe("@glyphs-ai/runtime public API guard", () => {
     expectTypeOf<Runtime>().toHaveProperty("provision");
     expectTypeOf<Runtime>().toHaveProperty("buildInteractiveLaunch");
     expectTypeOf<Runtime["provision"]>().toEqualTypeOf<
-      (opts: ProvisionOpts) => Promise<{ runtimeSessionId: string | null }>
+      (
+        opts: ProvisionOpts,
+      ) => ResultAsync<{ runtimeSessionId: string | null }, RuntimeProvisionFailed>
     >();
     expectTypeOf<Runtime["buildInteractiveLaunch"]>().toEqualTypeOf<
-      (runtimeSessionId: string | null, opts: BuildInteractiveLaunchOpts) => Promise<LaunchCommand>
+      (
+        runtimeSessionId: string | null,
+        opts: BuildInteractiveLaunchOpts,
+      ) => ResultAsync<LaunchCommand, RuntimeLaunchFailed>
     >();
     expectTypeOf<NonNullable<Runtime["readActivity"]>>().toEqualTypeOf<
-      (runtimeSessionId: string, opts?: ReadActivityOpts) => Promise<ActivityResult | null>
+      (
+        runtimeSessionId: string,
+        opts?: ReadActivityOpts,
+      ) => ResultAsync<ActivityResult | null, RuntimeActivityReadFailed>
     >();
     expectTypeOf<NonNullable<Runtime["streamActivity"]>>().toEqualTypeOf<
       (runtimeSessionId: string, opts?: StreamActivityOpts) => AsyncIterable<ActivityItem>
@@ -241,7 +256,7 @@ describe("@glyphs-ai/runtime public API guard", () => {
     expectTypeOf(new CopilotRuntime({})).toExtend<Runtime>();
 
     // RuntimeRegistry — owned by the composition root, value-imported.
-    const reg = new RuntimeRegistry();
+    const reg = new InMemoryRuntimeRegistry();
     expectTypeOf(reg).toExtend<RuntimeRegistry>();
     expectTypeOf(reg).toHaveProperty("register");
     expectTypeOf(reg).toHaveProperty("get");

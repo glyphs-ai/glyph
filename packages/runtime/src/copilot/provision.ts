@@ -7,7 +7,6 @@ import {
   UnknownPlaceholderError,
 } from "../placeholders.js";
 import type { AgentContentSource, ResolvedAgent } from "../types.js";
-import { InvalidMcpJson } from "./errors.js";
 
 /**
  * Apply a partial patch to the YAML frontmatter of a markdown document.
@@ -203,10 +202,12 @@ async function materializeAgent(
  * trickery, no `$HOME` env-var reliance, works on Windows.
  *
  * A typo in a placeholder (`${workspceDir}`) surfaces as
- * {@link UnknownPlaceholderError} → wrapped as {@link InvalidMcpJson}
- * here so the caller treats it like other malformed-spec
- * failure. The error's `.message` carries the offending MCP name +
- * placeholder so the dashboard can show the user where to fix.
+ * {@link UnknownPlaceholderError} → re-thrown here as a plain `Error`
+ * so the caller treats it like any other malformed-spec failure. The
+ * runtime boundary (`provision` / `launchHeadless`) catches it and
+ * folds it into that method's error atom; the message carries the
+ * offending MCP name + placeholder so the dashboard can show the user
+ * where to fix.
  *
  * Keys in `.mcp.json` use the FULL MCP-spec name (e.g. `azure/mcp`, with
  * `/`). Copilot CLI accepts `/` in mcpServers keys (verified empirically),
@@ -227,13 +228,13 @@ async function writeMcpConfig(
     try {
       stripped = await catalog.getMcpRuntimeConfig(mcp.fqn);
     } catch (cause) {
-      throw new InvalidMcpJson(mcp.fqn, cause as Error);
+      throw new Error(`MCP "${mcp.fqn}" config is invalid: ${(cause as Error).message}`, { cause });
     }
     try {
       mcpServers[mcp.fqn] = substitutePlaceholdersDeep(stripped, placeholders, `mcps:${mcp.fqn}`);
     } catch (cause) {
       if (cause instanceof UnknownPlaceholderError) {
-        throw new InvalidMcpJson(mcp.fqn, cause);
+        throw new Error(`MCP "${mcp.fqn}" config is invalid: ${cause.message}`, { cause });
       }
       throw cause;
     }

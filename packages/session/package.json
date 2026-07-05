@@ -2,7 +2,7 @@
   "name": "@glyphs-ai/session",
   "private": true,
   "version": "0.0.0",
-  "description": "Per-session workdir registry for glyph (manages CLI sessions baked from a catalog, parameterised over a Runtime)",
+  "description": "Interactive-session registry for glyph — Drizzle-backed sessions table plus use-cases to create, launch, list, and delete runtime-provisioned agent sandboxes",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -14,10 +14,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "import": "./dist/testing.js"
     }
   },
   "files": [
@@ -35,9 +31,11 @@
   },
   "dependencies": {
     "@glyphs-ai/runtime": "workspace:*",
+    "@glyphs-ai/terminal": "workspace:*",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
-    "pino": "^9.5.0"
+    "neverthrow": "^8.2.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

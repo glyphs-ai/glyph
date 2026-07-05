@@ -1,12 +1,32 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { type CatalogService, composeCatalogModule } from "@glyphs-ai/catalog";
-import type { RuntimeRegistry } from "@glyphs-ai/runtime";
-import { composeScheduleModule, type ScheduleService } from "@glyphs-ai/schedule";
-import { composeSessionModule, type SessionService, type SpawnFn } from "@glyphs-ai/session";
-import { composeTaskModule, type TaskService } from "@glyphs-ai/task";
-import { composeWorkflowModule, type WorkflowService } from "@glyphs-ai/workflow";
-import type { Workspace, WorkspaceService } from "@glyphs-ai/workspace";
+import {
+  type AgentFqn,
+  type CatalogModule,
+  composeCatalog,
+  type GetSkillResponse,
+  type McpFqn,
+  type SkillFqn,
+} from "@glyphs-ai/catalog";
+import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
+import { composeScheduleModule, type ScheduleModule } from "@glyphs-ai/schedule";
+import {
+  type AgentNotFound,
+  type AgentResolutionFailed,
+  type AgentResolver,
+  composeSessionModule,
+  type ResolvedAgent,
+  type SessionModule,
+} from "@glyphs-ai/session";
+import {
+  composeTaskModule,
+  type AgentResolver as TaskAgentResolver,
+  type TaskModule,
+} from "@glyphs-ai/task";
+import type { Spawner } from "@glyphs-ai/terminal";
+import { composeWorkflowModule, type WorkflowModule } from "@glyphs-ai/workflow";
+import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
+import { type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";
@@ -17,9 +37,18 @@ import { makeWorkerNodeRunner } from "./wiring/workflow-worker-task-runner.js";
 const silentLogger: Logger = pino({ level: "silent" });
 
 /**
+ * Wire DTO for a registered workspace. Same shape `GetWorkspaceResponse`
+ * carries when the workspace exists — narrowed to non-null because
+ * the context registry only ever holds entries for workspaces that
+ * have been resolved successfully.
+ */
+type Workspace = NonNullable<GetWorkspaceResponse>;
+type Skill = NonNullable<GetSkillResponse>;
+
+/**
  * Thrown by `WorkspaceContextRegistry.reload` when the cached context
- * still has live task subprocesses being supervised by its
- * `TaskService`. Reload would orphan them.
+ * still has live task subprocesses being supervised by its task module.
+ * Reload would orphan them.
  */
 export class WorkspaceHasLiveTasksError extends Error {
   override readonly name = "WorkspaceHasLiveTasksError";
@@ -70,34 +99,150 @@ export type WorkspaceContextState = "cached" | "loading" | "unloaded" | "not-reg
  * for this workspace.
  *
  * "Start an interactive session" semantics live on
- * `sessions.spawnInteractive(sid, opts)` — callers reach the spawner
- * via `ctx.sessions.spawnInteractive(...)`.
+ * `sessions.spawnInteractive.execute({ id, remote? })` — callers reach
+ * the spawner via `ctx.sessions.spawnInteractive.execute(...)`.
  */
 export interface WorkspaceContext {
   readonly workspace: Workspace;
-  readonly catalog: CatalogService;
-  readonly sessions: SessionService;
-  readonly tasks: TaskService;
+  readonly catalog: CatalogModule;
+  readonly sessions: SessionModule;
+  readonly tasks: TaskModule;
   /**
    * Per-workspace cron-driven task dispatch substrate. The timer is
    * armed in `load()` via `service.recover()` (catchup-once on boot)
    * and torn down before tasks in `close()` so a fire in flight
-   * doesn't race a closed `TaskService`.
+   * doesn't race a closed task module.
    */
-  readonly schedules: ScheduleService;
+  readonly schedules: ScheduleModule;
   /**
    * Per-workspace DAG-orchestration substrate. Hands the
-   * coordinator-kind dispatch path a `TaskService`-backed runner via
-   * a two-phase `getService` thunk (the runner needs a ref to the
-   * `WorkflowService` it sits inside), and the worker-kind
-   * dispatch path a sibling runner over the same `TaskService`.
+   * coordinator-kind dispatch path a task-module-backed runner via
+   * a two-phase `getModule` thunk (the runner needs a ref to the
+   * `WorkflowModule` it sits inside), and the worker-kind
+   * dispatch path a sibling runner over the same task module.
    * Closed FIRST in `close()` so the engine's drain step (which
-   * calls into `tasks.cancel` for any live nodes) still has a live
-   * `TaskService` to talk to.
+   * calls into `tasks.cancelTask.execute` for any live nodes) still has
+   * a live task module to talk to.
    */
-  readonly workflows: WorkflowService;
+  readonly workflows: WorkflowModule;
   /** Closes all backing connections. Idempotent. */
   close(): Promise<void>;
+}
+
+interface CatalogAgent {
+  readonly dependencies?: { readonly agents?: readonly { readonly fqn: string }[] };
+}
+
+interface CatalogBlockedDep {
+  readonly fqn: string;
+}
+
+interface CatalogBlockedReason {
+  readonly needsPrereqsAck?: true;
+  readonly disabledByUser?: true;
+  readonly orphaned?: true;
+  readonly missingDeps?: readonly unknown[];
+  readonly blockedDeps?: readonly CatalogBlockedDep[];
+}
+
+interface CatalogAgentEntry {
+  readonly status: "ready" | "blocked";
+  readonly blockedReason?: CatalogBlockedReason;
+}
+
+interface CatalogAgentLookup {
+  getAgent(fqn: string): Promise<CatalogAgent | null>;
+}
+
+interface CatalogRuntimePorts extends AgentContentSource, CatalogAgentLookup {
+  getAgentEntry(fqn: string): Promise<CatalogAgentEntry | null>;
+}
+
+function makeCatalogRuntimePorts(catalog: CatalogModule): CatalogRuntimePorts {
+  const unwrap = async <T, E extends { readonly type: string }>(
+    result: PromiseLike<Result<T, E>>,
+  ): Promise<T> => {
+    const settled = await result;
+    if (settled.isErr()) throw new Error(settled.error.type);
+    return settled.value;
+  };
+
+  const getAgent = async (fqn: string): Promise<CatalogAgent | null> => {
+    const res = await catalog.getAgent.execute({ id: fqn as AgentFqn });
+    if (res.isErr()) {
+      if (res.error.type === "AgentNotFound") return null;
+      throw new Error(res.error.type);
+    }
+    const agents = res.value.dependencies?.agents;
+    return agents !== undefined ? { dependencies: { agents } } : {};
+  };
+  const getSkill = async (fqn: string): Promise<Skill | null> => {
+    const res = await catalog.getSkill.execute({ id: fqn as SkillFqn });
+    if (res.isErr()) {
+      if (res.error.type === "SkillNotFound") return null;
+      throw new Error(res.error.type);
+    }
+    return res.value;
+  };
+
+  return {
+    getAgent,
+    async getAgentEntry(fqn) {
+      const entry = await unwrap(catalog.getAgentEntry.execute({ id: fqn as AgentFqn }));
+      if (entry === null) return null;
+      if (entry.blockedReason === undefined) return { status: entry.status };
+      const blockedReason: CatalogBlockedReason = {
+        ...(entry.blockedReason.needsPrereqsAck === true ? { needsPrereqsAck: true } : {}),
+        ...(entry.blockedReason.disabledByUser === true ? { disabledByUser: true } : {}),
+        ...(entry.blockedReason.orphaned === true ? { orphaned: true } : {}),
+        ...(entry.blockedReason.missingDeps !== undefined
+          ? { missingDeps: entry.blockedReason.missingDeps }
+          : {}),
+        ...(entry.blockedReason.blockedDeps !== undefined
+          ? { blockedDeps: entry.blockedReason.blockedDeps }
+          : {}),
+      };
+      return { status: entry.status, blockedReason };
+    },
+    resolveAgent(fqn) {
+      return unwrap(catalog.resolveAgent.execute({ id: fqn as AgentFqn }));
+    },
+    async *agentEntries(fqn) {
+      const entry = await unwrap(catalog.getAgentEntry.execute({ id: fqn as AgentFqn }));
+      if (entry === null) throw new Error("AgentNotFound");
+      const files = await unwrap(catalog.listAgentFiles.execute({ id: fqn as AgentFqn }));
+      for (const file of files) {
+        const content = await unwrap(
+          catalog.getAgentFile.execute({ id: fqn as AgentFqn, relPath: file.relPath }),
+        );
+        if (content !== null) yield { relPath: file.relPath, content };
+      }
+    },
+    async *skillEntries(fqn) {
+      const skill = await getSkill(fqn);
+      if (skill === null) throw new Error("SkillNotFound");
+      const files = await unwrap(catalog.listSkillFiles.execute({ id: fqn as SkillFqn }));
+      for (const file of files) {
+        const content = await unwrap(
+          catalog.getSkillFile.execute({ id: fqn as SkillFqn, relPath: file.relPath }),
+        );
+        if (content !== null) yield { relPath: file.relPath, content };
+      }
+    },
+    async getMcpRuntimeConfig(fqn) {
+      const result = await unwrap(catalog.getMcpContent.execute({ id: fqn as McpFqn }));
+      return stripMcpMeta(result.spec, fqn);
+    },
+  };
+}
+
+function stripMcpMeta(content: string, fqn: string): Record<string, unknown> {
+  const parsed = JSON.parse(content) as unknown;
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`MCP file must be a JSON object: ${fqn}`);
+  }
+  const { _meta: _drop, ...rest } = parsed as Record<string, unknown>;
+  return rest;
 }
 
 /**
@@ -116,22 +261,23 @@ export interface WorkspaceContext {
  * the package surface.
  */
 export class WorkspaceContextRegistry {
-  private readonly workspaceService: WorkspaceService;
+  private readonly getWorkspace: WorkspaceModule["getWorkspace"];
   private readonly runtimeRegistry: RuntimeRegistry;
-  private readonly spawnFn: SpawnFn;
+  /** Native Result-based terminal spawner (`@glyphs-ai/terminal`). */
+  private readonly spawner: Spawner;
   private readonly logger: Logger;
   private readonly entries = new Map<string, WorkspaceContext>();
   private readonly inflight = new Map<string, Promise<WorkspaceContext | null>>();
 
   constructor(opts: {
-    workspaceService: WorkspaceService;
+    getWorkspace: WorkspaceModule["getWorkspace"];
     runtimeRegistry: RuntimeRegistry;
-    spawnFn: SpawnFn;
+    spawner: Spawner;
     logger?: Logger;
   }) {
-    this.workspaceService = opts.workspaceService;
+    this.getWorkspace = opts.getWorkspace;
     this.runtimeRegistry = opts.runtimeRegistry;
-    this.spawnFn = opts.spawnFn;
+    this.spawner = opts.spawner;
     this.logger = opts.logger ?? silentLogger;
   }
 
@@ -163,8 +309,18 @@ export class WorkspaceContextRegistry {
   async peek(workspaceId: string): Promise<WorkspaceContextState> {
     if (this.entries.has(workspaceId)) return "cached";
     if (this.inflight.has(workspaceId)) return "loading";
-    const workspace = await this.workspaceService.get(workspaceId);
-    return workspace === null ? "not-registered" : "unloaded";
+    // DatabaseUnavailable from the registry surfaces here as a thrown
+    // error — re-throw the underlying driver cause so callers (e.g.
+    // middleware, Application.getContext) receive the driver-level
+    // failure shape.
+    //
+    // `workspaceId` is a raw `string` from a URL parameter; the
+    // use-case re-parses through `WorkspaceIdSchema` on entry, so
+    // the brand cast here is just to thread it through the use-case
+    // signature without a redundant pre-parse.
+    const result = await this.getWorkspace.execute({ id: workspaceId as WorkspaceId });
+    if (result.isErr()) throw result.error.cause;
+    return result.value === null ? "not-registered" : "unloaded";
   }
 
   async invalidate(workspaceId: string): Promise<void> {
@@ -261,7 +417,14 @@ export class WorkspaceContextRegistry {
   }
 
   private async load(workspaceId: string): Promise<WorkspaceContext | null> {
-    const workspace = await this.workspaceService.get(workspaceId);
+    const result = await this.getWorkspace.execute({ id: workspaceId as WorkspaceId });
+    if (result.isErr()) {
+      // Re-throw the driver cause so `Application.getContext` wraps
+      // it as `WorkspaceLoadError(workspaceId, cause)` and every host
+      // sees a stable `WorkspaceLoadError(workspaceId, cause)` shape.
+      throw result.error.cause;
+    }
+    const workspace = result.value;
     if (!workspace) return null;
 
     const dbFile = path.join(workspace.workspaceDir, "workspace.db");
@@ -286,48 +449,70 @@ export class WorkspaceContextRegistry {
       }
     };
 
-    let catalogModule: Awaited<ReturnType<typeof composeCatalogModule>>;
+    let catalogModule: CatalogModule;
     let sessionModule: Awaited<ReturnType<typeof composeSessionModule>>;
     let taskModule: Awaited<ReturnType<typeof composeTaskModule>>;
     let scheduleModule: Awaited<ReturnType<typeof composeScheduleModule>>;
     let workflowModule: Awaited<ReturnType<typeof composeWorkflowModule>>;
     // Two-phase init seam: the coord runner needs a ref to the
-    // `WorkflowService` it lives inside (to read header `brief` /
+    // `WorkflowModule` it lives inside (to read header `brief` /
     // `details` at dispatch time), but the service is constructed
     // by `composeWorkflowModule` which itself requires the runner.
     // The thunk lets us build the runner first, call compose, then
     // assign the ref. Mirrors the engine ↔ service two-phase init
     // in `@glyphs-ai/workflow`.
-    let workflowSvc: WorkflowService | null = null;
-    const getWorkflowService = (): WorkflowService => {
-      if (workflowSvc === null) {
+    let workflowRef: WorkflowModule | null = null;
+    const getWorkflowModule = (): WorkflowModule => {
+      if (workflowRef === null) {
         throw new Error(
-          "workspace-context: workflow service accessed before composeWorkflowModule completed",
+          "workspace-context: workflow module accessed before composeWorkflowModule completed",
         );
       }
-      return workflowSvc;
+      return workflowRef;
     };
     try {
-      catalogModule = await composeCatalogModule({
-        dbFile,
-        logger: this.logger,
-      });
+      catalogModule = composeCatalog({ dbFile });
       cleanup.push(() => catalogModule.close());
+      const catalogPorts = makeCatalogRuntimePorts(catalogModule);
+      const agentResolver: AgentResolver = {
+        resolve: (agent) =>
+          catalogModule.resolveAgent
+            .execute({ id: agent as AgentFqn })
+            .map((resolved): ResolvedAgent => resolved)
+            .mapErr((e): AgentNotFound | AgentResolutionFailed =>
+              e.type === "AgentNotFound"
+                ? { type: "AgentNotFound", agent }
+                : { type: "AgentResolutionFailed", agent, cause: e },
+            ),
+      };
+      // task's AgentResolver port needs `resolve` (shared with the
+      // session resolver above) + `getEntry` (dispatch-time readiness).
+      // `catalogPorts.getAgentEntry` already returns task's AgentEntry
+      // shape; wrap its promise on the Result rail and surface any throw
+      // as `AgentResolutionFailed`.
+      const taskAgentResolver: TaskAgentResolver = {
+        resolve: agentResolver.resolve,
+        getEntry: (agent) =>
+          ResultAsync.fromPromise(catalogPorts.getAgentEntry(agent), (cause) => ({
+            type: "AgentResolutionFailed" as const,
+            agent,
+            cause,
+          })),
+      };
       sessionModule = await composeSessionModule({
         dbFile,
-        agentResolver: catalogModule.service,
-        contentSource: catalogModule.service,
+        agentResolver,
+        contentSource: catalogPorts,
         runtimeRegistry: this.runtimeRegistry,
         workspaceDir: workspace.workspaceDir,
         workspaceId,
-        logger: this.logger,
-        spawnFn: this.spawnFn,
+        spawner: this.spawner,
       });
       cleanup.push(() => sessionModule.close());
       taskModule = await composeTaskModule({
         dbFile,
-        agentResolver: catalogModule.service,
-        contentSource: catalogModule.service,
+        agentResolver: taskAgentResolver,
+        contentSource: catalogPorts,
         runtimeRegistry: this.runtimeRegistry,
         workspaceDir: workspace.workspaceDir,
         workspaceId,
@@ -336,8 +521,8 @@ export class WorkspaceContextRegistry {
       cleanup.push(() => taskModule.close());
 
       // Schedules are composed AFTER tasks so the kind handler's
-      // `dispatch` / `hasInFlightByOrigin` / `deleteTerminalByOrigin`
-      // can bridge to a live `TaskService`. The same workspace.db
+      // `dispatchTask` / `hasInFlightByOrigin` / `deleteTerminalByOrigin`
+      // use-cases have a live task module. The same workspace.db
       // file is reused (WAL-mode shared connection); migrations are
       // idempotent.
       scheduleModule = await composeScheduleModule({
@@ -346,7 +531,8 @@ export class WorkspaceContextRegistry {
       });
       cleanup.push(() => scheduleModule.close());
 
-      await taskModule.service.recoverOrphaned();
+      const recoverTasks = await taskModule.recoverOrphanedTasks.execute({});
+      if (recoverTasks.isErr()) throw new Error(recoverTasks.error.type);
       // Register every kind BEFORE recover(). recover() freezes the
       // registry and preflights every persisted row's target_kind
       // against it — any row with an unregistered kind throws
@@ -355,13 +541,14 @@ export class WorkspaceContextRegistry {
       // load-bearing for the catchup path: a catchup fire (next
       // fire in the past at boot) needs the freshly-reconciled
       // task list when it checks hasInFlightByOrigin.
-      scheduleModule.service.registerKind(
+      const registerTask = scheduleModule.engine.registerKind(
         "task",
         makeTaskKindHandler({
-          tasks: taskModule.service,
-          catalog: catalogModule.service,
+          tasks: taskModule,
+          catalog: catalogPorts,
         }),
       );
+      if (registerTask.isErr()) throw new Error(registerTask.error.type);
 
       // Workflow substrate composed BEFORE recover() so the workflow
       // kind handler is registered and recover()'s catchup path can
@@ -371,9 +558,9 @@ export class WorkspaceContextRegistry {
       // service ref via the `getWorkflowService` thunk for the coord
       // runner.
       const coordRunner = makeCoordNodeRunner({
-        tasks: taskModule.service,
-        catalog: catalogModule.service,
-        getService: getWorkflowService,
+        tasks: taskModule,
+        catalog: catalogPorts,
+        getModule: getWorkflowModule,
         // The coord runner injects `GLYPH_WORKFLOW_DIR` into the
         // dispatched coord task's subprocess env via
         // `workflowDir(workspaceDir, wfid)`. The workspaceDir is the
@@ -384,12 +571,12 @@ export class WorkspaceContextRegistry {
         logger: this.logger,
       });
       const workerRunner = makeWorkerNodeRunner({
-        tasks: taskModule.service,
-        catalog: catalogModule.service,
+        tasks: taskModule,
+        catalog: catalogPorts,
         logger: this.logger,
       });
       const humanRunner = makeHumanNodeRunner({
-        getService: getWorkflowService,
+        getModule: getWorkflowModule,
       });
       workflowModule = await composeWorkflowModule({
         dbFile,
@@ -397,22 +584,24 @@ export class WorkspaceContextRegistry {
         logger: this.logger,
         runners: { coordinator: coordRunner, worker: workerRunner, human: humanRunner },
       });
-      workflowSvc = workflowModule.service;
+      workflowRef = workflowModule;
       cleanup.push(() => workflowModule.close());
 
       // Register workflow kind AFTER compose so the handler can
-      // reference the live WorkflowService for dispatch / hasInFlight
+      // reference the live WorkflowModule for dispatch / hasInFlight
       // / deleteTerminalByOrigin. Both kinds are now registered; recover()
       // below will preflight all persisted rows and fire catchups.
-      scheduleModule.service.registerKind(
+      const registerWorkflow = scheduleModule.engine.registerKind(
         "workflow",
         makeWorkflowKindHandler({
-          workflows: workflowModule.service,
-          tasks: taskModule.service,
-          catalog: catalogModule.service,
+          workflows: workflowModule,
+          tasks: taskModule,
+          catalog: catalogPorts,
         }),
       );
-      await scheduleModule.service.recover();
+      if (registerWorkflow.isErr()) throw new Error(registerWorkflow.error.type);
+      const recovered = await scheduleModule.engine.recover();
+      if (recovered.isErr()) throw new Error(recovered.error.type);
     } catch (err) {
       await teardown();
       throw err;
@@ -421,11 +610,11 @@ export class WorkspaceContextRegistry {
     const outerLogger = this.logger;
     const context: WorkspaceContext = {
       workspace,
-      catalog: catalogModule.service,
-      sessions: sessionModule.service,
-      tasks: taskModule.service,
-      schedules: scheduleModule.service,
-      workflows: workflowModule.service,
+      catalog: catalogModule,
+      sessions: sessionModule,
+      tasks: taskModule,
+      schedules: scheduleModule,
+      workflows: workflowModule,
       async close() {
         // Per-module try/catch: a throw from one module's close()
         // must NOT skip the others. Without per-module catches a
@@ -436,12 +625,12 @@ export class WorkspaceContextRegistry {
         // Ordering: workflow FIRST, then schedule, then task /
         // session / catalog (reverse of compose). workflow's
         // close() awaits `engine.drain()` which awaits in-flight
-        // ticks; those ticks dispatch through `TaskService`, so
+        // ticks; those ticks dispatch through the task module, so
         // tasks must still be alive while workflow drains.
         // schedule's close() likewise awaits `service.shutdown()`
         // which clears the in-flight setTimeout queue; closing it
-        // before tasks means no new fires can land on a torn-down
-        // TaskService.
+        // before tasks means no new fires can land on a closed task
+        // module.
         //
         // Multi-error handling: the FIRST error is re-thrown so the
         // caller sees something; LATER errors are logged via the

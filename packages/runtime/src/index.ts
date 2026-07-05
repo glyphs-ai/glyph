@@ -3,11 +3,7 @@
 export type { CopilotRuntimeConfig } from "./copilot/copilot-runtime.js";
 // Copilot runtime
 export { CopilotRuntime } from "./copilot/copilot-runtime.js";
-export {
-  CopilotSdkUnavailableError,
-  InvalidMcpJson,
-  TrustRegistrationFailed,
-} from "./copilot/errors.js";
+export { CopilotSdkUnavailableError } from "./copilot/errors.js";
 export {
   COPILOT_SESSION_ID_RE,
   generateCopilotSessionId,
@@ -26,14 +22,13 @@ export {
 } from "./copilot/preflight.js";
 export { flattenSkillName } from "./copilot/provision.js";
 export { isPathCovered } from "./copilot/trust.js";
-export {
-  RuntimeDoesNotSupportRemoteError,
+export type {
+  RuntimeActivityReadFailed,
   RuntimeHeadlessLaunchFailed,
+  RuntimeLaunchFailed,
   RuntimeProvisionFailed,
-  RuntimeReadActivityInvalidArgs,
-  RuntimeReadMetadataFailed,
   RuntimeStateDeletionFailed,
-  UnknownRuntimeError,
+  UnknownRuntime,
 } from "./errors.js";
 export {
   PLACEHOLDER_NAMES,
@@ -43,7 +38,7 @@ export {
   substitutePlaceholdersDeep,
   UnknownPlaceholderError,
 } from "./placeholders.js";
-export { RuntimeRegistry } from "./runtime-registry.js";
+export { InMemoryRuntimeRegistry, type RuntimeRegistry } from "./runtime-registry.js";
 export { SHARED_SUBDIR, sharedDir } from "./shared-dir.js";
 export type {
   ActivityItem,

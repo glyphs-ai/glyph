@@ -1,52 +1,67 @@
 import type {
-  CancelWorkflowRequest,
-  CreateWorkflowRequest,
-  RespondHumanNodeRequest,
-  WorkflowArtifact,
-  WorkflowArtifactsResponse,
-  WorkflowDag,
-  WorkflowEdge,
-  WorkflowHeader,
-  WorkflowHumanNodeSpec,
-  WorkflowListQuery,
-  WorkflowNode,
-  WorkflowNodeSpec,
-} from "@glyphs-ai/contracts";
-import { fetchJson, jsonInit, mutate, mutateJson, workspacePrefix } from "./http.js";
+  GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponse,
+  GetApiWorkspacesByIdWorkflowsByWfidDagResponse,
+  GetApiWorkspacesByIdWorkflowsByWfidResponse,
+  GetApiWorkspacesByIdWorkflowsData,
+  PostApiWorkspacesByIdWorkflowsByWfidCancelData,
+  PostApiWorkspacesByIdWorkflowsByWfidCancelResponses,
+  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData,
+  PostApiWorkspacesByIdWorkflowsData,
+  PostApiWorkspacesByIdWorkflowsResponses,
+} from "@glyphs-ai/sdk";
+import {
+  client,
+  deleteApiWorkspacesByIdWorkflowsByWfid,
+  getApiWorkspacesByIdWorkflows,
+  getApiWorkspacesByIdWorkflowsByWfid,
+  getApiWorkspacesByIdWorkflowsByWfidArtifacts,
+} from "@glyphs-ai/sdk";
+import { fetchJson, jsonInit, mutateJson, workspacePrefix } from "./http.js";
+import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 
-export type {
-  CancelWorkflowRequest,
-  CreateWorkflowRequest,
-  RespondHumanNodeRequest,
-  WorkflowArtifact,
-  WorkflowArtifactsResponse,
-  WorkflowDag,
-  WorkflowEdge,
-  WorkflowHeader,
-  WorkflowHumanNodeSpec,
-  WorkflowListQuery,
-  WorkflowNode,
-  WorkflowNodeSpec,
+// Local type aliases for workflow shapes (previously exported from sdk/wire.ts).
+export type WorkflowHeader = GetApiWorkspacesByIdWorkflowsByWfidResponse;
+export type WorkflowDag = GetApiWorkspacesByIdWorkflowsByWfidDagResponse;
+export type WorkflowNode = WorkflowDag["nodes"][number];
+export type WorkflowEdge = WorkflowDag["edges"][number];
+export type WorkflowNodeSpec = WorkflowNode["spec"];
+export type WorkflowArtifactsResponse = GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponse;
+export type WorkflowArtifact = WorkflowArtifactsResponse["artifacts"][number];
+export type WorkflowListQuery = NonNullable<GetApiWorkspacesByIdWorkflowsData["query"]>;
+export type CreateWorkflowRequest = NonNullable<PostApiWorkspacesByIdWorkflowsData["body"]>;
+export type CancelWorkflowRequest = NonNullable<
+  PostApiWorkspacesByIdWorkflowsByWfidCancelData["body"]
+>;
+export type RespondHumanNodeRequest = NonNullable<
+  PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData["body"]
+>;
+
+// Concrete spec type for human nodes. WorkflowNode["spec"] is `unknown`
+// so Extract<unknown, ...> resolves to never; we declare the shape directly.
+export type WorkflowHumanNodeSpec = {
+  kind: "human";
+  prompt: string;
+  promptStyle?: "plain" | "markdown";
+  choices?: readonly { id: string; label: string }[];
 };
 
-export const listWorkflows = (opts: WorkflowListQuery = {}): Promise<readonly WorkflowHeader[]> => {
-  const qs = new URLSearchParams();
-  if (opts.q !== undefined && opts.q !== "") qs.set("q", opts.q);
+export const listWorkflows = async (
+  opts: WorkflowListQuery = {},
+): Promise<readonly WorkflowHeader[]> => {
+  const query: { q?: string; coordinatorAgent?: string; createdSince?: string } = {};
+  if (opts.q !== undefined && opts.q !== "") query.q = opts.q;
   if (opts.coordinatorAgent !== undefined && opts.coordinatorAgent !== "") {
-    qs.set("coordinatorAgent", opts.coordinatorAgent);
+    query.coordinatorAgent = opts.coordinatorAgent;
   }
-  if (opts.createdSince !== undefined) qs.set("createdSince", opts.createdSince);
-  const suffix = qs.toString() === "" ? "" : `?${qs.toString()}`;
-  return fetchJson<readonly WorkflowHeader[]>(
-    `${workspacePrefix()}/workflows${suffix}`,
-    "workflows",
-  );
+  if (opts.createdSince !== undefined) query.createdSince = opts.createdSince;
+  return unwrap(await getApiWorkspacesByIdWorkflows({ path: { id: requireWorkspaceId() }, query }));
 };
 
-export const getWorkflow = (workflowId: string): Promise<WorkflowHeader> =>
-  fetchJson<WorkflowHeader>(
-    `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}`,
-    "workflow",
+export const getWorkflow = async (workflowId: string): Promise<WorkflowHeader> =>
+  unwrap(
+    await getApiWorkspacesByIdWorkflowsByWfid({
+      path: { id: requireWorkspaceId(), wfid: workflowId },
+    }),
   );
 
 export const getWorkflowDag = (workflowId: string): Promise<WorkflowDag> =>
@@ -55,8 +70,14 @@ export const getWorkflowDag = (workflowId: string): Promise<WorkflowDag> =>
     "workflow dag",
   );
 
-export const createWorkflow = (body: CreateWorkflowRequest): Promise<WorkflowHeader> =>
-  mutateJson<WorkflowHeader>(`${workspacePrefix()}/workflows`, jsonInit("POST", body));
+export const createWorkflow = async (body: CreateWorkflowRequest): Promise<WorkflowHeader> =>
+  unwrap(
+    await client.post<PostApiWorkspacesByIdWorkflowsResponses>({
+      url: "/api/workspaces/{id}/workflows",
+      path: { id: requireWorkspaceId() },
+      body,
+    }),
+  );
 
 /**
  * Cancel a workflow. The wire shape requires a `cancellation: { message }`
@@ -64,13 +85,16 @@ export const createWorkflow = (body: CreateWorkflowRequest): Promise<WorkflowHea
  * "user"` (the only kind operator-driven cancels emit). Empty message
  * is allowed but the `cancellation` object itself is required.
  */
-export const cancelWorkflow = (
+export const cancelWorkflow = async (
   workflowId: string,
   body: CancelWorkflowRequest,
 ): Promise<WorkflowHeader> =>
-  mutateJson<WorkflowHeader>(
-    `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/cancel`,
-    jsonInit("POST", body),
+  unwrap(
+    await client.post<PostApiWorkspacesByIdWorkflowsByWfidCancelResponses>({
+      url: "/api/workspaces/{id}/workflows/{wfid}/cancel",
+      path: { id: requireWorkspaceId(), wfid: workflowId },
+      body,
+    }),
   );
 
 /**
@@ -81,16 +105,23 @@ export const cancelWorkflow = (
  * substrate rows + workflow dir + per-node task workdirs + runtime
  * state all go.
  *
- * Server returns 409 when the workflow is still running (mutate()
+ * Server returns 409 when the workflow is still running (`unwrap()`
  * throws the typed envelope; callers parse `code` +
  * `transition` to render a "Cancel first" CTA, mirroring the task
  * delete pattern).
  */
-export const deleteWorkflow = (workflowId: string, opts?: { purge?: boolean }) => {
-  const qs = opts?.purge ? "?purge=1" : "";
-  return mutate(`${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}${qs}`, {
-    method: "DELETE",
-  });
+export const deleteWorkflow = async (
+  workflowId: string,
+  opts?: { purge?: boolean },
+): Promise<void> => {
+  const query: { purge?: "1" } = {};
+  if (opts?.purge) query.purge = "1";
+  unwrap(
+    await deleteApiWorkspacesByIdWorkflowsByWfid({
+      path: { id: requireWorkspaceId(), wfid: workflowId },
+      query,
+    }),
+  );
 };
 
 /**
@@ -99,12 +130,15 @@ export const deleteWorkflow = (workflowId: string, opts?: { purge?: boolean }) =
  * (`<workflowDir>/artifact/`) and per-node artifact namespaces
  * (`<tasksRoot>/<taskId>/artifact/`).
  *
- * The contracts type is the source of truth for the wire shape.
+ * The wire type is the source of truth for the shape.
  */
-export const listWorkflowArtifacts = (workflowId: string): Promise<WorkflowArtifactsResponse> =>
-  fetchJson<WorkflowArtifactsResponse>(
-    `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/artifacts`,
-    "workflow artifacts",
+export const listWorkflowArtifacts = async (
+  workflowId: string,
+): Promise<WorkflowArtifactsResponse> =>
+  unwrap(
+    await getApiWorkspacesByIdWorkflowsByWfidArtifacts({
+      path: { id: requireWorkspaceId(), wfid: workflowId },
+    }),
   );
 
 /**
@@ -122,10 +156,6 @@ export const listWorkflowArtifacts = (workflowId: string): Promise<WorkflowArtif
 export const workflowArtifactUrl = (workflowId: string, subPath: string): string =>
   `${workspacePrefix()}/workflows/${encodeURIComponent(workflowId)}/artifacts/${encodeURIComponent(subPath)}`;
 
-/**
- * Respond to a human-kind workflow node that is in `running` status.
- * Returns the updated node wire shape.
- */
 export const respondHumanNode = (
   workflowId: string,
   nodeId: string,

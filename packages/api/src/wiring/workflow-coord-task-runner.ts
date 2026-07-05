@@ -47,7 +47,7 @@
  *
  *   - The node's id lives in the task's typed `origin_id` column
  *     (`origin: "workflow"`, `originId: nodeId`). Worker and
- *     coord runners use the SAME column — `tasks.hasInFlightForWorkflowNode`
+ *     coord runners use the SAME column — `hasInFlightByOrigin`
  *     covers both kinds via the `tasks_origin_pair_idx` partial index.
  *   - `onTerminal` is fired exactly once per dispatched node by this
  *     runner (the interval is cleared the moment a terminal status
@@ -64,24 +64,36 @@
  *     `onTerminal({status: 'failed', reason: 'tasks.get exhausted: ...'})`.
  */
 
-import type { CatalogService } from "@glyphs-ai/catalog";
-import type { WorkflowCoordinatorNodeSpec } from "@glyphs-ai/contracts";
-import {
-  AgentNotFoundError,
-  AgentResolutionFailedError,
-  assertFramingPromptIsSafe,
-  type TaskService,
+import type {
+  GetTaskResponse,
+  ListInFlightByOriginResponse,
+  TaskId,
+  TaskModule,
 } from "@glyphs-ai/task";
+import { TaskBriefSchema } from "@glyphs-ai/task";
 import {
+  type RunnerFault,
+  type WorkflowId,
+  type WorkflowModule,
   type WorkflowNodeRunner,
   type WorkflowNodeTerminalResult,
   type WorkflowNodeValidateCtx,
-  type WorkflowService,
   workflowDir,
 } from "@glyphs-ai/workflow";
+import { err, ok, okAsync, type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
+import { taskAgentNotFound, taskAgentResolutionFailed } from "./_task-operation-error.js";
+import type { WorkflowCoordinatorNodeSpec } from "./workflow-node-specs.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
+
+interface CatalogAgent {
+  readonly dependencies?: { readonly agents?: readonly { readonly fqn: string }[] };
+}
+
+interface CatalogAgentLookup {
+  getAgent(fqn: string): Promise<CatalogAgent | null>;
+}
 
 /** Default poll cadence for `tasks.get(taskId)` in the coord runner. */
 export const DEFAULT_COORD_POLL_INTERVAL_MS = 2000;
@@ -103,13 +115,13 @@ export const DEFAULT_COORD_MAX_POLL_ERRORS = 3;
  * "what to do this wake-up" decision logic lives in the agent body,
  * not here.
  *
- * Single-line printable ASCII by the same invariant as the default
- * (see `framing.ts` — cmd.exe `/c` argv treats LF as a statement
- * separator on Windows). The assertion below catches any unsafe edit
- * that breaks that invariant at module load; the task pkg also
- * re-runs the same check at dispatch time.
+ * Single-line printable ASCII: cmd.exe `/c` argv treats LF as a
+ * statement separator on Windows, so a multi-line prompt would be
+ * truncated. A unit test asserts this invariant on the shipped
+ * constant, and task re-validates the forwarded prompt on every
+ * dispatch via `FramingPromptSchema`.
  */
-const COORD_FRAMING_PROMPT_COPILOT =
+export const COORD_FRAMING_PROMPT_COPILOT =
   "You are running as a workflow coordinator. " +
   "Identity: " +
   "GLYPH_WORKFLOW_ID -- the workflow you advance; " +
@@ -123,14 +135,6 @@ const COORD_FRAMING_PROMPT_COPILOT =
   "Before calling workflow finish (succeeded, failed, or cancelled), save a single self-contained HTML summary under $GLYPH_WORKFLOW_DIR/artifact/ (choose a descriptive filename; inline all CSS, JS, fonts, images as data URLs; no external links or CDN references; must render correctly when opened directly from disk with no network access). The summary MUST include: (1) the complete workflow brief from TASK.md (not just the title -- the full goal and context), (2) a timeline table showing each node's role, agent, start time, duration, and final status, (3) a collapsible coordinator decisions section summarizing each wake-up's case match and action taken (which case from the strategy was matched, what nodes were dispatched or what finish outcome was chosen, and why), (4) for each completed worker node: a collapsible section with the node's key outputs and findings as determined by the strategy skill and the worker's artifact contents, (5) final outcome metrics (iterations count, deliverable URLs, any remaining open items). Use HTML details/summary elements for collapsible sections so the page is scannable at a glance but full detail is one click away. The goal: a reader seeing this HTML for the first time should understand every decision made and every result produced without needing to open the dashboard or read task activity logs. " +
   "If state is inconsistent or no next step is decidable, " +
   "finish the workflow as failed rather than retrying indefinitely.";
-
-// Build-time safety check. Mirrors the module-load
-// `assertFramingPromptIsSafe(DEFAULT_TASK_FRAMING_PROMPT)` in
-// `@glyphs-ai/task`'s `framing.ts`. The task pkg also re-runs the
-// same invariant on every actual dispatch against the override
-// argument — this is the additional build-time guard on the
-// default value we ship here.
-assertFramingPromptIsSafe(COORD_FRAMING_PROMPT_COPILOT);
 
 /**
  * Wire-shape error for a malformed coord node spec. Lives next to
@@ -167,23 +171,24 @@ export class WorkflowCoordAgentNotCapableError extends Error {
 }
 
 export interface MakeCoordNodeRunnerOpts {
-  readonly tasks: TaskService;
-  readonly catalog: CatalogService;
+  readonly tasks: TaskModule;
+  readonly catalog: CatalogAgentLookup;
   /**
-   * Lazy getter for the {@link WorkflowService}. The runner needs it
+   * Lazy getter for the {@link WorkflowModule}. The runner needs it
    * to read the workflow header (`brief` / `details`) at dispatch
    * time, because `dispatch` opts hand the runner only the node-
    * level spec; `brief` / `details` live on the workflow row.
    *
-   * Two-phase init: the workflow service is constructed by
+   * Two-phase init: the workflow module is constructed by
    * `composeWorkflowModule`, which itself requires the runners.
-   * Taking an eager `service: WorkflowService` would make it
+   * Taking an eager `module: WorkflowModule` would make it
    * impossible for the caller to construct the runner before compose
    * returns. The thunk lets the caller capture a ref, build the
    * runner, call compose, then assign the ref — mirrors the engine
    * ↔ service two-phase init in `@glyphs-ai/workflow`.
    */
-  readonly getService: () => WorkflowService;
+  readonly getModule?: () => WorkflowModule;
+  readonly getService?: () => WorkflowModule;
   /**
    * Absolute path to the workspace root. The runner needs it so it
    * can resolve the per-workflow shared dir via
@@ -228,7 +233,7 @@ export function makeCoordNodeRunner(
 ): WorkflowNodeRunner & { dispose(): Promise<void> } {
   const tasks = opts.tasks;
   const catalog = opts.catalog;
-  const getService = opts.getService;
+  const getModule = opts.getModule ?? opts.getService;
   const workspaceDir = opts.workspaceDir;
   const logger = opts.logger ?? silentLogger;
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_COORD_POLL_INTERVAL_MS;
@@ -270,262 +275,302 @@ export function makeCoordNodeRunner(
   };
 
   return {
-    async validate(
-      spec: unknown,
-      _ctx: WorkflowNodeValidateCtx,
-    ): Promise<WorkflowCoordinatorNodeSpec> {
-      if (spec === null || typeof spec !== "object" || Array.isArray(spec)) {
-        throw new WorkflowCoordSpecError("Coord node spec must be an object");
-      }
-      const obj = spec as Record<string, unknown>;
-      if (typeof obj.agent !== "string" || obj.agent.trim().length === 0) {
-        throw new WorkflowCoordSpecError("Coord node spec requires non-empty agent");
-      }
-      // Strict shape: reject every key except `agent`. The coord
-      // spec is intentionally narrow; unknown keys signal a wire-
-      // shape mistake at the caller, not a feature the runner
-      // silently drops.
-      for (const k of Object.keys(obj)) {
-        if (k !== "agent") {
-          throw new WorkflowCoordSpecError(`Coord node spec rejects unknown key: ${k}`);
-        }
-      }
+    validate(spec: unknown, _ctx: WorkflowNodeValidateCtx) {
+      return new ResultAsync(
+        (async (): Promise<Result<WorkflowCoordinatorNodeSpec, RunnerFault>> => {
+          if (spec === null || typeof spec !== "object" || Array.isArray(spec)) {
+            return err({ cause: new WorkflowCoordSpecError("Coord node spec must be an object") });
+          }
+          const obj = spec as Record<string, unknown>;
+          if (typeof obj.agent !== "string" || obj.agent.trim().length === 0) {
+            return err({
+              cause: new WorkflowCoordSpecError("Coord node spec requires non-empty agent"),
+            });
+          }
+          // Strict shape: reject every key except `agent`. The coord
+          // spec is intentionally narrow; unknown keys signal a wire-
+          // shape mistake at the caller, not a feature the runner
+          // silently drops.
+          for (const k of Object.keys(obj)) {
+            if (k !== "agent") {
+              return err({
+                cause: new WorkflowCoordSpecError(`Coord node spec rejects unknown key: ${k}`),
+              });
+            }
+          }
 
-      // Catalog existence — mirrors the sibling worker runner.
-      // Checked at validate time so a bad agent name cannot land in
-      // the DB and surface as a non-recoverable dispatch failure
-      // later.
-      let found: Awaited<ReturnType<typeof catalog.getAgent>>;
-      try {
-        found = await catalog.getAgent(obj.agent);
-      } catch (err) {
-        throw new AgentResolutionFailedError(obj.agent, err);
-      }
-      if (found === null) throw new AgentNotFoundError(obj.agent);
-
-      // Workflow coordinator capability discipline: a workflow coord
-      // MUST declare a non-empty `dependencies.agents` dispatch
-      // menu in its catalog frontmatter. Without it, the coord has no
-      // menu to validate worker spec.agent against, and the coord-vs-
-      // task architectural split (workflow = declared menu; task =
-      // open-ended) collapses.
-      const menu = found.dependencies?.agents ?? [];
-      if (menu.length === 0) {
-        throw new WorkflowCoordAgentNotCapableError(obj.agent);
-      }
-
-      return { agent: obj.agent };
-    },
-
-    async dispatch(opts): Promise<void> {
-      // Resolve the service exactly once per dispatch — see the
-      // `getService` thunk JSDoc above. The substrate guarantees the
-      // ref is assigned by the time dispatch fires (post-compose),
-      // but the runner should fail loudly rather than silently
-      // dereference if a caller wires the runner without ever
-      // calling compose.
-      const service = getService() as WorkflowService | null | undefined;
-      if (service === null || service === undefined) {
-        throw new Error(
-          "workflow-coord-task-runner: getService() returned null/undefined; " +
-            "compose-time wiring forgot to set the ref. " +
-            "Build the runner with a thunk that closes over the WorkflowService " +
-            "returned by composeWorkflowModule.",
-        );
-      }
-
-      const wf = await service.getWorkflow(opts.workflowId);
-      const spec = opts.spec as WorkflowCoordinatorNodeSpec;
-      const task = await tasks.dispatch({
-        agent: spec.agent,
-        brief: wf.brief,
-        // Conditional spread: passing `details: undefined` into
-        // `tasks.dispatch` can serialize as the literal string
-        // "undefined" downstream. Mirrors the worker runner's
-        // conditional spread.
-        ...(wf.details !== undefined ? { details: wf.details } : {}),
-        origin: "workflow",
-        originId: opts.nodeId,
-        // `workflowId` stays in metadata for log correlation only.
-        // Worker and coord runners write the node reverse-lookup id to
-        // the SAME typed `origin_id` column — `tasks.hasInFlightForWorkflowNode`
-        // covers both kinds via the `tasks_origin_pair_idx` index.
-        metadata: {
-          workflowId: opts.workflowId,
-        },
-        // Override the default framing prompt so the spawned coord
-        // task receives the coord-kind opener defined at the top of
-        // this file. Replaces `@glyphs-ai/task`'s
-        // `DEFAULT_TASK_FRAMING_PROMPT` for this dispatch only. The
-        // default's safety is invariant-checked by `framing.ts` at
-        // module load; the override is checked at module load above
-        // + re-checked on every dispatch by the task pkg's
-        // `assertFramingPromptIsSafe` wire in `dispatch.ts`.
-        prompt: COORD_FRAMING_PROMPT_COPILOT,
-        // Coord tasks see all three workflow env keys
-        // (`GLYPH_WORKFLOW_ID`, `GLYPH_NODE_ID`,
-        // `GLYPH_WORKFLOW_DIR`). Worker tasks see only the first
-        // two — see the sibling worker runner for the rationale
-        // (the per-workflow shared dir is coord-only by design;
-        // workers stay workflow-unaware). The convention is doc-
-        // only, not OS-enforced. Key names are stable identifiers
-        // referenced by `skills/workflow-coordination/SKILL.md`.
-        subprocessEnv: {
-          GLYPH_WORKFLOW_ID: opts.workflowId,
-          GLYPH_NODE_ID: opts.nodeId,
-          GLYPH_WORKFLOW_DIR: workflowDir(workspaceDir, opts.workflowId),
-        },
-      });
-      const taskId = task.id;
-      const nodeId = opts.nodeId;
-      const onTerminal = opts.onTerminal;
-      logger.info(
-        { workflowId: opts.workflowId, nodeId, taskId },
-        "workflow-coord-task-runner: dispatched coordinator task",
-      );
-
-      // If a previous dispatch on the same nodeId left an orphan
-      // interval (shouldn't happen — the substrate guarantees a
-      // single in-flight per node — but defense-in-depth in case a
-      // test re-runs dispatch directly), wipe it before installing
-      // the new one.
-      clearForNode(nodeId);
-
-      let consecutivePollErrors = 0;
-      const handle = setInterval(() => {
-        // Fire-and-forget: setInterval callbacks can't be async,
-        // and any error we don't catch here would crash the process.
-        void (async () => {
-          let polled: Awaited<ReturnType<typeof tasks.get>>;
+          // Catalog existence — mirrors the sibling worker runner.
+          // Checked at validate time so a bad agent name cannot land in
+          // the DB and surface as a non-recoverable dispatch failure
+          // later.
+          let found: Awaited<ReturnType<typeof catalog.getAgent>>;
           try {
-            polled = await tasks.get(taskId);
-          } catch (err) {
-            consecutivePollErrors += 1;
-            logger.warn(
-              {
-                workflowId: opts.workflowId,
-                nodeId,
-                taskId,
-                consecutivePollErrors,
-                err,
-              },
-              "workflow-coord-task-runner: tasks.get threw",
-            );
-            if (consecutivePollErrors >= maxPollErrors) {
-              fireTerminal(
-                nodeId,
-                {
-                  status: "failed",
-                  reason: `tasks.get exhausted: ${maxPollErrors} consecutive failures (last: ${
-                    err instanceof Error ? err.message : String(err)
-                  })`,
-                },
-                onTerminal,
-              );
-            }
-            return;
+            found = await catalog.getAgent(obj.agent);
+          } catch (cause) {
+            return err({ cause: taskAgentResolutionFailed(obj.agent, cause) });
           }
-          consecutivePollErrors = 0;
-          if (polled === null) {
-            // Task deleted out from under us. Surface as a failure
-            // with reason "task not found" — the workflow node has
-            // no unit-of-work to wait on any more.
-            fireTerminal(
-              nodeId,
-              {
-                status: "failed",
-                reason: "task not found",
-              },
-              onTerminal,
-            );
-            return;
+          if (found === null) return err({ cause: taskAgentNotFound(obj.agent) });
+
+          // Workflow coordinator capability discipline: a workflow coord
+          // MUST declare a non-empty `dependencies.agents` dispatch
+          // menu in its catalog frontmatter. Without it, the coord has no
+          // menu to validate worker spec.agent against, and the coord-vs-
+          // task architectural split (workflow = declared menu; task =
+          // open-ended) collapses.
+          const menu = found.dependencies?.agents ?? [];
+          if (menu.length === 0) {
+            return err({ cause: new WorkflowCoordAgentNotCapableError(obj.agent) });
           }
-          switch (polled.status) {
-            case "running":
-              return;
-            case "succeeded":
-              fireTerminal(
-                nodeId,
-                {
-                  status: "succeeded",
-                  output: polled.success ?? null,
-                },
-                onTerminal,
-              );
-              return;
-            case "failed":
-              fireTerminal(
-                nodeId,
-                {
-                  status: "failed",
-                  reason: polled.failure?.message ?? "task failed (no reason recorded)",
-                  output: polled.failure ?? null,
-                },
-                onTerminal,
-              );
-              return;
-            case "cancelled":
-              fireTerminal(
-                nodeId,
-                {
-                  status: "cancelled",
-                  reason: polled.cancellation?.message ?? "task cancelled (no reason recorded)",
-                },
-                onTerminal,
-              );
-              return;
-            default: {
-              // Defense against an unknown TaskStatus arm we don't
-              // know about. Treat as failure rather than silently
-              // dropping; the runner is the layer that owns the
-              // mapping and should fail loudly if it drifts.
-              const unexpected: never = polled.status;
-              fireTerminal(
-                nodeId,
-                {
-                  status: "failed",
-                  reason: `workflow-coord-task-runner: unexpected task status: ${unexpected as string}`,
-                },
-                onTerminal,
-              );
-            }
-          }
-        })();
-      }, pollIntervalMs);
-      intervals.set(nodeId, handle);
+
+          return ok({ agent: obj.agent });
+        })(),
+      );
     },
 
-    async hasInFlightForNode(nodeId: string): Promise<boolean> {
-      return tasks.hasInFlightForWorkflowNode(nodeId);
-    },
+    dispatch(opts) {
+      return new ResultAsync(
+        (async (): Promise<Result<void, RunnerFault>> => {
+          // Resolve the service exactly once per dispatch — see the
+          // `getService` thunk JSDoc above. The substrate guarantees the
+          // ref is assigned by the time dispatch fires (post-compose),
+          // but the runner should fail loudly rather than silently
+          // dereference if a caller wires the runner without ever
+          // calling compose.
+          const module = getModule?.() as WorkflowModule | null | undefined;
+          if (module === null || module === undefined) {
+            return err({
+              cause: new Error(
+                "workflow-coord-task-runner: getModule() returned null/undefined; " +
+                  "compose-time wiring forgot to set the ref. " +
+                  "Build the runner with a thunk that closes over the WorkflowModule " +
+                  "returned by composeWorkflowModule.",
+              ),
+            });
+          }
 
-    async cancel(nodeId: string): Promise<void> {
-      // Tear down the local interval FIRST so a poll-tick can't race
-      // ahead and observe the cancellation as a generic terminal.
-      clearForNode(nodeId);
-      let inFlight: Awaited<ReturnType<typeof tasks.listInFlightForWorkflowNode>>;
-      try {
-        inFlight = await tasks.listInFlightForWorkflowNode(nodeId);
-      } catch (err) {
-        logger.warn(
-          { nodeId, err },
-          "workflow-coord-task-runner: listInFlightForWorkflowNode threw during cancel",
-        );
-        return;
-      }
-      // Best-effort, idempotent — per `WorkflowNodeRunner` contract.
-      // A throw on one task doesn't abort the others; we log and
-      // continue.
-      for (const t of inFlight) {
-        try {
-          await tasks.cancel(t.id);
-        } catch (err) {
-          logger.warn(
-            { nodeId, taskId: t.id, err },
-            "workflow-coord-task-runner: tasks.cancel threw",
+          const wfResult = await module.getWorkflow.execute({
+            workflowId: opts.workflowId as WorkflowId,
+          });
+          if (wfResult.isErr()) return err({ cause: new Error(wfResult.error.type) });
+          const wf = wfResult.value;
+          const spec = opts.spec as WorkflowCoordinatorNodeSpec;
+          const dispatchResult = await tasks.dispatchTask.execute({
+            agent: spec.agent,
+            brief: TaskBriefSchema.parse(wf.brief),
+            // Conditional spread: passing `details: undefined` into
+            // `tasks.dispatch` can serialize as the literal string
+            // "undefined" downstream. Mirrors the worker runner's
+            // conditional spread.
+            ...(wf.details !== undefined ? { details: wf.details } : {}),
+            origin: "workflow",
+            originId: opts.nodeId,
+            // `workflowId` stays in metadata for log correlation only.
+            // Worker and coord runners write the node reverse-lookup id to
+            // the SAME typed `origin_id` column — `hasInFlightByOrigin`
+            // covers both kinds via the `tasks_origin_pair_idx` index.
+            metadata: {
+              workflowId: opts.workflowId,
+            },
+            // Override the default framing prompt for this dispatch only.
+            // The constant is asserted safe by a unit test, and
+            // `DispatchTaskUseCase` re-validates the forwarded prompt
+            // before spawn.
+            prompt: COORD_FRAMING_PROMPT_COPILOT,
+            // Coord tasks see all three workflow env keys
+            // (`GLYPH_WORKFLOW_ID`, `GLYPH_NODE_ID`,
+            // `GLYPH_WORKFLOW_DIR`). Worker tasks see only the first
+            // two — see the sibling worker runner for the rationale
+            // (the per-workflow shared dir is coord-only by design;
+            // workers stay workflow-unaware). The convention is doc-
+            // only, not OS-enforced. Key names are stable identifiers
+            // referenced by `skills/workflow-coordination/SKILL.md`.
+            subprocessEnv: {
+              GLYPH_WORKFLOW_ID: opts.workflowId,
+              GLYPH_NODE_ID: opts.nodeId,
+              GLYPH_WORKFLOW_DIR: workflowDir(workspaceDir, opts.workflowId),
+            },
+          });
+          if (dispatchResult.isErr()) return err({ cause: dispatchResult.error });
+          const task = dispatchResult.value;
+          const taskId = task.id;
+          const nodeId = opts.nodeId;
+          const onTerminal = opts.onTerminal;
+          logger.info(
+            { workflowId: opts.workflowId, nodeId, taskId },
+            "workflow-coord-task-runner: dispatched coordinator task",
           );
-        }
-      }
+
+          // If a previous dispatch on the same nodeId left an orphan
+          // interval (shouldn't happen — the substrate guarantees a
+          // single in-flight per node — but defense-in-depth in case a
+          // test re-runs dispatch directly), wipe it before installing
+          // the new one.
+          clearForNode(nodeId);
+
+          let consecutivePollErrors = 0;
+          const handle = setInterval(() => {
+            // Fire-and-forget: setInterval callbacks can't be async,
+            // and any error we don't catch here would crash the process.
+            void (async () => {
+              let polled: GetTaskResponse;
+              try {
+                const getResult = await tasks.getTask.execute({ id: taskId as TaskId });
+                if (getResult.isErr()) throw taskUseCaseError(getResult.error);
+                polled = getResult.value;
+              } catch (err) {
+                consecutivePollErrors += 1;
+                logger.warn(
+                  {
+                    workflowId: opts.workflowId,
+                    nodeId,
+                    taskId,
+                    consecutivePollErrors,
+                    err,
+                  },
+                  "workflow-coord-task-runner: tasks.get threw",
+                );
+                if (consecutivePollErrors >= maxPollErrors) {
+                  fireTerminal(
+                    nodeId,
+                    {
+                      status: "failed",
+                      reason: `tasks.get exhausted: ${maxPollErrors} consecutive failures (last: ${
+                        err instanceof Error ? err.message : String(err)
+                      })`,
+                    },
+                    onTerminal,
+                  );
+                }
+                return;
+              }
+              consecutivePollErrors = 0;
+              if (polled === null) {
+                // Task deleted out from under us. Surface as a failure
+                // with reason "task not found" — the workflow node has
+                // no unit-of-work to wait on any more.
+                fireTerminal(
+                  nodeId,
+                  {
+                    status: "failed",
+                    reason: "task not found",
+                  },
+                  onTerminal,
+                );
+                return;
+              }
+              switch (polled.status) {
+                case "running":
+                  return;
+                case "succeeded":
+                  fireTerminal(
+                    nodeId,
+                    {
+                      status: "succeeded",
+                      output: polled.success ?? null,
+                    },
+                    onTerminal,
+                  );
+                  return;
+                case "failed":
+                  fireTerminal(
+                    nodeId,
+                    {
+                      status: "failed",
+                      reason: polled.failure?.message ?? "task failed (no reason recorded)",
+                      output: polled.failure ?? null,
+                    },
+                    onTerminal,
+                  );
+                  return;
+                case "cancelled":
+                  fireTerminal(
+                    nodeId,
+                    {
+                      status: "cancelled",
+                      reason: polled.cancellation?.message ?? "task cancelled (no reason recorded)",
+                    },
+                    onTerminal,
+                  );
+                  return;
+                default: {
+                  // Defense against an unknown TaskStatus arm we don't
+                  // know about. Treat as failure rather than silently
+                  // dropping; the runner is the layer that owns the
+                  // mapping and should fail loudly if it drifts.
+                  const unexpected: never = polled.status;
+                  fireTerminal(
+                    nodeId,
+                    {
+                      status: "failed",
+                      reason: `workflow-coord-task-runner: unexpected task status: ${unexpected as string}`,
+                    },
+                    onTerminal,
+                  );
+                }
+              }
+            })();
+          }, pollIntervalMs);
+          intervals.set(nodeId, handle);
+          return ok(undefined);
+        })(),
+      );
+    },
+
+    hasInFlightForNode(nodeId: string) {
+      return tasks.hasInFlightByOrigin
+        .execute({
+          origin: "workflow",
+          originId: nodeId,
+        })
+        .mapErr((cause): RunnerFault => ({ cause: taskUseCaseError(cause) }));
+    },
+
+    cancel(nodeId: string) {
+      return new ResultAsync(
+        (async (): Promise<Result<void, RunnerFault>> => {
+          // Tear down the local interval FIRST so a poll-tick can't race
+          // ahead and observe the cancellation as a generic terminal.
+          clearForNode(nodeId);
+          let inFlight: ListInFlightByOriginResponse;
+          try {
+            const result = await tasks.listInFlightByOrigin.execute({
+              origin: "workflow",
+              originId: nodeId,
+            });
+            if (result.isErr()) throw taskUseCaseError(result.error);
+            inFlight = result.value;
+          } catch (err) {
+            logger.warn(
+              { nodeId, err },
+              "workflow-coord-task-runner: listInFlightByOrigin threw during cancel",
+            );
+            return ok(undefined);
+          }
+          // Best-effort, idempotent — per `WorkflowNodeRunner` contract.
+          // A throw on one task doesn't abort the others; we log and
+          // continue.
+          for (const t of inFlight) {
+            try {
+              const result = await tasks.cancelTask.execute({ id: t.id });
+              if (result.isErr()) throw taskUseCaseError(result.error);
+            } catch (err) {
+              logger.warn(
+                { nodeId, taskId: t.id, err },
+                "workflow-coord-task-runner: tasks.cancel threw",
+              );
+            }
+          }
+          return ok(undefined);
+        })(),
+      );
+    },
+
+    listArtifacts() {
+      return okAsync(null);
+    },
+
+    resolveArtifactPath() {
+      return okAsync(null);
     },
 
     async dispose(): Promise<void> {
@@ -535,4 +580,8 @@ export function makeCoordNodeRunner(
       intervals.clear();
     },
   };
+}
+
+function taskUseCaseError(err: { readonly type: string; readonly cause?: unknown }): Error {
+  return err.cause instanceof Error ? err.cause : new Error(err.type);
 }

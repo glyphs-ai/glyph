@@ -33,7 +33,7 @@ the moment they're needed.
 packages/runtime/src/
   types.ts                       Public contract (Runtime, LaunchCommand, ActivityItem, ...)
   errors.ts                      Cross-runtime error classes
-  runtime-registry.ts            RuntimeRegistry (kind -> Runtime lookup)
+  runtime-registry.ts            RuntimeRegistry port + InMemoryRuntimeRegistry (kind -> Runtime lookup)
   placeholders.ts                ${workspaceDir} / ${sharedDir} expansion helpers
   shared-dir.ts                  Shared-state dir helper (cross-runtime)
   copilot/
@@ -88,7 +88,7 @@ typing without runtime ever importing the catalog package.
 ## CopilotRuntime
 
 ```ts
-import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
+import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 
 const runtime = new CopilotRuntime({
   // Cross-cutting env layered into every spawned subprocess
@@ -100,7 +100,7 @@ const runtime = new CopilotRuntime({
   subprocessEnvScrub: ["GLYPH_HOME"],
 });
 
-const registry = new RuntimeRegistry();
+const registry = new InMemoryRuntimeRegistry();
 registry.register(runtime);
 ```
 

@@ -7,7 +7,7 @@
  * intentionally non-persistent.
  */
 
-import type { AgentEntry, Mcp, SkillEntry } from "@glyphs-ai/contracts";
+import type { AgentEntry, Mcp, SkillEntry } from "../api/catalog.js";
 import type { SessionView, TaskRecord } from "../api/index.js";
 import { cloneDeep } from "./clone.js";
 import { fixtureAgents } from "./fixtures/agents.js";

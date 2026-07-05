@@ -3,12 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { CopilotClient, CopilotSession, SessionEvent } from "@github/copilot-sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TrustRegistrationFailed } from "../../src/copilot/errors.js";
-import {
-  CopilotRuntime,
-  RuntimeProvisionFailed,
-  RuntimeStateDeletionFailed,
-} from "../../src/index.js";
+import { CopilotRuntime } from "../../src/index.js";
 import type { AgentContentSource, ResolvedAgent, ToolCallItem } from "../../src/types.js";
 import { makeFakeContentSource } from "../fixtures/fake-content-source.js";
 
@@ -73,12 +68,14 @@ describe("CopilotRuntime", () => {
         copilotConfigPath: path.join(scratch, "copilot-config.json"),
       });
       const { agent, source } = await buildAgent();
-      const r = await rt.provision({
-        workdir,
-        agent,
-        catalog: source,
-        workspaceDir: scratch,
-      });
+      const r = (
+        await rt.provision({
+          workdir,
+          agent,
+          catalog: source,
+          workspaceDir: scratch,
+        })
+      )._unsafeUnwrap();
       expect(r.runtimeSessionId).toBe(FIXED_UUID);
       expect(await readFile(path.join(workdir, "AGENTS.md"), "utf8")).toContain("# demo\n");
       // No `.git/` is planted — Copilot CLI loads hooks from
@@ -101,21 +98,30 @@ describe("CopilotRuntime", () => {
         skills: [],
         mcps: [],
       };
-      await expect(
-        rt.provision({ workdir, agent: broken, catalog: source, workspaceDir: scratch }),
-      ).rejects.toBeInstanceOf(RuntimeProvisionFailed);
+      const r = await rt.provision({
+        workdir,
+        agent: broken,
+        catalog: source,
+        workspaceDir: scratch,
+      });
+      expect(r.isErr()).toBe(true);
+      const err = r._unsafeUnwrapErr();
+      expect(err.type).toBe("RuntimeProvisionFailed");
+      expect((err.cause as Error).message).toMatch(/agent not found|public\/absent/);
     });
 
     it("does NOT touch the Copilot config file (trust handled by buildInteractiveLaunch preflight)", async () => {
       const sp = path.join(scratch, "copilot-config.json");
       const rt = new CopilotRuntime({ copilotConfigPath: sp });
       const { agent, source } = await buildAgent();
-      await rt.provision({
-        workdir,
-        agent,
-        catalog: source,
-        workspaceDir: scratch,
-      });
+      (
+        await rt.provision({
+          workdir,
+          agent,
+          catalog: source,
+          workspaceDir: scratch,
+        })
+      )._unsafeUnwrap();
       expect(await exists(sp)).toBe(false);
     });
   });
@@ -139,7 +145,9 @@ describe("CopilotRuntime", () => {
       });
       const ws = path.join(scratch, "ws");
       await mkdir(ws, { recursive: true });
-      const c = await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws });
+      const c = (
+        await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws })
+      )._unsafeUnwrap();
       expect(c.cmd).toBe("copilot");
       expect(c.args).toEqual(["--yolo"]);
     });
@@ -150,7 +158,9 @@ describe("CopilotRuntime", () => {
       });
       const ws = path.join(scratch, "ws");
       await mkdir(ws, { recursive: true });
-      const c = await rt.buildInteractiveLaunch(FIXED_UUID, { workdir, workspaceDir: ws });
+      const c = (
+        await rt.buildInteractiveLaunch(FIXED_UUID, { workdir, workspaceDir: ws })
+      )._unsafeUnwrap();
       expect(c.args).toEqual([`--session-id=${FIXED_UUID}`, "--yolo"]);
     });
 
@@ -160,7 +170,7 @@ describe("CopilotRuntime", () => {
       const ws = path.join(scratch, "ws");
       await mkdir(ws, { recursive: true });
       expect(await exists(sp)).toBe(false);
-      await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws });
+      (await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws }))._unsafeUnwrap();
       const written = JSON.parse(await readFile(sp, "utf8"));
       expect(written.trustedFolders).toContain(path.resolve(ws));
     });
@@ -170,23 +180,25 @@ describe("CopilotRuntime", () => {
       const rt = new CopilotRuntime({ copilotConfigPath: sp });
       const ws = path.join(scratch, "ws");
       await mkdir(ws, { recursive: true });
-      await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws });
-      await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws });
+      (await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws }))._unsafeUnwrap();
+      (await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws }))._unsafeUnwrap();
       const written = JSON.parse(await readFile(sp, "utf8"));
       const matches = written.trustedFolders.filter((p: string) => p === path.resolve(ws));
       expect(matches).toHaveLength(1);
     });
 
-    it("propagates trust failures as TrustRegistrationFailed (so the launch fails fast)", async () => {
+    it("propagates trust failures as RuntimeLaunchFailed (so the launch fails fast)", async () => {
       // Force a failure by pointing at a config path whose parent cannot
       // be created (a path containing a NUL byte fails on every platform).
       const sp = "/no/such/path\0bad/config.json";
       const rt = new CopilotRuntime({ copilotConfigPath: sp });
       const ws = path.join(scratch, "ws");
       await mkdir(ws, { recursive: true });
-      await expect(
-        rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws }),
-      ).rejects.toBeInstanceOf(TrustRegistrationFailed);
+      const r = await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws });
+      expect(r.isErr()).toBe(true);
+      const err = r._unsafeUnwrapErr();
+      expect(err.type).toBe("RuntimeLaunchFailed");
+      expect((err.cause as Error).message).toMatch(/null|NUL|argument|path/i);
     });
 
     it("exposes subprocessEnvBase verbatim on the returned LaunchCommand.env", async () => {
@@ -206,7 +218,9 @@ describe("CopilotRuntime", () => {
       });
       const ws = path.join(scratch, "ws");
       await mkdir(ws, { recursive: true });
-      const c = await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws });
+      const c = (
+        await rt.buildInteractiveLaunch(null, { workdir, workspaceDir: ws })
+      )._unsafeUnwrap();
       expect(c.env).toEqual({
         GLYPH_SERVER: "http://127.0.0.1:8787",
         GLYPH_SHARED_DIR: "/h/shared",
@@ -295,12 +309,12 @@ describe("CopilotRuntime", () => {
   describe("readMetadata", () => {
     it("returns null when runtimeSessionId is null", async () => {
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      expect(await rt.readMetadata("")).toBeNull();
+      expect((await rt.readMetadata(""))._unsafeUnwrap()).toBeNull();
     });
 
     it("returns null when copilot has no state for the id", async () => {
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      const r = await rt.readMetadata(FIXED_UUID);
+      const r = (await rt.readMetadata(FIXED_UUID))._unsafeUnwrap();
       expect(r).toBeNull();
     });
 
@@ -312,7 +326,7 @@ describe("CopilotRuntime", () => {
         "utf8",
       );
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      const r = await rt.readMetadata(FIXED_UUID);
+      const r = (await rt.readMetadata(FIXED_UUID))._unsafeUnwrap();
       expect(r).toEqual({
         lastActiveAt: "2026-05-08T01:05:00.000Z",
         title: "hello there",
@@ -324,7 +338,7 @@ describe("CopilotRuntime", () => {
   describe("deleteState", () => {
     it("is a no-op when runtimeSessionId is null", async () => {
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      await rt.deleteState("");
+      (await rt.deleteState(""))._unsafeUnwrap();
       // No throw, no fs effect — pass.
     });
 
@@ -333,30 +347,22 @@ describe("CopilotRuntime", () => {
       await mkdir(dir, { recursive: true });
       await writeFile(path.join(dir, "workspace.yaml"), "name: x\n", "utf8");
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      await rt.deleteState(FIXED_UUID);
+      (await rt.deleteState(FIXED_UUID))._unsafeUnwrap();
       expect(await exists(dir)).toBe(false);
     });
 
     it("succeeds when the state dir does not exist (idempotent)", async () => {
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      await rt.deleteState(FIXED_UUID);
+      (await rt.deleteState(FIXED_UUID))._unsafeUnwrap();
     });
 
     it("wraps unexpected fs errors in RuntimeStateDeletionFailed", async () => {
-      // Simulate by passing a copilotStateDir that points at a non-directory
-      // file path so that path.join → rm hits a weird shape. On many systems
-      // rm with force:true tolerates this; if it does, this test simply
-      // passes the no-op path. Keep as a smoke check that the error class
-      // construction is wired correctly.
-      const wrapped = new RuntimeStateDeletionFailed(
-        "copilot",
-        "20260508-deadbeef",
-        new Error("EACCES: bad"),
-      );
-      expect(wrapped).toBeInstanceOf(RuntimeStateDeletionFailed);
-      expect(wrapped.kind).toBe("copilot");
-      expect(wrapped.sessionId).toBe("20260508-deadbeef");
-      expect((wrapped.cause as Error).message).toBe("EACCES: bad");
+      const rt = new CopilotRuntime({ copilotStateDir: `bad${String.fromCharCode(0)}state` });
+      const r = await rt.deleteState(FIXED_UUID);
+      expect(r.isErr()).toBe(true);
+      const err = r._unsafeUnwrapErr();
+      expect(err.type).toBe("RuntimeStateDeletionFailed");
+      expect((err.cause as Error).message).toMatch(/null|NUL|argument|path/i);
     });
   });
 
@@ -381,7 +387,7 @@ describe("CopilotRuntime", () => {
       const sentinel = path.join(scratch, "passwd");
       await writeFile(sentinel, "secret\n", "utf8");
       for (const id of MALICIOUS_IDS) {
-        const r = await rt.readMetadata(id ?? "");
+        const r = (await rt.readMetadata(id ?? ""))._unsafeUnwrap();
         expect(r).toBeNull();
       }
       // Sentinel still present and unread (no observable side effects).
@@ -395,7 +401,7 @@ describe("CopilotRuntime", () => {
       await mkdir(sentinelDir, { recursive: true });
       await writeFile(path.join(sentinelDir, "marker"), "x", "utf8");
       for (const id of MALICIOUS_IDS) {
-        await rt.deleteState(id ?? "");
+        (await rt.deleteState(id ?? ""))._unsafeUnwrap();
       }
       expect(await exists(sentinelDir)).toBe(true);
       expect(await exists(path.join(sentinelDir, "marker"))).toBe(true);
@@ -408,7 +414,9 @@ describe("CopilotRuntime", () => {
       const ws = path.join(scratch, "ws-mal");
       await mkdir(ws, { recursive: true });
       for (const id of MALICIOUS_IDS) {
-        const c = await rt.buildInteractiveLaunch(id, { workdir, workspaceDir: ws });
+        const c = (
+          await rt.buildInteractiveLaunch(id, { workdir, workspaceDir: ws })
+        )._unsafeUnwrap();
         expect(c.args).toEqual(["--yolo"]);
         expect(c.display).not.toContain(id);
         expect(c.display).not.toContain("--session-id");
@@ -419,13 +427,13 @@ describe("CopilotRuntime", () => {
   describe("readActivity", () => {
     it("returns null when runtimeSessionId is missing or invalid", async () => {
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      expect(await rt.readActivity("")).toBeNull();
-      expect(await rt.readActivity("not-a-uuid")).toBeNull();
+      expect((await rt.readActivity(""))._unsafeUnwrap()).toBeNull();
+      expect((await rt.readActivity("not-a-uuid"))._unsafeUnwrap()).toBeNull();
     });
 
     it("returns null when events.jsonl is missing on disk", async () => {
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      expect(await rt.readActivity(FIXED_UUID)).toBeNull();
+      expect((await rt.readActivity(FIXED_UUID))._unsafeUnwrap()).toBeNull();
     });
 
     it("paginates events.jsonl in three modes (tail / after / before)", async () => {
@@ -448,7 +456,7 @@ describe("CopilotRuntime", () => {
 
       // No limit, no pagination cursor: returns the entire log.
       // CLI default ("give me everything").
-      const all = await rt.readActivity(FIXED_UUID);
+      const all = (await rt.readActivity(FIXED_UUID))._unsafeUnwrap();
       expect(all?.activity).toHaveLength(10);
       expect(all?.totalItems).toBe(10);
       expect(all?.activity[0]?.seq).toBe(0);
@@ -457,9 +465,11 @@ describe("CopilotRuntime", () => {
 
       // Tail mode (limit but no cursor): returns the LATEST `limit`
       // items. GUI default — user lands at the most recent activity.
-      const tail = await rt.readActivity(FIXED_UUID, {
-        limit: 3,
-      });
+      const tail = (
+        await rt.readActivity(FIXED_UUID, {
+          limit: 3,
+        })
+      )._unsafeUnwrap();
       expect(tail?.activity).toHaveLength(3);
       expect(tail?.activity[0]?.seq).toBe(7);
       expect(tail?.activity[2]?.seq).toBe(9);
@@ -469,10 +479,12 @@ describe("CopilotRuntime", () => {
 
       // Forward (after): items strictly newer than seq, oldest-first,
       // capped at limit. SSE polling pattern.
-      const forward = await rt.readActivity(FIXED_UUID, {
-        after: 2,
-        limit: 5,
-      });
+      const forward = (
+        await rt.readActivity(FIXED_UUID, {
+          after: 2,
+          limit: 5,
+        })
+      )._unsafeUnwrap();
       expect(forward?.activity).toHaveLength(5);
       expect(forward?.activity[0]?.seq).toBe(3);
       expect(forward?.activity[4]?.seq).toBe(7);
@@ -481,10 +493,12 @@ describe("CopilotRuntime", () => {
       // Backward (before): items strictly older than seq, returns the
       // `limit` immediately preceding the cut, still ASC-sorted.
       // GUI "load older history" pattern.
-      const backward = await rt.readActivity(FIXED_UUID, {
-        before: 8,
-        limit: 3,
-      });
+      const backward = (
+        await rt.readActivity(FIXED_UUID, {
+          before: 8,
+          limit: 3,
+        })
+      )._unsafeUnwrap();
       expect(backward?.activity).toHaveLength(3);
       expect(backward?.activity[0]?.seq).toBe(5);
       expect(backward?.activity[2]?.seq).toBe(7);
@@ -493,29 +507,33 @@ describe("CopilotRuntime", () => {
       // Backward at the head boundary: window smaller than limit,
       // returns whatever's available, no truncation marker, and
       // `activity[0].seq === 0` so caller knows hasOlder = false.
-      const headBoundary = await rt.readActivity(FIXED_UUID, {
-        before: 2,
-        limit: 5,
-      });
+      const headBoundary = (
+        await rt.readActivity(FIXED_UUID, {
+          before: 2,
+          limit: 5,
+        })
+      )._unsafeUnwrap();
       expect(headBoundary?.activity).toHaveLength(2);
       expect(headBoundary?.activity[0]?.seq).toBe(0);
       expect(headBoundary?.truncated).toBeUndefined();
     });
 
-    it("rejects mutually-exclusive before + after with RuntimeReadActivityInvalidArgs", async () => {
+    it("rejects mutually-exclusive before + after with RuntimeActivityReadFailed", async () => {
       const dir = path.join(stateDir, FIXED_UUID);
       await mkdir(dir, { recursive: true });
       await writeFile(path.join(dir, "events.jsonl"), "");
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      // Throws before touching the file — the route layer should
+      // Fails before touching the file — the route layer should
       // catch this earlier as 400, but the runtime guards in case
       // an in-process caller bypasses the route.
-      await expect(
-        rt.readActivity(FIXED_UUID, {
-          before: 5,
-          after: 2,
-        }),
-      ).rejects.toThrow(/before.*after.*mutually exclusive/);
+      const r = await rt.readActivity(FIXED_UUID, {
+        before: 5,
+        after: 2,
+      });
+      expect(r.isErr()).toBe(true);
+      const err = r._unsafeUnwrapErr();
+      expect(err.type).toBe("RuntimeActivityReadFailed");
+      expect((err.cause as Error).message).toMatch(/before.*after.*mutually exclusive/);
     });
 
     it("handles pagination boundary edge cases (before=0, after=lastSeq, oversized limit)", async () => {
@@ -539,10 +557,12 @@ describe("CopilotRuntime", () => {
       // before=0: no items have seq < 0, so the page is empty AND
       // there's no truncation marker (we're at the head boundary,
       // not page-limited). totalItems still reflects the whole log.
-      const beforeZero = await rt.readActivity(FIXED_UUID, {
-        before: 0,
-        limit: 10,
-      });
+      const beforeZero = (
+        await rt.readActivity(FIXED_UUID, {
+          before: 0,
+          limit: 10,
+        })
+      )._unsafeUnwrap();
       expect(beforeZero?.activity).toHaveLength(0);
       expect(beforeZero?.totalItems).toBe(5);
       expect(beforeZero?.truncated).toBeUndefined();
@@ -550,10 +570,12 @@ describe("CopilotRuntime", () => {
       // after=lastSeq: no items beyond the tail, empty page, no
       // truncation marker. Polling pattern: client just sees no new
       // events and polls again later.
-      const afterTail = await rt.readActivity(FIXED_UUID, {
-        after: 4,
-        limit: 10,
-      });
+      const afterTail = (
+        await rt.readActivity(FIXED_UUID, {
+          after: 4,
+          limit: 10,
+        })
+      )._unsafeUnwrap();
       expect(afterTail?.activity).toHaveLength(0);
       expect(afterTail?.totalItems).toBe(5);
       expect(afterTail?.truncated).toBeUndefined();
@@ -561,9 +583,11 @@ describe("CopilotRuntime", () => {
       // limit > totalItems with no directional opt: returns the whole
       // log (tail mode), no truncation marker — the cap wasn't actually
       // hit because the log fit inside it.
-      const oversized = await rt.readActivity(FIXED_UUID, {
-        limit: 9999,
-      });
+      const oversized = (
+        await rt.readActivity(FIXED_UUID, {
+          limit: 9999,
+        })
+      )._unsafeUnwrap();
       expect(oversized?.activity).toHaveLength(5);
       expect(oversized?.totalItems).toBe(5);
       expect(oversized?.truncated).toBeUndefined();
@@ -590,7 +614,7 @@ describe("CopilotRuntime", () => {
       const eventsPath = path.join(dir, "events.jsonl");
       await writeFile(eventsPath, fatLine.repeat(repeats), "utf8");
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      const r = await rt.readActivity(FIXED_UUID);
+      const r = (await rt.readActivity(FIXED_UUID))._unsafeUnwrap();
       expect(r).not.toBeNull();
       expect(r?.truncated?.reason).toBe("size_limit");
       expect(r?.truncated?.droppedBytes).toBeGreaterThan(0);
@@ -602,13 +626,13 @@ describe("CopilotRuntime", () => {
   describe("getLastAgentActivity", () => {
     it("returns null when runtimeSessionId is missing or invalid", async () => {
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      expect(await rt.getLastAgentActivity("")).toBeNull();
-      expect(await rt.getLastAgentActivity("not-a-uuid")).toBeNull();
+      expect((await rt.getLastAgentActivity(""))._unsafeUnwrap()).toBeNull();
+      expect((await rt.getLastAgentActivity("not-a-uuid"))._unsafeUnwrap()).toBeNull();
     });
 
     it("returns null when events.jsonl is missing on disk", async () => {
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      expect(await rt.getLastAgentActivity(FIXED_UUID)).toBeNull();
+      expect((await rt.getLastAgentActivity(FIXED_UUID))._unsafeUnwrap()).toBeNull();
     });
 
     it("returns null when the stream has no assistant items", async () => {
@@ -623,7 +647,7 @@ describe("CopilotRuntime", () => {
       });
       await writeFile(path.join(dir, "events.jsonl"), line);
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      expect(await rt.getLastAgentActivity(FIXED_UUID)).toBeNull();
+      expect((await rt.getLastAgentActivity(FIXED_UUID))._unsafeUnwrap()).toBeNull();
     });
 
     it("returns the last assistant utterance, skipping trailing tool/system events", async () => {
@@ -686,7 +710,7 @@ describe("CopilotRuntime", () => {
       await writeFile(path.join(dir, "events.jsonl"), lines.join("\n"));
 
       const rt = new CopilotRuntime({ copilotStateDir: stateDir });
-      const last = await rt.getLastAgentActivity(FIXED_UUID);
+      const last = (await rt.getLastAgentActivity(FIXED_UUID))._unsafeUnwrap();
       expect(last).not.toBeNull();
       expect(last?.text).toBe("second");
       expect(last?.timestamp).toBe("2026-05-12T03:54:14.500Z");
@@ -847,13 +871,15 @@ describe("CopilotRuntime", () => {
         },
       });
 
-      const handle = await rt.launchHeadless({
-        workdir,
-        workspaceDir: scratch,
-        agent,
-        catalog: source,
-        prompt: "hi",
-      });
+      const handle = (
+        await rt.launchHeadless({
+          workdir,
+          workspaceDir: scratch,
+          agent,
+          catalog: source,
+          prompt: "hi",
+        })
+      )._unsafeUnwrap();
       const ac = new AbortController();
       const collected: ToolCallItem[] = [];
       const iterPromise = (async () => {

@@ -1,7 +1,28 @@
-import type { CatalogService } from "@glyphs-ai/catalog";
-import type { TaskTargetData, TaskTargetPatch } from "@glyphs-ai/contracts";
-import type { ScheduleKindHandler } from "@glyphs-ai/schedule";
-import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from "@glyphs-ai/task";
+import type { HandlerFault, ScheduleKindHandler } from "@glyphs-ai/schedule";
+import type { TaskModule } from "@glyphs-ai/task";
+import { TaskBriefSchema } from "@glyphs-ai/task";
+import { err, ok, type Result, ResultAsync } from "neverthrow";
+import { taskAgentNotFound, taskAgentResolutionFailed } from "./_task-operation-error.js";
+
+/** Concrete task-target shape this handler validates + persists as opaque `data`. */
+interface TaskTargetData {
+  readonly agent: string;
+  readonly brief: string;
+  readonly details?: string;
+  readonly runtime?: string;
+}
+
+/** RFC 7396 deep-merge patch for a task target (`null` deletes an optional). */
+interface TaskTargetPatch {
+  readonly agent?: string;
+  readonly brief?: string;
+  readonly details?: string | null;
+  readonly runtime?: string | null;
+}
+
+interface CatalogAgentLookup {
+  getAgent(fqn: string): Promise<unknown | null>;
+}
 
 /**
  * Sole module knowing about all of `@glyphs-ai/schedule`,
@@ -16,7 +37,7 @@ import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from
  *   - task-target shape validation
  *   - agent existence lookup
  *   - RFC 7396 deep-merge of task target patches
- *   - origin/originId synthesis for `TaskService.dispatch`
+ *   - origin/originId synthesis for `tasks.dispatchTask.execute`
  *   - lifecycle delegation for `hasInFlightForSchedule` /
  *     `deleteForSchedule`
  *
@@ -25,70 +46,91 @@ import { AgentNotFoundError, AgentResolutionFailedError, type TaskService } from
  * catalog-down invariant: a sparse "edit only brief" patch must not
  * fail because the catalog is unhealthy.
  *
- * Agent errors use task-pkg classes directly so downstream error
- * policies share canonical matches with the `/run` task-dispatch path.
+ * Agent-lookup failures propagate task union errors so downstream policies
+ * use the same status/body mapping as the task routes.
  */
 export function makeTaskKindHandler(opts: {
-  readonly tasks: TaskService;
-  readonly catalog: CatalogService;
+  readonly tasks: TaskModule;
+  readonly catalog: CatalogAgentLookup;
 }): ScheduleKindHandler {
   const tasks = opts.tasks;
   const catalog = opts.catalog;
 
   return {
-    async validate(raw, opts) {
-      if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-        throw new TaskScheduleTargetError("Task target data must be an object");
-      }
-      const obj = raw as Record<string, unknown>;
-      if (typeof obj.agent !== "string" || obj.agent.trim().length === 0) {
-        throw new TaskScheduleTargetError("Task target requires non-empty agent");
-      }
-      if (typeof obj.brief !== "string" || obj.brief.trim().length === 0) {
-        throw new TaskScheduleTargetError("Task target requires non-empty brief");
-      }
-      if (obj.brief.includes("\n") || obj.brief.includes("\r")) {
-        throw new TaskScheduleTargetError(
-          "Task target brief must be a single line (no newline characters); pass long content via details",
-        );
-      }
-      if (obj.brief.trim().length > 200) {
-        throw new TaskScheduleTargetError("Task target brief must be 200 characters or fewer");
-      }
-      if (obj.details !== undefined && typeof obj.details !== "string") {
-        throw new TaskScheduleTargetError("Task target details, when set, must be a string");
-      }
-      if (
-        obj.runtime !== undefined &&
-        (typeof obj.runtime !== "string" || obj.runtime.trim().length === 0)
-      ) {
-        throw new TaskScheduleTargetError(
-          "Task target runtime, when set, must be a non-empty string",
-        );
-      }
+    validate(raw, opts) {
+      return new ResultAsync(
+        (async (): Promise<Result<unknown, HandlerFault>> => {
+          if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+            return err({
+              cause: {
+                type: "TaskTargetInvalid",
+                message: "Task target data must be an object",
+              } satisfies TaskTargetInvalid,
+            });
+          }
+          const obj = raw as Record<string, unknown>;
+          if (typeof obj.agent !== "string" || obj.agent.trim().length === 0) {
+            return err({
+              cause: {
+                type: "TaskTargetInvalid",
+                message: "Task target requires non-empty agent",
+              } satisfies TaskTargetInvalid,
+            });
+          }
+          const briefResult = TaskBriefSchema.safeParse(obj.brief);
+          if (!briefResult.success) {
+            return err({
+              cause: {
+                type: "TaskTargetInvalid",
+                message: `Task target ${briefResult.error.issues[0]?.message ?? "has an invalid brief"}`,
+              } satisfies TaskTargetInvalid,
+            });
+          }
+          if (obj.details !== undefined && typeof obj.details !== "string") {
+            return err({
+              cause: {
+                type: "TaskTargetInvalid",
+                message: "Task target details, when set, must be a string",
+              } satisfies TaskTargetInvalid,
+            });
+          }
+          if (
+            obj.runtime !== undefined &&
+            (typeof obj.runtime !== "string" || obj.runtime.trim().length === 0)
+          ) {
+            return err({
+              cause: {
+                type: "TaskTargetInvalid",
+                message: "Task target runtime, when set, must be a non-empty string",
+              } satisfies TaskTargetInvalid,
+            });
+          }
 
-      // Catalog existence — skip if changedKeys excludes "agent".
-      // changedKeys === undefined means "full validate" (the create
-      // path); the patch path passes the exact set of changed keys
-      // so a brief-only edit skips the catalog round-trip.
-      const mustCheckAgent = opts?.changedKeys === undefined || opts.changedKeys.includes("agent");
-      if (mustCheckAgent) {
-        let found: Awaited<ReturnType<typeof catalog.getAgent>>;
-        try {
-          found = await catalog.getAgent(obj.agent as string);
-        } catch (err) {
-          throw new AgentResolutionFailedError(obj.agent as string, err);
-        }
-        if (found === null) throw new AgentNotFoundError(obj.agent as string);
-      }
+          // Catalog existence — skip if changedKeys excludes "agent".
+          // changedKeys === undefined means "full validate" (the create
+          // path); the patch path passes the exact set of changed keys
+          // so a brief-only edit skips the catalog round-trip.
+          const mustCheckAgent =
+            opts?.changedKeys === undefined || opts.changedKeys.includes("agent");
+          if (mustCheckAgent) {
+            let found: Awaited<ReturnType<typeof catalog.getAgent>>;
+            try {
+              found = await catalog.getAgent(obj.agent as string);
+            } catch (cause) {
+              return err({ cause: taskAgentResolutionFailed(obj.agent as string, cause) });
+            }
+            if (found === null) return err({ cause: taskAgentNotFound(obj.agent as string) });
+          }
 
-      const validated: TaskTargetData = {
-        agent: obj.agent as string,
-        brief: obj.brief as string,
-        ...(obj.details !== undefined ? { details: obj.details as string } : {}),
-        ...(obj.runtime !== undefined ? { runtime: obj.runtime as string } : {}),
-      };
-      return validated;
+          const validated: TaskTargetData = {
+            agent: obj.agent as string,
+            brief: briefResult.data,
+            ...(obj.details !== undefined ? { details: obj.details as string } : {}),
+            ...(obj.runtime !== undefined ? { runtime: obj.runtime as string } : {}),
+          };
+          return ok(validated);
+        })(),
+      );
     },
 
     mergePatch(existing, patch) {
@@ -144,45 +186,39 @@ export function makeTaskKindHandler(opts: {
       return { data, changedKeys };
     },
 
-    async dispatch({ scheduleId, firedAt, data }) {
+    dispatch({ scheduleId, firedAt, data }) {
       const t = data as TaskTargetData;
-      const result = await tasks.dispatch({
-        agent: t.agent,
-        brief: t.brief,
-        // `{ details: undefined }` is NOT equivalent to omitting the
-        // key under exactOptionalPropertyTypes; conditional spread.
-        ...(t.details !== undefined ? { details: t.details } : {}),
-        ...(t.runtime !== undefined ? { runtime: t.runtime } : {}),
-        origin: "schedule",
-        originId: scheduleId,
-        metadata: { firedAt },
-      });
-      return { id: result.id };
+      return tasks.dispatchTask
+        .execute({
+          agent: t.agent,
+          brief: TaskBriefSchema.parse(t.brief),
+          // `{ details: undefined }` is NOT equivalent to omitting the
+          // key under exactOptionalPropertyTypes; conditional spread.
+          ...(t.details !== undefined ? { details: t.details } : {}),
+          ...(t.runtime !== undefined ? { runtime: t.runtime } : {}),
+          origin: "schedule",
+          originId: scheduleId,
+          metadata: { firedAt },
+        })
+        .map((dispatched) => ({ id: dispatched.id }))
+        .mapErr((cause): HandlerFault => ({ cause }));
     },
 
     hasInFlightForSchedule(scheduleId) {
-      return tasks.hasInFlightByOrigin({
-        origin: "schedule",
-        originId: scheduleId,
-      });
+      return tasks.hasInFlightByOrigin
+        .execute({ origin: "schedule", originId: scheduleId })
+        .mapErr((cause): HandlerFault => ({ cause }));
     },
 
     deleteForSchedule(scheduleId) {
-      return tasks.deleteTerminalByOrigin({
-        origin: "schedule",
-        originId: scheduleId,
-      });
+      return tasks.deleteTerminalByOrigin
+        .execute({ origin: "schedule", originId: scheduleId })
+        .mapErr((cause): HandlerFault => ({ cause }));
     },
   };
 }
 
-/**
- * Wire-shape error for malformed task target data. Lives next to
- * the handler (rather than in `@glyphs-ai/schedule`) because the
- * schedule pkg is kind-agnostic. The schedules-route's error policy
- * needs a 400 row for this; we set `.name = "TaskScheduleTargetError"`
- * so the policy's instanceof match wires up cleanly.
- */
-export class TaskScheduleTargetError extends Error {
-  override readonly name = "TaskScheduleTargetError";
-}
+export type TaskTargetInvalid = {
+  readonly type: "TaskTargetInvalid";
+  readonly message: string;
+};

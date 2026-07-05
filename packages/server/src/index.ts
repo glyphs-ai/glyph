@@ -8,49 +8,54 @@ process.env.UV_THREADPOOL_SIZE ??= "16";
 import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import path, { sep as pathSep } from "node:path";
-import { composeApplication } from "@glyphs-ai/api";
+import { pathToFileURL } from "node:url";
+import {
+  catalogRoutes,
+  composeApplication,
+  configRoutes,
+  healthRoutes,
+  runtimesRoutes,
+  scheduledTasksRoutes,
+  scheduledWorkflowsRoutes,
+  schedulesPreviewCronRoutes,
+  schedulesTaskRoutes,
+  schedulesWorkflowRoutes,
+  sessionsRoutes,
+  tasksRoutes,
+  workflowsRoutes,
+  workspacesRoutes,
+} from "@glyphs-ai/api";
 import {
   assertCopilotSdkResolvable,
   CopilotRuntime,
-  RuntimeRegistry,
+  InMemoryRuntimeRegistry,
   sharedDir,
 } from "@glyphs-ai/runtime";
-import { globalDbPath, workspacesParentDir } from "@glyphs-ai/workspace";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { assertBindIsSafe, isLoopbackBind } from "./auth.js";
-import { logsDir, resolveGlyphHome } from "./glyph-home.js";
+import { globalDbPath, logsDir, resolveGlyphHome, workspacesParentDir } from "./glyph-home.js";
 import { buildLogger, type Logger, type LogLevel } from "./log/build-logger.js";
 import { accessLog } from "./middleware/access-log.js";
 import { requestId } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { type WorkspaceVars, workspaceContextMiddleware } from "./middleware/workspace-context.js";
-import { createApiApp } from "./routes/_openapi.js";
-import { catalogRoutes } from "./routes/catalog/index.js";
-import { configRoutes } from "./routes/config.js";
-import { healthRoutes } from "./routes/health.js";
-import { runtimesRoutes } from "./routes/runtimes.js";
-import { scheduledTasksRoutes } from "./routes/scheduled-tasks.js";
-import { scheduledWorkflowsRoutes } from "./routes/scheduled-workflows.js";
-import { schedulesRoutes } from "./routes/schedules.js";
-import { sessionsRoutes } from "./routes/sessions.js";
-import { tasksRoutes } from "./routes/tasks.js";
-import { workflowsRoutes } from "./routes/workflows.js";
-import { workspacesRoutes } from "./routes/workspaces.js";
+import { createApiApp, registerOpenApiDoc } from "./routes/_openapi.js";
 import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-env.js";
 
-// Route manifest and wire types live in `@glyphs-ai/contracts`,
-// re-exported via `@glyphs-ai/api`; CLI and dashboard import them
-// directly from api. Server's public surface is strictly its
-// transport (`runServer`, `RunServerOpts`) + the auth helpers below
-// + the CLI lifecycle breadcrumb helpers (`resolveGlyphHome`,
-// `logsDir`, `runtimeFilePath`, the `RuntimeFile` shape) re-exported
-// here for the CLI process-management commands (`glyph start`,
-// `status`, `stop`, `logs`, `connect`). Those helpers cannot live in
-// `@glyphs-ai/contracts` because they value-import `node:os` /
-// `node:path`, and the contracts pkg is the SPA-safe surface.
+// Route manifest and wire types live in `@glyphs-ai/api` (its `wire/`
+// surface); the server imports them via the api barrel, while CLI and
+// dashboard consume the same shapes through `@glyphs-ai/sdk`. Server's
+// public surface is strictly its transport (`runServer`,
+// `RunServerOpts`) + the auth helpers below + the CLI lifecycle
+// breadcrumb helpers (`resolveGlyphHome`, `logsDir`, `runtimeFilePath`,
+// the `RuntimeFile` shape) re-exported here for the CLI
+// process-management commands (`glyph start`, `status`, `stop`, `logs`,
+// `connect`). Those helpers cannot live in the wire surface because
+// they value-import `node:os` / `node:path`, and the wire surface is
+// the SPA-safe layer.
 export * from "./glyph-home.js";
 
 /**
@@ -151,7 +156,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
     format: opts.logFormat ?? (env.GLYPH_LOG_FORMAT === "json" ? "json" : "pretty"),
   });
 
-  const runtimeRegistry = new RuntimeRegistry();
+  const runtimeRegistry = new InMemoryRuntimeRegistry();
   // Fail-fast preflight: confirm `@github/copilot-sdk` (and its
   // transitive `@github/copilot` CLI dep) are resolvable from this
   // process's module graph BEFORE we register the copilot runtime.
@@ -201,14 +206,16 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   await mkdir(home, { recursive: true });
 
   const composition = await composeApplication({
-    workspace: { dbFile: globalDbPath(home) },
+    workspace: {
+      dbUrl: pathToFileURL(globalDbPath(home)).href,
+      defaultWorkspaceParent: workspacesParentDir(home),
+    },
     runtimeRegistry,
-    defaultWorkspaceParent: workspacesParentDir(home),
     logger,
   });
   logger.info({ file: globalDbPath(home) }, "global.db opened via workspace pkg");
 
-  const workspaceService = composition.workspaceService;
+  const workspace = composition.workspace;
   const application = composition;
 
   const app = new OpenAPIHono();
@@ -251,7 +258,11 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
       host: hostname,
       port,
       pathSeparator: pathSep,
-      currentWorkspaceId: () => workspaceService.getLastOpenedId(),
+      currentWorkspaceId: async () => {
+        const res = await workspace.getLastOpenedWorkspaceId.execute({}).map((r) => r.id);
+        if (res.isErr()) throw res.error.cause;
+        return res.value;
+      },
     }),
   );
   app.route("/api/runtimes", runtimesRoutes(runtimeRegistry));
@@ -278,7 +289,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", tasksApp);
 
   // `/scheduled-tasks` is the schedule-origin sibling of `/tasks`. It
-  // shares the same workspace-scoped TaskService (via the same
+  // shares the same workspace-scoped TaskModule (via the same
   // `workspaceContext.tasks` resolver) so storage / cancellation /
   // dispatch all observe one in-memory state — splitting at the route
   // layer, not the service layer, keeps the seam at the URL where it
@@ -305,18 +316,26 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   );
   app.route("/api/workspaces", scheduledWorkflowsApp);
 
-  // Schedule CRUD + run + preview. Sibling of `/scheduled-tasks` —
-  // that route is read-only over the dispatched task list; this
-  // route owns the trigger entities themselves. Both share the same
-  // workspace-scoped per-context state via the middleware.
+  // Schedule CRUD + run + preview, split by target kind. Each kind is a
+  // sibling collection under `/schedules/<kind>`; `/schedules/preview-cron` is
+  // the one kindless endpoint (a cron calculator, touches no stored row). All
+  // share the same workspace-scoped per-context state via one middleware.
   const schedulesApp = createApiApp<{ Variables: WorkspaceVars }>();
   schedulesApp.use("/:id/schedules/*", workspaceContextMiddleware(application, logger));
   schedulesApp.route(
-    "/:id/schedules",
-    schedulesRoutes(
+    "/:id/schedules/task",
+    schedulesTaskRoutes((c) => c.get("workspaceContext").schedules),
+  );
+  schedulesApp.route(
+    "/:id/schedules/workflow",
+    schedulesWorkflowRoutes(
       (c) => c.get("workspaceContext").schedules,
       (c) => c.get("workspaceContext").workflows,
     ),
+  );
+  schedulesApp.route(
+    "/:id/schedules/preview-cron",
+    schedulesPreviewCronRoutes((c) => c.get("workspaceContext").schedules),
   );
   app.route("/api/workspaces", schedulesApp);
 
@@ -345,11 +364,12 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", catalogApp);
 
   // OpenAPI: assemble the 3.1 document from every mounted OpenAPIHono
-  // sub-app and serve it, plus a Swagger UI page. Registered after all
-  // route families (so the spec carries every operation) and before the
-  // static/SPA fallback (so `/api/docs` and `/api/openapi.json` are not
-  // shadowed by the catch-all GET handler below).
-  app.doc31("/api/openapi.json", {
+  // sub-app, inject the mount-level workspace `id` params, and serve it,
+  // plus a Swagger UI page. Registered after all route families (so the
+  // spec carries every operation) and before the static/SPA fallback (so
+  // `/api/docs` and `/api/openapi.json` are not shadowed by the catch-all
+  // GET handler below).
+  registerOpenApiDoc(app, "/api/openapi.json", {
     openapi: "3.1.0",
     info: { title: serverName, version: serverVersion },
   });
@@ -376,7 +396,14 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   }
 
   const displayHost = hostname === "0.0.0.0" ? "localhost" : hostname;
-  const wsList = await workspaceService.list();
+  const wsListResult = await workspace.listWorkspaces.execute({});
+  if (wsListResult.isErr()) {
+    // Boot-time global-registry failure: cannot enumerate workspaces.
+    // Surface the underlying cause so the operator sees the driver
+    // error rather than a typed envelope.
+    throw wsListResult.error.cause;
+  }
+  const wsList = wsListResult.value;
   logger.info(
     {
       listen: `http://${displayHost}:${port}`,
@@ -455,7 +482,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   //      (a) a `POST /tasks` arriving mid-shutdown spawning a new
   //      subprocess after we've already taken the snapshot, and (b) the
   //      first request to a workspace whose context wasn't loaded yet
-  //      lazy-instantiating a fresh TaskService that wasn't in
+  //      lazy-instantiating a fresh TaskModule that wasn't in
   //      `application.loadedContexts()` and would never get drained.
   //   2. `tasks.shutdown()` second — by now no new dispatches can land,
   //      so the snapshot of cached contexts is authoritative.

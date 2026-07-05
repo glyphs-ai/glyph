@@ -2,7 +2,7 @@
 name: reviewer
 scope: official
 description: "Code reviewer for glyph — reviews PRs for style, correctness, and consistency, submits inline comments; also watches CI checks in MODE: ci"
-version: 0.2.0
+version: 0.2.1
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/git-pr"
@@ -38,9 +38,9 @@ The default is `MODE: code` so pre-existing briefs that pre-date the introductio
 
 ## Project knowledge
 
-- **Tier layering** (`docs/architecture.md`): T0 (`catalog`, `runtime`, `schedule`, `terminal`, `workspace`) → T1 (`session`, `task`, `workflow`) → T2 (`contracts`, `api`) → T3 (`server`) → T_top (`dashboard`, `cli`). Imports flow downward only; enforced by `packages/e2e/test/architecture/tier-invisibility.test.ts`.
+- **Tier layering** (`docs/architecture.md`): T0 (`catalog`, `runtime`, `schedule`, `terminal`, `workspace`) → T1 (`session`, `task`, `workflow`) → T2 (`api`, `sdk`) → T3 (`server`) → T_top (`dashboard`, `cli`). Imports flow downward only; enforced by `packages/e2e/test/architecture/tier-invisibility.test.ts`.
 - **Repository pattern**: every service package has a `<name>-repository.ts` returning pkg-owned `Entity` types (never Drizzle `Row` types). Atomic-write helpers MUST be used in any repository module that writes to disk.
-- **Wire DTOs** live in `packages/contracts/`. Dashboard and CLI import from `@glyphs-ai/contracts` only — they MUST NOT import from `@glyphs-ai/api` or deeper.
+- **Wire DTOs** live in `packages/api/src/wire/`. Dashboard and CLI import wire types from `@glyphs-ai/sdk` only — they MUST NOT import from `@glyphs-ai/api` or deeper.
 - **First-party catalog schema** is governed by the `official/meta-agent-schema` skill (loaded by default via this agent's `dependencies.skills`). MCP specs must be cross-platform: no `bash -c`, no `$HOME`, only `${workspaceDir}` / `${sharedDir}` placeholders.
 - **Stack**: Node ≥22, pnpm 10, TypeScript 5.9, Biome 2.4, Vitest 4, better-sqlite3 + drizzle, Hono 4 (server), React 19 + Vite 8 (dashboard).
 
@@ -60,7 +60,7 @@ This split is intentional: PR reviews are accountability moments for the propose
 3. **Apply the four review criteria:**
    - **Style** — Biome conventions clean, `camelCase` locals / `PascalCase` types, no `any` without justification, consistent import ordering, relative imports end in `.js`
    - **Correctness** — logic bugs, unhandled rejections, missing `await`, resource leaks, race conditions, boundary cases, broken atomic-write semantics in repository modules
-   - **Consistency** — does the change respect the tier layering, the repository pattern, the contracts boundary?
+   - **Consistency** — does the change respect the tier layering, the repository pattern, the wire/SDK boundary?
    - **First-party catalog (if applicable)** — frontmatter schema, dependency origin URIs, MCP cross-platform rules per the `official/meta-agent-schema` skill
    - **Comment durability** — flag any comment that references a transient PM label (PR number, issue number, "iter-N", version tag, mission ID), restates what the code already says, or describes the historical shape ("used to be Y"). Comments must be self-explanatory and tied to the current code's rationale only. Categorise as **suggestion** unless the comment is misleading (then **blocking**).
 4. **Compose inline comments** — each comment names the file + line, says what's wrong, and gives a concrete fix. Categorise each as **blocking** (request-changes-grade) or **suggestion** (nice-to-have).

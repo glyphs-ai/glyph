@@ -115,8 +115,8 @@ export type GetApiWorkspacesResponses = {
     200: Array<{
         id: string;
         name: string;
-        createdAt: string;
         workspaceDir: string;
+        createdAt: string;
         lastOpenedAt: string;
     }>;
 };
@@ -124,7 +124,7 @@ export type GetApiWorkspacesResponses = {
 export type GetApiWorkspacesResponse = GetApiWorkspacesResponses[keyof GetApiWorkspacesResponses];
 
 export type PostApiWorkspacesData = {
-    body?: {
+    body: {
         name: string;
         workspaceDir?: string;
     };
@@ -155,8 +155,8 @@ export type PostApiWorkspacesResponses = {
     201: {
         id: string;
         name: string;
-        createdAt: string;
         workspaceDir: string;
+        createdAt: string;
         lastOpenedAt: string;
     };
 };
@@ -189,7 +189,7 @@ export type GetApiWorkspacesCurrentResponses = {
 export type GetApiWorkspacesCurrentResponse = GetApiWorkspacesCurrentResponses[keyof GetApiWorkspacesCurrentResponses];
 
 export type PutApiWorkspacesCurrentData = {
-    body?: {
+    body: {
         id: string;
     };
     path?: never;
@@ -203,7 +203,7 @@ export type PutApiWorkspacesCurrentErrors = {
      */
     400: unknown;
     /**
-     * Workspace not registered
+     * Workspace not found
      */
     404: unknown;
     /**
@@ -228,9 +228,7 @@ export type DeleteApiWorkspacesByIdData = {
     path: {
         id: string;
     };
-    query?: {
-        purge?: string;
-    };
+    query?: never;
     url: '/api/workspaces/{id}';
 };
 
@@ -261,7 +259,7 @@ export type GetApiWorkspacesByIdData = {
 
 export type GetApiWorkspacesByIdErrors = {
     /**
-     * Workspace not registered
+     * Workspace not found
      */
     404: unknown;
     /**
@@ -277,17 +275,17 @@ export type GetApiWorkspacesByIdResponses = {
     200: {
         id: string;
         name: string;
-        createdAt: string;
         workspaceDir: string;
+        createdAt: string;
         lastOpenedAt: string;
-    };
+    } | null;
 };
 
 export type GetApiWorkspacesByIdResponse = GetApiWorkspacesByIdResponses[keyof GetApiWorkspacesByIdResponses];
 
 export type PatchApiWorkspacesByIdData = {
-    body?: {
-        name?: string;
+    body: {
+        name: string;
     };
     path: {
         id: string;
@@ -302,7 +300,7 @@ export type PatchApiWorkspacesByIdErrors = {
      */
     400: unknown;
     /**
-     * Workspace not registered
+     * Workspace not found
      */
     404: unknown;
     /**
@@ -318,10 +316,10 @@ export type PatchApiWorkspacesByIdResponses = {
     200: {
         id: string;
         name: string;
-        createdAt: string;
         workspaceDir: string;
+        createdAt: string;
         lastOpenedAt: string;
-    };
+    } | null;
 };
 
 export type PatchApiWorkspacesByIdResponse = PatchApiWorkspacesByIdResponses[keyof PatchApiWorkspacesByIdResponses];
@@ -337,7 +335,7 @@ export type PostApiWorkspacesByIdReloadData = {
 
 export type PostApiWorkspacesByIdReloadErrors = {
     /**
-     * Workspace not registered
+     * Workspace not found
      */
     404: unknown;
     /**
@@ -361,7 +359,9 @@ export type PostApiWorkspacesByIdReloadResponse = PostApiWorkspacesByIdReloadRes
 
 export type GetApiWorkspacesByIdSessionsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         agent?: string;
         createdSince?: string;
@@ -401,8 +401,13 @@ export type GetApiWorkspacesByIdSessionsResponses = {
 export type GetApiWorkspacesByIdSessionsResponse = GetApiWorkspacesByIdSessionsResponses[keyof GetApiWorkspacesByIdSessionsResponses];
 
 export type PostApiWorkspacesByIdSessionsData = {
-    body?: never;
-    path?: never;
+    body: {
+        agent: string;
+        runtime?: string;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/sessions';
 };
@@ -440,6 +445,7 @@ export type PostApiWorkspacesByIdSessionsResponse = PostApiWorkspacesByIdSession
 export type DeleteApiWorkspacesByIdSessionsBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: {
@@ -450,7 +456,7 @@ export type DeleteApiWorkspacesByIdSessionsBySidData = {
 
 export type DeleteApiWorkspacesByIdSessionsBySidErrors = {
     /**
-     * Runtime state deletion failed
+     * Runtime state / workdir removal failed
      */
     409: unknown;
     /**
@@ -471,6 +477,7 @@ export type DeleteApiWorkspacesByIdSessionsBySidResponse = DeleteApiWorkspacesBy
 export type GetApiWorkspacesByIdSessionsBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -502,14 +509,17 @@ export type GetApiWorkspacesByIdSessionsBySidResponses = {
         lastActiveAt: string | null;
         preview: string | null;
         lastLaunchMode: 'local' | 'remote' | null;
-    };
+    } | null;
 };
 
 export type GetApiWorkspacesByIdSessionsBySidResponse = GetApiWorkspacesByIdSessionsBySidResponses[keyof GetApiWorkspacesByIdSessionsBySidResponses];
 
 export type PostApiWorkspacesByIdSessionsBySidSpawnData = {
-    body?: never;
+    body?: {
+        remote?: boolean;
+    };
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -521,10 +531,6 @@ export type PostApiWorkspacesByIdSessionsBySidSpawnErrors = {
      * Malformed request body
      */
     400: unknown;
-    /**
-     * Session not found
-     */
-    404: unknown;
     /**
      * Internal error
      */
@@ -551,12 +557,14 @@ export type PostApiWorkspacesByIdSessionsBySidSpawnResponse = PostApiWorkspacesB
 
 export type GetApiWorkspacesByIdTasksData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         agent?: string;
-        runtime?: string;
         createdSince?: string;
-        status?: string;
+        runtime?: string;
+        status?: 'running' | 'succeeded' | 'failed' | 'cancelled';
     };
     url: '/api/workspaces/{id}/tasks';
 };
@@ -581,7 +589,7 @@ export type GetApiWorkspacesByIdTasksResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -596,10 +604,7 @@ export type GetApiWorkspacesByIdTasksResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -622,8 +627,15 @@ export type GetApiWorkspacesByIdTasksResponses = {
 export type GetApiWorkspacesByIdTasksResponse = GetApiWorkspacesByIdTasksResponses[keyof GetApiWorkspacesByIdTasksResponses];
 
 export type PostApiWorkspacesByIdTasksData = {
-    body?: never;
-    path?: never;
+    body: {
+        agent: string;
+        brief: string;
+        details?: string;
+        runtime?: string;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/tasks';
 };
@@ -648,7 +660,7 @@ export type PostApiWorkspacesByIdTasksResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -663,10 +675,7 @@ export type PostApiWorkspacesByIdTasksResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -688,9 +697,79 @@ export type PostApiWorkspacesByIdTasksResponses = {
 
 export type PostApiWorkspacesByIdTasksResponse = PostApiWorkspacesByIdTasksResponses[keyof PostApiWorkspacesByIdTasksResponses];
 
+export type GetApiWorkspacesByIdTasksByOriginData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        origin: string;
+        originId: string;
+    };
+    url: '/api/workspaces/{id}/tasks/by-origin';
+};
+
+export type GetApiWorkspacesByIdTasksByOriginErrors = {
+    /**
+     * Missing or malformed query
+     */
+    400: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdTasksByOriginResponses = {
+    /**
+     * Latest task for the origin pair, or null
+     */
+    200: {
+        id: string;
+        agent: string;
+        brief: string;
+        details?: string;
+        origin: string;
+        originId?: string;
+        status: 'running' | 'succeeded' | 'failed' | 'cancelled';
+        metadata: {
+            [key: string]: unknown;
+        };
+        createdAt: string;
+        startedAt: string;
+        endedAt?: string;
+        success?: {
+            output: string | null;
+            artifacts?: Array<string>;
+        };
+        failure?: {
+            kind: 'execution';
+            exitCode?: number;
+            signal?: string;
+            message: string;
+        } | {
+            kind: 'internal';
+            message: string;
+        } | {
+            kind: 'cascade';
+            message: string;
+        };
+        cancellation?: {
+            kind: 'user';
+            message: string;
+        } | {
+            kind: 'cascade';
+            message: string;
+        };
+    } | null;
+};
+
+export type GetApiWorkspacesByIdTasksByOriginResponse = GetApiWorkspacesByIdTasksByOriginResponses[keyof GetApiWorkspacesByIdTasksByOriginResponses];
+
 export type DeleteApiWorkspacesByIdTasksByTidData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: {
@@ -726,6 +805,7 @@ export type DeleteApiWorkspacesByIdTasksByTidResponse = DeleteApiWorkspacesByIdT
 export type GetApiWorkspacesByIdTasksByTidData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: never;
@@ -752,7 +832,7 @@ export type GetApiWorkspacesByIdTasksByTidResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -767,10 +847,7 @@ export type GetApiWorkspacesByIdTasksByTidResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -787,7 +864,7 @@ export type GetApiWorkspacesByIdTasksByTidResponses = {
             kind: 'cascade';
             message: string;
         };
-    };
+    } | null;
 };
 
 export type GetApiWorkspacesByIdTasksByTidResponse = GetApiWorkspacesByIdTasksByTidResponses[keyof GetApiWorkspacesByIdTasksByTidResponses];
@@ -795,6 +872,7 @@ export type GetApiWorkspacesByIdTasksByTidResponse = GetApiWorkspacesByIdTasksBy
 export type PostApiWorkspacesByIdTasksByTidCancelData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: never;
@@ -829,7 +907,7 @@ export type PostApiWorkspacesByIdTasksByTidCancelResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -844,10 +922,7 @@ export type PostApiWorkspacesByIdTasksByTidCancelResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -869,17 +944,19 @@ export type PostApiWorkspacesByIdTasksByTidCancelResponses = {
 
 export type PostApiWorkspacesByIdTasksByTidCancelResponse = PostApiWorkspacesByIdTasksByTidCancelResponses[keyof PostApiWorkspacesByIdTasksByTidCancelResponses];
 
-export type GetApiWorkspacesByIdTasksByTidArtifactByNameData = {
+export type GetApiWorkspacesByIdTasksByTidArtifactData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
-        name: string;
     };
-    query?: never;
-    url: '/api/workspaces/{id}/tasks/{tid}/artifact/{name}';
+    query: {
+        path: string;
+    };
+    url: '/api/workspaces/{id}/tasks/{tid}/artifact';
 };
 
-export type GetApiWorkspacesByIdTasksByTidArtifactByNameErrors = {
+export type GetApiWorkspacesByIdTasksByTidArtifactErrors = {
     /**
      * Malformed artifact name
      */
@@ -894,7 +971,7 @@ export type GetApiWorkspacesByIdTasksByTidArtifactByNameErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdTasksByTidArtifactByNameResponses = {
+export type GetApiWorkspacesByIdTasksByTidArtifactResponses = {
     /**
      * Artifact file stream
      */
@@ -904,12 +981,13 @@ export type GetApiWorkspacesByIdTasksByTidArtifactByNameResponses = {
 export type GetApiWorkspacesByIdTasksByTidActivityData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: {
-        before?: string;
-        after?: string;
-        limit?: string;
+        before?: number | null;
+        after?: number | null;
+        limit?: number;
     };
     url: '/api/workspaces/{id}/tasks/{tid}/activity';
 };
@@ -1040,6 +1118,7 @@ export type GetApiWorkspacesByIdTasksByTidActivityResponse = GetApiWorkspacesByI
 export type GetApiWorkspacesByIdTasksByTidActivityStreamData = {
     body?: never;
     path: {
+        id: string;
         tid: string;
     };
     query?: never;
@@ -1066,12 +1145,14 @@ export type GetApiWorkspacesByIdTasksByTidActivityStreamResponses = {
 
 export type GetApiWorkspacesByIdScheduledTasksData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         agent?: string;
-        runtime?: string;
         createdSince?: string;
-        status?: string;
+        runtime?: string;
+        status?: 'running' | 'succeeded' | 'failed' | 'cancelled';
         scheduleId?: string;
     };
     url: '/api/workspaces/{id}/scheduled-tasks';
@@ -1097,7 +1178,7 @@ export type GetApiWorkspacesByIdScheduledTasksResponses = {
         agent: string;
         brief: string;
         details?: string;
-        origin: 'standalone' | 'workflow' | 'schedule';
+        origin: string;
         originId?: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
         metadata: {
@@ -1112,10 +1193,7 @@ export type GetApiWorkspacesByIdScheduledTasksResponses = {
         };
         failure?: {
             kind: 'execution';
-            exitCode: number;
-            message: string;
-        } | {
-            kind: 'execution';
+            exitCode?: number;
             signal?: string;
             message: string;
         } | {
@@ -1139,7 +1217,9 @@ export type GetApiWorkspacesByIdScheduledTasksResponse = GetApiWorkspacesByIdSch
 
 export type GetApiWorkspacesByIdScheduledWorkflowsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         scheduleId?: string;
     };
@@ -1163,13 +1243,11 @@ export type GetApiWorkspacesByIdScheduledWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -1193,17 +1271,19 @@ export type GetApiWorkspacesByIdScheduledWorkflowsResponses = {
 
 export type GetApiWorkspacesByIdScheduledWorkflowsResponse = GetApiWorkspacesByIdScheduledWorkflowsResponses[keyof GetApiWorkspacesByIdScheduledWorkflowsResponses];
 
-export type GetApiWorkspacesByIdSchedulesData = {
+export type GetApiWorkspacesByIdSchedulesTaskData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         agent?: string;
-        enabled?: string;
+        enabled?: 'true' | 'false';
     };
-    url: '/api/workspaces/{id}/schedules';
+    url: '/api/workspaces/{id}/schedules/task';
 };
 
-export type GetApiWorkspacesByIdSchedulesErrors = {
+export type GetApiWorkspacesByIdSchedulesTaskErrors = {
     /**
      * Malformed query
      */
@@ -1214,9 +1294,9 @@ export type GetApiWorkspacesByIdSchedulesErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdSchedulesResponses = {
+export type GetApiWorkspacesByIdSchedulesTaskResponses = {
     /**
-     * Schedules
+     * Task schedules
      */
     200: Array<{
         id: string;
@@ -1226,38 +1306,41 @@ export type GetApiWorkspacesByIdSchedulesResponses = {
             expr: string;
             tz: string;
         };
-        enabled: boolean;
-        createdAt: string;
-        updatedAt: string;
-        lastFiredAt?: string;
-        nextFireAt?: string;
         target: {
             agent: string;
             brief: string;
             details?: string;
             runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
         };
-        fireStats?: {
-            awaitingCount: number;
-            runningCount: number;
-        };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
     }>;
 };
 
-export type GetApiWorkspacesByIdSchedulesResponse = GetApiWorkspacesByIdSchedulesResponses[keyof GetApiWorkspacesByIdSchedulesResponses];
+export type GetApiWorkspacesByIdSchedulesTaskResponse = GetApiWorkspacesByIdSchedulesTaskResponses[keyof GetApiWorkspacesByIdSchedulesTaskResponses];
 
 export type PostApiWorkspacesByIdSchedulesTaskData = {
-    body?: never;
-    path?: never;
+    body: {
+        name: string;
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        target: {
+            agent: string;
+            brief: string;
+            details?: string;
+            runtime?: string;
+        };
+        enabled?: boolean;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/schedules/task';
 };
@@ -1289,85 +1372,39 @@ export type PostApiWorkspacesByIdSchedulesTaskResponses = {
             expr: string;
             tz: string;
         };
-        enabled: boolean;
-        createdAt: string;
-        updatedAt: string;
-        lastFiredAt?: string;
-        nextFireAt?: string;
         target: {
             agent: string;
             brief: string;
             details?: string;
             runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
         };
-        fireStats?: {
-            awaitingCount: number;
-            runningCount: number;
-        };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
     };
 };
 
 export type PostApiWorkspacesByIdSchedulesTaskResponse = PostApiWorkspacesByIdSchedulesTaskResponses[keyof PostApiWorkspacesByIdSchedulesTaskResponses];
 
-export type GetApiWorkspacesByIdSchedulesPreviewCronData = {
-    body?: never;
-    path?: never;
-    query?: {
-        expr?: string;
-        tz?: string;
-        n?: string;
-    };
-    url: '/api/workspaces/{id}/schedules/preview-cron';
-};
-
-export type GetApiWorkspacesByIdSchedulesPreviewCronErrors = {
-    /**
-     * Missing or malformed query
-     */
-    400: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type GetApiWorkspacesByIdSchedulesPreviewCronResponses = {
-    /**
-     * Cron preview
-     */
-    200: {
-        describe: string;
-        nextRuns: Array<string>;
-    };
-};
-
-export type GetApiWorkspacesByIdSchedulesPreviewCronResponse = GetApiWorkspacesByIdSchedulesPreviewCronResponses[keyof GetApiWorkspacesByIdSchedulesPreviewCronResponses];
-
-export type DeleteApiWorkspacesByIdSchedulesBySidData = {
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/schedules/{sid}';
+    url: '/api/workspaces/{id}/schedules/task/{sid}';
 };
 
-export type DeleteApiWorkspacesByIdSchedulesBySidErrors = {
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
      * Schedule not found
      */
     404: unknown;
     /**
-     * Schedule has in-flight dispatch
+     * Schedule enabled or has in-flight dispatch
      */
     409: unknown;
     /**
@@ -1376,28 +1413,29 @@ export type DeleteApiWorkspacesByIdSchedulesBySidErrors = {
     500: unknown;
 };
 
-export type DeleteApiWorkspacesByIdSchedulesBySidResponses = {
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidResponses = {
     /**
      * Delete outcome
      */
     200: {
-        ok: true;
         deletedDispatchCount: number;
+        ok: true;
     };
 };
 
-export type DeleteApiWorkspacesByIdSchedulesBySidResponse = DeleteApiWorkspacesByIdSchedulesBySidResponses[keyof DeleteApiWorkspacesByIdSchedulesBySidResponses];
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidResponse = DeleteApiWorkspacesByIdSchedulesTaskBySidResponses[keyof DeleteApiWorkspacesByIdSchedulesTaskBySidResponses];
 
-export type GetApiWorkspacesByIdSchedulesBySidData = {
+export type GetApiWorkspacesByIdSchedulesTaskBySidData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/schedules/{sid}';
+    url: '/api/workspaces/{id}/schedules/task/{sid}';
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidErrors = {
+export type GetApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
      * Schedule not found
      */
@@ -1408,9 +1446,9 @@ export type GetApiWorkspacesByIdSchedulesBySidErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidResponses = {
+export type GetApiWorkspacesByIdSchedulesTaskBySidResponses = {
     /**
-     * Schedule
+     * Task schedule
      */
     200: {
         id: string;
@@ -1420,35 +1458,41 @@ export type GetApiWorkspacesByIdSchedulesBySidResponses = {
             expr: string;
             tz: string;
         };
-        enabled: boolean;
-        createdAt: string;
-        updatedAt: string;
-        lastFiredAt?: string;
-        nextFireAt?: string;
         target: {
             agent: string;
             brief: string;
             details?: string;
             runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
         };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
         describe: string;
     };
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidResponse = GetApiWorkspacesByIdSchedulesBySidResponses[keyof GetApiWorkspacesByIdSchedulesBySidResponses];
+export type GetApiWorkspacesByIdSchedulesTaskBySidResponse = GetApiWorkspacesByIdSchedulesTaskBySidResponses[keyof GetApiWorkspacesByIdSchedulesTaskBySidResponses];
 
 export type PatchApiWorkspacesByIdSchedulesTaskBySidData = {
-    body?: never;
+    body: {
+        name?: string;
+        trigger?: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        enabled?: boolean;
+        target?: {
+            agent?: string;
+            brief?: string;
+            details?: string | null;
+            runtime?: string | null;
+        };
+    };
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -1482,38 +1526,165 @@ export type PatchApiWorkspacesByIdSchedulesTaskBySidResponses = {
             expr: string;
             tz: string;
         };
-        enabled: boolean;
-        createdAt: string;
-        updatedAt: string;
-        lastFiredAt?: string;
-        nextFireAt?: string;
         target: {
             agent: string;
             brief: string;
             details?: string;
             runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
         };
-        fireStats?: {
-            awaitingCount: number;
-            runningCount: number;
-        };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
     };
 };
 
 export type PatchApiWorkspacesByIdSchedulesTaskBySidResponse = PatchApiWorkspacesByIdSchedulesTaskBySidResponses[keyof PatchApiWorkspacesByIdSchedulesTaskBySidResponses];
 
-export type PostApiWorkspacesByIdSchedulesWorkflowData = {
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+        sid: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{id}/schedules/task/{sid}/run';
+};
+
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunErrors = {
+    /**
+     * Schedule not found
+     */
+    404: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunResponses = {
+    /**
+     * Dispatch id
+     */
+    200: {
+        dispatchId: string;
+    };
+};
+
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunResponse = PostApiWorkspacesByIdSchedulesTaskBySidRunResponses[keyof PostApiWorkspacesByIdSchedulesTaskBySidRunResponses];
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewData = {
+    body?: never;
+    path: {
+        id: string;
+        sid: string;
+    };
+    query?: {
+        n?: number;
+    };
+    url: '/api/workspaces/{id}/schedules/task/{sid}/preview';
+};
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewErrors = {
+    /**
+     * Malformed query
+     */
+    400: unknown;
+    /**
+     * Schedule not found
+     */
+    404: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponses = {
+    /**
+     * Schedule preview
+     */
+    200: {
+        describe: string;
+        nextRuns: Array<string>;
+    };
+};
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponse = GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponses[keyof GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponses];
+
+export type GetApiWorkspacesByIdSchedulesWorkflowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        coordinatorAgent?: string;
+        enabled?: 'true' | 'false';
+    };
+    url: '/api/workspaces/{id}/schedules/workflow';
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowErrors = {
+    /**
+     * Malformed query
+     */
+    400: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowResponses = {
+    /**
+     * Workflow schedules
+     */
+    200: Array<{
+        id: string;
+        name: string;
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
+        fireStats: {
+            awaitingCount: number;
+            runningCount: number;
+        };
+    }>;
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowResponse = GetApiWorkspacesByIdSchedulesWorkflowResponses[keyof GetApiWorkspacesByIdSchedulesWorkflowResponses];
+
+export type PostApiWorkspacesByIdSchedulesWorkflowData = {
+    body: {
+        name: string;
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
+        enabled?: boolean;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/schedules/workflow';
 };
@@ -1545,27 +1716,17 @@ export type PostApiWorkspacesByIdSchedulesWorkflowResponses = {
             expr: string;
             tz: string;
         };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
         enabled: boolean;
         createdAt: string;
         updatedAt: string;
         lastFiredAt?: string;
         nextFireAt?: string;
-        target: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
-        };
-        fireStats?: {
+        fireStats: {
             awaitingCount: number;
             runningCount: number;
         };
@@ -1574,9 +1735,113 @@ export type PostApiWorkspacesByIdSchedulesWorkflowResponses = {
 
 export type PostApiWorkspacesByIdSchedulesWorkflowResponse = PostApiWorkspacesByIdSchedulesWorkflowResponses[keyof PostApiWorkspacesByIdSchedulesWorkflowResponses];
 
-export type PatchApiWorkspacesByIdSchedulesWorkflowBySidData = {
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidData = {
     body?: never;
     path: {
+        id: string;
+        sid: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}';
+};
+
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
+    /**
+     * Schedule not found
+     */
+    404: unknown;
+    /**
+     * Schedule enabled or has in-flight dispatch
+     */
+    409: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
+    /**
+     * Delete outcome
+     */
+    200: {
+        deletedDispatchCount: number;
+        ok: true;
+    };
+};
+
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponse = DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponses[keyof DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponses];
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidData = {
+    body?: never;
+    path: {
+        id: string;
+        sid: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}';
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
+    /**
+     * Schedule not found
+     */
+    404: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
+    /**
+     * Workflow schedule
+     */
+    200: {
+        id: string;
+        name: string;
+        trigger: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
+        enabled: boolean;
+        createdAt: string;
+        updatedAt: string;
+        lastFiredAt?: string;
+        nextFireAt?: string;
+        fireStats: {
+            awaitingCount: number;
+            runningCount: number;
+        };
+        describe: string;
+    };
+};
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidResponse = GetApiWorkspacesByIdSchedulesWorkflowBySidResponses[keyof GetApiWorkspacesByIdSchedulesWorkflowBySidResponses];
+
+export type PatchApiWorkspacesByIdSchedulesWorkflowBySidData = {
+    body: {
+        name?: string;
+        trigger?: {
+            kind: 'cron';
+            expr: string;
+            tz: string;
+        };
+        enabled?: boolean;
+        target?: {
+            coordinatorAgent?: string;
+            brief?: string;
+            details?: string | null;
+        };
+    };
+    path: {
+        id: string;
         sid: string;
     };
     query?: never;
@@ -1610,27 +1875,17 @@ export type PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
             expr: string;
             tz: string;
         };
+        target: {
+            coordinatorAgent: string;
+            brief: string;
+            details?: string;
+        };
         enabled: boolean;
         createdAt: string;
         updatedAt: string;
         lastFiredAt?: string;
         nextFireAt?: string;
-        target: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'task';
-        } | {
-            coordinatorAgent: string;
-            brief: string;
-            details?: string;
-            kind: 'workflow';
-        } | {
-            kind: string;
-            data?: unknown;
-        };
-        fireStats?: {
+        fireStats: {
             awaitingCount: number;
             runningCount: number;
         };
@@ -1639,16 +1894,17 @@ export type PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
 
 export type PatchApiWorkspacesByIdSchedulesWorkflowBySidResponse = PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses[keyof PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses];
 
-export type PostApiWorkspacesByIdSchedulesBySidRunData = {
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/schedules/{sid}/run';
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}/run';
 };
 
-export type PostApiWorkspacesByIdSchedulesBySidRunErrors = {
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors = {
     /**
      * Schedule not found
      */
@@ -1659,7 +1915,7 @@ export type PostApiWorkspacesByIdSchedulesBySidRunErrors = {
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdSchedulesBySidRunResponses = {
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponses = {
     /**
      * Dispatch id
      */
@@ -1668,20 +1924,21 @@ export type PostApiWorkspacesByIdSchedulesBySidRunResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdSchedulesBySidRunResponse = PostApiWorkspacesByIdSchedulesBySidRunResponses[keyof PostApiWorkspacesByIdSchedulesBySidRunResponses];
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponse = PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponses[keyof PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponses];
 
-export type GetApiWorkspacesByIdSchedulesBySidPreviewData = {
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewData = {
     body?: never;
     path: {
+        id: string;
         sid: string;
     };
     query?: {
-        n?: string;
+        n?: number;
     };
-    url: '/api/workspaces/{id}/schedules/{sid}/preview';
+    url: '/api/workspaces/{id}/schedules/workflow/{sid}/preview';
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidPreviewErrors = {
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewErrors = {
     /**
      * Malformed query
      */
@@ -1696,7 +1953,7 @@ export type GetApiWorkspacesByIdSchedulesBySidPreviewErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidPreviewResponses = {
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponses = {
     /**
      * Schedule preview
      */
@@ -1706,11 +1963,49 @@ export type GetApiWorkspacesByIdSchedulesBySidPreviewResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdSchedulesBySidPreviewResponse = GetApiWorkspacesByIdSchedulesBySidPreviewResponses[keyof GetApiWorkspacesByIdSchedulesBySidPreviewResponses];
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponse = GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponses[keyof GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponses];
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        expr: string;
+        tz: string;
+        n?: number;
+    };
+    url: '/api/workspaces/{id}/schedules/preview-cron';
+};
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronErrors = {
+    /**
+     * Missing or malformed query
+     */
+    400: unknown;
+    /**
+     * Internal error
+     */
+    500: unknown;
+};
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronResponses = {
+    /**
+     * Cron preview
+     */
+    200: {
+        describe: string;
+        nextRuns: Array<string>;
+    };
+};
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronResponse = GetApiWorkspacesByIdSchedulesPreviewCronResponses[keyof GetApiWorkspacesByIdSchedulesPreviewCronResponses];
 
 export type GetApiWorkspacesByIdWorkflowsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: {
         q?: string;
         coordinatorAgent?: string;
@@ -1740,13 +2035,11 @@ export type GetApiWorkspacesByIdWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -1771,8 +2064,14 @@ export type GetApiWorkspacesByIdWorkflowsResponses = {
 export type GetApiWorkspacesByIdWorkflowsResponse = GetApiWorkspacesByIdWorkflowsResponses[keyof GetApiWorkspacesByIdWorkflowsResponses];
 
 export type PostApiWorkspacesByIdWorkflowsData = {
-    body?: never;
-    path?: never;
+    body: {
+        brief: string;
+        details?: string;
+        coordinatorAgent: string;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/workflows';
 };
@@ -1802,13 +2101,11 @@ export type PostApiWorkspacesByIdWorkflowsResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -1835,6 +2132,7 @@ export type PostApiWorkspacesByIdWorkflowsResponse = PostApiWorkspacesByIdWorkfl
 export type DeleteApiWorkspacesByIdWorkflowsByWfidData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: {
@@ -1870,6 +2168,7 @@ export type DeleteApiWorkspacesByIdWorkflowsByWfidResponse = DeleteApiWorkspaces
 export type GetApiWorkspacesByIdWorkflowsByWfidData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -1897,13 +2196,11 @@ export type GetApiWorkspacesByIdWorkflowsByWfidResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -1930,6 +2227,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidResponse = GetApiWorkspacesByIdWo
 export type GetApiWorkspacesByIdWorkflowsByWfidDagData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -1958,13 +2256,11 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
             details?: string;
             coordinatorAgent: string;
             status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-            origin: 'standalone' | 'schedule';
+            origin: string;
             originId?: string;
             metadata: {
                 [key: string]: unknown;
             };
-            iterationCount?: number;
-            awaitingHumanCount: number;
             createdAt: string;
             startedAt?: string;
             endedAt?: string;
@@ -1987,30 +2283,10 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
         nodes: Array<{
             id: string;
             workflowId: string;
+            kind: 'coordinator' | 'worker' | 'human';
+            spec?: unknown;
             phase: number;
             status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-            taskId?: string;
-            spec: {
-                agent: string;
-                brief: string;
-                details?: string;
-                runtime?: string;
-                kind: 'worker';
-            } | {
-                agent: string;
-                kind: 'coordinator';
-            } | {
-                kind: 'human';
-                prompt: string;
-                promptStyle: 'plain' | 'markdown';
-                choices?: Array<{
-                    id: string;
-                    label: string;
-                }>;
-            } | {
-                kind: string;
-                spec?: unknown;
-            };
             metadata: {
                 [key: string]: unknown;
             };
@@ -2020,6 +2296,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
             endedAt?: string;
         }>;
         edges: Array<{
+            workflowId: string;
             from: string;
             to: string;
         }>;
@@ -2028,43 +2305,10 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
 
 export type GetApiWorkspacesByIdWorkflowsByWfidDagResponse = GetApiWorkspacesByIdWorkflowsByWfidDagResponses[keyof GetApiWorkspacesByIdWorkflowsByWfidDagResponses];
 
-export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidData = {
-    body?: never;
-    path: {
-        wfid: string;
-        nid: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}';
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidErrors = {
-    /**
-     * Workflow or node not found
-     */
-    404: unknown;
-    /**
-     * Node not mutable
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses = {
-    /**
-     * Node deleted
-     */
-    204: void;
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponse = DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses[keyof DeleteApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses];
-
 export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         nid: string;
     };
@@ -2090,30 +2334,10 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses = {
     200: {
         id: string;
         workflowId: string;
+        kind: 'coordinator' | 'worker' | 'human';
+        spec?: unknown;
         phase: number;
         status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-        taskId?: string;
-        spec: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'worker';
-        } | {
-            agent: string;
-            kind: 'coordinator';
-        } | {
-            kind: 'human';
-            prompt: string;
-            promptStyle: 'plain' | 'markdown';
-            choices?: Array<{
-                id: string;
-                label: string;
-            }>;
-        } | {
-            kind: string;
-            spec?: unknown;
-        };
         metadata: {
             [key: string]: unknown;
         };
@@ -2127,8 +2351,14 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses = {
 export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponse = GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses[keyof GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidCancelData = {
-    body?: never;
+    body: {
+        cancellation: {
+            kind: 'user';
+            message: string;
+        };
+    };
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2164,13 +2394,11 @@ export type PostApiWorkspacesByIdWorkflowsByWfidCancelResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -2197,6 +2425,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidCancelResponse = PostApiWorkspac
 export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2221,18 +2450,15 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponses = {
     200: {
         artifacts: Array<{
             kind: 'workflow-summary';
-            path: string;
+            relPath: string;
             size: number;
             modifiedAt: string;
-            mimeBucket: 'text' | 'image' | 'archive' | 'generic';
         } | {
             kind: 'node';
             nodeId: string;
-            taskId: string;
-            path: string;
+            relPath: string;
             size: number;
             modifiedAt: string;
-            mimeBucket: 'text' | 'image' | 'archive' | 'generic';
         }>;
     };
 };
@@ -2242,6 +2468,7 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponse = GetApiWorkspa
 export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         encodedPath: string;
     };
@@ -2271,90 +2498,33 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathResponses =
     200: unknown;
 };
 
-export type PostApiWorkspacesByIdWorkflowsByWfidNodesData = {
-    body?: never;
-    path: {
-        wfid: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/nodes';
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidNodesErrors = {
-    /**
-     * Malformed request body
-     */
-    400: unknown;
-    /**
-     * Workflow not found
-     */
-    404: unknown;
-    /**
-     * Workflow already terminal
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidNodesResponses = {
-    /**
-     * Inserted node
-     */
-    200: {
-        nodeId: string;
-        phase: number;
-    };
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidNodesResponse = PostApiWorkspacesByIdWorkflowsByWfidNodesResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesResponses];
-
-export type PostApiWorkspacesByIdWorkflowsByWfidEdgesData = {
-    body?: never;
-    path: {
-        wfid: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/edges';
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidEdgesErrors = {
-    /**
-     * Malformed request body
-     */
-    400: unknown;
-    /**
-     * Workflow not found
-     */
-    404: unknown;
-    /**
-     * Workflow already terminal
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses = {
-    /**
-     * Inserted edge
-     */
-    200: {
-        fromNodeId: string;
-        toNodeId: string;
-        toPhase: number;
-    };
-};
-
-export type PostApiWorkspacesByIdWorkflowsByWfidEdgesResponse = PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidEdgesResponses];
-
 export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphData = {
-    body?: never;
+    body: {
+        nodes: Array<{
+            tempId: string;
+            kind: 'coordinator' | 'worker' | 'human';
+            spec?: unknown;
+            existingParents?: Array<string>;
+        }>;
+        edges: Array<{
+            from: {
+                kind: 'existing';
+                id: string;
+            } | {
+                kind: 'temp';
+                tempId: string;
+            };
+            to: {
+                kind: 'existing';
+                id: string;
+            } | {
+                kind: 'temp';
+                tempId: string;
+            };
+        }>;
+    };
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2398,6 +2568,7 @@ export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponse = PostApiWorksp
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelData = {
     body?: never;
     path: {
+        id: string;
         wfid: string;
         nid: string;
     };
@@ -2427,30 +2598,10 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses = {
     200: {
         id: string;
         workflowId: string;
+        kind: 'coordinator' | 'worker' | 'human';
+        spec?: unknown;
         phase: number;
         status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-        taskId?: string;
-        spec: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'worker';
-        } | {
-            agent: string;
-            kind: 'coordinator';
-        } | {
-            kind: 'human';
-            prompt: string;
-            promptStyle: 'plain' | 'markdown';
-            choices?: Array<{
-                id: string;
-                label: string;
-            }>;
-        } | {
-            kind: string;
-            spec?: unknown;
-        };
         metadata: {
             [key: string]: unknown;
         };
@@ -2464,8 +2615,20 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses = {
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponse = PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidFinishData = {
-    body?: never;
+    body: {
+        outcome: 'succeeded';
+        success?: {
+            output: string | null;
+        };
+    } | {
+        outcome: 'failed';
+        failure: {
+            kind: 'coordinator';
+            message: string;
+        };
+    };
     path: {
+        id: string;
         wfid: string;
     };
     query?: never;
@@ -2501,13 +2664,11 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponses = {
         details?: string;
         coordinatorAgent: string;
         status: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin: 'standalone' | 'schedule';
+        origin: string;
         originId?: string;
         metadata: {
             [key: string]: unknown;
         };
-        iterationCount?: number;
-        awaitingHumanCount: number;
         createdAt: string;
         startedAt?: string;
         endedAt?: string;
@@ -2531,116 +2692,15 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponses = {
 
 export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponse = PostApiWorkspacesByIdWorkflowsByWfidFinishResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidFinishResponses];
 
-export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToData = {
-    body?: never;
-    path: {
-        wfid: string;
-        from: string;
-        to: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/edges/{from}/{to}';
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToErrors = {
-    /**
-     * Workflow or edge not found
-     */
-    404: unknown;
-    /**
-     * Edge not mutable
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses = {
-    /**
-     * Edge deleted
-     */
-    204: void;
-};
-
-export type DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponse = DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses[keyof DeleteApiWorkspacesByIdWorkflowsByWfidEdgesByFromByToResponses];
-
-export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData = {
-    body?: never;
-    path: {
-        wfid: string;
-        nid: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec';
-};
-
-export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors = {
-    /**
-     * Malformed request body
-     */
-    400: unknown;
-    /**
-     * Workflow or node not found
-     */
-    404: unknown;
-    /**
-     * Node not mutable
-     */
-    409: unknown;
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses = {
-    /**
-     * Updated node
-     */
-    200: {
-        id: string;
-        workflowId: string;
-        phase: number;
-        status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-        taskId?: string;
-        spec: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'worker';
-        } | {
-            agent: string;
-            kind: 'coordinator';
-        } | {
-            kind: 'human';
-            prompt: string;
-            promptStyle: 'plain' | 'markdown';
-            choices?: Array<{
-                id: string;
-                label: string;
-            }>;
-        } | {
-            kind: string;
-            spec?: unknown;
-        };
-        metadata: {
-            [key: string]: unknown;
-        };
-        createdAt: string;
-        readyAt?: string;
-        runningAt?: string;
-        endedAt?: string;
-    };
-};
-
-export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponse = PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses[keyof PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses];
-
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondData = {
-    body?: never;
+    body: {
+        response: {
+            choiceId?: string;
+            input?: string;
+        };
+    };
     path: {
+        id: string;
         wfid: string;
         nid: string;
     };
@@ -2674,30 +2734,10 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses = {
     200: {
         id: string;
         workflowId: string;
+        kind: 'coordinator' | 'worker' | 'human';
+        spec?: unknown;
         phase: number;
         status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-        taskId?: string;
-        spec: {
-            agent: string;
-            brief: string;
-            details?: string;
-            runtime?: string;
-            kind: 'worker';
-        } | {
-            agent: string;
-            kind: 'coordinator';
-        } | {
-            kind: 'human';
-            prompt: string;
-            promptStyle: 'plain' | 'markdown';
-            choices?: Array<{
-                id: string;
-                label: string;
-            }>;
-        } | {
-            kind: string;
-            spec?: unknown;
-        };
         metadata: {
             [key: string]: unknown;
         };
@@ -2712,7 +2752,9 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponse = Post
 
 export type GetApiWorkspacesByIdCatalogSkillsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/skills';
 };
@@ -2772,8 +2814,12 @@ export type GetApiWorkspacesByIdCatalogSkillsResponses = {
 export type GetApiWorkspacesByIdCatalogSkillsResponse = GetApiWorkspacesByIdCatalogSkillsResponses[keyof GetApiWorkspacesByIdCatalogSkillsResponses];
 
 export type PostApiWorkspacesByIdCatalogSkillsData = {
-    body?: never;
-    path?: never;
+    body: {
+        origin: string;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/skills';
 };
@@ -2803,7 +2849,7 @@ export type PostApiWorkspacesByIdCatalogSkillsResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -2828,14 +2874,23 @@ export type PostApiWorkspacesByIdCatalogSkillsResponses = {
                 existingOrigin: string;
             };
         }>;
+        orphansFlagged: Array<{
+            kind: 'skill' | 'mcp';
+            fqn: string;
+            origin: string;
+        }>;
     };
 };
 
 export type PostApiWorkspacesByIdCatalogSkillsResponse = PostApiWorkspacesByIdCatalogSkillsResponses[keyof PostApiWorkspacesByIdCatalogSkillsResponses];
 
 export type PostApiWorkspacesByIdCatalogSkillsResolveData = {
-    body?: never;
-    path?: never;
+    body: {
+        origin: string;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/skills/resolve';
 };
@@ -2861,6 +2916,7 @@ export type PostApiWorkspacesByIdCatalogSkillsResolveResponses = {
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -2924,23 +2980,25 @@ export type PostApiWorkspacesByIdCatalogSkillsResolveResponses = {
 
 export type PostApiWorkspacesByIdCatalogSkillsResolveResponse = PostApiWorkspacesByIdCatalogSkillsResolveResponses[keyof PostApiWorkspacesByIdCatalogSkillsResolveResponses];
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorData = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/anchor';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/anchor';
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorErrors = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponses = {
     /**
      * Anchor content
      */
@@ -2949,19 +3007,22 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponse = GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses[keyof GetApiWorkspacesByIdCatalogSkillsByNameAnchorResponses];
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponse = GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponses[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponses];
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesByPathData = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
-        path: string;
     };
-    query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/files/{path{.+}}';
+    query?: {
+        path?: string;
+    };
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/files';
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesByPathErrors = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesErrors = {
     /**
      * File not found
      */
@@ -2972,32 +3033,9 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameFilesByPathErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesByPathResponses = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponses = {
     /**
-     * File bytes
-     */
-    200: unknown;
-};
-
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesData = {
-    body?: never;
-    path: {
-        name: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/files';
-};
-
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesErrors = {
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesResponses = {
-    /**
-     * File entries
+     * File entries, or raw file bytes when ?path= is set
      */
     200: Array<{
         relPath: string;
@@ -3005,25 +3043,31 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameFilesResponses = {
     }>;
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameFilesResponse = GetApiWorkspacesByIdCatalogSkillsByNameFilesResponses[keyof GetApiWorkspacesByIdCatalogSkillsByNameFilesResponses];
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponse = GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponses[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponses];
 
-export type DeleteApiWorkspacesByIdCatalogSkillsByNameData = {
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}';
 };
 
-export type DeleteApiWorkspacesByIdCatalogSkillsByNameErrors = {
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
+    /**
+     * Skill still has dependents
+     */
+    409: unknown;
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type DeleteApiWorkspacesByIdCatalogSkillsByNameResponses = {
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponses = {
     /**
      * Deleted
      */
@@ -3032,18 +3076,20 @@ export type DeleteApiWorkspacesByIdCatalogSkillsByNameResponses = {
     };
 };
 
-export type DeleteApiWorkspacesByIdCatalogSkillsByNameResponse = DeleteApiWorkspacesByIdCatalogSkillsByNameResponses[keyof DeleteApiWorkspacesByIdCatalogSkillsByNameResponses];
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponse = DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponses[keyof DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponses];
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameData = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}';
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameErrors = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
     /**
      * Skill not found
      */
@@ -3054,7 +3100,7 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameResponses = {
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponses = {
     /**
      * Skill with content
      */
@@ -3100,25 +3146,27 @@ export type GetApiWorkspacesByIdCatalogSkillsByNameResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogSkillsByNameResponse = GetApiWorkspacesByIdCatalogSkillsByNameResponses[keyof GetApiWorkspacesByIdCatalogSkillsByNameResponses];
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponse = GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponses[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponses];
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveData = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/sync/resolve';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync/resolve';
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveErrors = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses = {
     /**
      * Resolve manifest
      */
@@ -3128,6 +3176,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses = {
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -3189,18 +3238,22 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogSkillsByNameSyncResolveResponses];
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses];
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncData = {
-    body?: never;
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncData = {
+    body: {
+        planToken: string;
+    };
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/sync';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/sync';
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncErrors = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
@@ -3215,7 +3268,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameSyncErrors = {
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses = {
     /**
      * Sync result
      */
@@ -3229,7 +3282,7 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -3262,25 +3315,27 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameSyncResponse = PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogSkillsByNameSyncResponses];
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponse = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses];
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsData = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/skills/{name{.+}}/acknowledge-prereqs';
+    url: '/api/workspaces/{id}/catalog/skills/{scope}/{name}/acknowledge-prereqs';
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsErrors = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses = {
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponses = {
     /**
      * Skill
      */
@@ -3305,11 +3360,13 @@ export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses 
     };
 };
 
-export type PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponse = PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses[keyof PostApiWorkspacesByIdCatalogSkillsByNameAcknowledgePrereqsResponses];
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponse = PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponses[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponses];
 
 export type GetApiWorkspacesByIdCatalogAgentsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/agents';
 };
@@ -3373,8 +3430,12 @@ export type GetApiWorkspacesByIdCatalogAgentsResponses = {
 export type GetApiWorkspacesByIdCatalogAgentsResponse = GetApiWorkspacesByIdCatalogAgentsResponses[keyof GetApiWorkspacesByIdCatalogAgentsResponses];
 
 export type PostApiWorkspacesByIdCatalogAgentsData = {
-    body?: never;
-    path?: never;
+    body: {
+        origin: string;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/agents';
 };
@@ -3404,7 +3465,7 @@ export type PostApiWorkspacesByIdCatalogAgentsResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -3429,14 +3490,23 @@ export type PostApiWorkspacesByIdCatalogAgentsResponses = {
                 existingOrigin: string;
             };
         }>;
+        orphansFlagged: Array<{
+            kind: 'skill' | 'mcp';
+            fqn: string;
+            origin: string;
+        }>;
     };
 };
 
 export type PostApiWorkspacesByIdCatalogAgentsResponse = PostApiWorkspacesByIdCatalogAgentsResponses[keyof PostApiWorkspacesByIdCatalogAgentsResponses];
 
 export type PostApiWorkspacesByIdCatalogAgentsResolveData = {
-    body?: never;
-    path?: never;
+    body: {
+        origin: string;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/agents/resolve';
 };
@@ -3462,6 +3532,7 @@ export type PostApiWorkspacesByIdCatalogAgentsResolveResponses = {
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -3525,23 +3596,25 @@ export type PostApiWorkspacesByIdCatalogAgentsResolveResponses = {
 
 export type PostApiWorkspacesByIdCatalogAgentsResolveResponse = PostApiWorkspacesByIdCatalogAgentsResolveResponses[keyof PostApiWorkspacesByIdCatalogAgentsResolveResponses];
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorData = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/anchor';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/anchor';
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorErrors = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponses = {
     /**
      * Anchor content
      */
@@ -3550,19 +3623,22 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponse = GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses[keyof GetApiWorkspacesByIdCatalogAgentsByNameAnchorResponses];
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponse = GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponses[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponses];
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesByPathData = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
-        path: string;
     };
-    query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/files/{path{.+}}';
+    query?: {
+        path?: string;
+    };
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/files';
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesByPathErrors = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesErrors = {
     /**
      * File not found
      */
@@ -3573,32 +3649,9 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameFilesByPathErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesByPathResponses = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponses = {
     /**
-     * File bytes
-     */
-    200: unknown;
-};
-
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesData = {
-    body?: never;
-    path: {
-        name: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/files';
-};
-
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesErrors = {
-    /**
-     * Internal error
-     */
-    500: unknown;
-};
-
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesResponses = {
-    /**
-     * File entries
+     * File entries, or raw file bytes when ?path= is set
      */
     200: Array<{
         relPath: string;
@@ -3606,25 +3659,31 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameFilesResponses = {
     }>;
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameFilesResponse = GetApiWorkspacesByIdCatalogAgentsByNameFilesResponses[keyof GetApiWorkspacesByIdCatalogAgentsByNameFilesResponses];
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponse = GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponses[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponses];
 
-export type DeleteApiWorkspacesByIdCatalogAgentsByNameData = {
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}';
 };
 
-export type DeleteApiWorkspacesByIdCatalogAgentsByNameErrors = {
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
+    /**
+     * Agent still has dependents
+     */
+    409: unknown;
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type DeleteApiWorkspacesByIdCatalogAgentsByNameResponses = {
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponses = {
     /**
      * Deleted
      */
@@ -3633,18 +3692,20 @@ export type DeleteApiWorkspacesByIdCatalogAgentsByNameResponses = {
     };
 };
 
-export type DeleteApiWorkspacesByIdCatalogAgentsByNameResponse = DeleteApiWorkspacesByIdCatalogAgentsByNameResponses[keyof DeleteApiWorkspacesByIdCatalogAgentsByNameResponses];
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponse = DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponses[keyof DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponses];
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameData = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}';
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameErrors = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
     /**
      * Agent not found
      */
@@ -3655,7 +3716,7 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameResponses = {
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponses = {
     /**
      * Agent with content
      */
@@ -3705,25 +3766,27 @@ export type GetApiWorkspacesByIdCatalogAgentsByNameResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogAgentsByNameResponse = GetApiWorkspacesByIdCatalogAgentsByNameResponses[keyof GetApiWorkspacesByIdCatalogAgentsByNameResponses];
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponse = GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponses[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/sync/resolve';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync/resolve';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses = {
     /**
      * Resolve manifest
      */
@@ -3733,6 +3796,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses = {
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -3794,18 +3858,22 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameSyncResolveResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncData = {
-    body?: never;
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncData = {
+    body: {
+        planToken: string;
+    };
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/sync';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/sync';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
@@ -3820,7 +3888,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameSyncErrors = {
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses = {
     /**
      * Sync result
      */
@@ -3834,7 +3902,7 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -3867,25 +3935,27 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameSyncResponse = PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameSyncResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/acknowledge-prereqs';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/acknowledge-prereqs';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponses = {
     /**
      * Agent
      */
@@ -3913,25 +3983,27 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses 
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponse = PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameAcknowledgePrereqsResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameDisableData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/disable';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/disable';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameDisableErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponses = {
     /**
      * Agent
      */
@@ -3959,25 +4031,27 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameDisableResponse = PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameDisableResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponses];
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameEnableData = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/agents/{name{.+}}/enable';
+    url: '/api/workspaces/{id}/catalog/agents/{scope}/{name}/enable';
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameEnableErrors = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses = {
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponses = {
     /**
      * Agent
      */
@@ -4005,11 +4079,13 @@ export type PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogAgentsByNameEnableResponse = PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses[keyof PostApiWorkspacesByIdCatalogAgentsByNameEnableResponses];
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponse = PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponses[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponses];
 
 export type GetApiWorkspacesByIdCatalogMcpsData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/mcps';
 };
@@ -4037,8 +4113,12 @@ export type GetApiWorkspacesByIdCatalogMcpsResponses = {
 export type GetApiWorkspacesByIdCatalogMcpsResponse = GetApiWorkspacesByIdCatalogMcpsResponses[keyof GetApiWorkspacesByIdCatalogMcpsResponses];
 
 export type PostApiWorkspacesByIdCatalogMcpsData = {
-    body?: never;
-    path?: never;
+    body: {
+        origin: string;
+    };
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/mcps';
 };
@@ -4068,7 +4148,7 @@ export type PostApiWorkspacesByIdCatalogMcpsResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -4093,28 +4173,39 @@ export type PostApiWorkspacesByIdCatalogMcpsResponses = {
                 existingOrigin: string;
             };
         }>;
+        orphansFlagged: Array<{
+            kind: 'skill' | 'mcp';
+            fqn: string;
+            origin: string;
+        }>;
     };
 };
 
 export type PostApiWorkspacesByIdCatalogMcpsResponse = PostApiWorkspacesByIdCatalogMcpsResponses[keyof PostApiWorkspacesByIdCatalogMcpsResponses];
 
-export type DeleteApiWorkspacesByIdCatalogMcpsByNameData = {
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/mcps/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}';
 };
 
-export type DeleteApiWorkspacesByIdCatalogMcpsByNameErrors = {
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
+    /**
+     * MCP still has dependents
+     */
+    409: unknown;
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type DeleteApiWorkspacesByIdCatalogMcpsByNameResponses = {
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponses = {
     /**
      * Deleted
      */
@@ -4123,18 +4214,20 @@ export type DeleteApiWorkspacesByIdCatalogMcpsByNameResponses = {
     };
 };
 
-export type DeleteApiWorkspacesByIdCatalogMcpsByNameResponse = DeleteApiWorkspacesByIdCatalogMcpsByNameResponses[keyof DeleteApiWorkspacesByIdCatalogMcpsByNameResponses];
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponse = DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponses[keyof DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponses];
 
-export type GetApiWorkspacesByIdCatalogMcpsByNameData = {
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/mcps/{name{.+}}';
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}';
 };
 
-export type GetApiWorkspacesByIdCatalogMcpsByNameErrors = {
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
     /**
      * MCP not found
      */
@@ -4145,7 +4238,7 @@ export type GetApiWorkspacesByIdCatalogMcpsByNameErrors = {
     500: unknown;
 };
 
-export type GetApiWorkspacesByIdCatalogMcpsByNameResponses = {
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponses = {
     /**
      * MCP with content
      */
@@ -4159,25 +4252,27 @@ export type GetApiWorkspacesByIdCatalogMcpsByNameResponses = {
     };
 };
 
-export type GetApiWorkspacesByIdCatalogMcpsByNameResponse = GetApiWorkspacesByIdCatalogMcpsByNameResponses[keyof GetApiWorkspacesByIdCatalogMcpsByNameResponses];
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponse = GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponses[keyof GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponses];
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveData = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveData = {
     body?: never;
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/mcps/{name{.+}}/sync/resolve';
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync/resolve';
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveErrors = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses = {
     /**
      * Resolve manifest
      */
@@ -4187,6 +4282,7 @@ export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses = {
         isSync: boolean;
         planToken?: string;
         upToDate: boolean;
+        rootAlreadyInstalled?: boolean;
         identityChange?: {
             kind: 'skill' | 'agent' | 'mcp';
             oldFqn: string;
@@ -4248,18 +4344,22 @@ export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogMcpsByNameSyncResolveResponses];
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponse = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses];
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncData = {
-    body?: never;
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncData = {
+    body: {
+        planToken: string;
+    };
     path: {
+        id: string;
+        scope: string;
         name: string;
     };
     query?: never;
-    url: '/api/workspaces/{id}/catalog/mcps/{name{.+}}/sync';
+    url: '/api/workspaces/{id}/catalog/mcps/{scope}/{name}/sync';
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncErrors = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
@@ -4274,7 +4374,7 @@ export type PostApiWorkspacesByIdCatalogMcpsByNameSyncErrors = {
     500: unknown;
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses = {
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses = {
     /**
      * Sync result
      */
@@ -4288,7 +4388,7 @@ export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses = {
         skipped: Array<{
             kind: 'skill' | 'agent' | 'mcp';
             fqn: string;
-            reason: 'already-installed' | 'dep-failed' | 'up-to-date';
+            reason: 'already-installed' | 'up-to-date' | 'dep-failed';
         }>;
         failed: Array<{
             kind: 'skill' | 'agent' | 'mcp';
@@ -4321,11 +4421,13 @@ export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses = {
     };
 };
 
-export type PostApiWorkspacesByIdCatalogMcpsByNameSyncResponse = PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogMcpsByNameSyncResponses];
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponse = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses];
 
 export type GetApiWorkspacesByIdCatalogOverviewData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
     url: '/api/workspaces/{id}/catalog/overview';
 };

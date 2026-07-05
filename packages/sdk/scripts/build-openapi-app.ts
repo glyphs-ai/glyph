@@ -21,25 +21,29 @@
  */
 
 import type { Application, WorkspaceContext } from "@glyphs-ai/api";
-import type { CatalogService } from "@glyphs-ai/catalog";
-import { CopilotRuntime, RuntimeRegistry } from "@glyphs-ai/runtime";
-import type { ScheduleService } from "@glyphs-ai/schedule";
-import type { SessionService } from "@glyphs-ai/session";
-import type { TaskService } from "@glyphs-ai/task";
-import type { WorkflowService } from "@glyphs-ai/workflow";
+import {
+  catalogRoutes,
+  configRoutes,
+  createApiApp,
+  healthRoutes,
+  runtimesRoutes,
+  scheduledTasksRoutes,
+  scheduledWorkflowsRoutes,
+  schedulesPreviewCronRoutes,
+  schedulesTaskRoutes,
+  schedulesWorkflowRoutes,
+  sessionsRoutes,
+  tasksRoutes,
+  workflowsRoutes,
+  workspacesRoutes,
+} from "@glyphs-ai/api";
+import type { CatalogModule } from "@glyphs-ai/catalog";
+import { CopilotRuntime, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
+import type { ScheduleModule } from "@glyphs-ai/schedule";
+import type { TaskModule } from "@glyphs-ai/task";
+import type { WorkflowModule } from "@glyphs-ai/workflow";
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import { createApiApp } from "../../server/src/routes/_openapi.js";
-import { catalogRoutes } from "../../server/src/routes/catalog/index.js";
-import { configRoutes } from "../../server/src/routes/config.js";
-import { healthRoutes } from "../../server/src/routes/health.js";
-import { runtimesRoutes } from "../../server/src/routes/runtimes.js";
-import { scheduledTasksRoutes } from "../../server/src/routes/scheduled-tasks.js";
-import { scheduledWorkflowsRoutes } from "../../server/src/routes/scheduled-workflows.js";
-import { schedulesRoutes } from "../../server/src/routes/schedules.js";
-import { sessionsRoutes } from "../../server/src/routes/sessions.js";
-import { tasksRoutes } from "../../server/src/routes/tasks.js";
-import { workflowsRoutes } from "../../server/src/routes/workflows.js";
-import { workspacesRoutes } from "../../server/src/routes/workspaces.js";
+import { registerOpenApiDoc } from "../../server/src/routes/_openapi.js";
 
 /**
  * Codegen-only identity for the assembled spec — NOT the runtime `info`.
@@ -84,7 +88,7 @@ export function buildOpenApiApp(): OpenAPIHono {
     }),
   );
 
-  const runtimeRegistry = new RuntimeRegistry();
+  const runtimeRegistry = new InMemoryRuntimeRegistry();
   runtimeRegistry.register(new CopilotRuntime({ sharedDir: "/tmp/shared" }));
   app.route("/api/runtimes", runtimesRoutes(runtimeRegistry));
 
@@ -120,11 +124,19 @@ export function buildOpenApiApp(): OpenAPIHono {
 
   const schedulesApp = createApiApp();
   schedulesApp.route(
-    "/:id/schedules",
-    schedulesRoutes(
+    "/:id/schedules/task",
+    schedulesTaskRoutes(() => stubScheduleService()),
+  );
+  schedulesApp.route(
+    "/:id/schedules/workflow",
+    schedulesWorkflowRoutes(
       () => stubScheduleService(),
       () => stubWorkflowService(),
     ),
+  );
+  schedulesApp.route(
+    "/:id/schedules/preview-cron",
+    schedulesPreviewCronRoutes(() => stubScheduleService()),
   );
   app.route("/api/workspaces", schedulesApp);
 
@@ -142,11 +154,11 @@ export function buildOpenApiApp(): OpenAPIHono {
   const catalogApp = createApiApp();
   catalogApp.route(
     "/:id/catalog",
-    catalogRoutes(() => stubCatalogFacade()),
+    catalogRoutes(() => stubCatalogModule()),
   );
   app.route("/api/workspaces", catalogApp);
 
-  app.doc31(OPENAPI_DOC_PATH, { openapi: "3.1.0", info: { ...OPENAPI_INFO } });
+  registerOpenApiDoc(app, OPENAPI_DOC_PATH, { openapi: "3.1.0", info: { ...OPENAPI_INFO } });
 
   return app;
 }
@@ -176,22 +188,22 @@ function stubApplication(): Application {
   });
 }
 
-function stubSessionManager(): SessionService {
+function stubSessionManager(): WorkspaceContext["sessions"] {
   return throwingStub("stubSessionManager");
 }
 
-function stubTaskManager(): TaskService {
+function stubTaskManager(): TaskModule {
   return throwingStub("stubTaskManager");
 }
 
-function stubScheduleService(): ScheduleService {
+function stubScheduleService(): ScheduleModule {
   return throwingStub("stubScheduleService");
 }
 
-function stubWorkflowService(): WorkflowService {
+function stubWorkflowService(): WorkflowModule {
   return throwingStub("stubWorkflowService");
 }
 
-function stubCatalogFacade(): CatalogService {
-  return throwingStub("stubCatalogFacade");
+function stubCatalogModule(): CatalogModule {
+  return throwingStub("stubCatalogModule");
 }

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { TerminalSpawnFailedError } from "../_errors.js";
 import {
   escapeCmdArg,
   hasUsableEnv,
@@ -6,7 +7,6 @@ import {
   pwshQuote,
   waitForEarlyFailure,
 } from "../_shared.js";
-import { TerminalSpawnFailedError } from "../errors.js";
 import type { LaunchCommand, SpawnTerminalDeps, SpawnTerminalResult } from "../types.js";
 
 /**

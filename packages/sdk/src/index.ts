@@ -25,7 +25,6 @@ export * from "./generated/index.js";
 // Convenience namespace so `import { sdk }` resolves: `sdk.getApiHealth(...)`.
 // Flat (one member per operation), not tag-grouped.
 export * as sdk from "./generated/sdk.gen.js";
-
 // Result helpers that turn a generated call's `{ data, error, response }`
 // tuple into a payload or a thrown `GlyphError`.
 export { unwrap, unwrapOr } from "./unwrap.js";

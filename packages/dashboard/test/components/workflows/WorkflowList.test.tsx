@@ -11,9 +11,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
-    iterationCount: 0,
     ...overrides,
   };
 }
@@ -114,10 +112,10 @@ describe("WorkflowList — single-open menu coordination", () => {
 });
 
 describe("WorkflowList — Awaiting you group", () => {
-  it("renders 'Awaiting you' group when a workflow has awaitingHumanCount > 0", () => {
+  it("renders 'Awaiting you' group (always empty since list has no human-node counts)", () => {
     const workflows = [
-      makeWorkflow({ id: "wf-awaiting", brief: "Awaiting", awaitingHumanCount: 1 }),
-      makeWorkflow({ id: "wf-running", brief: "Running" }),
+      makeWorkflow({ id: "wf-running-1", brief: "Running 1" }),
+      makeWorkflow({ id: "wf-running-2", brief: "Running 2" }),
       makeWorkflow({ id: "wf-done", brief: "Done", status: "succeeded" }),
     ];
     render(
@@ -131,7 +129,7 @@ describe("WorkflowList — Awaiting you group", () => {
         onMenuOpenChange={vi.fn()}
       />,
     );
-    const headers = screen.getAllByRole("button", { expanded: true });
+    const headers = Array.from(document.querySelectorAll(".task-list-group__header"));
     const labels = headers.map((h) => h.textContent);
     expect(labels[0]).toContain("Awaiting you");
     expect(labels[1]).toContain("Running");
@@ -141,8 +139,8 @@ describe("WorkflowList — Awaiting you group", () => {
   it("group order is awaiting → running → completed", () => {
     const workflows = [
       makeWorkflow({ id: "wf-done", brief: "Done", status: "succeeded" }),
-      makeWorkflow({ id: "wf-awaiting", brief: "Awaiting", awaitingHumanCount: 2 }),
-      makeWorkflow({ id: "wf-running", brief: "Running" }),
+      makeWorkflow({ id: "wf-running-1", brief: "Running 1" }),
+      makeWorkflow({ id: "wf-running-2", brief: "Running 2" }),
     ];
     render(
       <WorkflowList

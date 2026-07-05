@@ -63,7 +63,7 @@ describe("workspaceContextMiddleware", () => {
     const res = await app.request("/ws-x/probe");
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string; code: string };
-    expect(body.code).toBe("WorkspaceNotRegisteredError");
+    expect(body.code).toBe("WorkspaceNotFound");
     expect(application.getContext).not.toHaveBeenCalled();
   });
 
@@ -108,7 +108,7 @@ describe("workspaceContextMiddleware", () => {
     const res = await app.request("/ws-1/probe");
     expect(res.status).toBe(404);
     const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("WorkspaceNotRegisteredError");
+    expect(body.code).toBe("WorkspaceNotFound");
   });
 
   it('returns 200 when an "unloaded" load resolves inside the race window', async () => {
@@ -177,6 +177,6 @@ describe("workspaceContextMiddleware", () => {
     const res = await app.request("/ws-1/probe");
     expect(res.status).toBe(404);
     const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("WorkspaceNotRegisteredError");
+    expect(body.code).toBe("WorkspaceNotFound");
   });
 });

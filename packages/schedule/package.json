@@ -2,7 +2,7 @@
   "name": "@glyphs-ai/schedule",
   "private": true,
   "version": "0.0.0",
-  "description": "Schedules — cron-triggered dispatch substrate (schedules table + ScheduleService timer chain)",
+  "description": "Schedules — cron-triggered dispatch substrate (schedules table + Result-native CQRS + ScheduleEngine timer chain)",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -37,7 +37,9 @@
     "croner": "^10.0.1",
     "cronstrue": "^3.14.0",
     "drizzle-orm": "^0.45.2",
-    "pino": "^9.5.0"
+    "neverthrow": "^8.2.0",
+    "pino": "^9.5.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

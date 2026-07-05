@@ -12,17 +12,8 @@
  * match a handler above it.
  */
 
-import type {
-  AgentEntry,
-  CreateTaskScheduleRequest,
-  CreateWorkflowScheduleRequest,
-  Mcp,
-  PatchTaskScheduleRequest,
-  PatchWorkflowScheduleRequest,
-  SkillEntry,
-  TaskScheduleTarget,
-} from "@glyphs-ai/contracts";
 import { type DefaultBodyType, HttpResponse, http } from "msw";
+import type { AgentEntry, Mcp, SkillEntry } from "../api/catalog.js";
 import type {
   CreateWorkflowRequest,
   ScheduleDetail,
@@ -32,6 +23,13 @@ import type {
   WorkflowHeader,
   WorkflowNode,
 } from "../api/index.js";
+import type {
+  CreateTaskScheduleRequest,
+  CreateWorkflowScheduleRequest,
+  PatchTaskScheduleRequest,
+  PatchWorkflowScheduleRequest,
+  TaskScheduleTarget,
+} from "../api/schedules.js";
 import {
   artifactBodies,
   fixtureActiveWorkspaceId,
@@ -74,7 +72,7 @@ let synthFireSeq = 0;
 interface MutableWorkflowDag {
   workflow: WorkflowHeader;
   nodes: WorkflowNode[];
-  edges: { from: string; to: string }[];
+  edges: { from: string; to: string; workflowId: string }[];
 }
 
 const workflowsState: WorkflowHeader[] = fixtureWorkflows.map((w) => ({ ...w }));
@@ -211,8 +209,9 @@ export const handlers = [
     }
     return new HttpResponse(null, { status: 404 });
   }),
-  http.get(`/api/workspaces/${W}/tasks/:taskId/artifact/:name`, ({ params }) => {
-    const key = `${params.taskId}/${params.name}`;
+  http.get(`/api/workspaces/${W}/tasks/:taskId/artifact`, ({ params, request }) => {
+    const relPath = new URL(request.url).searchParams.get("path") ?? "";
+    const key = `${params.taskId}/${relPath}`;
     const entry = artifactBodies.get(key);
     if (!entry) return new HttpResponse(null, { status: 404 });
     return new HttpResponse(entry.body, {
@@ -239,7 +238,7 @@ export const handlers = [
   http.get("/api/config", () =>
     HttpResponse.json({
       glyphHome: "/mock/glyph-home",
-      currentWorkspace: fixtureActiveWorkspaceId,
+      currentWorkspaceId: fixtureActiveWorkspaceId,
       host: "localhost",
       port: 41817,
       pathSeparator: "/",
@@ -409,7 +408,8 @@ export const handlers = [
       nextFireAt: new Date(Date.now() + 60_000).toISOString(),
       lastFiredAt: undefined,
       describe: `Mock describe for ${body.trigger.expr}`,
-    };
+      fireStats: { awaitingCount: 0, runningCount: 0 },
+    } as ScheduleDetail;
     schedulesState.unshift(created);
     const { describe: _describe, ...entity } = created;
     return HttpResponse.json(entity satisfies ScheduleView, { status: 201 });
@@ -479,7 +479,7 @@ export const handlers = [
       target: nextTarget,
       ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
       updatedAt: new Date().toISOString(),
-    };
+    } as ScheduleDetail;
     schedulesState[idx] = merged;
     // Server's PATCH returns the entity without the describe enrichment
     // (re-derived only on GET); mirror that shape so the dashboard
@@ -520,7 +520,7 @@ export const handlers = [
       target: nextTarget,
       ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
       updatedAt: new Date().toISOString(),
-    };
+    } as ScheduleDetail;
     schedulesState[idx] = merged;
     const { describe: _describe, ...entity } = merged;
     return HttpResponse.json(entity);
@@ -561,18 +561,17 @@ export const handlers = [
         originId: row.id,
         coordinatorAgent: wfTarget.coordinatorAgent,
         metadata: { firedAt },
-        awaitingHumanCount: 0,
         createdAt: firedAt,
         startedAt: firedAt,
-        iterationCount: 0,
       };
       workflowsState.unshift(created);
       const coordNode: WorkflowNode = {
         id: cryptoUuid(),
         workflowId,
+        kind: "coordinator",
         status: "running",
         phase: 0,
-        spec: { kind: "coordinator", agent: wfTarget.coordinatorAgent },
+        spec: { agent: wfTarget.coordinatorAgent },
         metadata: {},
         createdAt: firedAt,
         readyAt: firedAt,
@@ -653,18 +652,17 @@ export const handlers = [
       origin: "standalone",
       coordinatorAgent: body.coordinatorAgent,
       metadata: {},
-      awaitingHumanCount: 0,
       createdAt: now,
       startedAt: now,
-      iterationCount: 0,
     };
     workflowsState.unshift(created);
     const coordNode: WorkflowNode = {
       id: cryptoUuid(),
       workflowId: id,
+      kind: "coordinator",
       status: "running",
       phase: 0,
-      spec: { kind: "coordinator", agent: body.coordinatorAgent },
+      spec: { agent: body.coordinatorAgent },
       metadata: {},
       createdAt: now,
       readyAt: now,
@@ -757,7 +755,7 @@ export const handlers = [
     const list = fixtureWorkflowArtifacts.get(wfid);
     const exists = (list ?? []).some((a) => {
       if (decoded.startsWith("summary/")) {
-        return a.kind === "workflow-summary" && a.path === decoded.slice("summary/".length);
+        return a.kind === "workflow-summary" && a.relPath === decoded.slice("summary/".length);
       }
       if (decoded.startsWith("nodes/")) {
         const tail = decoded.slice("nodes/".length);
@@ -765,7 +763,7 @@ export const handlers = [
         if (sep <= 0) return false;
         const nodeId = tail.slice(0, sep);
         const restPath = tail.slice(sep + 1);
-        return a.kind === "node" && a.nodeId === nodeId && a.path === restPath;
+        return a.kind === "node" && a.nodeId === nodeId && a.relPath === restPath;
       }
       return false;
     });
@@ -915,8 +913,8 @@ export const handlers = [
     );
   }),
   // Uninstall agent
-  http.delete(`/api/workspaces/${W}/catalog/agents/:fqn`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.delete(`/api/workspaces/${W}/catalog/agents/:scope/:name`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const idx = store.agents.findIndex((a) => a.agent.fqn === fqn);
     if (idx === -1) return notFound("agent not found");
     store.agents.splice(idx, 1);
@@ -954,8 +952,8 @@ export const handlers = [
     );
   }),
   // Uninstall skill
-  http.delete(`/api/workspaces/${W}/catalog/skills/:fqn`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.delete(`/api/workspaces/${W}/catalog/skills/:scope/:name`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const idx = store.skills.findIndex((s) => s.skill.fqn === fqn);
     if (idx === -1) return notFound("skill not found");
     store.skills.splice(idx, 1);
@@ -987,16 +985,16 @@ export const handlers = [
     );
   }),
   // Uninstall mcp
-  http.delete(`/api/workspaces/${W}/catalog/mcps/:fqn`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.delete(`/api/workspaces/${W}/catalog/mcps/:scope/:name`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const idx = store.mcps.findIndex((m) => m.fqn === fqn);
     if (idx === -1) return notFound("mcp not found");
     store.mcps.splice(idx, 1);
     return new HttpResponse(null, { status: 204 });
   }),
   // Sync resolve (agents)
-  http.post(`/api/workspaces/${W}/catalog/agents/:fqn/sync/resolve`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.post(`/api/workspaces/${W}/catalog/agents/:scope/:name/sync/resolve`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const entry = store.agents.find((a) => a.agent.fqn === fqn);
     if (!entry) return notFound("agent not found");
     return HttpResponse.json({
@@ -1013,14 +1011,14 @@ export const handlers = [
           shortName: fqn.split("/").pop() ?? fqn,
           scope: "public",
           status: "up-to-date",
-          depFqns: [],
+          dependencyOrigins: [],
         },
       ],
     });
   }),
   // Sync apply (agents)
-  http.post(`/api/workspaces/${W}/catalog/agents/:fqn/sync`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.post(`/api/workspaces/${W}/catalog/agents/:scope/:name/sync`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const entry = store.agents.find((a) => a.agent.fqn === fqn);
     if (!entry) return notFound("agent not found");
     return HttpResponse.json({
@@ -1031,8 +1029,8 @@ export const handlers = [
     });
   }),
   // Sync resolve (skills)
-  http.post(`/api/workspaces/${W}/catalog/skills/:fqn/sync/resolve`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.post(`/api/workspaces/${W}/catalog/skills/:scope/:name/sync/resolve`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const entry = store.skills.find((s) => s.skill.fqn === fqn);
     if (!entry) return notFound("skill not found");
     return HttpResponse.json({
@@ -1049,14 +1047,14 @@ export const handlers = [
           shortName: fqn.split("/").pop() ?? fqn,
           scope: "public",
           status: "up-to-date",
-          depFqns: [],
+          dependencyOrigins: [],
         },
       ],
     });
   }),
   // Sync apply (skills)
-  http.post(`/api/workspaces/${W}/catalog/skills/:fqn/sync`, ({ params }) => {
-    const fqn = decodeURIComponent(String(params.fqn));
+  http.post(`/api/workspaces/${W}/catalog/skills/:scope/:name/sync`, ({ params }) => {
+    const fqn = `${params.scope}/${params.name}`;
     const entry = store.skills.find((s) => s.skill.fqn === fqn);
     if (!entry) return notFound("skill not found");
     return HttpResponse.json({

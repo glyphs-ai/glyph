@@ -2,7 +2,7 @@
  * Architectural audit: `@glyphs-ai/runtime` MUST contain ZERO references
  * to `@glyphs-ai/catalog`. The two pkgs are decoupled by design — runtime
  * is the bottom layer of the package graph and never imports catalog,
- * not even as a test-only devDep. `CatalogService` satisfies runtime's
+ * not even as a test-only devDep. `CatalogModule` satisfies runtime's
  * `AgentContentSource` port by structural typing only; the production
  * wiring layer (`@glyphs-ai/api`) is the sole composition root that
  * value-imports both.

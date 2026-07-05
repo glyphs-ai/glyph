@@ -1,7 +1,11 @@
-import { type Application, type WorkspaceContext, WorkspaceLoadError } from "@glyphs-ai/api";
+import {
+  type Application,
+  errorBody,
+  type WorkspaceContext,
+  WorkspaceLoadError,
+} from "@glyphs-ai/api";
 import type { MiddlewareHandler } from "hono";
 import type { Logger as PinoLogger } from "pino";
-import { errorBody } from "../routes/_shared.js";
 
 /**
  * Variables stashed on the Hono context by the workspace context
@@ -53,10 +57,7 @@ export function workspaceContextMiddleware(
     const state = await application.peekContextState(id);
 
     if (state === "not-registered") {
-      return c.json(
-        { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegisteredError" },
-        404,
-      );
+      return c.json({ error: `workspace "${id}" not found`, code: "WorkspaceNotFound" }, 404);
     }
 
     if (state === "loading") {
@@ -69,10 +70,7 @@ export function workspaceContextMiddleware(
         // Race: a concurrent invalidate wiped the entry between
         // peek and get. Surface as 404 — caller's next request will
         // see "not-registered" on peek.
-        return c.json(
-          { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegisteredError" },
-          404,
-        );
+        return c.json({ error: `workspace "${id}" not found`, code: "WorkspaceNotFound" }, 404);
       }
       c.set("workspaceContext", ctx);
       return next();
@@ -122,10 +120,7 @@ export function workspaceContextMiddleware(
     if (!winner.ctx) {
       // Workspace was unregistered between peek and load — surface
       // as 404 like a stable not-registered.
-      return c.json(
-        { error: `workspace "${id}" is not registered`, code: "WorkspaceNotRegisteredError" },
-        404,
-      );
+      return c.json({ error: `workspace "${id}" not found`, code: "WorkspaceNotFound" }, 404);
     }
 
     c.set("workspaceContext", winner.ctx);

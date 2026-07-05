@@ -2,7 +2,7 @@
   "name": "@glyphs-ai/task",
   "private": true,
   "version": "0.0.0",
-  "description": "TaskService for autonomous agent runs - Drizzle-backed task registry, dispatch / cancel / delete lifecycle, runtime-driven exit watcher",
+  "description": "Headless one-shot task registry for glyph (Result-native, four-layer DDD) — Drizzle-backed tasks table plus use-cases to dispatch, observe, cancel, and delete runtime-provisioned agent runs",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -14,10 +14,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "import": "./dist/testing.js"
     }
   },
   "files": [
@@ -37,7 +33,9 @@
     "@glyphs-ai/runtime": "workspace:*",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
-    "pino": "^9.5.0"
+    "neverthrow": "^8.2.0",
+    "pino": "^9.5.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

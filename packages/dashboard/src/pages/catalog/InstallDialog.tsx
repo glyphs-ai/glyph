@@ -1,6 +1,6 @@
-import type { CatalogKind } from "@glyphs-ai/contracts";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import type { InstallProvider, InstallSource, ResolveManifest } from "../../api";
+import type { CatalogKind } from "../../api/catalog.js";
 import { Modal } from "../../components/Modal";
 import { ResolveTree } from "../../components/ResolveTree";
 import { CATALOG_VERBS } from "./catalog-verbs";
@@ -95,6 +95,9 @@ export function InstallDialog({ kind, open, busy, error, onClose, onSubmit }: In
 
   const stageBusy = busy || stage === "previewing" || stage === "applying";
   const showPreview = stage === "preview" || stage === "applying";
+  // Server short-circuits: root origin already installed → skip dep resolve,
+  // tell the user to sync from the entry's detail page instead.
+  const alreadyInstalled = manifest?.rootAlreadyInstalled === true;
   // When the resolved root was already installed under the same origin,
   // `install` semantically becomes "sync from upstream" (catalog upserts
   // with fresh content). Re-label the primary action so the user knows
@@ -146,7 +149,14 @@ export function InstallDialog({ kind, open, busy, error, onClose, onSubmit }: In
             <p className="form-hint">{inputMeta.hint}</p>
           </div>
 
-          {showPreview && manifest && <ResolveTree manifest={manifest} />}
+          {showPreview && manifest && !alreadyInstalled && <ResolveTree manifest={manifest} />}
+
+          {showPreview && alreadyInstalled && (
+            <div className="alert alert--info">
+              This entry is already installed. Use <strong>Sync</strong> from the entry's detail
+              page to check for upstream updates.
+            </div>
+          )}
 
           {(error || resolveError) && (
             <div className="alert alert--error">⚠ {error ?? resolveError}</div>
@@ -184,15 +194,17 @@ export function InstallDialog({ kind, open, busy, error, onClose, onSubmit }: In
               type="button"
               className="btn btn--primary"
               onClick={handleApply}
-              disabled={stageBusy}
+              disabled={stageBusy || alreadyInstalled}
             >
-              {stage === "applying"
-                ? rootIsWillSync
-                  ? "Syncing..."
-                  : "Installing..."
-                : rootIsWillSync
-                  ? "Sync from upstream"
-                  : "Install"}
+              {alreadyInstalled
+                ? "Already installed"
+                : stage === "applying"
+                  ? rootIsWillSync
+                    ? "Syncing..."
+                    : "Installing..."
+                  : rootIsWillSync
+                    ? "Sync from upstream"
+                    : "Install"}
             </button>
           )}
         </div>

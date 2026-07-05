@@ -1,8 +1,8 @@
-import type { AgentEntry, SkillEntry } from "@glyphs-ai/contracts";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import type { McpItem } from "../../src/api/catalog";
+import type { AgentEntry, SkillEntry } from "../../src/api/catalog.js";
 import { CatalogPage } from "../../src/pages/Catalog";
 
 /**

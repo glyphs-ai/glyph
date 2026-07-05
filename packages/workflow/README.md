@@ -20,8 +20,8 @@ the coord's prerogative.
 
 - **WorkflowStatus** is 4 values: `running | succeeded | failed |
   cancelled`. `running` is the only non-terminal value; "is the
-  coord awake right now" is derived from `workflow_nodes`
-  (`hasLiveCoord(nodes)` helper).
+  coord awake right now" is derived from `workflow_nodes` (a running
+  `kind='coordinator'` node).
 - **Coordinator** is first-class: every coord run is a
   `kind='coordinator'` node, not a row in a separate table. The
   current coord agent FQN is denormalized into
@@ -44,17 +44,17 @@ mutations and structural reads are surfaced over HTTP (see
 engine-facing methods are driven by the host (`@glyphs-ai/api` wiring +
 `@glyphs-ai/server` routes), never by the coordinator.
 
-- **Mutation primitives** (9, coord-callback): `addNode`, `addEdge`,
-  `addSubgraph`, `removeNode`, `removeEdge`, `replaceSpec`,
-  `cancelNode`, `finishWorkflow`, `respondHumanNode`. Each is
-  independently atomic; the substrate has no monolithic-batch API.
+- **Mutation primitives** (coord-callback): `addSubgraph`, `cancelNode`,
+  `finishWorkflow`, `respondHumanNode`. Each is independently atomic;
+  structural DAG mutation goes through `addSubgraph`.
 - **Structural reads**: `getWorkflow`, `getDag`, `getNode`,
   `getNodeDir`, plus the list / aggregate reads `list`,
   `countAwaitingHumanByWorkflow`, and `aggregateByOrigin`
   that back the dashboard's workflow list and badges.
 - **Lifecycle / operator**: `createWorkflow` (bootstrap a workflow and
   its initial coordinator node), `cancelWorkflow` (operator cancel,
-  cascades to in-flight nodes), `deleteWorkflow` / `purge` (teardown).
+  cascades to in-flight nodes), `deleteWorkflow` (teardown, optionally
+  purging the workflow directory).
   These are host entry points, not coord-reachable.
 - **Engine-facing**: `setEngine`, `listEligibleNodeIdsForDispatch`,
   `dispatchAtomic`, and `markNodeTerminal` — the dispatch /
@@ -137,7 +137,7 @@ bridge `@glyphs-ai/workflow`, `@glyphs-ai/task`, and
 
 ## Coord-callback API
 
-The 9 mutation primitives on `WorkflowService`, plus the per-node
+The coord-callback mutation primitives on `WorkflowService`, plus the per-node
 `getNode` structural read, are exposed over HTTP on
 `/api/workspaces/:id/workflows/:workflowId/*` so a coordinator agent's task
 can grow / shrink / inspect the DAG from its own process. HTTP routes
@@ -151,23 +151,16 @@ and surface as their own typed errors.
 
 | Verb     | Path                                       | Service method   | Body                                                                                                           | Response                                      |
 | -------- | ------------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `POST`   | `/:workflowId/nodes`                       | `addNode`        | `{ kind, spec, parents[] }`                                                                                    | `{ nodeId, phase }`                           |
 | `GET`    | `/:workflowId/nodes/:nodeId`               | `getNode`        | _none_                                                                                                         | `WorkflowNode`                            |
-| `POST`   | `/:workflowId/edges`                       | `addEdge`        | `{ fromNodeId, toNodeId }`                                                                                     | `{ fromNodeId, toNodeId, toPhase }`           |
-| `POST`   | `/:workflowId/subgraph`                    | `addSubgraph`    | `{ nodes:[{tempId,kind,spec,existingParents?}], edges:[{from,to}] }` — `from`/`to` are `{nodeId}` or `{tempId}` | `{ insertedNodes:[{tempId,nodeId,phase}] }`   |
+| `POST`   | `/:workflowId/subgraph`                    | `addSubgraph`    | `{ nodes:[{tempId,kind,spec,existingParents?}], edges:[{from,to}] }` — `from`/`to` are tagged `NodeRef`s        | `{ insertedNodes:[{tempId,nodeId,phase}] }`   |
 | `POST`   | `/:workflowId/nodes/:nodeId/cancel`        | `cancelNode`     | _none_                                                                                                         | `WorkflowNode` (post-cancel projection)   |
 | `POST`   | `/:workflowId/finish`                      | `finishWorkflow` | `{ outcome: "succeeded" \| "failed" }`                                                                         | `WorkflowHeader` (post-finish projection) |
-| `DELETE` | `/:workflowId/nodes/:nodeId`               | `removeNode`     | _none_                                                                                                         | `204 No Content`                              |
-| `DELETE` | `/:workflowId/edges/:fromNodeId/:toNodeId` | `removeEdge`     | _none_                                                                                                         | `204 No Content`                              |
-| `PATCH`  | `/:workflowId/nodes/:nodeId/spec`          | `replaceSpec`    | `{ newSpec }`                                                                                                  | `WorkflowNode` (post-replace projection)  |
 | `POST`   | `/:workflowId/nodes/:nodeId/respond`       | `respondHumanNode` | `{ choiceId?, input? }`                                                                                      | `WorkflowNode` (post-respond projection)  |
 
-`WorkflowNodeRef` on the wire is a structural-discriminator union — exactly
-one of `{nodeId}` (resolve to an existing node) or `{tempId}` (resolve
-to a temp node declared in the same `addSubgraph` batch). The route
-boundary translates each shape to the substrate's tag-discriminated
-`NodeRef` (`{kind:"existing",id}` / `{kind:"temp",tempId}`) before
-calling the service.
+`WorkflowNodeRef` is a tagged union:
+`{kind:"existing",id}` (resolve to an existing node) or
+`{kind:"temp",tempId}` (resolve to a temp node declared in the same
+`addSubgraph` batch).
 
 ### Error policy
 

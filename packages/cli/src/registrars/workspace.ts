@@ -67,12 +67,8 @@ export function registerWorkspaceCommands(program: Command, slot: Slot): void {
   withConnectFlags(workspaceCmd.command("rm"))
     .argument("<workspace-id>", "Workspace id")
     .description("Remove a workspace")
-    .option("--purge", "Also remove the workspace's glyph-managed subdirs")
     .action(async (workspaceId: string, opts: Record<string, unknown>) => {
-      slot.result = await workspaceRm(workspaceId, {
-        ...parseConnectFlags(opts),
-        purge: opts.purge === true,
-      });
+      slot.result = await workspaceRm(workspaceId, parseConnectFlags(opts));
     });
 
   withConnectFlags(workspaceCmd.command("reload"))

@@ -1,8 +1,8 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleDetail as ScheduleDetailType, ScheduleView } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");
@@ -48,7 +48,7 @@ function makeSchedule(
     createdAt: "2026-05-01T00:00:00Z",
     updatedAt: "2026-05-20T00:00:00Z",
     ...partial,
-  };
+  } as ScheduleView;
 }
 
 function makeDetail(view: ScheduleView, describe: string): ScheduleDetailType {

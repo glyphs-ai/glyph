@@ -151,10 +151,13 @@ function renderStateStrip({
     );
   }
   // Running.
-  if (workflow.awaitingHumanCount > 0) {
-    const count = workflow.awaitingHumanCount;
+  const awaitingHumanCount = (dag?.nodes ?? []).filter(
+    (n) => n.kind === "human" && n.status === "running",
+  ).length;
+  if (awaitingHumanCount > 0) {
+    const count = awaitingHumanCount;
     const firstHumanNode =
-      dag?.nodes.find((n) => n.spec.kind === "human" && n.status === "running") ?? null;
+      dag?.nodes.find((n) => n.kind === "human" && n.status === "running") ?? null;
     const message =
       count === 1
         ? "1 human node is waiting for your input."

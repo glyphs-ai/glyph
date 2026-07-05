@@ -1,10 +1,10 @@
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { getSchedule, patchSchedule, patchWorkflowSchedule, type ScheduleDetail } from "../../api";
 import type {
   AgentEntry,
   PatchTaskScheduleRequest,
   PatchWorkflowScheduleRequest,
-} from "@glyphs-ai/contracts";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { getSchedule, patchSchedule, patchWorkflowSchedule, type ScheduleDetail } from "../../api";
+} from "../../api/index.js";
 import { Modal } from "../Modal";
 import { presetToCron, validatePreset } from "./cron-presets";
 import { ScheduleFormFields } from "./ScheduleFormFields";

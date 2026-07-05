@@ -1,5 +1,5 @@
+import { NoTerminalFoundError } from "../_errors.js";
 import { hasUsableEnv, shExportPrefix, shQuote, waitForEarlyFailure } from "../_shared.js";
-import { NoTerminalFoundError } from "../errors.js";
 import type { LaunchCommand, Launcher, SpawnTerminalDeps, SpawnTerminalResult } from "../types.js";
 
 /**

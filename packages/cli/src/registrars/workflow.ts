@@ -7,9 +7,9 @@
  * canonical surface for the CLI; see `commands/workflow.ts` doc-block
  * for the design rationale behind each flag.
  *
- * Mutation primitives: add-node / add-subgraph / add-edge / remove-node /
- * remove-edge / replace-spec / cancel-node / finish — the 8 primitives
- * a coord agent calls via HTTP from its task.
+ * Mutation primitives: add-node / add-subgraph / add-edge / cancel-node /
+ * finish — the DAG-growth + terminal primitives a coord agent calls via
+ * HTTP from its task. The DAG is append-only: there is no remove/replace.
  */
 
 import { readFileSync } from "node:fs";
@@ -25,9 +25,6 @@ import {
   workflowFinish,
   workflowList,
   workflowNodeShow,
-  workflowRemoveEdge,
-  workflowRemoveNode,
-  workflowReplaceSpec,
   workflowRespond,
   workflowRm,
   workflowShow,
@@ -209,42 +206,6 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
         pickString(opts, "toNodeId") ?? "",
         parseWorkspaceFlags(opts),
       );
-    });
-
-  withWorkspaceFlags(workflowCmd.command("remove-node"))
-    .description("Coord-only: delete a not_started node (and its adjacent edges)")
-    .argument("<workflow-id>", "Workflow id")
-    .argument("<node-id>", "Node id")
-    .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
-      slot.result = await workflowRemoveNode(workflowId, nodeId, parseWorkspaceFlags(opts));
-    });
-
-  withWorkspaceFlags(workflowCmd.command("remove-edge"))
-    .description(
-      "Coord-only: delete a single edge (to-node must be not_started, ≥1 parent retained)",
-    )
-    .argument("<workflow-id>", "Workflow id")
-    .requiredOption("--from-node-id <id>", "Source node id")
-    .requiredOption("--to-node-id <id>", "Destination node id")
-    .action(async (workflowId: string, opts: Record<string, unknown>) => {
-      slot.result = await workflowRemoveEdge(
-        workflowId,
-        pickString(opts, "fromNodeId") ?? "",
-        pickString(opts, "toNodeId") ?? "",
-        parseWorkspaceFlags(opts),
-      );
-    });
-
-  withWorkspaceFlags(workflowCmd.command("replace-spec"))
-    .description("Coord-only: re-validate + replace a node's opaque spec (kind cannot change)")
-    .argument("<workflow-id>", "Workflow id")
-    .argument("<node-id>", "Node id")
-    .requiredOption("--spec-file <path>", "Path to JSON file holding the new spec")
-    .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
-      slot.result = await workflowReplaceSpec(workflowId, nodeId, {
-        ...parseWorkspaceFlags(opts),
-        specFile: pickString(opts, "specFile") ?? "",
-      });
     });
 
   withWorkspaceFlags(workflowCmd.command("cancel-node"))

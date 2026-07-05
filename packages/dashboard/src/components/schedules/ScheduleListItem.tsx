@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ScheduleView } from "../../api";
+import type { ScheduleView, WorkflowScheduleView } from "../../api";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { copyToClipboard } from "../../utils/clipboard";
 import { formatAbsolute, formatRelative } from "../../utils/time";
@@ -342,14 +342,16 @@ export function ScheduleListItem({
             <span className="badge__dot" aria-hidden="true" />
             {schedule.enabled ? "Enabled" : "Paused"}
           </span>
-          {schedule.target.kind === "workflow" && (schedule.fireStats?.awaitingCount ?? 0) > 0 ? (
+          {schedule.target.kind === "workflow" &&
+          ((schedule as WorkflowScheduleView).fireStats?.awaitingCount ?? 0) > 0 ? (
             <span className="badge badge--warn" title="Awaiting workflows">
-              ⏳ {schedule.fireStats?.awaitingCount}
+              ⏳ {(schedule as WorkflowScheduleView).fireStats?.awaitingCount}
             </span>
           ) : null}
-          {schedule.target.kind === "workflow" && (schedule.fireStats?.runningCount ?? 0) > 0 ? (
+          {schedule.target.kind === "workflow" &&
+          ((schedule as WorkflowScheduleView).fireStats?.runningCount ?? 0) > 0 ? (
             <span className="badge badge--info" title="Running workflows">
-              🟢 {schedule.fireStats?.runningCount}
+              🟢 {(schedule as WorkflowScheduleView).fireStats?.runningCount}
             </span>
           ) : null}
         </span>

@@ -1,8 +1,8 @@
 /**
  * API-contract tests for the `glyph` CLI.
  *
- * These cases exercise the full commander → action → `makeClient` →
- * `ApiClient.call` → fetch pipeline, but the fetch implementation is
+ * These cases exercise the full commander → action → `makeSdkClient` →
+ * `@glyphs-ai/sdk` client → fetch pipeline, but the fetch implementation is
  * a `vi.spyOn(globalThis, "fetch")` stub — no server is booted. The
  * goal is to pin:
  *
@@ -12,7 +12,7 @@
  *
  * Why not msw / nock: this keeps the test dependency surface small.
  * The repo's existing fetch-mock primitive is the same `typeof fetch`
- * swap already used by `api-client.test.ts` and
+ * swap already used by `sdk-client.test.ts` and
  * `task-activity.test.ts`.
  *
  * Pairs with:
@@ -62,8 +62,15 @@ function stubFetch(response: { status: number; body: string; contentType?: strin
       return new Response("unexpected second fetch call", { status: 500 });
     }
     called = true;
-    cap.url = String(input);
-    cap.method = String(init?.method ?? "GET");
+    if (input instanceof Request) {
+      // `@glyphs-ai/sdk` operations call `fetch(new Request(url, init))`
+      // (single Request arg); read the URL + method off the Request.
+      cap.url = input.url;
+      cap.method = input.method;
+    } else {
+      cap.url = String(input);
+      cap.method = String(init?.method ?? "GET");
+    }
     return new Response(response.body, {
       status: response.status,
       headers: { "content-type": response.contentType ?? "application/json" },

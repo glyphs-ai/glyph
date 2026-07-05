@@ -1,41 +1,73 @@
 /**
- * @glyphs-ai/workspace — workspace registry on Drizzle.
- *
- * A *workspace* is the user-chosen working directory that holds
- * glyph's per-workspace state. Each workspace is identified by an
- * opaque UUID `id` (the URL routing key) and lives at an absolute
- * filesystem `workspaceDir`. Display name + metadata live in the
- * global registry row (`global.db`).
+ * Workspace registry package. The public surface is use-case schemas,
+ * use-case result types, shared value objects/errors, and the
+ * `composeWorkspaceModule` composition root.
  */
 
+export {
+  type GetLastOpenedWorkspaceError,
+  type GetLastOpenedWorkspaceRequest,
+  GetLastOpenedWorkspaceRequestSchema,
+  type GetLastOpenedWorkspaceResponse,
+  GetLastOpenedWorkspaceResponseSchema,
+} from "./application/get-last-opened-workspace.js";
+export {
+  type GetLastOpenedWorkspaceIdError,
+  type GetLastOpenedWorkspaceIdRequest,
+  GetLastOpenedWorkspaceIdRequestSchema,
+  type GetLastOpenedWorkspaceIdResponse,
+  GetLastOpenedWorkspaceIdResponseSchema,
+} from "./application/get-last-opened-workspace-id.js";
+export {
+  type GetWorkspaceError,
+  type GetWorkspaceRequest,
+  GetWorkspaceRequestSchema,
+  type GetWorkspaceResponse,
+  GetWorkspaceResponseSchema,
+} from "./application/get-workspace.js";
+export {
+  type ListWorkspacesError,
+  type ListWorkspacesRequest,
+  ListWorkspacesRequestSchema,
+  type ListWorkspacesResponse,
+  ListWorkspacesResponseSchema,
+} from "./application/list-workspaces.js";
+export {
+  type OpenWorkspaceError,
+  type OpenWorkspaceRequest,
+  OpenWorkspaceRequestSchema,
+  type OpenWorkspaceResponse,
+  OpenWorkspaceResponseSchema,
+} from "./application/open-workspace.js";
+// ─── Per-use-case wire contracts ─────────────────────────────────
+// Schemas drive OpenAPI generation; use-case classes stay private.
+export {
+  type RegisterWorkspaceError,
+  type RegisterWorkspaceRequest,
+  RegisterWorkspaceRequestSchema,
+  type RegisterWorkspaceResponse,
+  RegisterWorkspaceResponseSchema,
+} from "./application/register-workspace.js";
+export {
+  type RenameWorkspaceError,
+  type RenameWorkspaceRequest,
+  RenameWorkspaceRequestSchema,
+  type RenameWorkspaceResponse,
+  RenameWorkspaceResponseSchema,
+} from "./application/rename-workspace.js";
+export {
+  type UnregisterWorkspaceError,
+  type UnregisterWorkspaceRequest,
+  UnregisterWorkspaceRequestSchema,
+  type UnregisterWorkspaceResponse,
+  UnregisterWorkspaceResponseSchema,
+} from "./application/unregister-workspace.js";
+// ─── Shared cross-use-case surface (re-exported from domain) ─────
+export * from "./application/workspace-public.js";
+// ─── Composition root ────────────────────────────────────────────
+export { type Db, openWorkspaceDb } from "./infrastructure/drizzle/workspace-db.js";
 export {
   composeWorkspaceModule,
   type WorkspaceModule,
   type WorkspaceModuleOptions,
-} from "./compose.js";
-export {
-  RegistryError,
-  WorkspaceError,
-  WorkspaceIdConflictError,
-  WorkspaceIdInvalidError,
-  WorkspaceNameInvalidError,
-  WorkspaceNotRegisteredError,
-  WorkspacePathConflictError,
-  WorkspacePathInvalidError,
-} from "./errors.js";
-export {
-  globalDbPath,
-  type WorkspaceLayout,
-  workspaceLayout,
-  workspacesParentDir,
-} from "./layout.js";
-export type {
-  ListWorkspacesOpts,
-  RegisterWorkspaceOpts,
-  RegisterWorkspaceResult,
-  RenameWorkspaceOpts,
-  UnregisterWorkspaceOpts,
-  Workspace,
-} from "./types.js";
-export { InputValidationError } from "./validate.js";
-export { WorkspaceService, type WorkspaceServiceOpts } from "./workspace-service.js";
+} from "./workspace-module.js";

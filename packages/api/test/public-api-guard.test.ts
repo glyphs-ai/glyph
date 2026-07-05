@@ -16,11 +16,9 @@ import { describe, expectTypeOf, it } from "vitest";
 import {
   type Application,
   composeApplication,
-  TaskScheduleTargetError,
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
   WorkflowHumanSpecError,
-  WorkflowScheduleTargetError,
   WorkflowWorkerNotInCoordMenuError,
   WorkflowWorkerSpecError,
   type WorkspaceContext,
@@ -46,8 +44,6 @@ describe("@glyphs-ai/api public API guard", () => {
     const errors = [
       new WorkspaceHasLiveTasksError("ws", 1),
       new WorkspaceLoadError("ws", new Error("cause")),
-      new TaskScheduleTargetError("bad target"),
-      new WorkflowScheduleTargetError("bad workflow target"),
       new WorkflowCoordAgentNotCapableError("official/coord"),
       new WorkflowCoordSpecError("bad coord"),
       new WorkflowWorkerSpecError("bad worker"),

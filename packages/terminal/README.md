@@ -1,17 +1,23 @@
 # @glyphs-ai/terminal
 
-> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+> **Tier:** T0 (Foundations / provider). See the [tier model](../../docs/architecture.md#tier-model).
 
-Host a shell-runnable `LaunchCommand` inside a per-platform terminal
+Hosts a shell-runnable `LaunchCommand` inside a per-platform terminal
 emulator. Glyph uses this for one-click interactive launch: instead of
 asking the user to copy a manual `cd … && <runtime-cli> …` command into
 their shell, the server opens the user's terminal in the requested
 workdir with the command already running.
 
+Result-based: `localSpawner.spawn(launch)` returns a
+`ResultAsync<SpawnResult, SpawnFailed>` — a failed launch (no emulator
+found, an unsupported platform, a fast child crash, an invalid command)
+is surfaced as a `SpawnFailed` atom, never thrown across the package
+boundary.
+
 ## Consumer port
 
 `LaunchCommand` is defined in this package and matched structurally
-against whatever the producer hands to `spawnTerminal`. The current
+against whatever the producer hands to `localSpawner.spawn`. The current
 producer is `@glyphs-ai/runtime`'s `Runtime.buildInteractiveLaunch`,
 but any structurally compatible object works. The wiring relies on
 TypeScript's structural typing at the call site rather than a workspace
@@ -28,6 +34,12 @@ interface LaunchCommand {
   readonly env?: Readonly<Record<string, string>>;
 }
 ```
+
+`@glyphs-ai/session`'s `spawnInteractive` use-case consumes the
+structurally-typed `Spawner` port; the composition root (`@glyphs-ai/api`)
+injects `localSpawner`. `session` deliberately does not value-import this
+package — `LaunchCommand` is the structural seam, so the architecture
+fence stays intact.
 
 ## Supported launchers
 
@@ -83,7 +95,7 @@ The example below shows a command produced by the Copilot runtime; other
 runtimes can provide their own `cmd` and `args`.
 
 ```ts
-import { spawnTerminal, type LaunchCommand } from "@glyphs-ai/terminal";
+import { localSpawner, type LaunchCommand } from "@glyphs-ai/terminal";
 
 const cmd: LaunchCommand = {
   cmd: "copilot",
@@ -93,9 +105,48 @@ const cmd: LaunchCommand = {
   env: { GLYPH_WORKSPACE: "ws-uuid" },
 };
 
-const result = await spawnTerminal(cmd); // { launcher: "wt" | "cmd" | ... }
+const result = await localSpawner.spawn(cmd);
+result.match(
+  ({ launcher }) => {
+    // opened in `launcher`: "wt" | "cmd" | "Terminal" | "gnome-terminal" | …
+  },
+  (err) => {
+    // err.code / err.message — fall back to copy-pasting `cmd.display`
+  },
+);
 ```
 
-Errors: `InvalidLaunchCommandError`, `NoTerminalFoundError`,
-`TerminalSpawnFailedError`, `UnsupportedPlatformError` — all named
-subclasses of `Error`.
+A failed launch is surfaced as a single `SpawnFailed` atom
+(`{ type: "SpawnFailed"; code; message }`), never thrown across the
+boundary. `code` is the internal error class's name —
+`NoTerminalFoundError`, `TerminalSpawnFailedError`,
+`UnsupportedPlatformError`, `InvalidLaunchCommandError`, or `SpawnError`
+for a raw child-process fault — giving the wire layer a stable machine
+label; `message` is human-readable detail. The throwing classes
+themselves are package-private (caught at the `Spawner` boundary).
+
+## Surface
+
+```
+packages/terminal/src/
+  spawner.ts        Spawner interface (Result-based)
+  local-spawner.ts  localSpawner + the platform dispatch it wraps
+  types.ts          public DTOs: LaunchCommand, SpawnResult
+  errors.ts         SpawnFailed discriminated-union atom
+  _errors.ts        internal throw classes caught at the boundary
+  _quoting.ts       per-platform quoting dialects (package-private)
+  _spawn.ts         node:child_process + fs adapters (package-private)
+  _validate.ts      LaunchCommand validation (package-private)
+  platforms/        wt/cmd, Terminal.app, gnome-terminal launchers
+```
+
+## Testing
+
+```sh
+pnpm --filter @glyphs-ai/terminal typecheck
+pnpm --filter @glyphs-ai/terminal test
+```
+
+## License
+
+MIT

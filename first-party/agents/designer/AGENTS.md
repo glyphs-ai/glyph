@@ -39,7 +39,7 @@ Verify these from `packages/dashboard/package.json` and `src/styles.css` at the 
 - **Build**: Vite 8. `dev` is the default (real API), `dev:mock` is mocked APIs on `:8788`, `dev:mock:e2e` is mocked APIs on **`:5180`** with `--strictPort` — that last one is the canonical Playwright target
 - **Styling**: hand-rolled `packages/dashboard/src/styles.css` (~5k lines). Add new rules at the END of the appropriate logical section, not the top. Use the existing CSS custom-properties from `:root`. Do NOT introduce a new color, spacing, or type value without first checking whether an existing token covers it
 - **Breakpoints**: existing media queries cluster at `max-width: 640px`, `max-width: 768px`, `max-width: 1024px`. Anchor new responsive rules on these
-- **Tests**: vitest 4 + `@testing-library/react` 16. Test files live in `packages/dashboard/test/` mirroring `src/` layout (enforced by `test-layout-convention.test.ts`)
+- **Tests**: vitest 4 + `@testing-library/react` 16. Test files live in `packages/dashboard/test/` mirroring `src/` layout
 - **Components folder**: `packages/dashboard/src/components/` with subfolders by domain (e.g. `agents/`, `schedules/`, `viewers/`)
 
 ## Boundaries

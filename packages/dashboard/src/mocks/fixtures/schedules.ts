@@ -149,5 +149,6 @@ export const fixtureSchedules: ScheduleDetail[] = [
     lastFiredAt: "2026-05-27T22:00:00.000Z",
     nextFireAt: isoOffsetHours(1),
     describe: "Every hour",
+    fireStats: { awaitingCount: 0, runningCount: 0 },
   },
 ];

@@ -14,10 +14,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "import": "./dist/testing.js"
     }
   },
   "files": [
@@ -33,13 +29,13 @@
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts && node ../../scripts/inline-migrations.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0",
+    "@libsql/client": "^0.17.4",
     "drizzle-orm": "^0.45.2",
+    "neverthrow": "^8.2.0",
     "pino": "^9.5.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "^5.7.0",

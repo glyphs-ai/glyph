@@ -65,17 +65,12 @@ const SKIP_DIR_NAMES = new Set(["node_modules", "__tests__", "drizzle", "migrati
  * into the facade.
  */
 const REQUIRED_SPLITS = new Set<string>([
-  "packages/task/src/task-service",
   "packages/dashboard/src/App",
   "packages/dashboard/src/components/tasks/TaskDetail",
-  "packages/catalog/src/facade/catalog-service",
-  "packages/catalog/src/facade/resolve-pipeline",
-  "packages/session/src/session-service",
+
   "packages/cli/src/commands/catalog",
   "packages/cli/src/commands/schedule",
   "packages/cli/src/commands/workflow",
-  "packages/contracts/src/routes",
-  "packages/server/src/routes/workflows",
 ]);
 
 interface ClassifiedDir {

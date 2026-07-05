@@ -3,7 +3,6 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import lockfile from "proper-lockfile";
 import writeFileAtomic from "write-file-atomic";
-import { TrustRegistrationFailed } from "./errors.js";
 
 /** Max size (10MB) for the trust config file. Anything bigger is rejected. */
 const MAX_CONFIG_BYTES = 10 * 1024 * 1024;
@@ -85,11 +84,11 @@ const MAX_CONFIG_BYTES = 10 * 1024 * 1024;
  * changes.
  *
  * Failure modes — every failure path (mkdir, lock timeout, atomic
- * write, parent permissions) is wrapped as {@link TrustRegistrationFailed}.
- * That gives `buildInteractiveLaunch` a single, typed catch surface
- * and preserves the underlying error message (which for a
- * `proper-lockfile` timeout includes the holder PID — the operator's
- * only handle to a wedged trust write).
+ * write, parent permissions) propagates its raw error. The
+ * `CopilotRuntime.buildInteractiveLaunch` boundary catches it and folds
+ * it into the `RuntimeLaunchFailed` atom's `cause`, preserving the
+ * underlying message (which for a `proper-lockfile` timeout includes the
+ * holder PID — the operator's only handle to a wedged trust write).
  *
  * If `dir` (or an ancestor) is already covered, the file is left untouched.
  * A missing or unparseable config file is treated as "start fresh"; we
@@ -99,64 +98,60 @@ const MAX_CONFIG_BYTES = 10 * 1024 * 1024;
 export async function ensureDirTrusted(dir: string, configPath: string): Promise<void> {
   const resolvedDir = path.resolve(dir);
 
+  await mkdir(path.dirname(configPath), { recursive: true });
+  // proper-lockfile requires the locked file to exist. Touch it
+  // only when it's genuinely missing — any other stat failure
+  // (EACCES, EIO, EISDIR, …) must propagate, because clobbering a
+  // present-but-unreadable `config.json` with `{}` would silently
+  // destroy real user data.
   try {
-    await mkdir(path.dirname(configPath), { recursive: true });
-    // proper-lockfile requires the locked file to exist. Touch it
-    // only when it's genuinely missing — any other stat failure
-    // (EACCES, EIO, EISDIR, …) must propagate, because clobbering a
-    // present-but-unreadable `config.json` with `{}` would silently
-    // destroy real user data.
-    try {
-      await stat(configPath);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-      await writeFileAtomicWithRetry(configPath, "{}");
+    await stat(configPath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    await writeFileAtomicWithRetry(configPath, "{}");
+  }
+  const release = await lockfile.lock(configPath, {
+    retries: { retries: 100, factor: 1.1, minTimeout: 50, maxTimeout: 200 },
+    stale: 30000,
+  });
+  try {
+    // Read + parse phase. Failure modes split into two outcomes:
+    //   - file missing / file unreadable as JSON  -> "start fresh"
+    //     (rewrite below with just `trustedFolders`, valid file).
+    //   - file present but exceeds MAX_CONFIG_BYTES -> HARD REFUSE
+    //     (do NOT clobber a 100MB user config with `{}` just
+    //     because we hit the cap). The size check therefore lives
+    //     OUTSIDE the swallow-and-start-fresh catch below.
+    const st = await statSafe(configPath);
+    if (st !== null && st.size > MAX_CONFIG_BYTES) {
+      throw new Error(
+        `refusing to touch ${configPath}: ${st.size} bytes exceeds cap of ${MAX_CONFIG_BYTES}`,
+      );
     }
-    const release = await lockfile.lock(configPath, {
-      retries: { retries: 100, factor: 1.1, minTimeout: 50, maxTimeout: 200 },
-      stale: 30000,
-    });
-    try {
-      // Read + parse phase. Failure modes split into two outcomes:
-      //   - file missing / file unreadable as JSON  -> "start fresh"
-      //     (rewrite below with just `trustedFolders`, valid file).
-      //   - file present but exceeds MAX_CONFIG_BYTES -> HARD REFUSE
-      //     (do NOT clobber a 100MB user config with `{}` just
-      //     because we hit the cap). The size check therefore lives
-      //     OUTSIDE the swallow-and-start-fresh catch below.
-      const st = await statSafe(configPath);
-      if (st !== null && st.size > MAX_CONFIG_BYTES) {
-        throw new Error(
-          `refusing to touch ${configPath}: ${st.size} bytes exceeds cap of ${MAX_CONFIG_BYTES}`,
-        );
-      }
 
-      let config: Record<string, unknown> = {};
-      if (st !== null) {
-        try {
-          const raw = await readFile(configPath, "utf8");
-          const parsed = JSON.parse(raw) as unknown;
-          if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-            config = parsed as Record<string, unknown>;
-          }
-        } catch {
-          // Invalid JSON — start fresh. We never refuse to launch
-          // because the user's config is corrupted; the rewrite
-          // below will produce a valid file containing just
-          // `trustedFolders`.
+    let config: Record<string, unknown> = {};
+    if (st !== null) {
+      try {
+        const raw = await readFile(configPath, "utf8");
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+          config = parsed as Record<string, unknown>;
         }
+      } catch {
+        // Invalid JSON — start fresh. We never refuse to launch
+        // because the user's config is corrupted; the rewrite
+        // below will produce a valid file containing just
+        // `trustedFolders`.
       }
-
-      const existing = readTrustedFolders(config.trustedFolders);
-      if (isPathCovered(resolvedDir, existing)) return;
-
-      config.trustedFolders = [...existing, resolvedDir];
-      await writeFileAtomicWithRetry(configPath, `${JSON.stringify(config, null, 2)}\n`);
-    } finally {
-      await release();
     }
-  } catch (cause) {
-    throw new TrustRegistrationFailed(configPath, resolvedDir, cause as Error);
+
+    const existing = readTrustedFolders(config.trustedFolders);
+    if (isPathCovered(resolvedDir, existing)) return;
+
+    config.trustedFolders = [...existing, resolvedDir];
+    await writeFileAtomicWithRetry(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  } finally {
+    await release();
   }
 }
 

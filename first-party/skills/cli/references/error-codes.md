@@ -3,7 +3,7 @@
 Every error from the glyph server has the envelope `{error, code?, ...}`. The CLI's `formatError` surfaces both the human message AND the `code`, like:
 
 ```
-not found (HTTP 404, WorkspaceNotRegisteredError)
+workspace not found (HTTP 404, WorkspaceNotFound)
 ```
 
 For `EntryNotReadyError` it also unpacks `agent` and `reason` into structured CTAs:
@@ -30,11 +30,9 @@ Both are stable wire contracts. The distinction matters only if you're maintaini
 
 | code | typical HTTP | meaning | fix |
 |---|---|---|---|
-| `WorkspaceNotRegisteredError` | 404 | The workspace id doesn't exist | `glyph workspace list` to find a real id |
-| `WorkspaceNotFoundError` | 404 | Workspace metadata missing on disk | Re-create or restore from backup |
+| `WorkspaceNotFound` | 404 | The workspace id isn't registered | `glyph workspace list` to find a real id |
 | `WorkspaceCorruptedError` | 500 | Workspace SQLite row is corrupted | Server-side issue; ask user to inspect logs |
 | `WorkspaceAlreadyExistsError` | 409 | `workspace add` collided | Use a different name/workdir, or remove the existing one |
-| `WorkspaceIdConflictError` | 409 | Same workspace id used twice in concurrent `add` | Retry once; if persistent, server bug |
 | `WorkspacePathConflictError` | 409 | Two workspaces on the same workdir | Pick a different `--workspace-dir` |
 | `WorkspaceNameInvalidError` | 400 | Name fails validation | Use kebab-case, ASCII, no slashes |
 | `WorkspaceIdInvalidError` | 400 | Bad id format | Get a real id via `workspace list` |
@@ -52,24 +50,16 @@ Both are stable wire contracts. The distinction matters only if you're maintaini
 | `RuntimeHeadlessLaunchFailed` | 500 | Runtime headless launch failed | Same as above |
 | `RuntimeRefreshFailed` | 500 | Runtime metadata refresh failed | Often transient; retry |
 | `EntryNotReadyError` | 409 | Agent is blocked — see `reason` | See "EntryNotReadyError reasons" below |
-| `AgentNotFoundError` | 400 / 404 | Agent FQN not installed | `glyph catalog agent install --url <url>` or `--file <path>` |
-| `AgentNameInvalidError` | 400 | Bad agent name | Check `[a-z0-9-]+` and matching folder name |
-| `AgentFrontmatterError` | 400 | Agent frontmatter validation failed | Read message; fix the YAML in upstream |
-| `AgentOriginConflictError` | 409 | Two agents with same FQN, different origins | Decide which to keep, remove the other |
-| `AgentPlanStaleError` | 400 | `planToken` expired (5-min TTL) or already used | Re-run `agent sync-resolve` |
-| `SkillNotFoundError` | 404 | Skill FQN not installed | `glyph catalog skill install --url <url>` or `--file <path>` |
-| `SkillNameInvalidError` | 400 | Bad skill name | Same as agent |
-| `SkillFrontmatterError` | 400 | Skill frontmatter validation failed | Read message; fix YAML upstream |
-| `SkillOriginConflictError` | 409 | Two skills with same FQN, different origins | Pick one |
-| `PlanStaleError` | 400 | Skill plan token expired/used | Re-run `skill sync-resolve` |
-| `McpNotFoundError` | 404 | MCP not installed | `glyph catalog mcp install --url <url>` or `--file <path>` |
-| `McpNameInvalidError` | 400 | Bad MCP FQN | Use `<namespace>/<short>` |
-| `McpInvalidJsonError` | 400 | MCP JSON failed schema validation | Read message; fix the JSON |
-| `McpOriginConflictError` | 409 | Two MCPs with same FQN, different origins | Pick one |
-| `HasDependentsError` | 409 | Trying to remove an entry someone depends on | Remove dependents first, or use `--force`-equivalent if exposed |
-| `CyclicDependencyError` | 400 | Install would create a cycle | Inspect the resolve plan; the chain is in the message |
-| `OriginParseError` | 400 | Malformed origin URL | Check the URL format |
-| `FetchError` | 502 | Couldn't fetch the origin (404, network error, etc) | Check the URL is reachable; transient — safe to retry |
+| `AgentNotFound` | 404 | Agent FQN not installed | `glyph catalog agent install --url <url>` or `--file <path>` |
+| `AgentOriginConflict` | 409 | Two agents with same FQN, different origins | Decide which to keep, remove the other |
+| `SkillNotFound` | 404 | Skill FQN not installed | `glyph catalog skill install --url <url>` or `--file <path>` |
+| `SkillOriginConflict` | 409 | Two skills with same FQN, different origins | Pick one |
+| `McpNotFound` | 404 | MCP not installed | `glyph catalog mcp install --url <url>` or `--file <path>` |
+| `McpOriginConflict` | 409 | Two MCPs with same FQN, different origins | Pick one |
+| `OriginInvalid` | 400 | Malformed origin URL | Check the URL format |
+| `ManifestInvalid` | 400 | Catalog manifest validation failed | Read message; fix the upstream manifest |
+| `SourceUnavailable` | 502 | Couldn't fetch the origin (404, network error, etc) | Check the URL is reachable; transient — safe to retry |
+| `DatabaseUnavailable` | 500 | Catalog persistence failed | Server-side; surface to user with the request id from logs |
 | `NoEventsYet` | 404 | Runtime hasn't produced activity events yet | Wait, then retry |
 | `NoTerminalFoundError` | 400 | Couldn't find a terminal to spawn the session in | Server-side; check OS terminal config |
 | `TerminalSpawnFailedError` | 500 | Terminal spawn failed | Same |

@@ -1,9 +1,9 @@
-import type { AgentEntry, SkillEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setActiveWorkspace } from "../src/api";
 import type { McpItem } from "../src/api/catalog";
+import type { AgentEntry, SkillEntry } from "../src/api/catalog.js";
 import { CatalogPage } from "../src/pages/Catalog";
 
 /**
@@ -105,8 +105,8 @@ function renderCatalogAt(initialPath: string, agents: AgentEntry[]) {
 describe("Catalog ?entry=<fqn> deep-link", () => {
   it("auto-opens the matching agent's dialog on mount", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.endsWith("/catalog/agents/official%2Fcoordinator")) {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith("/catalog/agents/official/coordinator")) {
         return jsonResponse({
           agent: {
             fqn: "official/coordinator",
@@ -155,8 +155,8 @@ describe("Catalog ?entry=<fqn> deep-link", () => {
 
   it("strips ?entry= from the URL when the dialog is closed", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.endsWith("/catalog/agents/official%2Fcoordinator")) {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith("/catalog/agents/official/coordinator")) {
         return jsonResponse({
           agent: {
             fqn: "official/coordinator",

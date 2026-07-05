@@ -5,8 +5,8 @@
  * `components/schedules/shared.ts` so each component file stays narrow.
  */
 
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import type { WorkflowHeader, WorkflowNode } from "../../api";
+import type { AgentEntry } from "../../api/catalog.js";
 
 /**
  * Hard-coded poll cadence for workflow list + detail. The server-config
@@ -116,11 +116,7 @@ export function isTerminal(status: WorkflowHeader["status"]): boolean {
  */
 export type StatusGroup = "awaiting" | "running" | "completed";
 
-export function statusGroup(
-  status: WorkflowHeader["status"],
-  awaitingHumanCount: number,
-): StatusGroup {
-  if (status === "running" && awaitingHumanCount > 0) return "awaiting";
+export function statusGroup(status: WorkflowHeader["status"]): StatusGroup {
   if (status === "running") return "running";
   return "completed";
 }

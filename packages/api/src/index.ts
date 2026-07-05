@@ -9,32 +9,81 @@
  * and don't see this layer at all.
  *
  * Wire contracts (route catalog, request / response body types, leaf
- * path helpers) live in the sibling `@glyphs-ai/contracts` pkg. This
- * barrel re-exports them so `@glyphs-ai/server` has a single import
- * site for both orchestration and contracts — `@glyphs-ai/dashboard`
- * and `@glyphs-ai/cli` should depend on `@glyphs-ai/contracts`
- * directly, which keeps orchestration out of their dep graph
- * structurally (not just by convention).
+ * path helpers) live in the `./wire` subtree. This barrel re-exports
+ * them so `@glyphs-ai/server` has a single import site for both
+ * orchestration and contracts. UI surfaces (`@glyphs-ai/dashboard`,
+ * `@glyphs-ai/cli`) instead consume the same shapes through the
+ * generated `@glyphs-ai/sdk`, which keeps orchestration out of their
+ * dep graph structurally (not just by convention).
  *
  * See `docs/architecture.md § Tier model` for the full layering
  * rationale.
  */
 
-// Re-export every wire contract from the sibling pkg so server can
-// `import { ... } from "@glyphs-ai/api"` and get both layers in one shot.
-export * from "@glyphs-ai/contracts";
+export { catalogErrorPolicy } from "./_error-policies/catalog.js";
+export {
+  respondScheduleError,
+  type ScheduleRouteError,
+  schedulesErrorPolicy,
+} from "./_error-policies/schedules.js";
+export {
+  type RespondSessionErrorOpts,
+  respondSessionError,
+  type SessionRouteError,
+} from "./_error-policies/sessions.js";
+export {
+  type TaskRouteError,
+  taskErrorWireBody,
+  taskUnionCodeStatuses,
+} from "./_error-policies/tasks.js";
+export {
+  respondWorkflowError,
+  type WorkflowRouteError,
+  workflowCustomDeleteBody,
+  workflowsErrorPolicy,
+} from "./_error-policies/workflows.js";
+export {
+  type ErrorPolicy,
+  errorBody,
+  INTERNAL_ERROR_NAMES,
+  logEvent,
+  logFault,
+  type RespondErrorOpts,
+  respondError,
+  SAFE_ERROR_NAMES,
+  unmappedFaultMeta,
+} from "./_http-errors.js";
+// HTTP route helpers — shared OpenAPI app factory and error utilities.
+// Consumed by `@glyphs-ai/server` (re-exports them to its own route
+// modules) and by route modules co-located here in api.
+export {
+  createApiApp,
+  errorResponse,
+  injectWorkspaceIdParam,
+  jsonRequest,
+  jsonResponse,
+} from "./_http-helpers.js";
 // Orchestration (composeApplication + per-workspace WorkspaceContext)
 export {
   type Application,
   composeApplication,
 } from "./application.js";
-export { listRoutes } from "./route-manifest.js";
-// Transport-agnostic zod schemas mirroring every wire contract. The
-// OpenAPI projection in `@glyphs-ai/server` consumes these; other
-// (non-HTTP) consumers can reuse them without an HTTP round-trip.
-export * from "./schemas/index.js";
-export { TaskScheduleTargetError } from "./wiring/schedule-task-handler.js";
-export { WorkflowScheduleTargetError } from "./wiring/schedule-workflow-handler.js";
+// Route factories — each returns an OpenAPIHono sub-app mountable by
+// the server's transport layer.
+export { type CatalogResolver, catalogRoutes } from "./routes/catalog/index.js";
+export { configRoutes } from "./routes/config.js";
+export { healthRoutes } from "./routes/health.js";
+export { runtimesRoutes } from "./routes/runtimes.js";
+export { scheduledTasksRoutes, schedulesTaskRoutes } from "./routes/schedules/scheduled-tasks.js";
+export {
+  scheduledWorkflowsRoutes,
+  schedulesWorkflowRoutes,
+} from "./routes/schedules/scheduled-workflows.js";
+export { schedulesPreviewCronRoutes } from "./routes/schedules/schedules.js";
+export { sessionsRoutes } from "./routes/sessions.js";
+export { tasksRoutes } from "./routes/tasks.js";
+export { workflowsRoutes } from "./routes/workflows.js";
+export { workspacesRoutes } from "./routes/workspaces.js";
 export {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,

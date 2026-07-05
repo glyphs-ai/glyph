@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c2f8dd52-fb73-40c8-b588-65b07bf401c7",
-  "prevId": "142b8fcd-310f-4561-8139-13a1db7a7f85",
+  "id": "142b8fcd-310f-4561-8139-13a1db7a7f85",
+  "prevId": "b7c3599f-84c5-45d1-8c87-edaae04d6680",
   "tables": {
     "workflow_edges": {
       "name": "workflow_edges",
@@ -224,13 +224,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'standalone'"
-        },
-        "origin_id": {
-          "name": "origin_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "started_at": {
           "name": "started_at",

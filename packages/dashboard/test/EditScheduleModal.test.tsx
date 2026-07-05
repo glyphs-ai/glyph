@@ -1,7 +1,7 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScheduleDetail } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 vi.mock("../src/api", async () => {
   const actual = await vi.importActual<typeof import("../src/api")>("../src/api");
@@ -64,7 +64,8 @@ const SAMPLE_WF: ScheduleDetail = {
   createdAt: "2026-05-01T00:00:00Z",
   updatedAt: "2026-05-20T00:00:00Z",
   describe: "every day at 02:00 Asia/Shanghai",
-};
+  fireStats: { awaitingCount: 0, runningCount: 0 },
+} as ScheduleDetail;
 
 function renderModal(overrides: Partial<React.ComponentProps<typeof EditScheduleModal>> = {}) {
   const onClose = vi.fn();

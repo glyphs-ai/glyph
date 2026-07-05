@@ -6,10 +6,11 @@
  * Coord-callback mutation primitives that back the coordinator-agent
  * contract:
  *  - `add-node` / `add-subgraph` / `add-edge`         -- grow the DAG
- *  - `remove-node` / `remove-edge`                    -- shrink it
- *  - `replace-spec`                                   -- re-validate + swap
  *  - `cancel-node`                                    -- terminate one worker
  *  - `finish`                                         -- flip the workflow terminal
+ *
+ * The DAG is append-only: nodes/edges can be added but not removed, and a
+ * node's spec cannot be replaced.
  *
  * Layout: this file is a thin facade. Command implementations live in
  * sibling concern modules under `./workflow/` -- `read.ts` (list /
@@ -24,7 +25,7 @@
  * "Naming conventions"): the workflow id is a positional `<workflow-id>`
  * on every subcommand (matching `task <task-id>` / `schedule <schedule-id>`);
  * the node id is `<node-id>` positional on node-scoped subcommands;
- * `add-edge` / `remove-edge` take `--from-node-id` / `--to-node-id`;
+ * `add-edge` takes `--from-node-id` / `--to-node-id`;
  * `add-node` takes `--parent-node-ids` (csv plural).
  *
  * Flag-name choices for create / show / dag / cancel / rm:

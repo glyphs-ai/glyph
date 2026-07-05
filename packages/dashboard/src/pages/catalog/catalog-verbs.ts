@@ -1,4 +1,3 @@
-import type { CatalogKind } from "@glyphs-ai/contracts";
 import {
   deleteAgent,
   deleteMcp,
@@ -14,6 +13,7 @@ import {
   resolveAgentInstall,
   resolveSkillInstall,
 } from "../../api";
+import type { CatalogKind } from "../../api/catalog.js";
 import { KIND_TITLE } from "../../kind-meta";
 
 /**

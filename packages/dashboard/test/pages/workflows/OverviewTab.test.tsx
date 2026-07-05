@@ -11,9 +11,7 @@ function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
-    iterationCount: 0,
     ...overrides,
   };
 }
@@ -113,10 +111,12 @@ describe("OverviewTab — awaiting CTA", () => {
   const humanNode: WorkflowNode = {
     id: "node-human-1",
     workflowId: "wf-1",
+    kind: "human",
     phase: 1,
     status: "running",
     spec: { kind: "human", prompt: "Please confirm", promptStyle: "plain" },
     createdAt: "2026-05-28T00:01:00.000Z",
+    metadata: {},
   } as unknown as WorkflowNode;
 
   const dag: WorkflowDag = {
@@ -125,36 +125,40 @@ describe("OverviewTab — awaiting CTA", () => {
       {
         id: "node-worker-1",
         workflowId: "wf-1",
+        kind: "worker",
         phase: 0,
         status: "succeeded",
         spec: { kind: "worker", agentRef: "official/engineer", brief: "do stuff" },
         createdAt: "2026-05-28T00:00:00.000Z",
+        metadata: {},
       },
     ],
     edges: [],
   } as unknown as WorkflowDag;
 
   it("renders awaiting message when awaitingHumanCount === 1", () => {
-    render(<OverviewTab workflow={makeWf({ awaitingHumanCount: 1 })} dag={dag} />);
+    render(<OverviewTab workflow={makeWf()} dag={dag} />);
     const hint = screen.getByTestId("workflow-overview-awaiting-hint");
     expect(hint.textContent).toContain("1 human node is waiting for your input.");
   });
 
   it("renders plural awaiting message when awaitingHumanCount > 1", () => {
-    render(<OverviewTab workflow={makeWf({ awaitingHumanCount: 3 })} dag={dag} />);
+    const multiHumanDag: WorkflowDag = {
+      nodes: [
+        { ...humanNode, id: "node-human-1" },
+        { ...humanNode, id: "node-human-2" },
+        { ...humanNode, id: "node-human-3" },
+      ],
+      edges: [],
+    } as unknown as WorkflowDag;
+    render(<OverviewTab workflow={makeWf()} dag={multiHumanDag} />);
     const hint = screen.getByTestId("workflow-overview-awaiting-hint");
     expect(hint.textContent).toContain("3 human nodes are waiting for your input.");
   });
 
   it("renders 'Open node →' button and fires callback on click", () => {
     const onGoToHumanNode = vi.fn();
-    render(
-      <OverviewTab
-        workflow={makeWf({ awaitingHumanCount: 1 })}
-        dag={dag}
-        onGoToHumanNode={onGoToHumanNode}
-      />,
-    );
+    render(<OverviewTab workflow={makeWf()} dag={dag} onGoToHumanNode={onGoToHumanNode} />);
     const btn = screen.getByTestId("workflow-overview-go-to-node");
     expect(btn.textContent).toBe("Open node →");
     fireEvent.click(btn);
@@ -163,20 +167,22 @@ describe("OverviewTab — awaiting CTA", () => {
   });
 
   it("renders 'Open first node →' button label when count > 1", () => {
-    render(
-      <OverviewTab
-        workflow={makeWf({ awaitingHumanCount: 2 })}
-        dag={dag}
-        onGoToHumanNode={vi.fn()}
-      />,
-    );
+    const twoHumanDag: WorkflowDag = {
+      nodes: [
+        { ...humanNode, id: "node-human-1" },
+        { ...humanNode, id: "node-human-2" },
+      ],
+      edges: [],
+    } as unknown as WorkflowDag;
+    render(<OverviewTab workflow={makeWf()} dag={twoHumanDag} onGoToHumanNode={vi.fn()} />);
     expect(screen.getByTestId("workflow-overview-go-to-node").textContent).toBe(
       "Open first node →",
     );
   });
 
   it("renders the generic running hint when awaitingHumanCount is 0", () => {
-    render(<OverviewTab workflow={makeWf({ awaitingHumanCount: 0 })} dag={dag} />);
+    const noHumanDag: WorkflowDag = { nodes: [], edges: [] } as unknown as WorkflowDag;
+    render(<OverviewTab workflow={makeWf()} dag={noHumanDag} />);
     expect(screen.getByTestId("workflow-overview-running-hint")).toBeTruthy();
     expect(screen.queryByTestId("workflow-overview-awaiting-hint")).toBeNull();
   });

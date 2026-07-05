@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -8,6 +7,7 @@ import {
   type WorkflowHeader,
   type WorkflowNode,
 } from "../api";
+import type { AgentEntry } from "../api/catalog.js";
 import { EmptyState } from "../components/common/EmptyState";
 import { HeaderActions } from "../components/HeaderActions";
 import { PlusIcon } from "../components/Icons";
@@ -192,11 +192,9 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   // selection null so the chip just renders un-styled.
   const selectedNodeId = useMemo(() => {
     if (humanNodeId !== null) return humanNodeId;
-    if (nodeTaskId !== null && detail.dag !== null) {
-      return detail.dag.nodes.find((n) => n.taskId === nodeTaskId)?.id ?? null;
-    }
+    if (nodeTaskId !== null) return nodeTaskId;
     return null;
-  }, [humanNodeId, nodeTaskId, detail.dag]);
+  }, [humanNodeId, nodeTaskId]);
 
   // Master selection write: clears any in-flight Mode B at the same
   // time so the right pane never falls into the inconsistent state
@@ -212,11 +210,10 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   // Human nodes use `humanNodeId`; task-backed nodes use `nodeTaskId`.
   const onSelectNode = useCallback(
     (node: WorkflowNode) => {
-      if (node.spec.kind === "human") {
+      if (node.kind === "human") {
         setMasterDetailUrl({ nodeTaskId: null, humanNodeId: node.id });
       } else {
-        if (node.taskId === undefined) return;
-        setMasterDetailUrl({ nodeTaskId: node.taskId, humanNodeId: null });
+        setMasterDetailUrl({ nodeTaskId: node.id, humanNodeId: null });
       }
     },
     [setMasterDetailUrl],
@@ -235,12 +232,11 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
 
   const onNavigateHumanNode = useCallback(
     (nextNodeId: string) => {
-      // Determine if the target node is a human or task node
       const target = detail.dag?.nodes.find((n) => n.id === nextNodeId);
-      if (target?.spec.kind === "human") {
+      if (target?.kind === "human") {
         setMasterDetailUrl({ humanNodeId: nextNodeId, nodeTaskId: null });
-      } else if (target?.taskId) {
-        setMasterDetailUrl({ nodeTaskId: target.taskId, humanNodeId: null });
+      } else if (target !== undefined) {
+        setMasterDetailUrl({ nodeTaskId: nextNodeId, humanNodeId: null });
       }
     },
     [setMasterDetailUrl, detail.dag],

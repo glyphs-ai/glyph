@@ -14,20 +14,17 @@ interface NormalArtifact {
 }
 
 /**
- * : `success.artifacts` is now the only artifact source.
- * Entries are absolute fs paths captured by `applyTerminal` at
- * terminal time; the basename is what we display + what the server
- * accepts as the URL segment.
+ * `success.artifacts` is the only artifact source. Entries are the
+ * artifact's relative-path identity (POSIX, e.g. `ref/report.html`),
+ * relativized server-side; that path is both what we display and what the
+ * server accepts as `?path=`.
  */
 function extractArtifacts(task: TaskRecord): NormalArtifact[] {
   const list = task.success?.artifacts ?? [];
-  return list.map((absPath) => {
-    const name = basename(absPath);
-    return {
-      name,
-      url: taskArtifactUrl(task.id, name),
-    };
-  });
+  return list.map((relPath) => ({
+    name: relPath,
+    url: taskArtifactUrl(task.id, relPath),
+  }));
 }
 
 function basename(p: string): string {
@@ -143,7 +140,7 @@ export function ArtifactsTab({ task }: ArtifactsTabProps) {
           className={`artifacts-pane__download${selected ? "" : " artifacts-pane__download--disabled"}`}
           target="_blank"
           rel="noreferrer noopener"
-          download={selected ?? undefined}
+          download={selected ? basename(selected) : undefined}
           aria-disabled={selected ? undefined : true}
           tabIndex={selected ? undefined : -1}
           title={selected ? `Download ${selected}` : "No artifact selected"}

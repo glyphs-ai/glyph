@@ -1,4 +1,3 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +8,7 @@ import type {
   TaskRecord,
   WorkspaceListItem,
 } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 import { HeaderActionsContext } from "../src/components/HeaderActions";
 import { CreateModal } from "../src/components/sessions/CreateModal";
 import { DispatchModal } from "../src/components/tasks/DispatchModal";

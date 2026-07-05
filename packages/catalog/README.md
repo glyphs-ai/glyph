@@ -3,7 +3,7 @@
 > **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
 
 Skill + MCP + Agent registry with dependency-aware resolve / install /
-sync / update / uninstall. This is a T0 foundation package; `api`
+uninstall. This is a T0 foundation package; `api`
 composes it into per-workspace application services. SQLite-backed; the
 per-workspace `workspace.db` owns `agents`, `skills`, `mcps`, the
 `*_files` BLOB tables, and the dependency edge tables.
@@ -26,12 +26,9 @@ What this package **does**:
 - Parse and fetch install origins via local `file:` paths, GitHub tree
   URLs, or Azure DevOps Services item URLs.
 - Validate graph rules on writes: name uniqueness, kebab-case,
-  missing-dependency, no cycles, reverse-dependency safety on
-  uninstall. The catalog schema has no FK constraints, so each
-  `SkillRepository.delete` / `McpRepository.delete` runs an
-  in-transaction `count()` check over the typed dep edge tables and
-  throws `HasDependentsError` directly (rolling back the empty
-  delete).
+  missing-dependency, no cycles, and dependency-aware install planning.
+  Use-cases return discriminated-union errors through
+  `neverthrow` results; they do not throw catalog error classes.
 
 What this package **does not** do:
 
@@ -43,41 +40,37 @@ What this package **does not** do:
   they spawn servers.
 - Execute installed entries, copy or "ingest" skills into agents, spawn
   MCP servers, or materialise runtime workdirs. Runtime adapters consume
-  catalog streams and MCP config bytes through the service API.
+  catalog streams and MCP config bytes through structural ports assembled
+  by the API composition root.
 
 ## Exports
 
-- `@glyphs-ai/catalog` — public DTOs, entity classes, per-entity service
-  namespaces, fetcher helpers, validators, errors, and
-  `composeCatalogModule`.
-- `@glyphs-ai/catalog/testing` — `openTestCatalogDb` for in-memory
-  better-sqlite3 tests.
+- `@glyphs-ai/catalog` — `composeCatalog({ dbFile })`, the `CatalogModule`
+  use-case container, per-use-case request / response / error contracts,
+  the curated domain surface, resolution graph types, and plan / apply
+  DTOs. Implementation details are package-internal.
 
 ## Layout
 
 ```
 packages/catalog/src/
-  schema.ts                Drizzle tables (private; only types exported)
-  types.ts                 Cross-entity DTOs (Agent / Skill / Mcp + entries + resolve results)
-  validate.ts              FQN / name / install-body validators
-  agent/                   Per-entity service + errors + entity class
-  skill/
-  mcp/
-  facade/
-    catalog-service.ts     Unified read+write surface across all entities
-    resolve-pipeline.ts    Three-phase resolve: upstream closure → local closure → diff
-    projection.ts          Pure projection helpers (Row → DTO)
-    plan-types.ts          Shared cross-entity plan DTOs
-    errors.ts              Cross-entity facade errors (HasDependentsError)
-    index.ts               Facade barrel
-  fetcher/                 Origin parser + remote bytes fetcher
-  _shared/                 Package-private utilities (dep-keys, etc.)
-  migrations.ts            applyCatalogMigrations (drizzle migration applier)
-  compose.ts               composeCatalogModule({ dbFile, logger? })
-  testing.ts               openTestCatalogDb helper (via /testing subpath)
-  index.ts                 public barrel
+  index.ts                 public barrel (compose + contracts + curated domain types)
+  compose.ts               composeCatalog({ dbFile }) -> CatalogModule
+  domain/                  entities, manifests, branded FQNs, repository/source ports
+    agent-entity.ts        AgentEntity (skill / mcp mirror)
+    agent-manifest.ts      frontmatter parsing (skill / mcp mirror)
+  application/             one use-case class per verb
+    resolve-plan.ts          fetch upstream graph + diff against local state
+    apply-plan.ts            apply a resolved plan through install use-cases
+    resolve-agent.ts         local DAG projection for runtime materialisation
+  infrastructure/drizzle/   persistence adapter (sole DB syscall site)
+    catalog-schema.ts        Drizzle tables (private; only types exported)
+    catalog-migrations.ts    applyCatalogMigrations
+    catalog-db.ts            openDb(dbFile): prod + test factory
+    agent-repository.ts      per-entity repository (skill / mcp mirror)
+  infrastructure/source/    outbound content adapter (origin → bytes): File / GitHub / ADO
 drizzle/                   generated SQL migrations (committed)
-drizzle.config.ts          drizzle-kit config
+drizzle.config.ts          drizzle-kit config (→ src/infrastructure/drizzle/catalog-schema.ts)
 ```
 
 ## On-disk
@@ -98,45 +91,45 @@ read out of the BLOB columns.
 ## Quick start
 
 ```ts
-import { composeCatalogModule } from "@glyphs-ai/catalog";
+import { composeCatalog } from "@glyphs-ai/catalog";
 
-const { service: catalog, close } = await composeCatalogModule({
+const catalog = composeCatalog({
   dbFile: "/abs/path/to/workspace.db",
 });
 
 // Install (origin-driven). The resolver fetches the entry + its
 // transitive deps, surfaces conflicts, and returns a CatalogPlan;
-// install() walks the topology in order.
-await catalog.installSkill("file:/abs/path/sop-prepared");
-await catalog.installAgent("https://github.com/org/repo/tree/main/agents/code-reviewer");
-await catalog.installMcpFromOrigin("file:/abs/path/mcps/playwright.json");
+// applyPlan walks the topology in order.
+const plan = await catalog.resolvePlan.execute({
+  kind: "agent",
+  origin: "https://github.com/org/repo/tree/main/agents/code-reviewer",
+});
+if (plan.isErr()) throw new Error(plan.error.type);
+await catalog.applyPlan.execute({ plan: plan.value });
 
 // Resolve from the local catalog (no network — DAG walk over
 // already-installed entries; used by the runtime when materialising
 // a workdir).
-const plan = await catalog.resolveAgent("public/code-reviewer");
+const resolved = await catalog.resolveAgent.execute({ id: "public/code-reviewer" });
 
 // Read DTOs at the boundary.
-await catalog.listSkillEntries();        // SkillEntry[]
-await catalog.getSkill(fqn);             // Skill | null
-await catalog.listAgentEntries();
-await catalog.listMcps();
+await catalog.listSkillEntries.execute({}); // Result<SkillEntry[], E>
+await catalog.getSkill.execute({ id: fqn }); // Result<Skill, SkillNotFound | E>
+await catalog.listAgentEntries.execute({});
+await catalog.listMcps.execute({});
 
-await close();
+await catalog.close();
 ```
 
 ## Errors
 
-- `AgentFrontmatterError` / `SkillFrontmatterError` — malformed YAML
-- `*NameInvalidError` — fails kebab-case / length / charset
-- `*NotFoundError` — unknown FQN
-- `*OriginConflictError` — install collision
-- `CyclicDependencyError` — `resolveAgent` walk found a cycle
-- `HasDependentsError` — uninstall blocked by reverse-deps; raised
-  inside `SkillRepository.delete` / `McpRepository.delete` from the
-  same transaction that counts dependents
-- `McpInvalidJsonError` — MCP file failed JSON schema check
-- `FetchError` / `OriginParseError` — fetcher subpackage errors
+Catalog use-cases return discriminated-union error objects through
+`Result`, for example:
+
+- `SkillNotFound` / `AgentNotFound` / `McpNotFound` — unknown FQN
+- `SkillOriginConflict` / `AgentOriginConflict` / `McpOriginConflict` — install collision
+- `OriginInvalid` / `ManifestInvalid` / `SourceUnavailable` — origin fetch or parse failure
+- `DatabaseUnavailable` — persistence failure
 
 ## Testing
 

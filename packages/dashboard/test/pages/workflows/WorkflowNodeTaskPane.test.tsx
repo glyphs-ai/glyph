@@ -12,6 +12,19 @@ vi.mock("../../../src/hooks/useTaskDetail", () => ({
   }),
 }));
 
+// The pane resolves a node id to its latest task via `findTaskByOrigin`
+// before mounting the TaskView. Stub it so the nav pill (rendered in every
+// resolution state) is present synchronously without a real fetch.
+vi.mock("../../../src/api", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/api")>("../../../src/api");
+  return {
+    ...actual,
+    findTaskByOrigin: vi.fn(async (_origin: string, originId: string) => ({
+      id: `task-${originId}`,
+    })),
+  };
+});
+
 import { WorkflowNodeTaskPane } from "../../../src/pages/workflows/WorkflowNodeTaskPane";
 
 function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
@@ -22,9 +35,7 @@ function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
-    iterationCount: 0,
     ...overrides,
   };
 }
@@ -36,32 +47,32 @@ function makeDag(): WorkflowDag {
       {
         id: "n1",
         workflowId: "wf-1",
+        kind: "worker" as const,
         status: "succeeded",
         phase: 0,
         spec: { kind: "worker", agent: "official/engineer", brief: "a" },
         metadata: {},
         createdAt: "2026-05-28T00:00:00.000Z",
-        taskId: "task-1",
       },
       {
         id: "n2",
         workflowId: "wf-1",
+        kind: "worker" as const,
         status: "running",
         phase: 1,
         spec: { kind: "worker", agent: "official/engineer", brief: "b" },
         metadata: {},
         createdAt: "2026-05-28T00:01:00.000Z",
-        taskId: "task-2",
       },
       {
         id: "n3",
         workflowId: "wf-1",
+        kind: "worker" as const,
         status: "running",
         phase: 2,
         spec: { kind: "worker", agent: "official/engineer", brief: "c" },
         metadata: {},
         createdAt: "2026-05-28T00:02:00.000Z",
-        taskId: "task-3",
       },
     ],
     edges: [],
@@ -76,7 +87,7 @@ describe("WorkflowNodeTaskPane", () => {
       <WorkflowNodeTaskPane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="task-2"
+        nodeTaskId="n2"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={() => {}}
@@ -91,7 +102,7 @@ describe("WorkflowNodeTaskPane", () => {
       <WorkflowNodeTaskPane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="task-2"
+        nodeTaskId="n2"
         pollIntervalMs={4000}
         onBack={onBack}
         onNavigate={() => {}}
@@ -107,14 +118,14 @@ describe("WorkflowNodeTaskPane", () => {
       <WorkflowNodeTaskPane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="task-2"
+        nodeTaskId="n2"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={onNavigate}
       />,
     );
     fireEvent.click(screen.getByTestId("workflow-node-prev"));
-    expect(onNavigate).toHaveBeenCalledWith("task-1");
+    expect(onNavigate).toHaveBeenCalledWith("n1");
   });
 
   it("disables prev at the first node and next at the last node", () => {
@@ -122,7 +133,7 @@ describe("WorkflowNodeTaskPane", () => {
       <WorkflowNodeTaskPane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="task-1"
+        nodeTaskId="n1"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={() => {}}
@@ -133,7 +144,7 @@ describe("WorkflowNodeTaskPane", () => {
       <WorkflowNodeTaskPane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="task-3"
+        nodeTaskId="n3"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={() => {}}

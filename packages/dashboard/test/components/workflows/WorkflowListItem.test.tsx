@@ -12,9 +12,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
-    iterationCount: 2,
     ...overrides,
   };
 }
@@ -119,7 +117,7 @@ describe("WorkflowListItem — meta rendering", () => {
     // Phase depth lives in the detail pane's WorkflowMetaStats. Guarding
     // here prevents a future
     // regression that reintroduces the row-level chip.
-    const { wf } = renderRow({ iterationCount: 7 });
+    const { wf } = renderRow({});
     const row = screen.getByTestId(`workflow-row-${wf.id}`);
     expect(row.textContent).not.toContain("iteration 7");
     expect(row.textContent).not.toContain("iter ");
@@ -313,7 +311,7 @@ describe("WorkflowListItem — amber awaiting pill", () => {
     const onCancel = vi.fn();
     const onDelete = vi.fn();
     const onMenuOpenChange = vi.fn();
-    const wf = makeWorkflow({ status: "running", awaitingHumanCount: 2 });
+    const wf = makeWorkflow({ status: "running" });
     render(
       <ul>
         <WorkflowListItem
@@ -338,7 +336,7 @@ describe("WorkflowListItem — amber awaiting pill", () => {
   });
 
   it("renders standard WorkflowStatusBadge when awaitingHumanCount is 0", () => {
-    const wf = makeWorkflow({ status: "running", awaitingHumanCount: 0 });
+    const wf = makeWorkflow({ status: "running" });
     render(
       <ul>
         <WorkflowListItem
@@ -361,7 +359,7 @@ describe("WorkflowListItem — amber awaiting pill", () => {
   });
 
   it("renders standard badge for non-running status even with awaitingHumanCount > 0", () => {
-    const wf = makeWorkflow({ status: "succeeded", awaitingHumanCount: 1 });
+    const wf = makeWorkflow({ status: "succeeded" });
     render(
       <ul>
         <WorkflowListItem

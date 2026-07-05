@@ -1,13 +1,16 @@
-import { randomUUID } from "node:crypto";
-import path from "node:path";
 import type { RuntimeRegistry } from "@glyphs-ai/runtime";
-import { spawnTerminal } from "@glyphs-ai/terminal";
+import { localSpawner } from "@glyphs-ai/terminal";
 import {
   composeWorkspaceModule,
-  type Workspace,
-  type WorkspaceModuleOptions,
-  type WorkspaceService,
+  type DatabaseUnavailable,
+  type GetWorkspaceResponse,
+  openWorkspaceDb,
+  type WorkspaceId,
+  type WorkspaceModule,
+  type WorkspaceName,
+  type WorkspaceNotFound,
 } from "@glyphs-ai/workspace";
+import { ResultAsync } from "neverthrow";
 import type { Logger } from "pino";
 import {
   type WorkspaceContext,
@@ -23,10 +26,12 @@ import {
  * `Application`; other in-process hosts can do the same without
  * exposing this layer to UI surfaces.
  *
- * Beyond per-workspace context resolution, this surface exposes the
- * canonical cross-BC orchestration methods (`registerWorkspace`,
- * `renameWorkspace`, `unregisterWorkspace`, `reloadWorkspace`) so
- * transport layers (HTTP routes, CLI commands) become thin adapters.
+ * The `workspace` module bundles the eight workspace use-cases as
+ * dependency-injected `<UseCase>.execute(request)` instances;
+ * transports (HTTP routes, CLI, MCP) call them directly. The methods
+ * mounted on `Application` itself are the small cross-cutting subset
+ * that also has to invalidate the per-workspace context cache
+ * (`renameWorkspace`, `unregisterWorkspace`, `reloadWorkspace`).
  *
  * The per-workspace `WorkspaceContextRegistry` is a private
  * implementation detail — consumers reach contexts via
@@ -34,38 +39,25 @@ import {
  * and never touch the registry class directly.
  */
 export interface Application {
-  readonly workspaceService: WorkspaceService;
-
-  /**
-   * Register a workspace. When `workspaceDir` is omitted the application
-   * mints a fresh UUID and uses `<defaultWorkspaceParent>/<uuid>` so the
-   * workspaceId and the directory basename stay coupled.
-   *
-   * Returns the canonical {@link Workspace} after register completes
-   * (so callers don't have to issue a follow-up read for the
-   * server-generated `createdAt`).
-   */
-  registerWorkspace(opts: {
-    readonly name: string;
-    readonly workspaceDir?: string;
-  }): Promise<Workspace>;
+  readonly workspace: WorkspaceModule;
 
   /**
    * Rename a workspace. Invalidates the per-workspace context so the
-   * next request rebuilds with the fresh metadata. Returns the
-   * canonical post-rename {@link Workspace}, or `null` if the workspaceId
-   * is absent (rare; concurrent unregister).
+   * next request rebuilds with the fresh metadata. Returns
+   * `Result.Ok<Workspace | null>` (`null` when the workspaceId is
+   * absent — rare; concurrent unregister) or `Err` over the workspace
+   * domain errors.
    */
   renameWorkspace(
     workspaceId: string,
-    opts: { readonly newName: string },
-  ): Promise<Workspace | null>;
+    input: { readonly name: WorkspaceName },
+  ): ResultAsync<GetWorkspaceResponse, WorkspaceNotFound | DatabaseUnavailable>;
 
   /**
-   * Unregister a workspace. Idempotent (no error if the workspaceId is unknown).
-   * Invalidates the per-workspace context afterwards.
+   * Unregister a workspace. Idempotent (no error if the workspaceId is
+   * unknown). Invalidates the per-workspace context afterwards.
    */
-  unregisterWorkspace(workspaceId: string, opts?: { readonly purge?: boolean }): Promise<void>;
+  unregisterWorkspace(workspaceId: string): ResultAsync<void, DatabaseUnavailable>;
 
   /**
    * Force-rebuild the cached per-workspace container. Throws
@@ -73,7 +65,7 @@ export interface Application {
    * when reload would orphan live task subprocesses; returns `null`
    * when the workspaceId is absent.
    */
-  reloadWorkspace(workspaceId: string): Promise<Workspace | null>;
+  reloadWorkspace(workspaceId: string): Promise<GetWorkspaceResponse>;
 
   /**
    * Resolve the per-workspace {@link WorkspaceContext}, building it on
@@ -104,65 +96,65 @@ export interface Application {
 
 /** Typed opts object for `composeApplication`. */
 export interface ApplicationOpts {
-  readonly workspace: WorkspaceModuleOptions;
+  readonly workspace: {
+    /** libsql URL for the global registry DB (a `file:` URL in production,
+     * `":memory:"` in tests). The caller owns file-path policy. */
+    readonly dbUrl: string;
+    /** Parent directory for auto-created workspace directories. */
+    readonly defaultWorkspaceParent: string;
+    readonly logger?: Logger;
+  };
   readonly runtimeRegistry: RuntimeRegistry;
-  /**
-   * Directory under which `registerWorkspace({ workspaceDir: undefined })`
-   * mints `<defaultWorkspaceParent>/<uuid>/`. Required because the
-   * default-dir policy is part of the registration contract; without a
-   * parent dir the caller MUST supply an explicit `workspaceDir`.
-   */
-  readonly defaultWorkspaceParent: string;
   readonly logger?: Logger;
 }
 
 export async function composeApplication(opts: ApplicationOpts): Promise<Application> {
-  if (!path.isAbsolute(opts.defaultWorkspaceParent)) {
-    throw new Error(
-      `composeApplication: defaultWorkspaceParent must be an absolute path; got ${JSON.stringify(opts.defaultWorkspaceParent)}`,
-    );
+  // The api layer is the assembler: it opens the global registry DB from the
+  // caller-provided url, then hands the bare handle to the workspace module
+  // (which owns schema + use-cases, never file-path policy). This composer
+  // owns the handle's lifecycle via `close()`.
+  const { db, close: closeWorkspaceDb } = await openWorkspaceDb({ url: opts.workspace.dbUrl });
+  let workspace: WorkspaceModule;
+  try {
+    workspace = await composeWorkspaceModule({
+      db,
+      defaultWorkspaceParent: opts.workspace.defaultWorkspaceParent,
+      ...(opts.workspace.logger !== undefined ? { logger: opts.workspace.logger } : {}),
+    });
+  } catch (err) {
+    closeWorkspaceDb();
+    throw err;
   }
-  const workspaceModule = await composeWorkspaceModule(opts.workspace);
   const registry = new WorkspaceContextRegistry({
-    workspaceService: workspaceModule.service,
+    getWorkspace: workspace.getWorkspace,
     runtimeRegistry: opts.runtimeRegistry,
-    spawnFn: spawnTerminal,
+    spawner: localSpawner,
     ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
   });
-  const workspaceService = workspaceModule.service;
-  const defaultWorkspaceParent = opts.defaultWorkspaceParent;
 
   return {
-    workspaceService,
+    workspace,
 
-    async registerWorkspace({ name, workspaceDir }) {
-      const workspaceId = randomUUID();
-      const resolvedWorkspaceDir =
-        workspaceDir === undefined || workspaceDir.trim() === ""
-          ? path.join(defaultWorkspaceParent, workspaceId)
-          : path.resolve(workspaceDir);
-      await workspaceService.register({
-        id: workspaceId,
-        workspaceDir: resolvedWorkspaceDir,
-        name,
-      });
-      const view = await workspaceService.get(workspaceId);
-      if (view === null) {
-        // Should be impossible — we just inserted it. Surface as a fault.
-        throw new Error(`workspace registered but not readable back: ${workspaceId}`);
-      }
-      return view;
+    renameWorkspace(workspaceId, input) {
+      // `workspaceId` is a raw `string` from the URL/CLI; the
+      // use-case re-parses through `WorkspaceIdSchema` on entry, so
+      // the brand cast is just to thread it through the typed
+      // signature. Same applies below.
+      const id = workspaceId as WorkspaceId;
+      return workspace.renameWorkspace
+        .execute({ id, name: input.name })
+        .andThen(() =>
+          ResultAsync.fromSafePromise(registry.invalidate(workspaceId)).andThen(() =>
+            workspace.getWorkspace.execute({ id }),
+          ),
+        );
     },
 
-    async renameWorkspace(workspaceId, { newName }) {
-      await workspaceService.rename(workspaceId, { newName });
-      await registry.invalidate(workspaceId);
-      return workspaceService.get(workspaceId);
-    },
-
-    async unregisterWorkspace(workspaceId, opts = {}) {
-      await workspaceService.unregister(workspaceId, opts);
-      await registry.invalidate(workspaceId);
+    unregisterWorkspace(workspaceId) {
+      const id = workspaceId as WorkspaceId;
+      return workspace.unregisterWorkspace
+        .execute({ id })
+        .andThen(() => ResultAsync.fromSafePromise(registry.invalidate(workspaceId)));
     },
 
     async reloadWorkspace(workspaceId) {
@@ -201,7 +193,7 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
       // resource ownership (the composer composes -> the composer
       // disposes, top-down).
       await registry.closeAll();
-      await workspaceModule.close();
+      closeWorkspaceDb();
     },
   };
 }

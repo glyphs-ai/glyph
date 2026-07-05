@@ -15,8 +15,8 @@
  */
 
 import { resolveGlyphHome } from "@glyphs-ai/server";
-import { ApiClient } from "./api-client.js";
 import { readRuntimeFile } from "./runtime-file.js";
+import { configureClient, type SdkClient } from "./sdk-client.js";
 
 export interface ConnectFlags {
   /** Override `GLYPH_SERVER`. Trailing slash stripped by the client. */
@@ -64,13 +64,17 @@ export async function resolveConnection(flags: ConnectFlags = {}): Promise<Conne
 }
 
 /**
- * Build a typed {@link ApiClient} for a CLI command. Wraps
- * {@link resolveConnection} and the constructor in one call so each
- * command stays one line.
+ * Configure the shared `@glyphs-ai/sdk` client for a CLI command and return a
+ * {@link SdkClient} handle. Wraps {@link resolveConnection} and
+ * {@link configureClient} so each command stays one line.
+ *
+ * The generated typed SDK operations use the configured shared singleton
+ * directly. The handle's `baseUrl` backs the raw SSE stream in
+ * `commands/task.ts`.
  */
-export async function makeClient(flags: ConnectFlags = {}): Promise<ApiClient> {
+export async function makeSdkClient(flags: ConnectFlags = {}): Promise<SdkClient> {
   const conn = await resolveConnection(flags);
-  return new ApiClient({ baseUrl: conn.baseUrl });
+  return configureClient(conn.baseUrl);
 }
 
 export interface WorkspaceFlags extends ConnectFlags {

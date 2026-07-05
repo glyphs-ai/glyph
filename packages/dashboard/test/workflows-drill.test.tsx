@@ -1,8 +1,8 @@
-import type { AgentEntry } from "@glyphs-ai/contracts";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowHeader } from "../src/api";
+import type { AgentEntry } from "../src/api/catalog.js";
 
 /**
  * Layer A (drill router) lock-in for the Workflows page. Verifies that
@@ -58,9 +58,7 @@ function makeWorkflow(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
     origin: "standalone",
     coordinatorAgent: "official/engineer",
     metadata: {},
-    awaitingHumanCount: 0,
     createdAt: "2026-05-28T00:00:00.000Z",
-    iterationCount: 0,
     ...overrides,
   };
 }
