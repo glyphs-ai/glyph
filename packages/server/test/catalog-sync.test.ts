@@ -1,9 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Application, Skill } from "@glyphs-ai/api";
+import type { Application } from "@glyphs-ai/api";
 import { catalogRoutes } from "@glyphs-ai/api";
-import type { CatalogModule } from "@glyphs-ai/catalog";
+import type { CatalogModule, GetSkillResponse } from "@glyphs-ai/catalog";
 import type { WorkspaceModule, WorkspaceName } from "@glyphs-ai/workspace";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -151,7 +151,7 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
 
     // Before ack: prereqsAck=false, status=blocked (needsPrereqsAck).
     const before = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool`);
-    const beforeBody = (await before.json()) as { skill: Skill; status: string };
+    const beforeBody = (await before.json()) as { skill: GetSkillResponse; status: string };
     expect(beforeBody.skill.prereqsAck).toBe(false);
     expect(beforeBody.status).toBe("blocked");
     expect(beforeBody.skill.orphaned).toBe(false);
@@ -163,7 +163,7 @@ describe("server: catalog sync + acknowledge + enable/disable routes", () => {
     expect(ack.status).toBe(200);
 
     const after = await app.request(`/api/workspaces/${ws.id}/catalog/skills/public/tool`);
-    const afterBody = (await after.json()) as { skill: Skill; status: string };
+    const afterBody = (await after.json()) as { skill: GetSkillResponse; status: string };
     expect(afterBody.skill.prereqsAck).toBe(true);
     expect(afterBody.status).toBe("ready");
   });
