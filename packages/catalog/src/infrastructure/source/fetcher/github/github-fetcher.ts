@@ -78,6 +78,37 @@ export class GitHubFetcher implements Fetcher {
     );
   }
 
+  fetchFile(
+    origin: string,
+    relPath: string,
+  ): ResultAsync<Buffer, OriginInvalid | SourceUnavailable> {
+    return parseGitHub(origin).asyncAndThen((parsed) =>
+      ResultAsync.fromPromise<Buffer, SourceUnavailable>(
+        this.fetchSingleFile(parsed, relPath),
+        (cause) => ({ type: "SourceUnavailable", origin, cause }),
+      ),
+    );
+  }
+
+  /** Single-file download via the GitHub Contents API (returns base64). */
+  private async fetchSingleFile(parsed: GitHubOrigin, relPath: string): Promise<Buffer> {
+    const { owner, repo, ref, path: subPath } = parsed;
+    const fullPath = subPath ? `${subPath}/${relPath}` : relPath;
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(fullPath)}?ref=${encodeURIComponent(ref)}`;
+    const response = await fetch(url, {
+      headers: await this.headers("application/vnd.github+json"),
+      redirect: "follow",
+    });
+    if (!response.ok) {
+      throw new Error(`GitHub Contents API returned ${response.status} for ${fullPath}`);
+    }
+    const json = (await response.json()) as { content?: string; encoding?: string };
+    if (json.encoding !== "base64" || typeof json.content !== "string") {
+      throw new Error(`unexpected Contents API response for ${fullPath}`);
+    }
+    return Buffer.from(json.content.replace(/\n/g, ""), "base64");
+  }
+
   private async slurp(parsed: GitHubOrigin): Promise<ReadonlyMap<string, Buffer>> {
     const files = new Map<string, Buffer>();
     for await (const file of this.stream(parsed)) files.set(file.relPath, file.content);

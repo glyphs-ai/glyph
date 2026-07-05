@@ -20,8 +20,18 @@ import type { FetcherRegistry } from "./fetcher/registry.js";
 export class JsonMcpSource implements Source<McpManifest> {
   constructor(private readonly fetcher: FetcherRegistry) {}
 
-  load(origin: string): ResultAsync<McpManifest, SourceError> {
+  resolve(origin: string): ResultAsync<McpManifest, SourceError> {
     return this.fetcher.fetchEntry(origin).andThen((files) => this.parseManifest(origin, files));
+  }
+
+  fetch(
+    origin: string,
+  ): ResultAsync<{ manifest: McpManifest; files: ReadonlyMap<string, Buffer> }, SourceError> {
+    return this.fetcher
+      .fetchEntry(origin)
+      .andThen((files) =>
+        this.parseManifest(origin, files).map((manifest) => ({ manifest, files })),
+      );
   }
 
   private parseManifest(

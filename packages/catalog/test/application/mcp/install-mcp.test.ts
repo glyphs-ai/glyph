@@ -34,7 +34,7 @@ let useCase: InstallMcpUseCase;
 beforeEach(() => {
   mcpSource = mock<Source<McpManifest>>();
   mcpRepo = mock<McpRepository>();
-  mcpSource.load.mockReturnValue(okAsync(manifest()));
+  mcpSource.resolve.mockReturnValue(okAsync(manifest()));
   mcpRepo.get.mockReturnValue(errAsync({ type: "McpNotFound", fqn: MCP_ID }));
   mcpRepo.save.mockReturnValue(okAsync(undefined));
   useCase = new InstallMcpUseCase({ mcpSource, mcpRepo });
@@ -44,7 +44,7 @@ describe("InstallMcpUseCase — happy path", () => {
   it("loads a fresh MCP manifest, saves it, and returns the DTO", async () => {
     const dto = (await useCase.execute({ origin: ORIGIN }))._unsafeUnwrap();
     expect(dto).toEqual({ id: MCP_ID, origin: ORIGIN });
-    expect(mcpSource.load).toHaveBeenCalledWith(ORIGIN);
+    expect(mcpSource.resolve).toHaveBeenCalledWith(ORIGIN);
     expect(mcpRepo.get).toHaveBeenCalledWith(MCP_ID);
     expect(mcpRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -67,7 +67,7 @@ describe("InstallMcpUseCase — happy path", () => {
 
 describe("InstallMcpUseCase — error channel", () => {
   it("SourceError propagated from mcpSource.load", async () => {
-    mcpSource.load.mockReturnValue(
+    mcpSource.resolve.mockReturnValue(
       errAsync({ type: "SourceUnavailable", origin: ORIGIN, cause: new Error("offline") }),
     );
     const res = await useCase.execute({ origin: ORIGIN });

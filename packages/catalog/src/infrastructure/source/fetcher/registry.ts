@@ -11,7 +11,7 @@
  * `Source<T>` ports.
  */
 
-import { errAsync, type ResultAsync } from "neverthrow";
+import { errAsync, okAsync, type ResultAsync } from "neverthrow";
 import type { OriginInvalid, SourceUnavailable } from "../../../domain/source.js";
 import { AzureDevOpsFetcher } from "./ado/azure-devops-fetcher.js";
 import type { Fetcher } from "./fetcher.js";
@@ -29,18 +29,33 @@ export class FetcherRegistry {
     origin: string,
   ): ResultAsync<ReadonlyMap<string, Buffer>, OriginInvalid | SourceUnavailable> {
     const leaf = this.fetchers.find((x) => x.matches(origin));
-    if (!leaf) {
-      return errAsync<ReadonlyMap<string, Buffer>, OriginInvalid>({
-        type: "OriginInvalid",
-        origin,
-        reason:
-          "unsupported scheme; supported origins are " +
-          "https://github.com/<owner>/<repo>/tree/<ref>[/path], " +
-          "https://dev.azure.com/<org>/<project>/_git/<repo>?path=/..., " +
-          "and file:<absolutePath>",
-      });
-    }
+    if (!leaf) return errAsync(this.unsupported(origin));
     return leaf.fetch(origin);
+  }
+
+  /**
+   * Fetch only the anchor file from an origin via the leaf's single-file API.
+   * Much faster than fetchEntry for resolve (avoids downloading the full tree).
+   */
+  fetchAnchor(
+    origin: string,
+    anchorName: string,
+  ): ResultAsync<Buffer, OriginInvalid | SourceUnavailable> {
+    const leaf = this.fetchers.find((x) => x.matches(origin));
+    if (!leaf) return errAsync(this.unsupported(origin));
+    return leaf.fetchFile(origin, anchorName);
+  }
+
+  private unsupported(origin: string): OriginInvalid {
+    return {
+      type: "OriginInvalid",
+      origin,
+      reason:
+        "unsupported scheme; supported origins are " +
+        "https://github.com/<owner>/<repo>/tree/<ref>[/path], " +
+        "https://dev.azure.com/<org>/<project>/_git/<repo>?path=/..., " +
+        "and file:<absolutePath>",
+    };
   }
 }
 

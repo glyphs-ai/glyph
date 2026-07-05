@@ -56,8 +56,10 @@ export class InstallAgentUseCase
 
   execute(request: InstallAgentRequest): UseCaseResult<InstallAgentResponse, InstallAgentError> {
     return this.deps.agentSource
-      .load(request.origin)
-      .andThen((manifest) => this.buildEntity(manifest, request.origin, request.dependencyRefs))
+      .fetch(request.origin)
+      .andThen(({ manifest, files }) =>
+        this.buildEntity(manifest, files, request.origin, request.dependencyRefs),
+      )
       .andThen(({ agent, files }) => this.deps.agentRepo.save(agent, files).map(() => agent))
       .map((agent) => ({
         id: agent.id,
@@ -76,6 +78,7 @@ export class InstallAgentUseCase
 
   private buildEntity(
     manifest: AgentManifest,
+    files: ReadonlyMap<string, Buffer>,
     origin: string,
     dependencyRefs: AgentDependencyRefs,
   ): ResultAsync<Built, AgentOriginConflict | DatabaseUnavailable> {
@@ -93,7 +96,7 @@ export class InstallAgentUseCase
       });
       if (carriedAck) agent.acknowledgePrereqs();
       if (carriedDisabled) agent.disable();
-      return { agent, files: manifest.files };
+      return { agent, files };
     };
     return this.deps.agentRepo
       .get(fqn)

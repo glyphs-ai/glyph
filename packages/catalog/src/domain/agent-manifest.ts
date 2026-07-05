@@ -48,19 +48,14 @@ export class AgentManifest {
     readonly version: string,
     readonly prereqs: string | undefined,
     readonly dependencyRefs: AgentDependencyRefs,
-    readonly files: ReadonlyMap<string, Buffer>,
   ) {}
 
   /**
-   * Build a manifest from already-parsed frontmatter plus the file tree.
-   *
-   * Validates metadata, keeps declared `scope` and `name`, and stores
-   * dependency origins for install-time resolution.
+   * Build a manifest from already-parsed frontmatter. Validates metadata,
+   * keeps declared `scope` and `name`, and stores dependency origins for
+   * install-time resolution. Files are a separate concern.
    */
-  static create(
-    frontmatter: unknown,
-    files: ReadonlyMap<string, Buffer>,
-  ): Result<AgentManifest, AgentManifestInvalid> {
+  static create(frontmatter: unknown): Result<AgentManifest, AgentManifestInvalid> {
     const meta = FrontmatterSchema.safeParse(frontmatter);
     if (!meta.success) {
       return err({ type: "AgentManifestInvalid", reason: `frontmatter: ${meta.error.message}` });
@@ -77,7 +72,6 @@ export class AgentManifest {
           mcps: meta.data.dependencies.mcps ?? [],
           agents: meta.data.dependencies.agents ?? [],
         },
-        files,
       ),
     );
   }

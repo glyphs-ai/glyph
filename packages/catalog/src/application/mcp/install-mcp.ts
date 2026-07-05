@@ -60,7 +60,7 @@ export class InstallMcpUseCase
 
   execute(request: InstallMcpRequest): UseCaseResult<InstallMcpResponse, InstallMcpError> {
     return this.deps.mcpSource
-      .load(request.origin)
+      .resolve(request.origin)
       .andThen((manifest) => this.guardOrigin(manifest, request.origin))
       .map((manifest) =>
         McpEntity.create({

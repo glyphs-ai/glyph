@@ -4,10 +4,6 @@ import type { OriginInvalid, SourceUnavailable } from "../../../src/domain/sourc
 import type { FetcherRegistry } from "../../../src/infrastructure/source/fetcher/registry.js";
 import { MarkdownSkillSource } from "../../../src/infrastructure/source/markdown-skill-source.js";
 
-/**
- * The fetcher is stubbed so `MarkdownSkillSource` tests do not touch the
- * filesystem or network.
- */
 const ANCHOR = "SKILL.md";
 const ORIGIN = "file:/catalog/skills/bar";
 
@@ -23,44 +19,53 @@ body text
 `;
 
 function fetcherOf(files: ReadonlyMap<string, Buffer>): FetcherRegistry {
-  return { fetchEntry: () => okAsync(files) } as unknown as FetcherRegistry;
+  return {
+    fetchEntry: () => okAsync(files),
+    fetchAnchor: (_origin: string, anchorName: string) => {
+      const buf = files.get(anchorName);
+      return buf
+        ? okAsync(buf)
+        : errAsync({ type: "SourceUnavailable", origin: ORIGIN, cause: new Error("not found") });
+    },
+  } as unknown as FetcherRegistry;
 }
 
 function fetcherFailing(e: OriginInvalid | SourceUnavailable): FetcherRegistry {
   return {
     fetchEntry: () => errAsync(e) as ResultAsync<ReadonlyMap<string, Buffer>, typeof e>,
+    fetchAnchor: () => errAsync(e) as ResultAsync<Buffer, typeof e>,
   } as unknown as FetcherRegistry;
 }
 
-describe("MarkdownSkillSource", () => {
-  it("builds a manifest from anchor frontmatter + files", async () => {
+describe("MarkdownSkillSource.fetch", () => {
+  it("returns {manifest, files} from anchor frontmatter + full tree", async () => {
     const files = new Map([[ANCHOR, Buffer.from(VALID)]]);
-    const res = await new MarkdownSkillSource(fetcherOf(files)).load(ORIGIN);
+    const res = await new MarkdownSkillSource(fetcherOf(files)).fetch(ORIGIN);
     expect(res.isOk()).toBe(true);
-    const m = res._unsafeUnwrap();
-    expect(m.name).toBe("bar");
-    expect(m.scope).toBe("public");
-    expect(m.version).toBe("2.0.0");
-    expect(m.dependencyRefs.mcps).toEqual(["file:/catalog/mcps/baz"]);
-    expect(m.files.get(ANCHOR)).toBeDefined();
+    const { manifest, files: returnedFiles } = res._unsafeUnwrap();
+    expect(manifest.name).toBe("bar");
+    expect(manifest.scope).toBe("public");
+    expect(manifest.version).toBe("2.0.0");
+    expect(manifest.dependencyRefs.mcps).toEqual(["file:/catalog/mcps/baz"]);
+    expect(returnedFiles.get(ANCHOR)).toBeDefined();
   });
 
   it("ManifestInvalid when anchor missing", async () => {
-    const res = await new MarkdownSkillSource(fetcherOf(new Map())).load(ORIGIN);
+    const res = await new MarkdownSkillSource(fetcherOf(new Map())).fetch(ORIGIN);
     expect(res.isErr()).toBe(true);
     expect(res._unsafeUnwrapErr().type).toBe("ManifestInvalid");
   });
 
   it("ManifestInvalid when frontmatter fails manifest compliance", async () => {
     const files = new Map([[ANCHOR, Buffer.from("no frontmatter here")]]);
-    const res = await new MarkdownSkillSource(fetcherOf(files)).load(ORIGIN);
+    const res = await new MarkdownSkillSource(fetcherOf(files)).fetch(ORIGIN);
     expect(res.isErr()).toBe(true);
     expect(res._unsafeUnwrapErr().type).toBe("ManifestInvalid");
   });
 
   it("ManifestInvalid when frontmatter YAML is malformed", async () => {
     const files = new Map([[ANCHOR, Buffer.from("---\nname: [unclosed\n---\nbody\n")]]);
-    const res = await new MarkdownSkillSource(fetcherOf(files)).load(ORIGIN);
+    const res = await new MarkdownSkillSource(fetcherOf(files)).fetch(ORIGIN);
     expect(res.isErr()).toBe(true);
     expect(res._unsafeUnwrapErr().type).toBe("ManifestInvalid");
   });
@@ -68,11 +73,35 @@ describe("MarkdownSkillSource", () => {
   it("propagates fetcher OriginInvalid / SourceUnavailable verbatim", async () => {
     const oi = await new MarkdownSkillSource(
       fetcherFailing({ type: "OriginInvalid", origin: ORIGIN, reason: "bad" }),
-    ).load(ORIGIN);
+    ).fetch(ORIGIN);
     expect(oi._unsafeUnwrapErr().type).toBe("OriginInvalid");
     const su = await new MarkdownSkillSource(
       fetcherFailing({ type: "SourceUnavailable", origin: ORIGIN, cause: new Error("net") }),
-    ).load(ORIGIN);
+    ).fetch(ORIGIN);
     expect(su._unsafeUnwrapErr().type).toBe("SourceUnavailable");
+  });
+});
+
+describe("MarkdownSkillSource.resolve", () => {
+  it("returns manifest from anchor-only fetch (no full tree)", async () => {
+    const files = new Map([[ANCHOR, Buffer.from(VALID)]]);
+    const res = await new MarkdownSkillSource(fetcherOf(files)).resolve(ORIGIN);
+    expect(res.isOk()).toBe(true);
+    const manifest = res._unsafeUnwrap();
+    expect(manifest.name).toBe("bar");
+    expect(manifest.version).toBe("2.0.0");
+  });
+
+  it("ManifestInvalid when anchor parse fails via resolve", async () => {
+    const files = new Map([[ANCHOR, Buffer.from("no frontmatter")]]);
+    const res = await new MarkdownSkillSource(fetcherOf(files)).resolve(ORIGIN);
+    expect(res.isErr()).toBe(true);
+    expect(res._unsafeUnwrapErr().type).toBe("ManifestInvalid");
+  });
+
+  it("propagates SourceUnavailable when anchor not available", async () => {
+    const res = await new MarkdownSkillSource(fetcherOf(new Map())).resolve(ORIGIN);
+    expect(res.isErr()).toBe(true);
+    expect(res._unsafeUnwrapErr().type).toBe("SourceUnavailable");
   });
 });

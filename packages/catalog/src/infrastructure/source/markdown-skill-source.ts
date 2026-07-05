@@ -22,18 +22,29 @@ const ANCHOR = "SKILL.md";
 export class MarkdownSkillSource implements Source<SkillManifest> {
   constructor(private readonly fetcher: FetcherRegistry) {}
 
-  load(origin: string): ResultAsync<SkillManifest, SourceError> {
-    return this.fetcher.fetchEntry(origin).andThen((files) => this.parseManifest(origin, files));
+  resolve(origin: string): ResultAsync<SkillManifest, SourceError> {
+    return this.fetcher
+      .fetchAnchor(origin, ANCHOR)
+      .andThen((buf) => this.parseManifest(origin, buf));
   }
 
-  private parseManifest(
+  fetch(
     origin: string,
-    files: ReadonlyMap<string, Buffer>,
-  ): Result<SkillManifest, ManifestInvalid> {
-    const anchor = files.get(ANCHOR);
-    if (anchor === undefined) {
-      return err({ type: "ManifestInvalid", origin, reason: `missing anchor file ${ANCHOR}` });
-    }
+  ): ResultAsync<{ manifest: SkillManifest; files: ReadonlyMap<string, Buffer> }, SourceError> {
+    return this.fetcher.fetchEntry(origin).andThen((files) => {
+      const anchor = files.get(ANCHOR);
+      if (anchor === undefined) {
+        return err<never, ManifestInvalid>({
+          type: "ManifestInvalid",
+          origin,
+          reason: `missing anchor file ${ANCHOR}`,
+        });
+      }
+      return this.parseManifest(origin, anchor).map((manifest) => ({ manifest, files }));
+    });
+  }
+
+  private parseManifest(origin: string, anchor: Buffer): Result<SkillManifest, ManifestInvalid> {
     let parsed: ReturnType<typeof grayMatter>;
     try {
       parsed = grayMatter(anchor.toString("utf8"));
@@ -44,7 +55,7 @@ export class MarkdownSkillSource implements Source<SkillManifest> {
         reason: `failed to parse ${ANCHOR} frontmatter: ${cause instanceof Error ? cause.message : String(cause)}`,
       });
     }
-    return SkillManifest.create(parsed.data, files).mapErr((e) => ({
+    return SkillManifest.create(parsed.data).mapErr((e) => ({
       type: "ManifestInvalid",
       origin,
       reason: e.reason,

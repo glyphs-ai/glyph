@@ -20,11 +20,11 @@ function fetcherFailing(e: OriginInvalid | SourceUnavailable): FetcherRegistry {
   } as unknown as FetcherRegistry;
 }
 
-describe("JsonMcpSource", () => {
+describe("JsonMcpSource.resolve", () => {
   it("builds a manifest from the sole JSON file, keeping spec verbatim", async () => {
     const spec = '{"_meta":{"name":"azure/mcp"},"command":"npx"}';
     const files = new Map([["azure.json", Buffer.from(spec)]]);
-    const res = await new JsonMcpSource(fetcherOf(files)).load(ORIGIN);
+    const res = await new JsonMcpSource(fetcherOf(files)).resolve(ORIGIN);
     expect(res.isOk()).toBe(true);
     const m = res._unsafeUnwrap();
     expect(m.name).toBe("azure/mcp");
@@ -32,21 +32,21 @@ describe("JsonMcpSource", () => {
   });
 
   it("ManifestInvalid when the origin yields no file", async () => {
-    const res = await new JsonMcpSource(fetcherOf(new Map())).load(ORIGIN);
+    const res = await new JsonMcpSource(fetcherOf(new Map())).resolve(ORIGIN);
     expect(res.isErr()).toBe(true);
     expect(res._unsafeUnwrapErr().type).toBe("ManifestInvalid");
   });
 
   it("ManifestInvalid on malformed JSON", async () => {
     const files = new Map([["azure.json", Buffer.from("{not json")]]);
-    const res = await new JsonMcpSource(fetcherOf(files)).load(ORIGIN);
+    const res = await new JsonMcpSource(fetcherOf(files)).resolve(ORIGIN);
     expect(res.isErr()).toBe(true);
     expect(res._unsafeUnwrapErr().type).toBe("ManifestInvalid");
   });
 
   it("ManifestInvalid when _meta.name violates the fqn grammar", async () => {
     const files = new Map([["azure.json", Buffer.from('{"_meta":{"name":"no-slash"}}')]]);
-    const res = await new JsonMcpSource(fetcherOf(files)).load(ORIGIN);
+    const res = await new JsonMcpSource(fetcherOf(files)).resolve(ORIGIN);
     expect(res.isErr()).toBe(true);
     expect(res._unsafeUnwrapErr().type).toBe("ManifestInvalid");
   });
@@ -54,11 +54,23 @@ describe("JsonMcpSource", () => {
   it("propagates fetcher OriginInvalid / SourceUnavailable verbatim", async () => {
     const oi = await new JsonMcpSource(
       fetcherFailing({ type: "OriginInvalid", origin: ORIGIN, reason: "bad" }),
-    ).load(ORIGIN);
+    ).resolve(ORIGIN);
     expect(oi._unsafeUnwrapErr().type).toBe("OriginInvalid");
     const su = await new JsonMcpSource(
       fetcherFailing({ type: "SourceUnavailable", origin: ORIGIN, cause: new Error("net") }),
-    ).load(ORIGIN);
+    ).resolve(ORIGIN);
     expect(su._unsafeUnwrapErr().type).toBe("SourceUnavailable");
+  });
+});
+
+describe("JsonMcpSource.fetch", () => {
+  it("returns {manifest, files} with the same file tree", async () => {
+    const spec = '{"_meta":{"name":"azure/mcp"},"command":"npx"}';
+    const files = new Map([["azure.json", Buffer.from(spec)]]);
+    const res = await new JsonMcpSource(fetcherOf(files)).fetch(ORIGIN);
+    expect(res.isOk()).toBe(true);
+    const { manifest, files: returnedFiles } = res._unsafeUnwrap();
+    expect(manifest.name).toBe("azure/mcp");
+    expect(returnedFiles).toBe(files);
   });
 });

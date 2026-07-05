@@ -385,4 +385,18 @@ describe("ResolvePlanUseCase — orchestration", () => {
 
     expect(plan.orphans).toEqual([]);
   });
+
+  it("short-circuits with rootAlreadyInstalled when install-path origin is already installed", async () => {
+    await saveSkill(skillEntity("public/root", "file:/skill/root"));
+
+    const plan = (
+      await useCase.execute({ kind: "skill", origin: "file:/skill/root" })
+    )._unsafeUnwrap();
+
+    expect(plan.rootAlreadyInstalled).toBe(true);
+    expect(plan.upToDate).toBe(true);
+    expect(plan.toInstall).toEqual([]);
+    expect(plan.alreadyInstalled).toEqual([]);
+    expect(getUpstreamTreeExecute).not.toHaveBeenCalled();
+  });
 });

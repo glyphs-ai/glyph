@@ -65,6 +65,18 @@ export class FileFetcher implements Fetcher {
       ),
     );
   }
+
+  fetchFile(
+    origin: string,
+    relPath: string,
+  ): ResultAsync<Buffer, OriginInvalid | SourceUnavailable> {
+    return parseFile(origin).asyncAndThen((src) =>
+      ResultAsync.fromPromise<Buffer, SourceUnavailable>(
+        readFile(path.join(src, relPath)),
+        (cause) => ({ type: "SourceUnavailable", origin, cause }),
+      ),
+    );
+  }
 }
 
 async function slurp(src: string): Promise<ReadonlyMap<string, Buffer>> {

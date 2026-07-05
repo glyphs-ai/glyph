@@ -51,6 +51,10 @@ const PlanNodeSchema = z.object({
   deps: z.array(z.string()),
   /** Dep origins by kind; apply resolves these to installed fqns before persisting. */
   dependencyRefs: DependencyRefsSchema,
+  /** Manifest version (skill/agent semver; "" for mcp). Carried from resolve so apply skips re-fetch. */
+  version: z.string(),
+  /** Manifest content (mcp spec; "" for skill/agent). Carried from resolve so apply skips re-fetch. */
+  content: z.string(),
 });
 export type PlanNode = z.infer<typeof PlanNodeSchema>;
 
@@ -123,6 +127,8 @@ function planNode(n: ResolvedNode, disposition: PlanNode["disposition"], was: bo
     wasAlreadyInstalled: was,
     deps: [...n.dependencyRefs.skills, ...n.dependencyRefs.mcps, ...n.dependencyRefs.agents],
     dependencyRefs: n.dependencyRefs,
+    version: n.version,
+    content: n.content,
   };
 }
 

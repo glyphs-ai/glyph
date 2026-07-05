@@ -51,8 +51,10 @@ export class InstallSkillUseCase
 
   execute(request: InstallSkillRequest): UseCaseResult<InstallSkillResponse, InstallSkillError> {
     return this.deps.skillSource
-      .load(request.origin)
-      .andThen((manifest) => this.buildEntity(manifest, request.origin, request.dependencyRefs))
+      .fetch(request.origin)
+      .andThen(({ manifest, files }) =>
+        this.buildEntity(manifest, files, request.origin, request.dependencyRefs),
+      )
       .andThen(({ skill, files }) => this.deps.skillRepo.save(skill, files).map(() => skill))
       .map((skill) => ({
         id: skill.id,
@@ -66,6 +68,7 @@ export class InstallSkillUseCase
 
   private buildEntity(
     manifest: SkillManifest,
+    files: ReadonlyMap<string, Buffer>,
     origin: string,
     dependencyRefs: SkillDependencyRefs,
   ): ResultAsync<Built, SkillOriginConflict | DatabaseUnavailable> {
@@ -82,7 +85,7 @@ export class InstallSkillUseCase
         now: new Date().toISOString(),
       });
       if (carriedAck) skill.acknowledgePrereqs();
-      return { skill, files: manifest.files };
+      return { skill, files };
     };
     return this.deps.skillRepo
       .get(fqn)

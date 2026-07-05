@@ -110,6 +110,22 @@ export class AzureDevOpsFetcher implements Fetcher {
     );
   }
 
+  fetchFile(
+    origin: string,
+    relPath: string,
+  ): ResultAsync<Buffer, OriginInvalid | SourceUnavailable> {
+    return parseAdo(origin).asyncAndThen((parsed) =>
+      ResultAsync.fromPromise<Buffer, SourceUnavailable>(
+        (async () => {
+          const cred = await resolveDefaultAdoToken(parsed.org, parsed.repo);
+          const fullPath = parsed.path.replace(/\/+$/, "") + "/" + relPath;
+          return this.fetchItemRaw(parsed.org, parsed.project, parsed.repo, fullPath, cred);
+        })(),
+        (cause) => ({ type: "SourceUnavailable", origin, cause }),
+      ),
+    );
+  }
+
   private async slurp(parsed: AdoOrigin): Promise<ReadonlyMap<string, Buffer>> {
     const files = new Map<string, Buffer>();
     for await (const file of this.stream(parsed)) files.set(file.relPath, file.content);

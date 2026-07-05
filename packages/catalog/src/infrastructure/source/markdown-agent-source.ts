@@ -22,18 +22,29 @@ const ANCHOR = "AGENTS.md";
 export class MarkdownAgentSource implements Source<AgentManifest> {
   constructor(private readonly fetcher: FetcherRegistry) {}
 
-  load(origin: string): ResultAsync<AgentManifest, SourceError> {
-    return this.fetcher.fetchEntry(origin).andThen((files) => this.parseManifest(origin, files));
+  resolve(origin: string): ResultAsync<AgentManifest, SourceError> {
+    return this.fetcher
+      .fetchAnchor(origin, ANCHOR)
+      .andThen((buf) => this.parseManifest(origin, buf));
   }
 
-  private parseManifest(
+  fetch(
     origin: string,
-    files: ReadonlyMap<string, Buffer>,
-  ): Result<AgentManifest, ManifestInvalid> {
-    const anchor = files.get(ANCHOR);
-    if (anchor === undefined) {
-      return err({ type: "ManifestInvalid", origin, reason: `missing anchor file ${ANCHOR}` });
-    }
+  ): ResultAsync<{ manifest: AgentManifest; files: ReadonlyMap<string, Buffer> }, SourceError> {
+    return this.fetcher.fetchEntry(origin).andThen((files) => {
+      const anchor = files.get(ANCHOR);
+      if (anchor === undefined) {
+        return err<never, ManifestInvalid>({
+          type: "ManifestInvalid",
+          origin,
+          reason: `missing anchor file ${ANCHOR}`,
+        });
+      }
+      return this.parseManifest(origin, anchor).map((manifest) => ({ manifest, files }));
+    });
+  }
+
+  private parseManifest(origin: string, anchor: Buffer): Result<AgentManifest, ManifestInvalid> {
     let parsed: ReturnType<typeof grayMatter>;
     try {
       parsed = grayMatter(anchor.toString("utf8"));
@@ -44,7 +55,7 @@ export class MarkdownAgentSource implements Source<AgentManifest> {
         reason: `failed to parse ${ANCHOR} frontmatter: ${cause instanceof Error ? cause.message : String(cause)}`,
       });
     }
-    return AgentManifest.create(parsed.data, files).mapErr((e) => ({
+    return AgentManifest.create(parsed.data).mapErr((e) => ({
       type: "ManifestInvalid",
       origin,
       reason: e.reason,

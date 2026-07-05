@@ -10,42 +10,34 @@ import type { SkillName, SkillScope } from "../../../src/domain/skill-fqn.js";
 import { SkillManifest } from "../../../src/domain/skill-manifest.js";
 import type { Source } from "../../../src/domain/source.js";
 
-const FILES = new Map([["README.md", Buffer.from("fixture")]]);
-
 function skillManifest(
   name: string,
   opts: { version?: string; skills?: string[]; mcps?: string[] } = {},
 ): SkillManifest {
-  return SkillManifest.create(
-    {
-      name: name as SkillName,
-      scope: "public" as SkillScope,
-      description: `${name} skill`,
-      version: opts.version ?? "1.0.0",
-      dependencies: { skills: opts.skills ?? [], mcps: opts.mcps ?? [] },
-    },
-    FILES,
-  )._unsafeUnwrap();
+  return SkillManifest.create({
+    name: name as SkillName,
+    scope: "public" as SkillScope,
+    description: `${name} skill`,
+    version: opts.version ?? "1.0.0",
+    dependencies: { skills: opts.skills ?? [], mcps: opts.mcps ?? [] },
+  })._unsafeUnwrap();
 }
 
 function agentManifest(
   name: string,
   opts: { version?: string; skills?: string[]; mcps?: string[]; agents?: string[] } = {},
 ): AgentManifest {
-  return AgentManifest.create(
-    {
-      name: name as AgentName,
-      scope: "public" as AgentScope,
-      description: `${name} agent`,
-      version: opts.version ?? "1.0.0",
-      dependencies: {
-        skills: opts.skills ?? [],
-        mcps: opts.mcps ?? [],
-        agents: opts.agents ?? [],
-      },
+  return AgentManifest.create({
+    name: name as AgentName,
+    scope: "public" as AgentScope,
+    description: `${name} agent`,
+    version: opts.version ?? "1.0.0",
+    dependencies: {
+      skills: opts.skills ?? [],
+      mcps: opts.mcps ?? [],
+      agents: opts.agents ?? [],
     },
-    FILES,
-  )._unsafeUnwrap();
+  })._unsafeUnwrap();
 }
 
 function mcpManifest(name: string, spec = JSON.stringify({ _meta: { name } })): McpManifest {
@@ -61,13 +53,13 @@ beforeEach(() => {
   skillSource = mock<Source<SkillManifest>>();
   agentSource = mock<Source<AgentManifest>>();
   mcpSource = mock<Source<McpManifest>>();
-  skillSource.load.mockImplementation((origin) =>
+  skillSource.resolve.mockImplementation((origin) =>
     errAsync({ type: "SourceUnavailable", origin, cause: new Error("missing") }),
   );
-  agentSource.load.mockImplementation((origin) =>
+  agentSource.resolve.mockImplementation((origin) =>
     errAsync({ type: "SourceUnavailable", origin, cause: new Error("missing") }),
   );
-  mcpSource.load.mockImplementation((origin) =>
+  mcpSource.resolve.mockImplementation((origin) =>
     errAsync({ type: "SourceUnavailable", origin, cause: new Error("missing") }),
   );
   useCase = new GetUpstreamTreeUseCase({ skill: skillSource, agent: agentSource, mcp: mcpSource });
@@ -75,7 +67,7 @@ beforeEach(() => {
 
 describe("GetUpstreamTreeUseCase — source graph", () => {
   it("returns the deduped reachable closure from an agent root", async () => {
-    agentSource.load.mockImplementation((origin) => {
+    agentSource.resolve.mockImplementation((origin) => {
       if (origin === "file:/agent/root")
         return okAsync(
           agentManifest("root", {
@@ -88,12 +80,12 @@ describe("GetUpstreamTreeUseCase — source graph", () => {
         return okAsync(agentManifest("helper", { skills: ["file:/skill/child"] }));
       return errAsync({ type: "SourceUnavailable", origin, cause: new Error("missing") });
     });
-    skillSource.load.mockImplementation((origin) => {
+    skillSource.resolve.mockImplementation((origin) => {
       if (origin === "file:/skill/child")
         return okAsync(skillManifest("child", { mcps: ["file:/mcp/shared"] }));
       return errAsync({ type: "SourceUnavailable", origin, cause: new Error("missing") });
     });
-    mcpSource.load.mockImplementation((origin) => {
+    mcpSource.resolve.mockImplementation((origin) => {
       if (origin === "file:/mcp/shared") return okAsync(mcpManifest("azure/mcp"));
       return errAsync({ type: "SourceUnavailable", origin, cause: new Error("missing") });
     });
@@ -109,11 +101,11 @@ describe("GetUpstreamTreeUseCase — source graph", () => {
       "public/root",
     ]);
     expect(graph.conflicts).toEqual([]);
-    expect(mcpSource.load).toHaveBeenCalledTimes(1);
+    expect(mcpSource.resolve).toHaveBeenCalledTimes(1);
   });
 
   it("records a fetch conflict for an unfetchable dependency origin", async () => {
-    skillSource.load.mockImplementation((origin) => {
+    skillSource.resolve.mockImplementation((origin) => {
       if (origin === "file:/skill/root")
         return okAsync(skillManifest("root", { skills: ["file:/skill/missing"] }));
       return errAsync({ type: "SourceUnavailable", origin, cause: new Error("ENOENT") });
@@ -135,7 +127,7 @@ describe("GetUpstreamTreeUseCase — source graph", () => {
   });
 
   it("records a parse conflict for an invalid manifest", async () => {
-    skillSource.load.mockReturnValue(
+    skillSource.resolve.mockReturnValue(
       errAsync({ type: "ManifestInvalid", origin: "file:/skill/root", reason: "bad yaml" }),
     );
 
@@ -148,7 +140,7 @@ describe("GetUpstreamTreeUseCase — source graph", () => {
   });
 
   it("handles a dependency cycle by deduplicating (both nodes fetched, no conflict)", async () => {
-    skillSource.load.mockImplementation((origin) => {
+    skillSource.resolve.mockImplementation((origin) => {
       if (origin === "file:/skill/a")
         return okAsync(skillManifest("a", { skills: ["file:/skill/b"] }));
       if (origin === "file:/skill/b")

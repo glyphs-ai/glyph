@@ -114,7 +114,7 @@ export class GetUpstreamTreeUseCase
             },
     });
     if (kind === "skill") {
-      return (await this.sources.skill.load(origin)).match(
+      return (await this.sources.skill.resolve(origin)).match(
         (m) => ({
           kind,
           origin,
@@ -131,7 +131,7 @@ export class GetUpstreamTreeUseCase
       );
     }
     if (kind === "agent") {
-      return (await this.sources.agent.load(origin)).match(
+      return (await this.sources.agent.resolve(origin)).match(
         (m) => ({
           kind,
           origin,
@@ -147,7 +147,7 @@ export class GetUpstreamTreeUseCase
         onErr,
       );
     }
-    return (await this.sources.mcp.load(origin)).match(
+    return (await this.sources.mcp.resolve(origin)).match(
       (m) => ({
         kind,
         origin,

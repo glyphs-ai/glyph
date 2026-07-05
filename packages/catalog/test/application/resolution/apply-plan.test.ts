@@ -41,6 +41,8 @@ function planNode(
     wasAlreadyInstalled: opts.wasAlreadyInstalled ?? false,
     deps: [...dependencyRefs.skills, ...dependencyRefs.mcps, ...dependencyRefs.agents],
     dependencyRefs,
+    version: "1.0.0",
+    content: "",
   };
 }
 

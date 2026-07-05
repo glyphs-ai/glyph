@@ -12,6 +12,7 @@ const SKILL_ID = SkillFqnSchema.parse("public/tool-use");
 const ORIGIN = "file:///skills/tool-use";
 const OTHER_ORIGIN = "file:///skills/other";
 const databaseError = { type: "DatabaseUnavailable", cause: new Error("db down") } as const;
+const FILES = new Map([["SKILL.md", Buffer.from("# tool-use")]]);
 
 function skill(overrides: Partial<SkillEntityArgs> = {}): SkillEntity {
   return new SkillEntity({
@@ -31,17 +32,14 @@ function skill(overrides: Partial<SkillEntityArgs> = {}): SkillEntity {
 function manifest(
   args: { prereqs?: string; dependencies?: { skills?: string[]; mcps?: string[] } } = {},
 ): SkillManifest {
-  return SkillManifest.create(
-    {
-      name: "tool-use",
-      scope: "public",
-      description: "Tool use",
-      version: "1.0.0",
-      ...(args.prereqs !== undefined ? { prereqs: args.prereqs } : {}),
-      ...(args.dependencies !== undefined ? { dependencies: args.dependencies } : {}),
-    },
-    new Map([["SKILL.md", Buffer.from("# tool-use")]]),
-  )._unsafeUnwrap();
+  return SkillManifest.create({
+    name: "tool-use",
+    scope: "public",
+    description: "Tool use",
+    version: "1.0.0",
+    ...(args.prereqs !== undefined ? { prereqs: args.prereqs } : {}),
+    ...(args.dependencies !== undefined ? { dependencies: args.dependencies } : {}),
+  })._unsafeUnwrap();
 }
 
 let skillSource: MockProxy<Source<SkillManifest>>;
@@ -51,14 +49,16 @@ let useCase: InstallSkillUseCase;
 beforeEach(() => {
   skillSource = mock<Source<SkillManifest>>();
   skillRepo = mock<SkillRepository>();
-  skillSource.load.mockReturnValue(okAsync(manifest({ prereqs: "set GITHUB_TOKEN" })));
+  skillSource.fetch.mockReturnValue(
+    okAsync({ manifest: manifest({ prereqs: "set GITHUB_TOKEN" }), files: FILES }),
+  );
   skillRepo.get.mockReturnValue(errAsync({ type: "SkillNotFound", fqn: SKILL_ID }));
   skillRepo.save.mockReturnValue(okAsync(undefined));
   useCase = new InstallSkillUseCase({ skillSource, skillRepo });
 });
 
 describe("InstallSkillUseCase — mutation paths", () => {
-  it("loads a new skill, saves entity plus files, and returns install status", async () => {
+  it("fetches a new skill, saves entity plus files, and returns install status", async () => {
     const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrap()).toEqual({
       id: SKILL_ID,
@@ -66,7 +66,7 @@ describe("InstallSkillUseCase — mutation paths", () => {
       prereqs: "set GITHUB_TOKEN",
       prereqsAck: false,
     });
-    expect(skillSource.load).toHaveBeenCalledWith(ORIGIN);
+    expect(skillSource.fetch).toHaveBeenCalledWith(ORIGIN);
     expect(skillRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         fqn: SKILL_ID,
@@ -76,19 +76,22 @@ describe("InstallSkillUseCase — mutation paths", () => {
         prereqs: "set GITHUB_TOKEN",
         dependencyRefs: { skills: [], mcps: [] },
       }),
-      expect.any(Map),
+      FILES,
     );
   });
 
   it("omits blank prereqs and auto-acknowledges when no prereqs exist", async () => {
-    skillSource.load.mockReturnValue(okAsync(manifest()));
+    skillSource.fetch.mockReturnValue(okAsync({ manifest: manifest(), files: FILES }));
     const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrap()).toEqual({ id: SKILL_ID, origin: ORIGIN, prereqsAck: true });
   });
 
   it("uses request dependencyRefs instead of manifest dependencyRefs", async () => {
-    skillSource.load.mockReturnValue(
-      okAsync(manifest({ dependencies: { skills: ["public/from-manifest"] } })),
+    skillSource.fetch.mockReturnValue(
+      okAsync({
+        manifest: manifest({ dependencies: { skills: ["public/from-manifest"] } }),
+        files: FILES,
+      }),
     );
     await useCase.execute({
       origin: ORIGIN,
@@ -116,9 +119,9 @@ describe("InstallSkillUseCase — mutation paths", () => {
 });
 
 describe("InstallSkillUseCase — error channel", () => {
-  it("propagates SourceError from skillSource.load", async () => {
+  it("propagates SourceError from skillSource.fetch", async () => {
     const sourceError = { type: "OriginInvalid", origin: ORIGIN, reason: "bad" } as const;
-    skillSource.load.mockReturnValue(errAsync(sourceError));
+    skillSource.fetch.mockReturnValue(errAsync(sourceError));
     const res = await useCase.execute({ origin: ORIGIN, dependencyRefs: { skills: [], mcps: [] } });
     expect(res._unsafeUnwrapErr()).toBe(sourceError);
     expect(skillRepo.save).not.toHaveBeenCalled();

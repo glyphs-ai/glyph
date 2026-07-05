@@ -46,19 +46,15 @@ export class SkillManifest {
     readonly version: string,
     readonly prereqs: string | undefined,
     readonly dependencyRefs: SkillDependencyRefs,
-    readonly files: ReadonlyMap<string, Buffer>,
   ) {}
 
   /**
-   * Build a manifest from already-parsed frontmatter plus the file tree.
-   *
-   * Validates metadata and keeps declared `scope` and `name`; the fqn is
-   * composed at install time.
+   * Build a manifest from already-parsed frontmatter. Validates metadata and
+   * keeps declared `scope` and `name`; the fqn is composed at install time.
+   * Files are a separate concern — they travel alongside the manifest in the
+   * `Source.fetch()` return, not inside it.
    */
-  static create(
-    frontmatter: unknown,
-    files: ReadonlyMap<string, Buffer>,
-  ): Result<SkillManifest, SkillManifestInvalid> {
+  static create(frontmatter: unknown): Result<SkillManifest, SkillManifestInvalid> {
     const meta = FrontmatterSchema.safeParse(frontmatter);
     if (!meta.success) {
       return err({ type: "SkillManifestInvalid", reason: `frontmatter: ${meta.error.message}` });
@@ -71,7 +67,6 @@ export class SkillManifest {
         meta.data.version,
         meta.data.prereqs,
         { skills: meta.data.dependencies.skills ?? [], mcps: meta.data.dependencies.mcps ?? [] },
-        files,
       ),
     );
   }

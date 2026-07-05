@@ -14,7 +14,14 @@ import {
  * delegation.
  */
 function leaf(scheme: string, files: ReadonlyMap<string, Buffer>): Fetcher {
-  return { matches: (u) => u.startsWith(scheme), fetch: vi.fn(() => okAsync(files)) };
+  return {
+    matches: (u) => u.startsWith(scheme),
+    fetch: vi.fn(() => okAsync(files)),
+    fetchFile: vi.fn((_origin: string, relPath: string) => {
+      const buf = files.get(relPath);
+      return buf ? okAsync(buf) : okAsync(Buffer.alloc(0));
+    }),
+  };
 }
 
 describe("FetcherRegistry selection", () => {
@@ -48,6 +55,22 @@ describe("FetcherRegistry selection", () => {
   });
 });
 
+describe("FetcherRegistry.fetchAnchor", () => {
+  it("delegates to the matching leaf's fetchFile", async () => {
+    const files = new Map([["SKILL.md", Buffer.from("anchor content")]]);
+    const reg = new FetcherRegistry([leaf("file:", files)]);
+    const res = await reg.fetchAnchor("file:/x", "SKILL.md");
+    expect(res.isOk()).toBe(true);
+    expect(res._unsafeUnwrap().toString()).toBe("anchor content");
+  });
+
+  it("OriginInvalid when no leaf matches", async () => {
+    const reg = new FetcherRegistry([leaf("file:", new Map())]);
+    const res = await reg.fetchAnchor("ftp://nope", "SKILL.md");
+    expect(res._unsafeUnwrapErr().type).toBe("OriginInvalid");
+  });
+});
+
 describe("defaultRegistry wiring", () => {
   let dir: string;
   beforeEach(async () => {
@@ -62,6 +85,13 @@ describe("defaultRegistry wiring", () => {
     const res = await defaultRegistry().fetchEntry(`file:${dir}`);
     expect(res.isOk()).toBe(true);
     expect(res._unsafeUnwrap().get("SKILL.md")?.toString()).toBe("anchor");
+  });
+
+  it("fetchAnchor on file: fetches a single file", async () => {
+    await writeFile(path.join(dir, "SKILL.md"), "single file");
+    const res = await defaultRegistry().fetchAnchor(`file:${dir}`, "SKILL.md");
+    expect(res.isOk()).toBe(true);
+    expect(res._unsafeUnwrap().toString()).toBe("single file");
   });
 
   it("routes github.com origins to the GitHubFetcher (bad grammar → OriginInvalid, no network)", async () => {

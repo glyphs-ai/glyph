@@ -12,6 +12,7 @@ import type { Source } from "../../../src/domain/source.js";
 
 const AGENT_ID = AgentFqnSchema.parse("public/triage");
 const AGENT_ORIGIN = "file:///catalog/agents/triage";
+const FILES = new Map([["AGENTS.md", Buffer.from("# triage")]]);
 const asAgentFqn = (value: string) => AgentFqnSchema.parse(value);
 const asSkillFqn = (value: string) => SkillFqnSchema.parse(value);
 const asMcpFqn = (value: string) => McpFqnSchema.parse(value);
@@ -42,28 +43,24 @@ function agentManifest(
       readonly mcps: readonly string[];
       readonly agents: readonly string[];
     };
-    readonly files?: ReadonlyMap<string, Buffer>;
   } = {},
 ): AgentManifest {
-  return AgentManifest.create(
-    {
-      name: "triage",
-      scope: "public",
-      description: opts.description ?? "Triage agent",
-      version: opts.version ?? "1.0.0",
-      ...(opts.prereqs !== undefined ? { prereqs: opts.prereqs } : {}),
-      ...(opts.dependencyRefs !== undefined
-        ? {
-            dependencies: {
-              skills: [...opts.dependencyRefs.skills],
-              mcps: [...opts.dependencyRefs.mcps],
-              agents: [...opts.dependencyRefs.agents],
-            },
-          }
-        : {}),
-    },
-    opts.files ?? new Map([["AGENTS.md", Buffer.from("# triage")]]),
-  )._unsafeUnwrap();
+  return AgentManifest.create({
+    name: "triage",
+    scope: "public",
+    description: opts.description ?? "Triage agent",
+    version: opts.version ?? "1.0.0",
+    ...(opts.prereqs !== undefined ? { prereqs: opts.prereqs } : {}),
+    ...(opts.dependencyRefs !== undefined
+      ? {
+          dependencies: {
+            skills: [...opts.dependencyRefs.skills],
+            mcps: [...opts.dependencyRefs.mcps],
+            agents: [...opts.dependencyRefs.agents],
+          },
+        }
+      : {}),
+  })._unsafeUnwrap();
 }
 
 let agentSource: MockProxy<Source<AgentManifest>>;
@@ -79,9 +76,10 @@ beforeEach(() => {
 });
 
 describe("InstallAgentUseCase — happy path", () => {
-  it("loads a manifest, creates a new agent, saves files, and returns the install DTO", async () => {
-    const files = new Map([["AGENTS.md", Buffer.from("# triage")]]);
-    agentSource.load.mockReturnValue(okAsync(agentManifest({ prereqs: "Set token", files })));
+  it("fetches a manifest, creates a new agent, saves files, and returns the install DTO", async () => {
+    agentSource.fetch.mockReturnValue(
+      okAsync({ manifest: agentManifest({ prereqs: "Set token" }), files: FILES }),
+    );
 
     const dto = (
       await useCase.execute({
@@ -95,7 +93,7 @@ describe("InstallAgentUseCase — happy path", () => {
     )._unsafeUnwrap();
 
     const saved = agentRepo.save.mock.calls[0]?.[0];
-    expect(agentSource.load).toHaveBeenCalledWith(AGENT_ORIGIN);
+    expect(agentSource.fetch).toHaveBeenCalledWith(AGENT_ORIGIN);
     expect(saved).toMatchObject({
       fqn: AGENT_ID,
       origin: AGENT_ORIGIN,
@@ -103,7 +101,7 @@ describe("InstallAgentUseCase — happy path", () => {
       version: "1.0.0",
       prereqs: "Set token",
     });
-    expect(agentRepo.save.mock.calls[0]?.[1]).toBe(files);
+    expect(agentRepo.save.mock.calls[0]?.[1]).toBe(FILES);
     expect(dto).toEqual({
       id: AGENT_ID,
       description: "Triage agent",
@@ -118,12 +116,13 @@ describe("InstallAgentUseCase — happy path", () => {
   });
 
   it("uses request dependencyRefs instead of manifest dependencyRefs when provided", async () => {
-    agentSource.load.mockReturnValue(
-      okAsync(
-        agentManifest({
+    agentSource.fetch.mockReturnValue(
+      okAsync({
+        manifest: agentManifest({
           dependencyRefs: { skills: [asSkillFqn("public/manifest")], mcps: [], agents: [] },
         }),
-      ),
+        files: FILES,
+      }),
     );
 
     const dto = (
@@ -138,7 +137,9 @@ describe("InstallAgentUseCase — happy path", () => {
   });
 
   it("carries prereq acknowledgement and disabled state across same-origin reinstall", async () => {
-    agentSource.load.mockReturnValue(okAsync(agentManifest({ prereqs: "Same prereq" })));
+    agentSource.fetch.mockReturnValue(
+      okAsync({ manifest: agentManifest({ prereqs: "Same prereq" }), files: FILES }),
+    );
     agentRepo.get.mockReturnValue(
       okAsync(
         agentEntity({
@@ -162,7 +163,9 @@ describe("InstallAgentUseCase — happy path", () => {
   });
 
   it("resets prereq acknowledgement when prereqs change on reinstall", async () => {
-    agentSource.load.mockReturnValue(okAsync(agentManifest({ prereqs: "New prereq" })));
+    agentSource.fetch.mockReturnValue(
+      okAsync({ manifest: agentManifest({ prereqs: "New prereq" }), files: FILES }),
+    );
     agentRepo.get.mockReturnValue(
       okAsync(agentEntity({ origin: AGENT_ORIGIN, prereqs: "Old prereq", prereqsAck: true })),
     );
@@ -180,7 +183,7 @@ describe("InstallAgentUseCase — happy path", () => {
 
 describe("InstallAgentUseCase — error channel", () => {
   it("propagates source errors and does not save", async () => {
-    agentSource.load.mockReturnValue(
+    agentSource.fetch.mockReturnValue(
       errAsync({ type: "OriginInvalid", origin: AGENT_ORIGIN, reason: "bad scheme" }),
     );
 
@@ -198,7 +201,7 @@ describe("InstallAgentUseCase — error channel", () => {
   });
 
   it("returns AgentOriginConflict when the fqn is installed from another origin", async () => {
-    agentSource.load.mockReturnValue(okAsync(agentManifest()));
+    agentSource.fetch.mockReturnValue(okAsync({ manifest: agentManifest(), files: FILES }));
     agentRepo.get.mockReturnValue(okAsync(agentEntity({ origin: "file:///other" })));
 
     const res = await useCase.execute({
@@ -217,7 +220,7 @@ describe("InstallAgentUseCase — error channel", () => {
 
   it("propagates DatabaseUnavailable from repo.get", async () => {
     const cause = new Error("disk");
-    agentSource.load.mockReturnValue(okAsync(agentManifest()));
+    agentSource.fetch.mockReturnValue(okAsync({ manifest: agentManifest(), files: FILES }));
     agentRepo.get.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
 
     const res = await useCase.execute({
@@ -230,7 +233,7 @@ describe("InstallAgentUseCase — error channel", () => {
 
   it("propagates DatabaseUnavailable from repo.save", async () => {
     const cause = new Error("disk");
-    agentSource.load.mockReturnValue(okAsync(agentManifest()));
+    agentSource.fetch.mockReturnValue(okAsync({ manifest: agentManifest(), files: FILES }));
     agentRepo.save.mockReturnValue(errAsync({ type: "DatabaseUnavailable", cause }));
 
     const res = await useCase.execute({
