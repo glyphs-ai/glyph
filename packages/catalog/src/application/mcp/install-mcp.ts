@@ -2,7 +2,7 @@
  * Use case: install an MCP from a source origin.
  *
  * MCPs are single-file leaves. Install flow:
- *   1. `mcpSource.load(origin)`  → ResultAsync<McpManifest, SourceError>.
+ *   1. `mcpSource.resolve(origin)` → ResultAsync<McpManifest, SourceError>.
  *      The source validates the fqn grammar via `McpFqnSchema`.
  *   2. origin-conflict guard      → reads `mcpRepo.get(fqn)`; a
  *      `McpNotFound` means "fresh install" (ok), a same-origin hit means

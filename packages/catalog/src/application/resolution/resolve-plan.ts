@@ -214,7 +214,7 @@ export class ResolvePlanUseCase
   private async build(kind: CatalogKind, origin: string): Promise<ResolvePlanResponse> {
     const fetched = (await this.deps.getUpstreamTree.execute({ kind, origin }))._unsafeUnwrap();
     // A driver fault while flagging degrades to the unflagged graph (no
-    // conflicts surfaced), matching the previous swallow-and-continue policy.
+    // conflicts surfaced).
     const upstream = (
       await this.deps.queries.query((db) => this.flagOriginConflicts(db, fetched))
     ).unwrapOr(fetched);

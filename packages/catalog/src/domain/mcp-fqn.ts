@@ -3,8 +3,8 @@ import { z } from "zod";
 /**
  * MCP spec FQN — the aggregate's identity, `<namespace>/<short>` (e.g.
  * `azure/mcp`). Branded so a raw string can't be passed where a
- * validated fqn is required (see workspace's `workspace-id.ts` for the
- * brand-naming convention: brand = pkg concept, kept unique).
+ * validated fqn is required (the brand name is the package concept, kept
+ * unique across packages).
  *
  * Grammar fixed by the MCP spec, not glyph's storage: ≤200 chars, no
  * whitespace, no control chars/backslashes, exactly one `/`, neither

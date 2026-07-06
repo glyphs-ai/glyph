@@ -8,7 +8,6 @@ import type { UseCase, UseCaseResult } from "../use-case.js";
 
 export const GetSkillFileRequestSchema = z.object({ id: SkillFqnSchema, relPath: z.string() });
 export type GetSkillFileRequest = z.infer<typeof GetSkillFileRequestSchema>;
-export const GetSkillFileResponseSchema = z.custom<Buffer | null>();
 export type GetSkillFileResponse = Buffer | null;
 export type GetSkillFileError = DatabaseUnavailable;
 

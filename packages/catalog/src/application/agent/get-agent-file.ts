@@ -8,7 +8,6 @@ import type { UseCase, UseCaseResult } from "../use-case.js";
 
 export const GetAgentFileRequestSchema = z.object({ id: AgentFqnSchema, relPath: z.string() });
 export type GetAgentFileRequest = z.infer<typeof GetAgentFileRequestSchema>;
-export const GetAgentFileResponseSchema = z.custom<Buffer | null>();
 export type GetAgentFileResponse = Buffer | null;
 export type GetAgentFileError = DatabaseUnavailable;
 

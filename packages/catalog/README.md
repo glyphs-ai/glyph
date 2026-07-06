@@ -1,6 +1,6 @@
 # @glyphs-ai/catalog
 
-> **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
+> **Tier:** T0 (Foundations).
 
 Skill + MCP + Agent registry with dependency-aware resolve / install /
 uninstall. This is a T0 foundation package; `api`
@@ -25,10 +25,10 @@ What this package **does**:
   skill or agent.
 - Parse and fetch install origins via local `file:` paths, GitHub tree
   URLs, or Azure DevOps Services item URLs.
-- Validate graph rules on writes: name uniqueness, kebab-case,
-  missing-dependency, no cycles, and dependency-aware install planning.
-  Use-cases return discriminated-union errors through
-  `neverthrow` results; they do not throw catalog error classes.
+- Validate graph rules on writes: name uniqueness, kebab-case, and
+  dependency-aware install planning. Use-cases return
+  discriminated-union errors through `neverthrow` results; they do not
+  throw catalog error classes.
 
 What this package **does not** do:
 
@@ -55,7 +55,7 @@ What this package **does not** do:
 ```
 packages/catalog/src/
   index.ts                 public barrel (compose + contracts + curated domain types)
-  compose.ts               composeCatalog({ dbFile }) -> CatalogModule
+  catalog-module.ts        composeCatalog({ dbFile }) -> CatalogModule
   domain/                  entities, manifests, branded FQNs, repository/source ports
     agent-entity.ts        AgentEntity (skill / mcp mirror)
     agent-manifest.ts      frontmatter parsing (skill / mcp mirror)
@@ -82,10 +82,8 @@ skill content), and the per-entity dep edge tables. There is no
 agent and skill source content (frontmatter + Markdown body) is
 read out of the BLOB columns.
 
-> Why SQLite for catalog? See
-> [docs/architecture.md — Backend selection](../../docs/architecture.md#backend-selection-when-sqlite)
-> — catalog has cross-entity dependency-graph queries (`resolveAgent`)
-> and BLOB content streams, which are exactly the cases the rule says
+> Why SQLite for catalog? Catalog has cross-entity dependency-graph
+> queries (`resolveAgent`) and BLOB content streams — exactly the cases
 > SQLite owns.
 
 ## Quick start
