@@ -15,10 +15,6 @@ const listSkillsDependencies = z
   })
   .optional();
 
-// Deliberate duplication: this skill projection is intentionally NOT shared
-// with the sibling skill use cases that expose the same shape. Each owns its
-// V1 response so a later evolution of one caller never drags the others along
-// in lockstep. Redundancy > coupling.
 const listSkillsEntry = z.object({
   fqn: z.string(),
   origin: z.string(),

@@ -11,10 +11,6 @@ import type { UseCase, UseCaseResult } from "./use-case.js";
 export const GetSessionRequestSchema = z.object({ id: SessionIdSchema }).strict();
 export type GetSessionRequest = z.infer<typeof GetSessionRequestSchema>;
 
-// Deliberate duplication: this 9-field session projection is intentionally NOT
-// shared with the sibling create-session / list-sessions use cases that expose
-// the same shape. Each owns its V1 response so a later evolution of one caller
-// never drags the others along in lockstep. Redundancy > coupling.
 export const GetSessionResponseSchema = z
   .object({
     id: SessionIdSchema,
