@@ -33,6 +33,7 @@ packages/workspace/src/
     workspace-migrations.ts    applyWorkspaceMigrations
     workspace-repository.ts    Drizzle write-side adapter (get/save/delete)
     workspace-queries.ts       Drizzle read-side adapter (query() + workspaces table)
+    workspace-mapper.ts        row ↔ entity mapping (WorkspaceRow / WorkspaceMapper)
   infrastructure/file/
     local-workspace-provisioner.ts  ensures the workspace root dir exists
   workspace-module.ts          composeWorkspaceModule({ db, defaultWorkspaceParent, logger? })
