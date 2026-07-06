@@ -1,6 +1,6 @@
 # @glyphs-ai/server
 
-> **Tier:** T3 (Host). See the [tier model](../../docs/architecture.md#tier-model).
+> **Tier:** T3 (Host).
 
 The HTTP API surface — a [Hono](https://hono.dev) app that mounts the
 workspace registry plus workspace-scoped catalog, session, task,
@@ -57,8 +57,8 @@ not a task sub-layer.
 /api/workspaces/:id/schedules/workflow                   POST                     create workflow-kind schedule
 /api/workspaces/:id/schedules/preview-cron               GET                      preview an arbitrary (expr, tz)
 /api/workspaces/:id/schedules/:sid                       GET DELETE               get / delete
-/api/workspaces/:id/schedules/task/:sid                  PATCH                    patch task-kind schedule (RFC 7396 deep-merge on target)
-/api/workspaces/:id/schedules/workflow/:sid              PATCH                    patch workflow-kind schedule (RFC 7396 deep-merge on target)
+/api/workspaces/:id/schedules/task/:sid                  PATCH                    patch task-kind schedule (deep-merge on target)
+/api/workspaces/:id/schedules/workflow/:sid              PATCH                    patch workflow-kind schedule (deep-merge on target)
 /api/workspaces/:id/schedules/:sid/run                   POST                     manual fire-now
 /api/workspaces/:id/schedules/:sid/preview               GET                      next-N fires for this schedule
 
@@ -101,40 +101,11 @@ catalog the dashboard sees.
   entity's sandbox dir. Schedule and catalog DELETEs do NOT honour
   the flag — schedules return a `deletedDispatchCount` summary
   instead, and catalog DELETEs always remove both the row and the
-  content file. See [`docs/architecture.md`](../../docs/architecture.md).
+  content file.
 - **Time filters canonicalise** any `Date.parse`-able input into ISO
   8601 with a `Z` suffix before forwarding to services; the
   service's lexicographic compare relies on canonical form. Garbage
   input — 400 with a descriptive error.
-
-## Validation pipeline
-
-Every route that accepts a body or query validates it before touching a
-service, and the outcome is a small ADT rather than thrown control flow.
-
-- **`ValidationResult<T>`** (`src/routes/_shared.ts`) is the discriminated
-  union `ValidationOk<T>` (`{ ok: true, value }`) or `ValidationFail`
-  (`{ ok: false, error }`). It is lifted into `_shared.ts` so the
-  `schedules` and `workflows` route files share one definition instead of
-  each redeclaring the triple. On `ok: false` the route replies `400`
-  with the `error` string; on `ok: true` it forwards `value` to the
-  service. Helpers like `unknownBodyKey` reject unexpected keys, so a
-  URL-implied discriminator (e.g. a target `kind` already fixed by the
-  path) cannot be smuggled back in through the body.
-- **Per-kind spec validation** lives one layer in, at dispatch time. The
-  `@glyphs-ai/workflow` package is kind-agnostic about node specs; the
-  per-kind checks run in the api wiring runners
-  (`packages/api/src/wiring/`), which throw `WorkflowCoordSpecError`,
-  `WorkflowWorkerSpecError`, or `WorkflowHumanSpecError` when a coord /
-  worker / human node spec is malformed.
-- **`respondError` + `ErrorPolicy`** turn those typed errors into stable
-  HTTP responses. Each domain threads an `ErrorPolicy`
-  (`src/routes/_error-policies/`) mapping error classes to status codes.
-  Only error `name`s on the `SAFE_ERROR_NAMES` allow-list
-  (`src/routes/_shared.ts`) have their `.message` surfaced in the
-  response body — the three workflow spec errors are on that list;
-  anything unmapped collapses to a generic internal error so host paths
-  and `fs` strings never leak.
 
 ## OpenAPI surface
 
@@ -154,10 +125,9 @@ zod, pinned 1:1 to the `@glyphs-ai/api` wire types by a parity
 test. A route's `responses` declare the success body via its schema
 (the documented shape) and at least one description-only error status;
 `request.body` / `request.query` schemas additionally drive **runtime
-400 validation**. A failed request validation is converted by the
-shared `defaultHook` (`src/routes/_openapi.ts`) into a structured
-envelope — `{ error, code: "ValidationError", issues }` — consistent
-with the `respondError` envelope for business errors.
+400 validation**. A failed request validation is converted into the same
+`application/problem+json` envelope used for business errors —
+`{ type, title, status, detail, code: "ValidationError", issues }`.
 
 Two invariants are pinned by tests:
 
@@ -234,9 +204,11 @@ LOGS_SUBDIR;                                      // `"logs"`
 logsDir(home: string): string;
 ```
 
-`@glyphs-ai/cli` consumes every member of the "CLI lifecycle helpers"
-group for `glyph start` / `status` / `stop` / `connect` / `logs`;
-they cannot live in `@glyphs-ai/sdk` because they value-import
+`@glyphs-ai/cli` imports `resolveGlyphHome`, `logsDir`, `runtimeFilePath`,
+and `RuntimeFile` for `glyph start` / `status` / `stop` / `connect` /
+`logs`; the accompanying `DEFAULT_GLYPH_HOME` / `RUNTIME_FILE_NAME` /
+`LOGS_SUBDIR` constants document the home layout those helpers resolve.
+They cannot live in `@glyphs-ai/sdk` because they value-import
 `node:os` / `node:path`, and the sdk is the SPA-safe surface.
 
 ## Graceful shutdown

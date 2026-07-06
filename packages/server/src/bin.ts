@@ -9,7 +9,7 @@
  * `--serve-static` ON unless the operator explicitly opts out with
  * `--no-serve-static`.
  *
- * Anything else — port, host, API key, GLYPH_HOME — is still controlled
+ * Anything else — port, host, GLYPH_HOME, log level — is still controlled
  * by environment variables and read inside `runServer`.
  *
  * The CLI's `glyph serve` subcommand calls `runServer` directly with

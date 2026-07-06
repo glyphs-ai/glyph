@@ -17,8 +17,8 @@ export function isLoopbackBind(host: string): boolean {
   // recognise here than to leave a paper-cut for users who explicitly
   // type the v6 form.
   if (host.startsWith("::ffff:127.") || host.startsWith("[::ffff:127.")) return true;
-  // Other 127.x.x.x addresses are also loopback per RFC 5735, but we
-  // expect production users to spell them as 127.0.0.1.
+  // Every other 127.0.0.0/8 address is loopback too, but we expect
+  // production users to spell them as 127.0.0.1.
   return host.startsWith("127.");
 }
 
@@ -28,12 +28,11 @@ export function isLoopbackBind(host: string): boolean {
  * deployment fails closed at startup rather than silently exposing
  * destructive endpoints (DELETE /api/skills/:name etc.).
  *
- * glyph deliberately ships without built-in auth: the previous
- * `GLYPH_API_KEY` Bearer scheme was a half-finished shared secret with
- * a real SSE gap because browser `EventSource` cannot send custom
- * headers. Rolling our own auth is rarely the right answer for a
- * single-user local-first dashboard, so operators who need remote
- * access should terminate auth at a layer designed for it.
+ * glyph deliberately ships without built-in auth: a shared-secret Bearer
+ * scheme cannot cover the SSE endpoints, because browser `EventSource`
+ * cannot send custom headers, and rolling our own auth is rarely the
+ * right answer for a single-user local-first dashboard. Operators who
+ * need remote access should terminate auth at a layer designed for it.
  */
 export function assertBindIsSafe(host: string): void {
   if (isLoopbackBind(host)) return;

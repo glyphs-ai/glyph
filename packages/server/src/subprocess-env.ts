@@ -83,7 +83,6 @@ export function buildSubprocessEnvBase(input: {
  * apply this scrub: a user-driven shell owns its own env. `cmd /k`
  * and pwsh `$env:` prefixes can only SET values, not unset them, so
  * there is no way to delete an inherited key from inside the shell
- * launcher anyway. See "Deliberately not exposed" in
- * `docs/architecture.md` for the contract.
+ * launcher anyway.
  */
 export const SUBPROCESS_ENV_SCRUB_KEYS: readonly string[] = Object.freeze(["GLYPH_HOME"]);

@@ -3,11 +3,9 @@ import path from "node:path";
 import pino, { type DestinationStream, type LoggerOptions } from "pino";
 
 /**
- * `Logger` is pino's `Logger` type, re-exported. glyph commits to
- * pino at the type level — the previous 4-method facade was hiding
- * pino features (child loggers, redact, serializers) that the codebase
- * actually wants to use.
- * See `docs/architecture.md` → "Tech stack" for the concise rationale.
+ * `Logger` is pino's `Logger` type, re-exported. glyph commits to pino
+ * at the type level so call sites can use pino features directly — child
+ * loggers, redact, serializers — instead of through a narrower facade.
  *
  * Call sites use pino's API directly:
  *   logger.info({ userId }, "user logged in");           // meta, msg
