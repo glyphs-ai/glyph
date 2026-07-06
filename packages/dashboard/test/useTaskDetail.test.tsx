@@ -9,7 +9,7 @@ vi.mock("../src/api", async () => {
     ...actual,
     getTask: vi.fn(),
     fetchTaskActivity: vi.fn(),
-    subscribeTaskActivity: vi.fn(() => ({ close: () => {} })),
+    openActivityStream: vi.fn(async () => ({ lastEventId: undefined, ended: true })),
   };
 });
 

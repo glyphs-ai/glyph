@@ -3,12 +3,12 @@ import {
   type ActivityItem,
   fetchTaskActivity,
   getTask,
-  subscribeTaskActivity,
   type TaskActivity,
   type TaskRecord,
 } from "../api";
 import { useMounted } from "./useMounted";
 import { usePollWithBackoff } from "./usePollWithBackoff";
+import { useReconnectingStream } from "./useReconnectingStream";
 
 export interface TaskDetailData {
   task: TaskRecord | null;
@@ -138,22 +138,22 @@ export function useTaskDetail(taskId: string | null, pollIntervalMs: number): Ta
   const pollEnabled = !!task && task.status === "running";
   usePollWithBackoff(refresh, pollIntervalMs, pollEnabled);
 
-  // Live tail via SSE while running.
-  useEffect(() => {
-    if (!taskId || !pollEnabled) return;
-    const handle = subscribeTaskActivity(taskId, {
-      onItem: (item) => {
-        if (!mounted.current) return;
-        setActivity((prev) => mergeStreamItem(prev, item));
-      },
-      onError: (err) => {
-        if (typeof console !== "undefined") {
-          console.warn("activity stream error", err);
-        }
-      },
-    });
-    return () => handle.close();
-  }, [taskId, pollEnabled]);
+  // Live tail via SSE while running. The SDK stream is one-shot; this hook
+  // owns reconnection (backoff + Last-Event-ID resume) and stops on the
+  // server's `end` sentinel or when `pollEnabled` flips false.
+  useReconnectingStream({
+    taskId,
+    enabled: pollEnabled,
+    onItem: (item) => {
+      if (!mounted.current) return;
+      setActivity((prev) => mergeStreamItem(prev, item));
+    },
+    onError: (err) => {
+      if (typeof console !== "undefined") {
+        console.warn("activity stream error", err);
+      }
+    },
+  });
 
   return { task, activity, activityError, refresh, loadOlder };
 }

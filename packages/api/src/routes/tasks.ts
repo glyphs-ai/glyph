@@ -126,6 +126,30 @@ const TaskActivityResponseSchema = z.object({
   truncated: TruncationInfoSchema.optional(),
 });
 
+/** `data:` payload of an `error` frame on the activity SSE stream. */
+const StreamErrorSchema = z.object({ error: z.string() });
+
+/**
+ * Schema of a single `text/event-stream` frame's `data:` payload for
+ * `GET /api/workspaces/:id/tasks/:tid/activity/stream`. The SSE `event:` name
+ * is the wire discriminator (`activity` | `heartbeat` | `end` | `error`);
+ * this union types the JSON that rides in each frame's `data:` line so the SDK
+ * generates a typed stream instead of `unknown`:
+ * - `activity` reuses {@link ActivityItemSchema} verbatim (byte-compatible wire),
+ * - `error` carries `{ error }`,
+ * - `heartbeat` and `end` are empty objects (`{}`).
+ * There is no shared discriminator property on the payloads (that would break
+ * the raw `data:` wire), so consumers route on the SSE `event:` name.
+ */
+const ActivityStreamEventSchema = z.union([ActivityItemSchema, StreamErrorSchema, z.object({})]);
+
+/**
+ * Cadence of `heartbeat` keep-alive frames on the activity SSE stream. Emitted
+ * while the underlying activity iterator is idle so proxies and clients can tell
+ * a live-but-quiet stream from a dead connection.
+ */
+const HEARTBEAT_INTERVAL_MS = 15_000;
+
 /**
  * Compile-time drift guard. Activity is a runtime-produced shape (not a
  * task-domain response), so `TaskActivityResponseSchema` is an api-owned
@@ -503,7 +527,13 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       summary: "Stream a task's activity (SSE)",
       request: { params: TaskPathSchema },
       responses: {
-        200: errorResponse("SSE stream (text/event-stream)"),
+        200: {
+          description:
+            "Server-sent event stream. Each frame's `event:` names the kind " +
+            "(`activity` | `heartbeat` | `end` | `error`) and `data:` carries " +
+            "the JSON payload described by this schema.",
+          content: { "text/event-stream": { schema: ActivityStreamEventSchema } },
+        },
         404: errorResponse("Task or stream not found"),
         500: errorResponse("Internal error"),
       },
@@ -544,6 +574,12 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
               // Controller closed (client gone).
             }
           };
+          const heartbeat = setInterval(
+            () => enqueue("event: heartbeat\ndata: {}\n\n"),
+            HEARTBEAT_INTERVAL_MS,
+          );
+          // Don't let the keep-alive timer hold the process open on its own.
+          (heartbeat as { unref?: () => void }).unref?.();
           try {
             for await (const item of stream as AsyncIterable<ActivityItem>) {
               if (c.req.raw.signal.aborted) break;
@@ -557,6 +593,7 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
               })}\n\n`,
             );
           } finally {
+            clearInterval(heartbeat);
             try {
               controller.close();
             } catch {

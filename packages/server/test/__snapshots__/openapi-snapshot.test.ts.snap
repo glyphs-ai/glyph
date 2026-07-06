@@ -10502,7 +10502,388 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
         "responses": {
           "200": {
-            "description": "SSE stream (text/event-stream)",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "attachments": {
+                          "items": {
+                            "properties": {
+                              "data": {
+                                "type": "string",
+                              },
+                              "kind": {
+                                "enum": [
+                                  "image",
+                                  "file",
+                                ],
+                                "type": "string",
+                              },
+                              "mimeType": {
+                                "type": "string",
+                              },
+                              "name": {
+                                "type": "string",
+                              },
+                              "url": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "kind",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "id": {
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "user",
+                          ],
+                          "type": "string",
+                        },
+                        "parentSeq": {
+                          "type": "number",
+                        },
+                        "seq": {
+                          "type": "number",
+                        },
+                        "text": {
+                          "type": "string",
+                        },
+                        "timestamp": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "seq",
+                        "timestamp",
+                        "kind",
+                        "text",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "assistant",
+                          ],
+                          "type": "string",
+                        },
+                        "model": {
+                          "type": "string",
+                        },
+                        "parentSeq": {
+                          "type": "number",
+                        },
+                        "seq": {
+                          "type": "number",
+                        },
+                        "stopReason": {
+                          "type": "string",
+                        },
+                        "text": {
+                          "type": "string",
+                        },
+                        "timestamp": {
+                          "type": "string",
+                        },
+                        "tokens": {
+                          "properties": {
+                            "cacheWrite": {
+                              "type": "number",
+                            },
+                            "cached": {
+                              "type": "number",
+                            },
+                            "input": {
+                              "type": "number",
+                            },
+                            "output": {
+                              "type": "number",
+                            },
+                            "reasoning": {
+                              "type": "number",
+                            },
+                            "total": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "output",
+                          ],
+                          "type": "object",
+                        },
+                      },
+                      "required": [
+                        "seq",
+                        "timestamp",
+                        "kind",
+                        "text",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "thinking",
+                          ],
+                          "type": "string",
+                        },
+                        "parentSeq": {
+                          "type": "number",
+                        },
+                        "seq": {
+                          "type": "number",
+                        },
+                        "subject": {
+                          "type": "string",
+                        },
+                        "text": {
+                          "type": "string",
+                        },
+                        "timestamp": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "seq",
+                        "timestamp",
+                        "kind",
+                        "text",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "args": {},
+                        "callId": {
+                          "type": "string",
+                        },
+                        "display": {
+                          "properties": {
+                            "content": {
+                              "type": "string",
+                            },
+                            "markdown": {
+                              "type": "boolean",
+                            },
+                          },
+                          "required": [
+                            "content",
+                          ],
+                          "type": "object",
+                        },
+                        "durationMs": {
+                          "type": "number",
+                        },
+                        "id": {
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "tool_call",
+                          ],
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                        "parentSeq": {
+                          "type": "number",
+                        },
+                        "result": {},
+                        "seq": {
+                          "type": "number",
+                        },
+                        "status": {
+                          "enum": [
+                            "running",
+                            "success",
+                            "error",
+                            "cancelled",
+                          ],
+                          "type": "string",
+                        },
+                        "timestamp": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "seq",
+                        "timestamp",
+                        "kind",
+                        "callId",
+                        "name",
+                        "status",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "system",
+                          ],
+                          "type": "string",
+                        },
+                        "level": {
+                          "enum": [
+                            "info",
+                            "warn",
+                            "error",
+                          ],
+                          "type": "string",
+                        },
+                        "parentSeq": {
+                          "type": "number",
+                        },
+                        "seq": {
+                          "type": "number",
+                        },
+                        "subKind": {
+                          "type": "string",
+                        },
+                        "text": {
+                          "type": "string",
+                        },
+                        "timestamp": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "seq",
+                        "timestamp",
+                        "kind",
+                        "text",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "summary",
+                          ],
+                          "type": "string",
+                        },
+                        "parentSeq": {
+                          "type": "number",
+                        },
+                        "seq": {
+                          "type": "number",
+                        },
+                        "stats": {
+                          "properties": {
+                            "costUSD": {
+                              "type": "number",
+                            },
+                            "durationMs": {
+                              "type": "number",
+                            },
+                            "filesModified": {
+                              "items": {
+                                "type": "string",
+                              },
+                              "type": "array",
+                            },
+                            "linesAdded": {
+                              "type": "number",
+                            },
+                            "linesRemoved": {
+                              "type": "number",
+                            },
+                            "model": {
+                              "type": "string",
+                            },
+                            "premiumRequests": {
+                              "type": "number",
+                            },
+                            "toolCallsCount": {
+                              "type": "number",
+                            },
+                          },
+                          "type": "object",
+                        },
+                        "text": {
+                          "type": "string",
+                        },
+                        "timestamp": {
+                          "type": "string",
+                        },
+                        "tokens": {
+                          "properties": {
+                            "cacheWrite": {
+                              "type": "number",
+                            },
+                            "cached": {
+                              "type": "number",
+                            },
+                            "input": {
+                              "type": "number",
+                            },
+                            "output": {
+                              "type": "number",
+                            },
+                            "reasoning": {
+                              "type": "number",
+                            },
+                            "total": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "output",
+                          ],
+                          "type": "object",
+                        },
+                      },
+                      "required": [
+                        "seq",
+                        "timestamp",
+                        "kind",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "error",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {},
+                      "type": "object",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Server-sent event stream. Each frame's \`event:\` names the kind (\`activity\` | \`heartbeat\` | \`end\` | \`error\`) and \`data:\` carries the JSON payload described by this schema.",
           },
           "404": {
             "description": "Task or stream not found",
