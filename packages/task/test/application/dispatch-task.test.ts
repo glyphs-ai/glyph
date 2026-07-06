@@ -115,14 +115,14 @@ describe("DispatchTaskUseCase — pre-flight error channel", () => {
     expect(e.type).toBe("EntryNotReady");
   });
 
-  it("propagates a catalog fault as AgentResolutionFailed", async () => {
+  it("propagates a catalog fault as AgentUnresolvable", async () => {
     resolver.resolve.mockReturnValue(
-      errAsync({ type: "AgentResolutionFailed", agent: "public/demo", cause: null }),
+      errAsync({ type: "AgentUnresolvable", agent: "public/demo", cause: null }),
     );
     const e = (
       await useCase.execute({ agent: "public/demo", brief: TaskBriefSchema.parse("b") })
     )._unsafeUnwrapErr();
-    expect(e.type).toBe("AgentResolutionFailed");
+    expect(e.type).toBe("AgentUnresolvable");
   });
 
   it("maps an unregistered runtime to RuntimeDoesNotSupportTasks", async () => {

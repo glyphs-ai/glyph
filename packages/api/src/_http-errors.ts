@@ -84,23 +84,8 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "WorkflowAlreadyTerminalError",
   "WorkflowNodeNotMutableError",
   "WorkflowNodeSpecError",
-  "MultipleSuccessorCoordsError",
-  "OrphanCoordInsertError",
-  "ParentStateError",
-  "WorkflowDagInvariantError",
-  "WorkflowSubgraphEmptyError",
-  "WorkflowSubgraphTempIdInvalidError",
-  "WorkflowSubgraphTempParentlessError",
-  "WorkflowSubgraphNodeRefUnresolvedError",
-  "WorkflowSubgraphCyclicError",
-  "WorkflowSubgraphMultipleCoordTempsError",
-  // Caller-facing kind shape guard. Reachable from
-  // `POST .../subgraph` when the caller supplies a
-  // body with a non-string or empty `kind`; the substrate's defensive
-  // throw surfaces the value the caller sent.
-  // Messages echo only caller-supplied values — no host paths, no
-  // third-party stack lines.
-  "WorkflowNodeKindShapeError",
+  "WorkflowDagConflictError",
+  "WorkflowSubgraphInvalidError",
 ]);
 
 /**
@@ -123,16 +108,17 @@ export const INTERNAL_ERROR_NAMES = new Set<string>([
   // @glyphs-ai/runtime
   "CopilotSdkUnavailableError",
   "UnknownPlaceholderError",
-  // @glyphs-ai/session / @glyphs-ai/task
-  "AgentResolutionFailedError",
+  // @glyphs-ai/session / @glyphs-ai/task use DU errors and export no
+  // internal error classes (AgentUnresolvable is a DU code rendered
+  // opaque by the task / schedule / workflow route tables, not a class).
   // @glyphs-ai/schedule
   "ScheduleKindMismatchError",
   "ScheduleKindAlreadyRegisteredError",
   "ScheduleKindNotRegisteredError",
   "ScheduleKindRegistryFrozenError",
-  // @glyphs-ai/workflow
-  "WorkflowNodeKindCorruptionError",
-  "WorkflowEnumValueCorruptionError",
+  // @glyphs-ai/workflow uses DU errors and exports no internal error
+  // classes (WorkflowInvariantViolation is a DU code rendered opaque by
+  // the workflows route table).
 ]);
 
 type LoggerContext = Context<{ Variables: { logger?: Logger } }>;

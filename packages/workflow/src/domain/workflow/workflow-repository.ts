@@ -1,5 +1,4 @@
 import type { ResultAsync } from "neverthrow";
-import type { WorkflowNodeKind } from "../node/workflow-node-kind.js";
 import type { WorkflowId } from "../workflow/workflow-id.js";
 import type { WorkflowEntity } from "./workflow-entity.js";
 
@@ -19,41 +18,21 @@ export type WorkflowNotFound = {
 // Surfaced by `get` when a persisted row cannot be mapped back to a
 // valid aggregate. The infrastructure mapper is the sole producer.
 
-/** A persisted scalar or payload shape is incompatible with the domain schema. */
-export type WorkflowCorruption = {
-  readonly type: "WorkflowCorruption";
-  readonly field: string;
-  readonly value: string;
-  readonly allowed: readonly string[];
-};
-
-/** A persisted enum value is outside the current vocabulary. */
-export type WorkflowEnumValueCorruption = {
-  readonly type: "WorkflowEnumValueCorruption";
-  readonly field: string;
-  readonly value: string;
-  readonly allowed: readonly string[];
-};
-
-/** A node kind value has the wrong scalar shape. */
-export type WorkflowNodeKindShape = {
-  readonly type: "WorkflowNodeKindShape";
-  readonly value: unknown;
-};
-
-/** A string node kind is outside the closed substrate kind set. */
-export type WorkflowNodeKindCorruption = {
-  readonly type: "WorkflowNodeKindCorruption";
-  readonly kind: string;
-  readonly allowed: readonly WorkflowNodeKind[];
+/**
+ * A persisted row cannot be rehydrated into a valid aggregate. `subtype`
+ * names the specific corruption class; the optional `field` / `value` /
+ * `allowed` carry diagnostics for logging (never surfaced on the wire).
+ */
+export type WorkflowInvariantViolation = {
+  readonly type: "WorkflowInvariantViolation";
+  readonly subtype: "corruption" | "enumValue" | "nodeKindShape" | "nodeKindValue";
+  readonly field?: string;
+  readonly value?: unknown;
+  readonly allowed?: readonly string[];
 };
 
 /** Corruption atoms emitted when the mapper rehydrates a persisted row. */
-export type WorkflowEntityCorruption =
-  | WorkflowCorruption
-  | WorkflowEnumValueCorruption
-  | WorkflowNodeKindShape
-  | WorkflowNodeKindCorruption;
+export type WorkflowEntityCorruption = WorkflowInvariantViolation;
 
 /** CQRS write-side repository for the mutable workflow aggregate. */
 export interface WorkflowRepository {

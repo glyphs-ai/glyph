@@ -3,7 +3,7 @@
  * the schedule / workflow Problem-table handling.
  */
 
-import type { AgentNotFound, AgentResolutionFailed } from "@glyphs-ai/task";
+import type { AgentNotFound, AgentUnresolvable } from "@glyphs-ai/task";
 
 /** Any task discriminated-union error value — every atom carries a string `type`. */
 export interface TaskUnionError {
@@ -27,6 +27,6 @@ export function taskAgentNotFound(agent: string): AgentNotFound {
  * The catalog `getAgent` lookup threw (catalog unreachable / resolver crash)
  * — infrastructure, not bad caller input, so it maps to a 500 opaque body.
  */
-export function taskAgentResolutionFailed(agent: string, cause: unknown): AgentResolutionFailed {
-  return { type: "AgentResolutionFailed", agent, cause } satisfies AgentResolutionFailed;
+export function taskAgentUnresolvable(agent: string, cause: unknown): AgentUnresolvable {
+  return { type: "AgentUnresolvable", agent, cause } satisfies AgentUnresolvable;
 }

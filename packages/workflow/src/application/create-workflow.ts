@@ -9,9 +9,7 @@ import {
 } from "../domain/workflow/workflow-entity.js";
 import type {
   EmptyParents,
-  MultipleSuccessorCoords,
-  OrphanCoordInsert,
-  ParentState,
+  WorkflowDagConflict,
   WorkflowNodeNotFound,
 } from "../domain/workflow/workflow-entity-errors.js";
 import { generateWorkflowId, WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
@@ -63,10 +61,8 @@ export type CreateWorkflowError =
   | WorkflowNodeNotFound
   | WorkflowAlreadyTerminal
   | DatabaseUnavailable
-  | OrphanCoordInsert
-  | MultipleSuccessorCoords
-  | EmptyParents
-  | ParentState;
+  | WorkflowDagConflict
+  | EmptyParents;
 export interface CreateWorkflowDeps {
   readonly repo: WorkflowRepository;
   readonly coordinator: WorkflowDispatchCoordinator;

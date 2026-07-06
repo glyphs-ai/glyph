@@ -103,7 +103,7 @@ function mapThrownTaskError(e: unknown) {
   if (e instanceof InvalidTransition) return { type: "InvalidTransition" as const, from: e.from };
   if (e instanceof ManagerShuttingDownError) return { type: "ManagerShuttingDown" as const };
   if (e instanceof TaskIdAllocationFailedError)
-    return { type: "WorkdirReservationFailed" as const, cause: e };
+    return { type: "WorkdirFailed" as const, phase: "reserve" as const, cause: e };
   return { type: "DatabaseUnavailable" as const, cause: e };
 }
 

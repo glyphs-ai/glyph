@@ -26,9 +26,8 @@ export type { DatabaseUnavailable, TaskNotFound } from "../domain/task-repositor
 // ─── sandbox (file port) atoms ────────────────────────────────────────
 export type {
   ArtifactListingFailed,
-  WorkdirMaterializationFailed,
+  WorkdirFailed,
   WorkdirRemovalFailed,
-  WorkdirReservationFailed,
 } from "../domain/task-sandbox.js";
 export { type TaskStatus, TaskStatusSchema, type TerminalStatus } from "../domain/task-status.js";
 export { type TaskSuccess, TaskSuccessSchema } from "../domain/task-success.js";

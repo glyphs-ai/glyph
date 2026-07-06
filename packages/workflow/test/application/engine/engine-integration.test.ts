@@ -776,6 +776,9 @@ describe("WorkflowEngine integration", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphTempParentless");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "tempParentless" },
+    });
   });
 });

@@ -10,11 +10,7 @@ import { SessionEntity } from "../domain/session-entity.js";
 import { type SessionId, SessionIdSchema } from "../domain/session-id.js";
 import type { DatabaseUnavailable, SessionRepository } from "../domain/session-repository.js";
 import type { SandboxProvisionFailed, SessionSandbox } from "../domain/session-sandbox.js";
-import type {
-  AgentNotFound,
-  AgentResolutionFailed,
-  AgentResolver,
-} from "./ports/agent-resolver.js";
+import type { AgentNotFound, AgentResolver, AgentUnresolvable } from "./ports/agent-resolver.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 const DEFAULT_RUNTIME = "copilot";
@@ -56,7 +52,7 @@ export type CreateSessionResponse = z.infer<typeof CreateSessionResponseSchema>;
 
 export type CreateSessionError =
   | AgentNotFound
-  | AgentResolutionFailed
+  | AgentUnresolvable
   | SandboxProvisionFailed
   | UnknownRuntime
   | RuntimeProvisionFailed

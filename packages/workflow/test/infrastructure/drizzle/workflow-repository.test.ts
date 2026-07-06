@@ -121,7 +121,10 @@ describe("DrizzleWorkflowRepository — save insert / get round-trip", () => {
       .run();
     const r = await repo.get(wfId(1));
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowEnumValueCorruption");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowInvariantViolation",
+      subtype: "enumValue",
+    });
   });
 });
 

@@ -27,7 +27,7 @@
 
 import type {
   AgentNotFound,
-  AgentResolutionFailed,
+  AgentUnresolvable,
   DispatchTaskResponse as Task,
   TaskModule,
 } from "@glyphs-ai/task";
@@ -360,11 +360,11 @@ describe("respondError contract — 5xx fault log separation", () => {
   });
 });
 
-describe("respondError contract — AgentResolutionFailed 500 path", () => {
-  // The three AgentResolutionFailed flows (task / schedule's-own /
+describe("respondError contract — AgentUnresolvable 500 path", () => {
+  // The three AgentUnresolvable flows (task / schedule's-own /
   // schedule-run-delegated-to-task) all collapse to the SAME opaque
   // wire Problem: 500 with `detail: "internal error"` and
-  // `code: "AgentResolutionFailed"`. The shape is the contract.
+  // `code: "AgentUnresolvable"`. The shape is the contract.
   // Each test pins:
   //   - response status === 500
   //   - body.toEqual(the opaque Problem)
@@ -376,15 +376,15 @@ describe("respondError contract — AgentResolutionFailed 500 path", () => {
     status: 500,
     title: "Internal error",
     detail: "internal error",
-    code: "AgentResolutionFailed",
+    code: "AgentUnresolvable",
   });
 
-  it("tasks route AgentResolutionFailed → 500 + opaque body + 5xx fault log", async () => {
+  it("tasks route AgentUnresolvable → 500 + opaque body + 5xx fault log", async () => {
     const m = stubTaskModule({
       dispatchTask: {
         execute: vi.fn(() =>
           errAsync({
-            type: "AgentResolutionFailed",
+            type: "AgentUnresolvable",
             agent: "public/writer",
             cause: new Error("DB exploded"),
           }),
@@ -413,13 +413,13 @@ describe("respondError contract — AgentResolutionFailed 500 path", () => {
     expect(unmapped).toBeUndefined();
   });
 
-  it("schedules CREATE AgentResolutionFailed (via kind handler) → 500 + opaque body + 5xx fault log", async () => {
+  it("schedules CREATE AgentUnresolvable (via kind handler) → 500 + opaque body + 5xx fault log", async () => {
     const create = vi.fn(() =>
       errAsync({
-        type: "AgentResolutionFailed",
+        type: "AgentUnresolvable",
         agent: "public/writer",
         cause: new Error("DB exploded"),
-      } as AgentResolutionFailed),
+      } as AgentUnresolvable),
     );
     const stub = { createSchedule: { execute: create } } as never;
     const { app, cap } = await buildAppWithLogger((a) => {
@@ -448,7 +448,7 @@ describe("respondError contract — AgentResolutionFailed 500 path", () => {
     expect(unmapped).toBeUndefined();
   });
 
-  it("schedules-run AgentResolutionFailed (delegated) → 500 + opaque body + 5xx fault log", async () => {
+  it("schedules-run AgentUnresolvable (delegated) → 500 + opaque body + 5xx fault log", async () => {
     // POST /schedules/:sid/run delegates to task dispatch; a task
     // resolution fault must surface as 500
     // via the schedules policy's task-code entry. Without that row,
@@ -456,10 +456,10 @@ describe("respondError contract — AgentResolutionFailed 500 path", () => {
     const sid = "550e8400-e29b-41d4-a716-446655440000";
     const run = vi.fn(() =>
       errAsync({
-        type: "AgentResolutionFailed",
+        type: "AgentUnresolvable",
         agent: "public/writer",
         cause: new Error("DB exploded"),
-      } as AgentResolutionFailed),
+      } as AgentUnresolvable),
     );
     const stub = { runSchedule: { execute: run } } as never;
     const { app, cap } = await buildAppWithLogger((a) => {

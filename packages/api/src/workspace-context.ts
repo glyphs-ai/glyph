@@ -12,8 +12,8 @@ import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
 import { composeScheduleModule, type ScheduleModule } from "@glyphs-ai/schedule";
 import {
   type AgentNotFound,
-  type AgentResolutionFailed,
   type AgentResolver,
+  type AgentUnresolvable,
   composeSessionModule,
   type ResolvedAgent,
   type SessionModule,
@@ -479,22 +479,22 @@ export class WorkspaceContextRegistry {
           catalogModule.resolveAgent
             .execute({ id: agent as AgentFqn })
             .map((resolved): ResolvedAgent => resolved)
-            .mapErr((e): AgentNotFound | AgentResolutionFailed =>
+            .mapErr((e): AgentNotFound | AgentUnresolvable =>
               e.type === "AgentNotFound"
                 ? { type: "AgentNotFound", agent }
-                : { type: "AgentResolutionFailed", agent, cause: e },
+                : { type: "AgentUnresolvable", agent, cause: e },
             ),
       };
       // task's AgentResolver port needs `resolve` (shared with the
       // session resolver above) + `getEntry` (dispatch-time readiness).
       // `catalogPorts.getAgentEntry` already returns task's AgentEntry
       // shape; wrap its promise on the Result rail and surface any throw
-      // as `AgentResolutionFailed`.
+      // as `AgentUnresolvable`.
       const taskAgentResolver: TaskAgentResolver = {
         resolve: agentResolver.resolve,
         getEntry: (agent) =>
           ResultAsync.fromPromise(catalogPorts.getAgentEntry(agent), (cause) => ({
-            type: "AgentResolutionFailed" as const,
+            type: "AgentUnresolvable" as const,
             agent,
             cause,
           })),

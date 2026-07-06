@@ -2,7 +2,7 @@ import type { HandlerFault, ScheduleKindHandler } from "@glyphs-ai/schedule";
 import type { TaskModule } from "@glyphs-ai/task";
 import { TaskBriefSchema } from "@glyphs-ai/task";
 import { err, ok, type Result, ResultAsync } from "neverthrow";
-import { taskAgentNotFound, taskAgentResolutionFailed } from "./_task-operation-error.js";
+import { taskAgentNotFound, taskAgentUnresolvable } from "./_task-operation-error.js";
 
 /** Concrete task-target shape this handler validates + persists as opaque `data`. */
 interface TaskTargetData {
@@ -117,7 +117,7 @@ export function makeTaskKindHandler(opts: {
             try {
               found = await catalog.getAgent(obj.agent as string);
             } catch (cause) {
-              return err({ cause: taskAgentResolutionFailed(obj.agent as string, cause) });
+              return err({ cause: taskAgentUnresolvable(obj.agent as string, cause) });
             }
             if (found === null) return err({ cause: taskAgentNotFound(obj.agent as string) });
           }

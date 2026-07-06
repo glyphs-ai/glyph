@@ -7,16 +7,13 @@ import type { TaskEntity } from "../domain/task-entity.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { type TaskId, TaskIdSchema } from "../domain/task-id.js";
 import type { DatabaseUnavailable } from "../domain/task-repository.js";
-import type {
-  WorkdirMaterializationFailed,
-  WorkdirReservationFailed,
-} from "../domain/task-sandbox.js";
+import type { WorkdirFailed } from "../domain/task-sandbox.js";
 import { TaskStatusSchema } from "../domain/task-status.js";
 import { TaskSuccessSchema } from "../domain/task-success.js";
 import type {
   AgentNotFound,
-  AgentResolutionFailed,
   AgentResolver,
+  AgentUnresolvable,
   BlockedReason,
 } from "./ports/agent-resolver.js";
 import {
@@ -134,11 +131,10 @@ export type DispatchTaskError =
   | DispatchKernelEnvCollision
   | AgentNotFound
   | EntryNotReady
-  | AgentResolutionFailed
+  | AgentUnresolvable
   | RuntimeDoesNotSupportTasks
   // The stateful spawn pipeline's faults (from TaskSupervisor.runDispatch):
-  | WorkdirReservationFailed
-  | WorkdirMaterializationFailed
+  | WorkdirFailed
   | DatabaseUnavailable
   | RuntimeHeadlessLaunchFailed;
 

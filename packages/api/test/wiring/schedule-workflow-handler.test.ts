@@ -11,7 +11,7 @@
  *     `coordinatorAgent` is not in `changedKeys` (patch-when-catalog-down)
  *   - `validate` returns `WorkflowTargetInvalid` on unknown /
  *     not-coord-eligible agent, but wraps catalog throws as task
- *     `AgentResolutionFailed` unions (→ 500 opaque)
+ *     `AgentUnresolvable` unions (→ 500 opaque)
  *   - `mergePatch` RFC 7396 semantics + `changedKeys` accuracy
  *   - `dispatch` synthesises `originId: scheduleId` + `metadata: { firedAt }`,
  *     conditional-spreads `details`, returns `{ id }`
@@ -290,11 +290,11 @@ describe("makeWorkflowKindHandler.validate — catalog cross-check + coord-eligi
     );
   });
 
-  it("returns task-pkg's AgentResolutionFailed DU when the catalog throws", async () => {
+  it("returns task-pkg's AgentUnresolvable DU when the catalog throws", async () => {
     const deps = stubDeps({ getAgentThrows: new Error("catalog DB down") });
     const h = makeHandler(deps);
     const fault = await expectErr(h.validate({ coordinatorAgent: "coord", brief: "x" }));
-    expect(fault.cause).toMatchObject({ type: "AgentResolutionFailed", agent: "coord" });
+    expect(fault.cause).toMatchObject({ type: "AgentUnresolvable", agent: "coord" });
     // Must NOT echo the raw catalog error string back to the caller.
     expect(String(fault.cause)).not.toMatch(/catalog DB down/);
   });

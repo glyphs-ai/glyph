@@ -17,12 +17,9 @@ import type { WorkflowCancellation } from "./workflow-cancellation.js";
 import { computePhaseFromParents, structuralLeaves, wouldCreateCycle } from "./workflow-dag.js";
 import { parentsReadyForKind } from "./workflow-dispatch-readiness.js";
 import type {
-  DagInvariant,
   EmptyParents,
-  MultipleSuccessorCoords,
-  OrphanCoordInsert,
-  ParentState,
   SubgraphError,
+  WorkflowDagConflict,
   WorkflowNodeNotFound,
   WorkflowNodeNotMutable,
 } from "./workflow-entity-errors.js";
@@ -243,12 +240,7 @@ export class WorkflowEntity {
     readonly nowIso: string;
   }): Result<
     { readonly nodeId: WorkflowNodeId; readonly phase: number },
-    | WorkflowAlreadyTerminal
-    | EmptyParents
-    | ParentState
-    | OrphanCoordInsert
-    | MultipleSuccessorCoords
-    | WorkflowNodeNotFound
+    WorkflowAlreadyTerminal | EmptyParents | WorkflowDagConflict | WorkflowNodeNotFound
   > {
     const running = this.requireRunning();
     if (running.isErr()) return err(running.error);
@@ -298,10 +290,7 @@ export class WorkflowEntity {
     },
     | WorkflowAlreadyTerminal
     | SubgraphError
-    | DagInvariant
-    | ParentState
-    | OrphanCoordInsert
-    | MultipleSuccessorCoords
+    | WorkflowDagConflict
     | WorkflowNodeNotFound
     | WorkflowNodeNotMutable
   > {
@@ -337,10 +326,13 @@ export class WorkflowEntity {
     for (const edge of allNewEdges) {
       if (wouldCreateCycle(simulatedEdges, edge))
         return err({
-          type: "WorkflowSubgraphCyclic",
-          workflowId: this.id,
-          from: edge.from,
-          to: edge.to,
+          type: "WorkflowSubgraphInvalid",
+          reason: {
+            kind: "cyclic",
+            workflowId: this.id,
+            from: edge.from,
+            to: edge.to,
+          },
         });
       simulatedEdges.push(edge);
     }
@@ -351,10 +343,13 @@ export class WorkflowEntity {
       const full = inputByTemp.get(node.tempId);
       if (full === undefined)
         return err({
-          type: "WorkflowSubgraphNodeRefUnresolved",
-          workflowId: this.id,
-          refKind: "temp",
-          refValue: node.tempId,
+          type: "WorkflowSubgraphInvalid",
+          reason: {
+            kind: "nodeRefUnresolved",
+            workflowId: this.id,
+            refKind: "temp",
+            refValue: node.tempId,
+          },
         });
       const parentIds = parentIdsForTemp(
         node.tempId,
@@ -401,10 +396,13 @@ export class WorkflowEntity {
     const finalLeaves = structuralLeaves([...this.nodes, ...insertedNodes], simulatedEdges);
     if (!(finalLeaves.length === 1 && finalLeaves[0]?.kind === COORDINATOR_KIND))
       return err({
-        type: "DagInvariant",
-        workflowId: this.id,
-        actualLeafIds: finalLeaves.map((node) => node.id),
-        actualLeafKinds: finalLeaves.map((node) => node.kind),
+        type: "WorkflowDagConflict",
+        reason: {
+          kind: "invariant",
+          workflowId: this.id,
+          actualLeafIds: finalLeaves.map((node) => node.id),
+          actualLeafKinds: finalLeaves.map((node) => node.kind),
+        },
       });
     this._nodes.push(...insertedNodes);
     this._edges.push(
@@ -435,7 +433,7 @@ export class WorkflowEntity {
     readonly nowIso: string;
   }): Result<
     { readonly nodeId: WorkflowNodeId; readonly phase: number },
-    WorkflowAlreadyTerminal | WorkflowNodeNotFound | OrphanCoordInsert | MultipleSuccessorCoords
+    WorkflowAlreadyTerminal | WorkflowNodeNotFound | WorkflowDagConflict
   > {
     const running = this.requireRunning();
     if (running.isErr()) return err(running.error);
@@ -681,16 +679,19 @@ export class WorkflowEntity {
   private rejectBadParentsForKind(
     kind: WorkflowNodeKind,
     parents: readonly WorkflowNodeEntity[],
-  ): Result<void, ParentState> {
+  ): Result<void, WorkflowDagConflict> {
     if (kind !== WORKER_KIND && kind !== HUMAN_KIND) return ok(undefined);
     for (const parent of parents)
       if (parent.status === "failed" || parent.status === "cancelled")
         return err({
-          type: "ParentState",
-          workflowId: this.id,
-          nodeKind: kind,
-          parentNodeId: parent.id,
-          parentStatus: parent.status,
+          type: "WorkflowDagConflict",
+          reason: {
+            kind: "parentState",
+            workflowId: this.id,
+            nodeKind: kind,
+            parentNodeId: parent.id,
+            parentStatus: parent.status,
+          },
         });
     return ok(undefined);
   }
@@ -699,12 +700,15 @@ export class WorkflowEntity {
     parentEntities: readonly WorkflowNodeEntity[],
     extraEdges: readonly { readonly from: WorkflowNodeId; readonly to: WorkflowNodeId }[] = [],
     extraNodes: readonly WorkflowNodeEntity[] = [],
-  ): Result<void, OrphanCoordInsert | MultipleSuccessorCoords> {
+  ): Result<void, WorkflowDagConflict> {
     const coordParents = parentEntities.filter((parent) => parent.kind === COORDINATOR_KIND);
     if (coordParents.length === 0) {
       if (parentEntities.length === 0 && this.latestCoordIdWith(extraNodes) === null)
         return ok(undefined);
-      return err({ type: "OrphanCoordInsert", workflowId: this.id });
+      return err({
+        type: "WorkflowDagConflict",
+        reason: { kind: "orphanCoordInsert", workflowId: this.id },
+      });
     }
     const nodesById = new Map([...this.nodes, ...extraNodes].map((node) => [node.id, node]));
     const edges = [...this.edges.map((edge) => ({ from: edge.from, to: edge.to })), ...extraEdges];
@@ -717,9 +721,12 @@ export class WorkflowEntity {
           .some((child) => child?.kind === COORDINATOR_KIND)
       )
         return err({
-          type: "MultipleSuccessorCoords",
-          workflowId: this.id,
-          coordParentNodeId: coordParent.id,
+          type: "WorkflowDagConflict",
+          reason: {
+            kind: "successorCoordExists",
+            workflowId: this.id,
+            coordParentNodeId: coordParent.id,
+          },
         });
     }
     return ok(undefined);
@@ -877,38 +884,49 @@ export function validateSubgraphShape(
   nodes: readonly SubgraphTempNodeShape[],
   edges: readonly SubgraphEdgeShape[],
 ): Result<void, SubgraphError> {
-  if (nodes.length === 0) return err({ type: "WorkflowSubgraphEmpty" });
+  if (nodes.length === 0)
+    return err({ type: "WorkflowSubgraphInvalid", reason: { kind: "empty" } });
   const tempIds = new Set<string>();
   let coordCount = 0;
   for (const node of nodes) {
     if (typeof node.tempId !== "string" || node.tempId.length === 0)
       return err({
-        type: "WorkflowSubgraphTempIdInvalid",
-        reason: "tempId must be a non-empty string",
+        type: "WorkflowSubgraphInvalid",
+        reason: { kind: "tempIdInvalid", message: "tempId must be a non-empty string" },
       });
     if (tempIds.has(node.tempId))
       return err({
-        type: "WorkflowSubgraphTempIdInvalid",
-        reason: `duplicate tempId "${node.tempId}"`,
+        type: "WorkflowSubgraphInvalid",
+        reason: { kind: "tempIdInvalid", message: `duplicate tempId "${node.tempId}"` },
       });
     tempIds.add(node.tempId);
     if (node.kind === COORDINATOR_KIND) coordCount++;
   }
-  if (coordCount > 1) return err({ type: "WorkflowSubgraphMultipleCoordTemps", workflowId });
+  if (coordCount > 1)
+    return err({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "multipleCoordTemps", workflowId },
+    });
   for (const edge of edges) {
     if (edge.from.kind === "temp" && !tempIds.has(edge.from.tempId))
       return err({
-        type: "WorkflowSubgraphNodeRefUnresolved",
-        workflowId,
-        refKind: "temp",
-        refValue: edge.from.tempId,
+        type: "WorkflowSubgraphInvalid",
+        reason: {
+          kind: "nodeRefUnresolved",
+          workflowId,
+          refKind: "temp",
+          refValue: edge.from.tempId,
+        },
       });
     if (edge.to.kind === "temp" && !tempIds.has(edge.to.tempId))
       return err({
-        type: "WorkflowSubgraphNodeRefUnresolved",
-        workflowId,
-        refKind: "temp",
-        refValue: edge.to.tempId,
+        type: "WorkflowSubgraphInvalid",
+        reason: {
+          kind: "nodeRefUnresolved",
+          workflowId,
+          refKind: "temp",
+          refValue: edge.to.tempId,
+        },
       });
   }
   const intraIncoming = new Map<string, number>();
@@ -919,7 +937,10 @@ export function validateSubgraphShape(
   for (const node of nodes) {
     const parentCount = node.existingParents.length + (intraIncoming.get(node.tempId) ?? 0);
     if (parentCount === 0)
-      return err({ type: "WorkflowSubgraphTempParentless", tempId: node.tempId });
+      return err({
+        type: "WorkflowSubgraphInvalid",
+        reason: { kind: "tempParentless", tempId: node.tempId },
+      });
   }
   return ok(undefined);
 }
@@ -939,17 +960,23 @@ export function resolveSubgraphTopology(
   for (const edge of edges) {
     if (edge.from.kind === "temp" && !byTempId.has(edge.from.tempId))
       return err({
-        type: "WorkflowSubgraphNodeRefUnresolved",
-        workflowId,
-        refKind: "temp",
-        refValue: edge.from.tempId,
+        type: "WorkflowSubgraphInvalid",
+        reason: {
+          kind: "nodeRefUnresolved",
+          workflowId,
+          refKind: "temp",
+          refValue: edge.from.tempId,
+        },
       });
     if (edge.to.kind === "temp" && !byTempId.has(edge.to.tempId))
       return err({
-        type: "WorkflowSubgraphNodeRefUnresolved",
-        workflowId,
-        refKind: "temp",
-        refValue: edge.to.tempId,
+        type: "WorkflowSubgraphInvalid",
+        reason: {
+          kind: "nodeRefUnresolved",
+          workflowId,
+          refKind: "temp",
+          refValue: edge.to.tempId,
+        },
       });
     if (edge.from.kind === "temp" && edge.to.kind === "temp") {
       outAdj.get(edge.from.tempId)?.push(edge.to.tempId);
@@ -987,13 +1014,19 @@ export function resolveSubgraphTopology(
         !processed.has(edge.to.tempId)
       )
         return err({
-          type: "WorkflowSubgraphCyclic",
-          workflowId,
-          from: edge.from.tempId,
-          to: edge.to.tempId,
+          type: "WorkflowSubgraphInvalid",
+          reason: {
+            kind: "cyclic",
+            workflowId,
+            from: edge.from.tempId,
+            to: edge.to.tempId,
+          },
         });
     const tempId = nodes.find((node) => !processed.has(node.tempId))?.tempId ?? "<unknown>";
-    return err({ type: "WorkflowSubgraphCyclic", workflowId, from: tempId, to: tempId });
+    return err({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "cyclic", workflowId, from: tempId, to: tempId },
+    });
   }
   return ok(order);
 }

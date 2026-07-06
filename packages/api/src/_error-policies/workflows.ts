@@ -89,25 +89,26 @@ const WORKFLOW_ATOM_TABLE = {
     title: "Node must have a parent",
     detail: () => "node must have at least one parent",
   },
-  WorkflowSubgraphEmpty: {
+  WorkflowSubgraphInvalid: {
     status: 422,
-    title: "Subgraph empty",
-    detail: () => "subgraph must contain at least one node",
-  },
-  WorkflowSubgraphTempIdInvalid: {
-    status: 422,
-    title: "Subgraph temp id invalid",
-    detail: (err) => err.reason,
-  },
-  WorkflowSubgraphTempParentless: {
-    status: 422,
-    title: "Subgraph temp node parentless",
-    detail: (err) => `temp node has no parent: ${err.tempId}`,
-  },
-  WorkflowSubgraphNodeRefUnresolved: {
-    status: 422,
-    title: "Subgraph node ref unresolved",
-    detail: (err) => `subgraph node ref unresolved: ${err.refValue}`,
+    title: "Subgraph invalid",
+    detail: (err) => {
+      switch (err.reason.kind) {
+        case "empty":
+          return "subgraph must contain at least one node";
+        case "tempIdInvalid":
+          return err.reason.message;
+        case "tempParentless":
+          return `temp node has no parent: ${err.reason.tempId}`;
+        case "nodeRefUnresolved":
+          return `subgraph node ref unresolved: ${err.reason.refValue}`;
+        case "cyclic":
+          return "subgraph would create a cycle";
+        case "multipleCoordTemps":
+          return "subgraph contains multiple coordinator temp nodes";
+      }
+    },
+    extension: (err) => ({ reason: err.reason }),
   },
   HumanNodeResponseInvalid: {
     status: 422,
@@ -135,41 +136,24 @@ const WORKFLOW_ATOM_TABLE = {
       transition: opts.transition ?? "delete",
     }),
   },
-  MultipleSuccessorCoords: {
+  WorkflowDagConflict: {
     status: 409,
-    title: "Multiple successor coordinators",
-    detail: () => "coordinator node already has a successor coordinator",
+    title: "Workflow DAG conflict",
+    detail: (err) => {
+      switch (err.reason.kind) {
+        case "successorCoordExists":
+          return "coordinator node already has a successor coordinator";
+        case "orphanCoordInsert":
+          return "coordinator insert would orphan the DAG frontier";
+        case "parentState":
+          return `parent ${err.reason.parentNodeId} is ${err.reason.parentStatus}; cannot attach ${err.reason.nodeKind}`;
+        case "invariant":
+          return "workflow DAG invariant violation";
+      }
+    },
+    extension: (err) => ({ reason: err.reason }),
   },
-  OrphanCoordInsert: {
-    status: 409,
-    title: "Orphan coordinator insert",
-    detail: () => "coordinator insert would orphan the DAG frontier",
-  },
-  ParentState: {
-    status: 409,
-    title: "Parent state conflict",
-    detail: (err) =>
-      `parent ${err.parentNodeId} is ${err.parentStatus}; cannot attach ${err.nodeKind}`,
-  },
-  WorkflowSubgraphCyclic: {
-    status: 422,
-    title: "Subgraph cyclic",
-    detail: () => "subgraph would create a cycle",
-  },
-  WorkflowSubgraphMultipleCoordTemps: {
-    status: 422,
-    title: "Subgraph has multiple coordinator temps",
-    detail: () => "subgraph contains multiple coordinator temp nodes",
-  },
-  DagInvariant: {
-    status: 409,
-    title: "Workflow DAG invariant violation",
-    detail: () => "workflow DAG invariant violation",
-  },
-  WorkflowCorruption: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  WorkflowEnumValueCorruption: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  WorkflowNodeKindShape: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  WorkflowNodeKindCorruption: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  WorkflowInvariantViolation: { status: 500, title: "Internal error", detail: () => INTERNAL },
   DatabaseUnavailable: { status: 503, title: "Internal error", detail: () => INTERNAL },
   WorkflowDirReservationFailed: { status: 503, title: "Internal error", detail: () => INTERNAL },
 } satisfies DomainProblemTable<WorkflowRouteError>;

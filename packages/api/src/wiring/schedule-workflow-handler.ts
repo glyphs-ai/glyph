@@ -3,7 +3,7 @@ import type { TaskId, TaskModule } from "@glyphs-ai/task";
 import type { WorkflowModule } from "@glyphs-ai/workflow";
 import { WorkflowBriefSchema } from "@glyphs-ai/workflow";
 import { err, ok, type Result, ResultAsync } from "neverthrow";
-import { taskAgentResolutionFailed } from "./_task-operation-error.js";
+import { taskAgentUnresolvable } from "./_task-operation-error.js";
 
 /** Concrete workflow-target shape this handler validates + persists as opaque `data`. */
 interface WorkflowTargetData {
@@ -55,7 +55,7 @@ interface CatalogAgentLookup {
  *
  * Error policy mirrors the task handler and the `/workflows` create
  * path: catalog *resolution / infra* failure surfaces as the task
- * `AgentResolutionFailed` union (→ 500, opaque body) so a transient
+ * `AgentUnresolvable` union (→ 500, opaque body) so a transient
  * catalog outage never masquerades as a 400 bad-request that leaks the
  * underlying error string. Genuine validation failures (unknown
  * coordinatorAgent, not coord-eligible, malformed brief) stay
@@ -129,7 +129,7 @@ export function makeWorkflowKindHandler(opts: {
               // error (→ 500 opaque) rather than a 400 that would falsely
               // blame the caller and echo the raw error message.
               return err({
-                cause: taskAgentResolutionFailed(obj.coordinatorAgent as string, cause),
+                cause: taskAgentUnresolvable(obj.coordinatorAgent as string, cause),
               });
             }
             if (found === null) {

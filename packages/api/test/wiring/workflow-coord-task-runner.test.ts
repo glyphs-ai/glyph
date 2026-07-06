@@ -9,7 +9,7 @@
  * exercise:
  *
  *   - validate: strict coord spec shape + agent-existence lookup
- *     (`AgentNotFound` / `AgentResolutionFailed` task unions)
+ *     (`AgentNotFound` / `AgentUnresolvable` task unions)
  *   - dispatch: reads the workflow header via `getService` thunk;
  *     synthesises `origin: 'workflow'` + canonical
  *     node id in the typed `origin_id` column (reverse-lookup); conditional
@@ -328,7 +328,7 @@ describe("makeCoordNodeRunner — validate", () => {
     await r.dispose();
   });
 
-  it("U10: throws AgentResolutionFailed DU carrying the cause when catalog throws", async () => {
+  it("U10: throws AgentUnresolvable DU carrying the cause when catalog throws", async () => {
     const cause = new Error("catalog down");
     const deps = stubDeps({ getAgentThrows: cause });
     const r = makeCoordNodeRunner({
@@ -338,8 +338,8 @@ describe("makeCoordNodeRunner — validate", () => {
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     const captured = await errCause(r.validate({ agent: "x" }, NODE_VALIDATE_CTX));
-    expect(captured).toMatchObject({ type: "AgentResolutionFailed", agent: "x" });
-    // The AgentResolutionFailed atom carries the original error as `cause`.
+    expect(captured).toMatchObject({ type: "AgentUnresolvable", agent: "x" });
+    // The AgentUnresolvable atom carries the original error as `cause`.
     expect((captured as { cause?: unknown }).cause).toBe(cause);
     await r.dispose();
   });

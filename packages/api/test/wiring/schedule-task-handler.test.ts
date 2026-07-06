@@ -9,7 +9,7 @@
  *     `agent` is not in `changedKeys` (the patch-when-catalog-down
  *     property the service preserves)
  *   - `validate` wraps null catalog hits as task `AgentNotFound`
- *     unions, and catalog throws as `AgentResolutionFailed` unions
+ *     unions, and catalog throws as `AgentUnresolvable` unions
  *   - `mergePatch` RFC 7396 semantics + `changedKeys` accuracy
  *   - `dispatch` synthesises `origin: "schedule"` +
  *     `originId: scheduleId` + `metadata: { firedAt }`, conditional-spreads
@@ -215,11 +215,11 @@ describe("makeTaskKindHandler.validate — catalog cross-check", () => {
     expect(fault.cause).toEqual({ type: "AgentNotFound", agent: "ghost" });
   });
 
-  it("returns task-pkg's AgentResolutionFailed DU on any other catalog throw", async () => {
+  it("returns task-pkg's AgentUnresolvable DU on any other catalog throw", async () => {
     const deps = stubDeps({ getAgentThrows: new Error("DB exploded") });
     const h = makeTaskKindHandler({ catalog: deps.catalog, tasks: deps.tasks });
     const fault = await expectErr(h.validate({ agent: "writer", brief: "x" }));
-    expect(fault.cause).toMatchObject({ type: "AgentResolutionFailed", agent: "writer" });
+    expect(fault.cause).toMatchObject({ type: "AgentUnresolvable", agent: "writer" });
   });
 });
 

@@ -75,8 +75,8 @@ export {
 // ─── host-supplied ports ───────────────────────────────────────────
 export type {
   AgentNotFound,
-  AgentResolutionFailed,
   AgentResolver,
+  AgentUnresolvable,
 } from "./application/ports/agent-resolver.js";
 // ─── curated domain surface (SessionId, error atoms) ───────────────
 // Funnelled through session-public so this file never mentions

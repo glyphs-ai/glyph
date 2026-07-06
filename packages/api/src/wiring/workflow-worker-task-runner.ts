@@ -23,7 +23,7 @@
  *
  * `validate(spec, _)` checks the inbound payload shape and verifies
  * the named agent exists in the catalog, surfacing a missing / failed
- * lookup as task's `AgentNotFound` / `AgentResolutionFailed` union
+ * lookup as task's `AgentNotFound` / `AgentUnresolvable` union
  * — matching `schedule-task-handler.ts`'s precedent.
  *
  * Agent errors propagate as raw task DU atoms so the schedule / workflow
@@ -79,7 +79,7 @@ import type {
 } from "@glyphs-ai/workflow";
 import { err, ok, okAsync, type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
-import { taskAgentNotFound, taskAgentResolutionFailed } from "./_task-operation-error.js";
+import { taskAgentNotFound, taskAgentUnresolvable } from "./_task-operation-error.js";
 import type { WorkflowWorkerNodeSpec } from "./workflow-node-specs.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
@@ -257,7 +257,7 @@ export function makeWorkerNodeRunner(
           try {
             found = await catalog.getAgent(obj.agent);
           } catch (cause) {
-            return err({ cause: taskAgentResolutionFailed(obj.agent, cause) });
+            return err({ cause: taskAgentUnresolvable(obj.agent, cause) });
           }
           if (found === null) return err({ cause: taskAgentNotFound(obj.agent) });
 
@@ -273,7 +273,7 @@ export function makeWorkerNodeRunner(
           try {
             coordAgent = await catalog.getAgent(ctx.coordinatorAgent);
           } catch (cause) {
-            return err({ cause: taskAgentResolutionFailed(ctx.coordinatorAgent, cause) });
+            return err({ cause: taskAgentUnresolvable(ctx.coordinatorAgent, cause) });
           }
           if (coordAgent === null) {
             // Defensive: the substrate denorm should have kept this in
