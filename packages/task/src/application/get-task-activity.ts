@@ -16,10 +16,9 @@ import {
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 /**
- * Hard upper bound on how many activity items a single page may request —
- * a safety cap (guards runaway reads). A property of the read operation, so
- * it lives here and is re-exported for any HTTP/CLI surface that projects
- * this query.
+ * Hard upper bound on how many activity items a single page may request — a
+ * safety cap that guards runaway reads and the `max` the request schema
+ * enforces.
  */
 export const TASK_ACTIVITY_MAX_LIMIT = 500;
 

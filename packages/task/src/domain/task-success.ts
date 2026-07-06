@@ -13,9 +13,7 @@ export const TaskSuccessSchema = z.object({
   output: z.string().nullable(),
   /**
    * Paths (POSIX, relative to `<workdir>/artifact/`) of every file captured
-   * under that dir at terminal time. Rows written before the switch to
-   * relative storage hold absolute paths; the read projection normalizes
-   * those to the same relative identity.
+   * under that dir at terminal time.
    */
   artifacts: z.array(z.string()).readonly().optional(),
 });
