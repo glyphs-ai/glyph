@@ -34,10 +34,10 @@ function makeRunner() {
   // Validator does not call into the service, so a never-invoked
   // getter is enough — keeps the runner constructor happy without
   // standing up a real WorkflowModule.
-  const getService = () => {
-    throw new Error("getService should not be called from validate()");
+  const getModule = () => {
+    throw new Error("getModule should not be called from validate()");
   };
-  return makeHumanNodeRunner({ getService: getService as unknown as () => WorkflowModule });
+  return makeHumanNodeRunner({ getModule: getModule as unknown as () => WorkflowModule });
 }
 
 describe("makeHumanNodeRunner — validate", () => {

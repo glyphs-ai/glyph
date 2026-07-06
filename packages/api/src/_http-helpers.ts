@@ -4,7 +4,7 @@
  * Every route module builds its sub-app with {@link createApiApp} so the
  * whole mount tree is `OpenAPIHono` and the assembled spec carries every
  * route. The factory installs a `defaultHook` that converts a failed zod
- * request validation into the RFC 9457 `ValidationError` Problem
+ * request validation into the `ValidationError` Problem
  * (`application/problem+json`), consistent with the Problem envelope that
  * `respondProblem` produces for business errors.
  *
@@ -63,10 +63,10 @@ export function createApiApp<E extends Env = Env>(): OpenAPIHono<E> {
       return err.getResponse();
     }
     // Service-layer input-schema parse failures (a `Schema.parse(...)`
-    // call in `WorkspaceService.register` / `open` etc.) surface here
-    // as a thrown `ZodError`. Convert to the same `ValidationError`
-    // Problem `defaultHook` produces so body validation and
-    // service-input validation look identical on the wire.
+    // call inside a workspace use-case such as `registerWorkspace` /
+    // `openWorkspace`) surface here as a thrown `ZodError`. Convert to
+    // the same `ValidationError` Problem `defaultHook` produces so body
+    // validation and service-input validation look identical on the wire.
     if (err instanceof ZodError) {
       return c.json(validationProblem(zodValidationIssues(err)), 400, {
         "content-type": PROBLEM_CONTENT_TYPE,
@@ -120,9 +120,6 @@ export function errorResponse(description: string) {
 
 /** The assembled OpenAPI 3.1 document, as produced by `getOpenAPI31Document`. */
 type OpenApiDocument = ReturnType<OpenAPIHono["getOpenAPI31Document"]>;
-/** Config accepted by `getOpenAPI31Document` (openapi version + `info` block). */
-// biome-ignore lint/correctness/noUnusedVariables: kept with OpenApiDocument for the document helper type pair.
-type OpenApiDocumentConfig = Parameters<OpenAPIHono["getOpenAPI31Document"]>[0];
 
 const OPENAPI_HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
 

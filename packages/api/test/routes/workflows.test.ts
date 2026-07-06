@@ -5,7 +5,7 @@
  * coord-callback mutation surface.
  *
  * Assertion surface:
- *   - happy-path passthrough to the injected `WorkflowService` stub
+ *   - happy-path passthrough to the injected `WorkflowModule` stub
  *   - input validation 400s (status query, create body shape,
  *     mutation body shapes, tagged NodeRef arms)
  *   - 404 mapping for `WorkflowNotFoundError`

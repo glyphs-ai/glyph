@@ -12,7 +12,7 @@ interface WorkflowTargetData {
   readonly details?: string;
 }
 
-/** RFC 7396 deep-merge patch for a workflow target (`null` deletes an optional). */
+/** Deep-merge patch for a workflow target (`null` deletes an optional). */
 interface WorkflowTargetPatch {
   readonly coordinatorAgent?: string;
   readonly brief?: string;
@@ -43,8 +43,8 @@ interface CatalogAgentLookup {
  *
  *   - workflow-target shape validation
  *   - coordinator-agent existence + coord-eligibility lookup
- *   - RFC 7396 deep-merge of workflow target patches
- *   - origin/originId synthesis for `WorkflowService.createWorkflow`
+ *   - deep-merge of workflow target patches
+ *   - origin/originId synthesis for `WorkflowModule.createWorkflow`
  *   - lifecycle delegation for `hasInFlightForSchedule` /
  *     `deleteForSchedule`
  *

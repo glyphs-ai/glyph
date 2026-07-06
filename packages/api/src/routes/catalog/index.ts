@@ -18,8 +18,8 @@ const CatalogOverviewSchema = z.object({
 
 /**
  * Workspace-scoped catalog routes. The routes pull a per-workspace
- * `CatalogModule` ({@link CatalogModule} writes + {@link CatalogModule}
- * reads) off the Hono context, set up by the workspace middleware.
+ * `CatalogModule` (both catalog writes and reads) off the Hono context,
+ * set up by the workspace middleware.
  *
  * Tests can pass a `CatalogModule` directly. The catalog brings its
  * own `FetcherRegistry` via `CatalogModuleOpts.fetchers`; routes don't

@@ -1,7 +1,7 @@
 /**
  * End-to-end acceptance test for thecoord-callback HTTP surface.
  *
- * Scope: spin up a real `WorkflowService` (in-memory SQLite, mock per-
+ * Scope: spin up a real `WorkflowModule` (in-memory SQLite, mock per-
  * kind runners), mount `workflowsRoutes` against it, then drive a
  * complete workflow lifecycle via HTTP. Asserts the wire shapes and
  * status codes for the live (substrate-backed) round-trip — distinct

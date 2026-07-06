@@ -8,16 +8,13 @@
  * this; UI surfaces (`@glyphs-ai/dashboard`, `@glyphs-ai/cli`) speak HTTP
  * and don't see this layer at all.
  *
- * Wire contracts (route catalog, request / response body types, leaf
- * path helpers) live in the `./wire` subtree. This barrel re-exports
- * them so `@glyphs-ai/server` has a single import site for both
- * orchestration and contracts. UI surfaces (`@glyphs-ai/dashboard`,
- * `@glyphs-ai/cli`) instead consume the same shapes through the
+ * This barrel gives `@glyphs-ai/server` a single import site for the
+ * whole layer: the `composeApplication` root, the mountable route
+ * factories, and the shared HTTP error / Problem-envelope surface the
+ * routes and the server's error seam use. Dashboard and cli never
+ * import it — they consume the same response shapes through the
  * generated `@glyphs-ai/sdk`, which keeps orchestration out of their
- * dep graph structurally (not just by convention).
- *
- * See `docs/architecture.md § Tier model` for the full layering
- * rationale.
+ * dep graph structurally, not just by convention.
  */
 
 export { catalogErrorPolicy } from "./_error-policies/catalog.js";
@@ -91,7 +88,7 @@ export { sessionsRoutes } from "./routes/sessions.js";
 export { tasksRoutes } from "./routes/tasks.js";
 export { workflowsRoutes } from "./routes/workflows.js";
 export { workspacesRoutes } from "./routes/workspaces.js";
-// RFC 9457 Problem envelope — the global HTTP error wire shape.
+// Problem envelope — the global HTTP error wire shape.
 // Only the symbols external consumers (server middleware, tests, and
 // downstream clients that hand-build a Problem) actually need are exposed.
 // `kebabCase` / `problemTypeUri` / `PROBLEM_TYPE_PREFIX` / `PROBLEM_JSON_SCHEMA`

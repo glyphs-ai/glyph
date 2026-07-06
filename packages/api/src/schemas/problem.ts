@@ -1,5 +1,5 @@
 /**
- * RFC 9457 Problem Details — the single wire shape for every HTTP error.
+ * Problem Details — the single wire shape for every HTTP error.
  *
  * This module is the transport-agnostic source of truth for the error
  * envelope: the zod schema (runtime validation + SDK codegen), the
@@ -8,7 +8,7 @@
  * `hono` / `@hono/zod-openapi` import — the architecture fence keeps the
  * wire schema pure zod, exactly like the other `schemas/*` modules.
  *
- * Wire shape (RFC 9457 §3):
+ * Wire shape:
  *
  * ```json
  * {
@@ -22,24 +22,25 @@
  * }
  * ```
  *
- * - **RFC 9457 core**: `type` (URI), `title`, `status`, `detail`,
+ * - **Core members**: `type` (URI), `title`, `status`, `detail`,
  *   `instance?`.
  * - **Glyph extensions**: `code` (machine-stable discriminator = a DU
  *   `.type` or class `.name`) plus atom-specific members (`agent`,
- *   `reason`, `transition`, `fromStatus`, `field`, `issues`, …). RFC 9457
- *   §3.2 explicitly permits arbitrary extension members.
+ *   `reason`, `transition`, `fromStatus`, `field`, `issues`, …).
+ *   Arbitrary extension members beyond the named ones are permitted.
  * - **Content-Type**: `application/problem+json`.
  */
 
 import { z } from "zod";
 
-/** The media type every error response carries (RFC 9457 §3). */
+/** The media type every error response carries. */
 export const PROBLEM_CONTENT_TYPE = "application/problem+json";
 
 /**
  * Stable prefix for the `type` URI. Not required to resolve to a served
- * document — RFC 9457 §4.1 allows an API-controlled URI as a stable
- * identifier. `toProblem` derives the full URI mechanically from `code`.
+ * document — an API-controlled URI is allowed to serve purely as a
+ * stable identifier. `toProblem` derives the full URI mechanically from
+ * `code`.
  */
 export const PROBLEM_TYPE_PREFIX = "https://errors.glyph.ai/";
 
@@ -51,9 +52,9 @@ export const ProblemIssueSchema = z.object({
 export type ProblemIssue = z.infer<typeof ProblemIssueSchema>;
 
 /**
- * The RFC 9457 Problem Details object plus glyph extensions. `catchall`
- * keeps the object open so extension members beyond the named ones round
- * trip through validation (RFC 9457 §3.2).
+ * The Problem Details object plus glyph extensions. `catchall` keeps the
+ * object open so extension members beyond the named ones round trip
+ * through validation.
  */
 export const ProblemSchema = z
   .object({

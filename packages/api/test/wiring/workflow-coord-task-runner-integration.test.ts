@@ -8,9 +8,9 @@
  * dir for no extra coverage of THIS runner's behavior).
  *
  * Two-phase init demonstration: the coord runner is built with a
- * `getService` thunk that closes over a mutable holder; after
+ * `getModule` thunk that closes over a mutable holder; after
  * `composeWorkflowModule` returns, the holder is populated with the
- * actual `WorkflowService`. Mirrors the engine ↔ service two-phase
+ * actual `WorkflowModule`. Mirrors the engine ↔ module two-phase
  * init in `@glyphs-ai/workflow`.
  *
  * The worker runner is a passthrough stub that never gets exercised
@@ -108,7 +108,7 @@ async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
   const coordRunner = makeCoordNodeRunner({
     tasks,
     catalog,
-    getService: () => {
+    getModule: () => {
       const s = serviceHolder.service;
       if (s === null) {
         throw new Error(

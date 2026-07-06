@@ -163,7 +163,7 @@ export function unmappedFaultMeta(
  * `code`, plus optional builders for the per-occurrence `detail` string
  * and the extension members (`agent`, `reason`, `transition`, …).
  *
- * `title` is the RFC 9457 problem-type summary — stable across
+ * `title` is the problem-type summary — stable across
  * occurrences. `detail` is the occurrence-specific message (today's
  * flattened error string). `extension` carries the atom-specific fields
  * the CLI / dashboard branch on. Both builders receive the route `opts`
@@ -182,10 +182,9 @@ export interface ProblemDef {
 
 /**
  * A per-domain error table: `code → {status, title, detail?, extension?}`.
- * Replaces the old twin `STATUS_BY_TYPE` + `MESSAGE_BY_TYPE` maps with a
- * single composite lookup. Each domain (tasks / sessions / workspaces /
- * schedules / workflows / catalog) owns its own table so same-named codes
- * from different domains map independently.
+ * Each domain (tasks / sessions / workspaces / schedules / workflows /
+ * catalog) owns its own table so same-named codes from different domains
+ * map independently.
  */
 export type ProblemTable = Readonly<Record<string, ProblemDef>>;
 

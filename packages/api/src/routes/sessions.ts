@@ -167,8 +167,8 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
   // Default ("archive"): only the metadata row is removed; workdir +
   // runtime per-session state preserved. `?purge=1` ("hard delete"):
   // row + workdir + runtime state all gone. The query validator is
-  // permissive (`purge` as a free string) to preserve the legacy
-  // `=== "1"` semantics — any other value is treated as "off", not 400.
+  // permissive (`purge` as a free string) so only the exact value `"1"`
+  // enables purge — any other value is treated as "off", not 400.
   // Delete is idempotent: an already-absent session still returns 204.
   app.openapi(
     createRoute({
