@@ -48,7 +48,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       summary: "List registered workspaces",
       responses: {
         200: jsonResponse(ListWorkspacesResponseSchema, "Registered workspaces"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -76,6 +76,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
         400: errorResponse("Malformed request body"),
         409: errorResponse("Workspace directory already registered"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -104,7 +105,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       summary: "Get the current workspace id",
       responses: {
         200: jsonResponse(GetLastOpenedWorkspaceIdResponseSchema, "Current workspace id (or null)"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -134,7 +135,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
         200: jsonResponse(GetLastOpenedWorkspaceIdResponseSchema, "Selected workspace id"),
         400: errorResponse("Malformed request body"),
         404: errorResponse("Workspace not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -165,7 +166,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       responses: {
         200: jsonResponse(GetWorkspaceResponseSchema, "Workspace"),
         404: errorResponse("Workspace not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -206,7 +207,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
         200: jsonResponse(GetWorkspaceResponseSchema, "Updated workspace"),
         400: errorResponse("Malformed request body"),
         404: errorResponse("Workspace not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -253,7 +254,7 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       },
       responses: {
         204: errorResponse("Deleted (no content)"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {

@@ -34,7 +34,7 @@ const INTERNAL = "internal error";
 
 export const SESSION_TABLE = {
   SessionNotFound: { status: 404, title: "Session not found", detail: () => "session not found" },
-  AgentNotFound: { status: 400, title: "Agent not found", detail: () => "agent not found" },
+  AgentNotFound: { status: 404, title: "Agent not found", detail: () => "agent not found" },
   UnknownRuntime: { status: 400, title: "Unknown runtime", detail: () => "unknown runtime" },
   RuntimeStateDeletionFailed: {
     status: 409,
@@ -49,7 +49,7 @@ export const SESSION_TABLE = {
   AgentResolutionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
   SandboxProvisionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
   RuntimeProvisionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  DatabaseUnavailable: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  DatabaseUnavailable: { status: 503, title: "Internal error", detail: () => INTERNAL },
 } satisfies DomainProblemTable<SessionRouteError>;
 
 export interface RespondSessionErrorOpts {

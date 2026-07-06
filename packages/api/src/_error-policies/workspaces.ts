@@ -56,7 +56,7 @@ const WORKSPACE_TABLE: Readonly<Record<WorkspaceCode, WorkspaceDef>> = {
     title: "Workspace path conflict",
     detail: () => "workspace directory already registered",
   },
-  DatabaseUnavailable: { status: 500, title: "Internal error", detail: () => "internal error" },
+  DatabaseUnavailable: { status: 503, title: "Internal error", detail: () => "internal error" },
   ProvisioningFailed: { status: 500, title: "Internal error", detail: () => "internal error" },
   WorkspaceHasLiveTasksError: {
     status: 409,

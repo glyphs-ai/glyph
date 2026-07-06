@@ -54,14 +54,14 @@ const INTERNAL = "internal error";
  */
 export const TASK_TABLE = {
   TaskNotFound: { status: 404, title: "Task not found", detail: () => "task not found" },
-  AgentNotFound: { status: 400, title: "Agent not found", detail: () => "agent not found" },
+  AgentNotFound: { status: 404, title: "Agent not found", detail: () => "agent not found" },
   RuntimeDoesNotSupportTasks: {
-    status: 400,
+    status: 501,
     title: "Runtime does not support tasks",
     detail: () => "runtime does not support task dispatch",
   },
   DispatchKernelEnvCollision: {
-    status: 400,
+    status: 422,
     title: "Dispatch kernel env collision",
     detail: () => "subprocess env key collides with a kernel key",
   },
@@ -89,9 +89,9 @@ export const TASK_TABLE = {
     detail: () => "task manager is shutting down",
   },
   AgentResolutionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  WorkdirReservationFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  WorkdirMaterializationFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  DatabaseUnavailable: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  WorkdirReservationFailed: { status: 503, title: "Internal error", detail: () => INTERNAL },
+  WorkdirMaterializationFailed: { status: 503, title: "Internal error", detail: () => INTERNAL },
+  DatabaseUnavailable: { status: 503, title: "Internal error", detail: () => INTERNAL },
   RuntimeHeadlessLaunchFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
   RuntimeActivityReadFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
   CorruptedTask: { status: 500, title: "Internal error", detail: () => INTERNAL },

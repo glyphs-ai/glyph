@@ -74,7 +74,8 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
         400: errorResponse("Malformed request body"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Agent not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -104,7 +105,8 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(GetAgentContentResponseSchema.omit({ id: true }), "Anchor content"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Agent not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -142,7 +144,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
           "File entries, or raw file bytes when ?path= is set",
         ),
         404: errorResponse("File not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -205,7 +207,7 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
           "Agent with content",
         ),
         404: errorResponse("Agent not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -242,7 +244,8 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       responses: {
         201: jsonResponse(ApplyPlanResponseSchema, "Install result"),
         400: errorResponse("Malformed request body"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Agent not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -282,7 +285,8 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Agent not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -321,7 +325,6 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
         200: jsonResponse(ApplyPlanResponseSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
         410: errorResponse("Plan token expired or already applied"),
-        500: errorResponse("Internal error"),
       },
     }),
     async (c) => {
@@ -362,7 +365,8 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(GetAgentResponseSchema, "Agent"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Agent not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -394,7 +398,8 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(GetAgentResponseSchema, "Agent"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Agent not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -426,7 +431,8 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(GetAgentResponseSchema, "Agent"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Agent not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -458,8 +464,9 @@ export function agentsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(z.object({ ok: z.literal(true) }), "Deleted"),
+        404: errorResponse("Agent not found"),
         409: errorResponse("Agent still has dependents"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {

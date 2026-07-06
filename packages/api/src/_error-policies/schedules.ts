@@ -101,7 +101,7 @@ const SCHEDULE_ATOM_TABLE = {
   },
   ScheduleKindNotRegistered: { status: 500, title: "Internal error", detail: () => INTERNAL },
   ScheduleCorruption: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  DatabaseUnavailable: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  DatabaseUnavailable: { status: 503, title: "Internal error", detail: () => INTERNAL },
 } satisfies DomainProblemTable<ScheduleRouteAtom>;
 
 /**

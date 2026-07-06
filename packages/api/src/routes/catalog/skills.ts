@@ -76,7 +76,8 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
         400: errorResponse("Malformed request body"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Skill not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -106,7 +107,8 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(GetSkillContentResponseSchema.omit({ id: true }), "Anchor content"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Skill not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -144,7 +146,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
           "File entries, or raw file bytes when ?path= is set",
         ),
         404: errorResponse("File not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -207,7 +209,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
           "Skill with content",
         ),
         404: errorResponse("Skill not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -244,7 +246,8 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       responses: {
         201: jsonResponse(ApplyPlanResponseSchema, "Install result"),
         400: errorResponse("Malformed request body"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Skill not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -284,7 +287,8 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(ResolveManifestSchema, "Resolve manifest"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Skill not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -327,7 +331,6 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
         200: jsonResponse(ApplyPlanResponseSchema, "Sync result"),
         400: errorResponse("Malformed request body"),
         410: errorResponse("Plan token expired or already applied"),
-        500: errorResponse("Internal error"),
       },
     }),
     async (c) => {
@@ -372,7 +375,8 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(GetSkillResponseSchema, "Skill"),
-        500: errorResponse("Internal error"),
+        404: errorResponse("Skill not found"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -404,8 +408,9 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
       request: { params: z.object({ scope: z.string().min(1), name: z.string().min(1) }) },
       responses: {
         200: jsonResponse(z.object({ ok: z.literal(true) }), "Deleted"),
+        404: errorResponse("Skill not found"),
         409: errorResponse("Skill still has dependents"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {

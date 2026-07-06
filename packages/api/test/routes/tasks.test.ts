@@ -462,7 +462,7 @@ describe("tasksRoutes", () => {
     });
   });
 
-  it("POST / maps AgentNotFoundError to 400", async () => {
+  it("POST / maps AgentNotFoundError to 404", async () => {
     const m = stubManager({
       dispatch: vi.fn(async () => {
         throw new AgentNotFoundError("ghost");
@@ -473,12 +473,12 @@ describe("tasksRoutes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ agent: "ghost", brief: "go" }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
     const body = await jsonBody(res);
     expect(body.code).toBe("AgentNotFound");
   });
 
-  it("POST / maps RuntimeDoesNotSupportTasksError to 400", async () => {
+  it("POST / maps RuntimeDoesNotSupportTasksError to 501", async () => {
     const m = stubManager({
       dispatch: vi.fn(async () => {
         throw new RuntimeDoesNotSupportTasksError("unsupported-runtime");
@@ -489,7 +489,7 @@ describe("tasksRoutes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ agent: "writer", brief: "go" }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(501);
     const body = await jsonBody(res);
     expect(body.code).toBe("RuntimeDoesNotSupportTasks");
   });
@@ -615,7 +615,7 @@ describe("tasksRoutes", () => {
       }),
     });
     const res = await tasksRoutes(() => m).request("/bad");
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
   });
 
   it("DELETE /:tid returns 204", async () => {
@@ -647,7 +647,7 @@ describe("tasksRoutes", () => {
 
   // Server-side faults must not be reported as client-input errors.
   // Both classes match the analogous mappings in sessions.ts.
-  it("POST / maps TaskIdAllocationFailedError to 500 (server-side fs collision)", async () => {
+  it("POST / maps TaskIdAllocationFailedError to 503 (server-side fs collision)", async () => {
     const m = stubManager({
       dispatch: vi.fn(async () => {
         throw new TaskIdAllocationFailedError(5);
@@ -658,7 +658,7 @@ describe("tasksRoutes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ agent: "writer", brief: "x" }),
     });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
   });
 
   describe("GET /:tid/activity", () => {
@@ -1088,7 +1088,7 @@ describe("tasksRoutes", () => {
       return { app, cap };
     };
 
-    it("GET /: logs unmapped error from TaskModule.listTasks.execute and returns 500 internal error", async () => {
+    it("GET /: logs unmapped error from TaskModule.listTasks.execute and returns 503 internal error", async () => {
       const m = stubManager({
         list: vi.fn(async () => {
           throw new Error("metadata.jsonl read failed");
@@ -1096,7 +1096,7 @@ describe("tasksRoutes", () => {
       });
       const { app, cap } = await buildAppWithLogger(m);
       const res = await app.request("/");
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       const body = await jsonBody(res);
       expect(body.detail).toBe("internal error");
 
@@ -1109,7 +1109,7 @@ describe("tasksRoutes", () => {
       expect((fault?.err as { type?: string } | undefined)?.type).toBe("DatabaseUnavailable");
     });
 
-    it("POST /: logs the unmapped error AND returns 500 internal error on the wire", async () => {
+    it("POST /: logs the unmapped error AND returns 503 internal error on the wire", async () => {
       const m = stubManager({
         dispatch: vi.fn(async () => {
           // A bare `Error` is NOT on the task error policy.
@@ -1126,7 +1126,7 @@ describe("tasksRoutes", () => {
         body: JSON.stringify({ agent: "writer", brief: "go" }),
       });
       // Wire body unchanged — SAFE_ERROR_NAMES whitelist still flattens.
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       const body = await jsonBody(res);
       expect(body.detail).toBe("internal error");
 
@@ -1156,7 +1156,7 @@ describe("tasksRoutes", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ agent: "ghost", brief: "go" }),
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(404);
       // Critical: no "unmapped" log entry for a mapped 4xx. This is
       // the policy split — only unrecognised classes fall into the
       // observability bucket; recognised 4xx stay quiet.
@@ -1172,7 +1172,7 @@ describe("tasksRoutes", () => {
       });
       const { app, cap } = await buildAppWithLogger(m);
       const res = await app.request(`/${sampleTask.id}`);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
       expect(fault).toBeDefined();
       expect(fault?.msg).toBe("tasks.get: 5xx fault");
@@ -1190,7 +1190,7 @@ describe("tasksRoutes", () => {
       });
       const { app, cap } = await buildAppWithLogger(m);
       const res = await app.request(`/${sampleTask.id}?purge=1`, { method: "DELETE" });
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
       expect(fault).toBeDefined();
       expect(fault?.msg).toBe("tasks.delete: 5xx fault");
@@ -1206,7 +1206,7 @@ describe("tasksRoutes", () => {
       });
       const { app, cap } = await buildAppWithLogger(m);
       const res = await app.request(`/${sampleTask.id}/cancel`, { method: "POST" });
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
       expect(fault).toBeDefined();
       expect(fault?.msg).toBe("tasks.cancel: 5xx fault");
@@ -1221,7 +1221,7 @@ describe("tasksRoutes", () => {
       });
       const { app, cap } = await buildAppWithLogger(m);
       const res = await app.request(`/${sampleTask.id}/activity`);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
       expect(fault).toBeDefined();
       expect(fault?.msg).toBe("tasks.activity: 5xx fault");
@@ -1239,7 +1239,7 @@ describe("tasksRoutes", () => {
       });
       const { app, cap } = await buildAppWithLogger(m);
       const res = await app.request(`/${sampleTask.id}/artifact?path=out.txt`);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       const body = await jsonBody(res);
       expect(body.detail).toBe("internal error");
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
@@ -1265,7 +1265,7 @@ describe("tasksRoutes", () => {
       });
       const { app, cap } = await buildAppWithLogger(m);
       const res = await app.request(`/${sampleTask.id}/activity/stream`);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       const body = await jsonBody(res);
       expect(body.detail).toBe("internal error");
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
@@ -1276,7 +1276,7 @@ describe("tasksRoutes", () => {
 
     it("POST /: still surfaces mapped 5xx faults (TaskIdAllocationFailedError) WITHOUT the unmapped label", async () => {
       // TaskIdAllocationFailedError is on the task error policy:
-      // status=500, isUnmapped=false, `"tasks: 5xx fault"` log line.
+      // status=503, isUnmapped=false, `"tasks: 5xx fault"` log line.
       const m = stubManager({
         dispatch: vi.fn(async () => {
           throw new TaskIdAllocationFailedError(5);
@@ -1288,12 +1288,12 @@ describe("tasksRoutes", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ agent: "writer", brief: "x" }),
       });
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       // The 5xx fault log fires (existing behaviour).
       const fivexx = cap.entries.find((e) => e.msg === "tasks: 5xx fault");
       expect(fivexx).toBeDefined();
       // The unmapped log does NOT fire — the error class IS mapped,
-      // just to 500 rather than 4xx. This split keeps the two
+      // just to 503 rather than 4xx. This split keeps the two
       // observability buckets from overlapping in the log stream.
       const unmapped = cap.entries.find((e) => e.msg?.includes("5xx fault"));
       expect(unmapped).toBeDefined();

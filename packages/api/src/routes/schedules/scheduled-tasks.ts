@@ -131,7 +131,7 @@ export function schedulesTaskRoutes(resolve: ScheduleServiceResolver): OpenAPIHo
           "Task schedules",
         ),
         400: errorResponse("Malformed query"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -179,6 +179,7 @@ export function schedulesTaskRoutes(resolve: ScheduleServiceResolver): OpenAPIHo
         400: errorResponse("Malformed request body"),
         404: errorResponse("Agent not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -227,8 +228,9 @@ export function schedulesTaskRoutes(resolve: ScheduleServiceResolver): OpenAPIHo
           }),
           "Task schedule",
         ),
+        400: errorResponse("Invalid schedule id"),
         404: errorResponse("Schedule not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -281,6 +283,7 @@ export function schedulesTaskRoutes(resolve: ScheduleServiceResolver): OpenAPIHo
         400: errorResponse("Malformed request body"),
         404: errorResponse("Schedule not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -332,9 +335,11 @@ export function schedulesTaskRoutes(resolve: ScheduleServiceResolver): OpenAPIHo
           DeleteScheduleResponseSchema.extend({ ok: z.literal(true) }),
           "Delete outcome",
         ),
+        400: errorResponse("Invalid schedule id"),
         404: errorResponse("Schedule not found"),
         409: errorResponse("Schedule enabled or has in-flight dispatch"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -363,8 +368,10 @@ export function schedulesTaskRoutes(resolve: ScheduleServiceResolver): OpenAPIHo
       request: { params: z.object({ sid: z.string() }) },
       responses: {
         200: jsonResponse(RunScheduleResponseSchema, "Dispatch id"),
+        400: errorResponse("Invalid schedule id"),
         404: errorResponse("Schedule not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -398,7 +405,7 @@ export function schedulesTaskRoutes(resolve: ScheduleServiceResolver): OpenAPIHo
         200: jsonResponse(PreviewScheduleResponseSchema, "Schedule preview"),
         400: errorResponse("Malformed query"),
         404: errorResponse("Schedule not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -461,7 +468,7 @@ export function scheduledTasksRoutes(resolve: (c: Context) => TaskModule): OpenA
       responses: {
         200: jsonResponse(ListTasksResponseSchema, "Tasks"),
         400: errorResponse("Malformed query"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {

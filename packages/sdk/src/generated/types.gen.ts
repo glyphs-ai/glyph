@@ -131,9 +131,9 @@ export type GetApiWorkspacesData = {
 
 export type GetApiWorkspacesErrors = {
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesError = GetApiWorkspacesErrors[keyof GetApiWorkspacesErrors];
@@ -176,6 +176,10 @@ export type PostApiWorkspacesErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesError = PostApiWorkspacesErrors[keyof PostApiWorkspacesErrors];
@@ -204,9 +208,9 @@ export type GetApiWorkspacesCurrentData = {
 
 export type GetApiWorkspacesCurrentErrors = {
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesCurrentError = GetApiWorkspacesCurrentErrors[keyof GetApiWorkspacesCurrentErrors];
@@ -241,9 +245,9 @@ export type PutApiWorkspacesCurrentErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type PutApiWorkspacesCurrentError = PutApiWorkspacesCurrentErrors[keyof PutApiWorkspacesCurrentErrors];
@@ -270,9 +274,9 @@ export type DeleteApiWorkspacesByIdData = {
 
 export type DeleteApiWorkspacesByIdErrors = {
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdError = DeleteApiWorkspacesByIdErrors[keyof DeleteApiWorkspacesByIdErrors];
@@ -301,9 +305,9 @@ export type GetApiWorkspacesByIdErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdError = GetApiWorkspacesByIdErrors[keyof GetApiWorkspacesByIdErrors];
@@ -344,9 +348,9 @@ export type PatchApiWorkspacesByIdErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type PatchApiWorkspacesByIdError = PatchApiWorkspacesByIdErrors[keyof PatchApiWorkspacesByIdErrors];
@@ -420,9 +424,9 @@ export type GetApiWorkspacesByIdSessionsErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdSessionsError = GetApiWorkspacesByIdSessionsErrors[keyof GetApiWorkspacesByIdSessionsErrors];
@@ -464,9 +468,17 @@ export type PostApiWorkspacesByIdSessionsErrors = {
      */
     400: Problem;
     /**
+     * Agent not found
+     */
+    404: Problem;
+    /**
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdSessionsError = PostApiWorkspacesByIdSessionsErrors[keyof PostApiWorkspacesByIdSessionsErrors];
@@ -504,13 +516,17 @@ export type DeleteApiWorkspacesByIdSessionsBySidData = {
 
 export type DeleteApiWorkspacesByIdSessionsBySidErrors = {
     /**
+     * Unknown runtime
+     */
+    400: Problem;
+    /**
      * Runtime state / workdir removal failed
      */
     409: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdSessionsBySidError = DeleteApiWorkspacesByIdSessionsBySidErrors[keyof DeleteApiWorkspacesByIdSessionsBySidErrors];
@@ -540,9 +556,9 @@ export type GetApiWorkspacesByIdSessionsBySidErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdSessionsBySidError = GetApiWorkspacesByIdSessionsBySidErrors[keyof GetApiWorkspacesByIdSessionsBySidErrors];
@@ -629,9 +645,9 @@ export type GetApiWorkspacesByIdTasksErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdTasksError = GetApiWorkspacesByIdTasksErrors[keyof GetApiWorkspacesByIdTasksErrors];
@@ -702,9 +718,29 @@ export type PostApiWorkspacesByIdTasksErrors = {
      */
     400: Problem;
     /**
+     * Agent not found
+     */
+    404: Problem;
+    /**
+     * Task entry not ready
+     */
+    409: Problem;
+    /**
+     * Unprocessable entity
+     */
+    422: Problem;
+    /**
      * Internal error
      */
     500: Problem;
+    /**
+     * Runtime does not support tasks
+     */
+    501: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdTasksError = PostApiWorkspacesByIdTasksErrors[keyof PostApiWorkspacesByIdTasksErrors];
@@ -773,9 +809,9 @@ export type GetApiWorkspacesByIdTasksByOriginErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdTasksByOriginError = GetApiWorkspacesByIdTasksByOriginErrors[keyof GetApiWorkspacesByIdTasksByOriginErrors];
@@ -851,6 +887,10 @@ export type DeleteApiWorkspacesByIdTasksByTidErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdTasksByTidError = DeleteApiWorkspacesByIdTasksByTidErrors[keyof DeleteApiWorkspacesByIdTasksByTidErrors];
@@ -880,9 +920,9 @@ export type GetApiWorkspacesByIdTasksByTidErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdTasksByTidError = GetApiWorkspacesByIdTasksByTidErrors[keyof GetApiWorkspacesByIdTasksByTidErrors];
@@ -1032,9 +1072,9 @@ export type GetApiWorkspacesByIdTasksByTidArtifactErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdTasksByTidArtifactError = GetApiWorkspacesByIdTasksByTidArtifactErrors[keyof GetApiWorkspacesByIdTasksByTidArtifactErrors];
@@ -1073,6 +1113,10 @@ export type GetApiWorkspacesByIdTasksByTidActivityErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdTasksByTidActivityError = GetApiWorkspacesByIdTasksByTidActivityErrors[keyof GetApiWorkspacesByIdTasksByTidActivityErrors];
@@ -1201,9 +1245,9 @@ export type GetApiWorkspacesByIdTasksByTidActivityStreamErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdTasksByTidActivityStreamError = GetApiWorkspacesByIdTasksByTidActivityStreamErrors[keyof GetApiWorkspacesByIdTasksByTidActivityStreamErrors];
@@ -1331,9 +1375,9 @@ export type GetApiWorkspacesByIdScheduledTasksErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdScheduledTasksError = GetApiWorkspacesByIdScheduledTasksErrors[keyof GetApiWorkspacesByIdScheduledTasksErrors];
@@ -1397,9 +1441,9 @@ export type GetApiWorkspacesByIdScheduledWorkflowsData = {
 
 export type GetApiWorkspacesByIdScheduledWorkflowsErrors = {
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdScheduledWorkflowsError = GetApiWorkspacesByIdScheduledWorkflowsErrors[keyof GetApiWorkspacesByIdScheduledWorkflowsErrors];
@@ -1460,9 +1504,9 @@ export type GetApiWorkspacesByIdSchedulesTaskErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdSchedulesTaskError = GetApiWorkspacesByIdSchedulesTaskErrors[keyof GetApiWorkspacesByIdSchedulesTaskErrors];
@@ -1531,6 +1575,10 @@ export type PostApiWorkspacesByIdSchedulesTaskErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdSchedulesTaskError = PostApiWorkspacesByIdSchedulesTaskErrors[keyof PostApiWorkspacesByIdSchedulesTaskErrors];
@@ -1575,6 +1623,10 @@ export type DeleteApiWorkspacesByIdSchedulesTaskBySidData = {
 
 export type DeleteApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
+     * Invalid schedule id
+     */
+    400: Problem;
+    /**
      * Schedule not found
      */
     404: Problem;
@@ -1586,6 +1638,10 @@ export type DeleteApiWorkspacesByIdSchedulesTaskBySidErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdSchedulesTaskBySidError = DeleteApiWorkspacesByIdSchedulesTaskBySidErrors[keyof DeleteApiWorkspacesByIdSchedulesTaskBySidErrors];
@@ -1614,13 +1670,17 @@ export type GetApiWorkspacesByIdSchedulesTaskBySidData = {
 
 export type GetApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
+     * Invalid schedule id
+     */
+    400: Problem;
+    /**
      * Schedule not found
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdSchedulesTaskBySidError = GetApiWorkspacesByIdSchedulesTaskBySidErrors[keyof GetApiWorkspacesByIdSchedulesTaskBySidErrors];
@@ -1691,6 +1751,10 @@ export type PatchApiWorkspacesByIdSchedulesTaskBySidErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PatchApiWorkspacesByIdSchedulesTaskBySidError = PatchApiWorkspacesByIdSchedulesTaskBySidErrors[keyof PatchApiWorkspacesByIdSchedulesTaskBySidErrors];
@@ -1735,6 +1799,10 @@ export type PostApiWorkspacesByIdSchedulesTaskBySidRunData = {
 
 export type PostApiWorkspacesByIdSchedulesTaskBySidRunErrors = {
     /**
+     * Invalid schedule id
+     */
+    400: Problem;
+    /**
      * Schedule not found
      */
     404: Problem;
@@ -1742,6 +1810,10 @@ export type PostApiWorkspacesByIdSchedulesTaskBySidRunErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdSchedulesTaskBySidRunError = PostApiWorkspacesByIdSchedulesTaskBySidRunErrors[keyof PostApiWorkspacesByIdSchedulesTaskBySidRunErrors];
@@ -1779,9 +1851,9 @@ export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewError = GetApiWorkspacesByIdSchedulesTaskBySidPreviewErrors[keyof GetApiWorkspacesByIdSchedulesTaskBySidPreviewErrors];
@@ -1816,9 +1888,9 @@ export type GetApiWorkspacesByIdSchedulesWorkflowErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdSchedulesWorkflowError = GetApiWorkspacesByIdSchedulesWorkflowErrors[keyof GetApiWorkspacesByIdSchedulesWorkflowErrors];
@@ -1882,13 +1954,13 @@ export type PostApiWorkspacesByIdSchedulesWorkflowErrors = {
      */
     400: Problem;
     /**
-     * Coordinator agent not found
-     */
-    404: Problem;
-    /**
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdSchedulesWorkflowError = PostApiWorkspacesByIdSchedulesWorkflowErrors[keyof PostApiWorkspacesByIdSchedulesWorkflowErrors];
@@ -1936,6 +2008,10 @@ export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidData = {
 
 export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
     /**
+     * Invalid schedule id
+     */
+    400: Problem;
+    /**
      * Schedule not found
      */
     404: Problem;
@@ -1947,6 +2023,10 @@ export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidError = DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors[keyof DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors];
@@ -1975,13 +2055,17 @@ export type GetApiWorkspacesByIdSchedulesWorkflowBySidData = {
 
 export type GetApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
     /**
+     * Invalid schedule id
+     */
+    400: Problem;
+    /**
      * Schedule not found
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdSchedulesWorkflowBySidError = GetApiWorkspacesByIdSchedulesWorkflowBySidErrors[keyof GetApiWorkspacesByIdSchedulesWorkflowBySidErrors];
@@ -2054,6 +2138,10 @@ export type PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PatchApiWorkspacesByIdSchedulesWorkflowBySidError = PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors[keyof PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors];
@@ -2101,6 +2189,10 @@ export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunData = {
 
 export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors = {
     /**
+     * Invalid schedule id
+     */
+    400: Problem;
+    /**
      * Schedule not found
      */
     404: Problem;
@@ -2108,6 +2200,10 @@ export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunError = PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors[keyof PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors];
@@ -2145,9 +2241,9 @@ export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewError = GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewErrors[keyof GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewErrors];
@@ -2221,9 +2317,9 @@ export type GetApiWorkspacesByIdWorkflowsErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdWorkflowsError = GetApiWorkspacesByIdWorkflowsErrors[keyof GetApiWorkspacesByIdWorkflowsErrors];
@@ -2289,9 +2385,25 @@ export type PostApiWorkspacesByIdWorkflowsErrors = {
      */
     404: Problem;
     /**
+     * Workflow state conflict
+     */
+    409: Problem;
+    /**
+     * Unprocessable entity
+     */
+    422: Problem;
+    /**
      * Internal error
      */
     500: Problem;
+    /**
+     * Runtime does not support tasks
+     */
+    501: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdWorkflowsError = PostApiWorkspacesByIdWorkflowsErrors[keyof PostApiWorkspacesByIdWorkflowsErrors];
@@ -2359,6 +2471,10 @@ export type DeleteApiWorkspacesByIdWorkflowsByWfidErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdWorkflowsByWfidError = DeleteApiWorkspacesByIdWorkflowsByWfidErrors[keyof DeleteApiWorkspacesByIdWorkflowsByWfidErrors];
@@ -2391,6 +2507,10 @@ export type GetApiWorkspacesByIdWorkflowsByWfidErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdWorkflowsByWfidError = GetApiWorkspacesByIdWorkflowsByWfidErrors[keyof GetApiWorkspacesByIdWorkflowsByWfidErrors];
@@ -2452,6 +2572,10 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdWorkflowsByWfidDagError = GetApiWorkspacesByIdWorkflowsByWfidDagErrors[keyof GetApiWorkspacesByIdWorkflowsByWfidDagErrors];
@@ -2536,6 +2660,10 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidError = GetApiWorkspacesByIdWorkflowsByWfidNodesByNidErrors[keyof GetApiWorkspacesByIdWorkflowsByWfidNodesByNidErrors];
@@ -2595,6 +2723,10 @@ export type PostApiWorkspacesByIdWorkflowsByWfidCancelErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdWorkflowsByWfidCancelError = PostApiWorkspacesByIdWorkflowsByWfidCancelErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidCancelErrors];
@@ -2764,9 +2896,21 @@ export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors = {
      */
     409: Problem;
     /**
+     * Unprocessable entity
+     */
+    422: Problem;
+    /**
      * Internal error
      */
     500: Problem;
+    /**
+     * Runtime does not support tasks
+     */
+    501: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphError = PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors];
@@ -2810,6 +2954,10 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelError = PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelErrors];
@@ -2875,6 +3023,10 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishErrors = {
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdWorkflowsByWfidFinishError = PostApiWorkspacesByIdWorkflowsByWfidFinishErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidFinishErrors];
@@ -2943,13 +3095,17 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors = {
      */
     404: Problem;
     /**
-     * Node not awaiting input
+     * Unprocessable entity
      */
-    409: Problem;
+    422: Problem;
     /**
      * Internal error
      */
     500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondError = PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors];
@@ -3059,9 +3215,13 @@ export type PostApiWorkspacesByIdCatalogSkillsErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Skill not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogSkillsError = PostApiWorkspacesByIdCatalogSkillsErrors[keyof PostApiWorkspacesByIdCatalogSkillsErrors];
@@ -3132,9 +3292,13 @@ export type PostApiWorkspacesByIdCatalogSkillsResolveErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Skill not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogSkillsResolveError = PostApiWorkspacesByIdCatalogSkillsResolveErrors[keyof PostApiWorkspacesByIdCatalogSkillsResolveErrors];
@@ -3226,9 +3390,13 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorData = {
 
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorErrors = {
     /**
-     * Internal error
+     * Skill not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorError = GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorErrors[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorErrors];
@@ -3263,9 +3431,9 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesError = GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesErrors[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesErrors];
@@ -3295,13 +3463,17 @@ export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameData = {
 
 export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
     /**
+     * Skill not found
+     */
+    404: Problem;
+    /**
      * Skill still has dependents
      */
     409: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameError = DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors[keyof DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors];
@@ -3334,9 +3506,9 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameError = GetApiWorkspacesByIdCatalogSkillsByScopeByNameErrors[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameErrors];
@@ -3402,9 +3574,13 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveData = {
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveErrors = {
     /**
-     * Internal error
+     * Skill not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveError = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveErrors[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveErrors];
@@ -3505,10 +3681,6 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors = {
      * Plan token expired or already applied
      */
     410: Problem;
-    /**
-     * Internal error
-     */
-    500: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncError = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors];
@@ -3575,9 +3747,13 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsDat
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsErrors = {
     /**
-     * Internal error
+     * Skill not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsError = PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsErrors[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsErrors];
@@ -3695,9 +3871,13 @@ export type PostApiWorkspacesByIdCatalogAgentsErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Agent not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogAgentsError = PostApiWorkspacesByIdCatalogAgentsErrors[keyof PostApiWorkspacesByIdCatalogAgentsErrors];
@@ -3768,9 +3948,13 @@ export type PostApiWorkspacesByIdCatalogAgentsResolveErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * Agent not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogAgentsResolveError = PostApiWorkspacesByIdCatalogAgentsResolveErrors[keyof PostApiWorkspacesByIdCatalogAgentsResolveErrors];
@@ -3862,9 +4046,13 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorData = {
 
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorErrors = {
     /**
-     * Internal error
+     * Agent not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorError = GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorErrors[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorErrors];
@@ -3899,9 +4087,9 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesError = GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesErrors[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesErrors];
@@ -3931,13 +4119,17 @@ export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameData = {
 
 export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
     /**
+     * Agent not found
+     */
+    404: Problem;
+    /**
      * Agent still has dependents
      */
     409: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameError = DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors[keyof DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors];
@@ -3970,9 +4162,9 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameError = GetApiWorkspacesByIdCatalogAgentsByScopeByNameErrors[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameErrors];
@@ -4042,9 +4234,13 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveData = {
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveErrors = {
     /**
-     * Internal error
+     * Agent not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveErrors];
@@ -4145,10 +4341,6 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors = {
      * Plan token expired or already applied
      */
     410: Problem;
-    /**
-     * Internal error
-     */
-    500: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors];
@@ -4215,9 +4407,13 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsDat
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsErrors = {
     /**
-     * Internal error
+     * Agent not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsErrors];
@@ -4265,9 +4461,13 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableData = {
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableErrors = {
     /**
-     * Internal error
+     * Agent not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableErrors];
@@ -4315,9 +4515,13 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableData = {
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableErrors = {
     /**
-     * Internal error
+     * Agent not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableErrors];
@@ -4402,9 +4606,13 @@ export type PostApiWorkspacesByIdCatalogMcpsErrors = {
      */
     400: Problem;
     /**
-     * Internal error
+     * MCP not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogMcpsError = PostApiWorkspacesByIdCatalogMcpsErrors[keyof PostApiWorkspacesByIdCatalogMcpsErrors];
@@ -4471,13 +4679,17 @@ export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameData = {
 
 export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
     /**
+     * MCP not found
+     */
+    404: Problem;
+    /**
      * MCP still has dependents
      */
     409: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameError = DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors[keyof DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors];
@@ -4510,9 +4722,9 @@ export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
      */
     404: Problem;
     /**
-     * Internal error
+     * Service unavailable
      */
-    500: Problem;
+    503: Problem;
 };
 
 export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameError = GetApiWorkspacesByIdCatalogMcpsByScopeByNameErrors[keyof GetApiWorkspacesByIdCatalogMcpsByScopeByNameErrors];
@@ -4546,9 +4758,13 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveData = {
 
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveErrors = {
     /**
-     * Internal error
+     * MCP not found
      */
-    500: Problem;
+    404: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveError = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveErrors[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveErrors];
@@ -4649,10 +4865,6 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors = {
      * Plan token expired or already applied
      */
     410: Problem;
-    /**
-     * Internal error
-     */
-    500: Problem;
 };
 
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncError = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors];
