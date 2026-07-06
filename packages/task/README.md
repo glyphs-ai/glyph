@@ -30,7 +30,7 @@ the package boundary. Every use-case implements
   running tasks), `listTasks` (indexed filters), and the runtime activity
   surface (`getTaskActivity` one-shot + `getTaskActivityStream` live tail).
 - **End** a task: `cancelTask` (best-effort SIGTERM, awaits the terminal
-  persistence) and `deleteTask` (record removal, optional background purge
+  persistence) and `deleteTask` (record removal, optional purge
   of the workdir + runtime state).
 - **Integrate**: origin-keyed reverse-lookups (`hasInFlightByOrigin`,
   `listInFlightByOrigin`, `findLatestByOrigin`, `deleteTerminalByOrigin`,
@@ -63,21 +63,20 @@ packages/task/src/
       live-process-registry.ts  live-subprocess index port + atoms
     supervision/             stateful lifecycle concern (CATEGORY container):
       task-supervisor.ts       orchestrates dispatch pipeline / cancel / shutdown /
-                               background purge; delegates live handles to the registry.
+                               purge; delegates live handles to the registry.
                                Owns the runDispatch input contracts (RunDispatchArgs /
                                LaunchableRuntime / DEFAULT_RUNTIME) + the ManagerShuttingDown
                                lifecycle atom
       in-memory-live-process-registry.ts  in-memory LiveProcessRegistry impl —
                                pure coordination (watch / kill / drain), no third-party IO
       terminal-decision.ts     pure exit -> terminal-status classifier
-      index.ts                 barrel (TaskSupervisor + registry + supervisor contracts)
     use-case.ts              UseCase<Req,Res,Err> + UseCaseResult = ResultAsync
     dispatch-task.ts · cancel-task.ts · delete-task.ts · get-task.ts ·
     list-tasks.ts · get-task-activity.ts · get-task-activity-stream.ts ·
     recover-orphaned-tasks.ts · resolve-artifact-path.ts · and the five
     origin query use-cases (each owns its Request + Response Zod schema +
     Error atoms inline — no shared DTO or error module)
-    index.ts                 curated domain surface (TaskId, value schemas, error atoms)
+    task-public.ts           curated domain surface (TaskId, value schemas, error atoms)
   infrastructure/
     drizzle/                 task-db / schema / migrations / mapper / repository
     file/local-task-sandbox.ts  LocalTaskSandbox (node:fs); owns the on-disk
@@ -145,7 +144,7 @@ await tasks.listTasks.execute({ status: "running", agent: "writer" }); // ListTa
 await tasks.getTask.execute({ id: task.id }); // GetTaskResponse (task view | null)
 await tasks.cancelTask.execute({ id: task.id }); // best-effort SIGTERM
 await tasks.deleteTask.execute({ id: task.id, purge: false });
-await tasks.resolveArtifactPath.execute({ id: task.id, name: "report.html" });
+await tasks.resolveArtifactPath.execute({ id: task.id, relPath: "report.html" });
 
 // Activity: one-shot + live tail.
 await tasks.getTaskActivity.execute({ id: task.id, limit: 50 });
@@ -189,12 +188,11 @@ Task use-cases return discriminated-union error objects through
 
 - `TaskNotFound` — unknown task id
 - `InvalidTransition` — impossible FSM transition for the current status
-- `AgentNotFound` / `AgentResolutionFailed` / `EntryNotReady` — launch
+- `AgentNotFound` / `AgentUnresolvable` / `EntryNotReady` — launch
   target cannot be resolved or is not ready
 - `RuntimeDoesNotSupportTasks` / `RuntimeHeadlessLaunchFailed` — runtime
   selection or subprocess launch failure
-- `WorkdirReservationFailed` / `WorkdirMaterializationFailed` /
-  `DatabaseUnavailable` — filesystem or persistence failure
+- `WorkdirFailed` / `DatabaseUnavailable` — filesystem or persistence failure
 
 ## Testing
 

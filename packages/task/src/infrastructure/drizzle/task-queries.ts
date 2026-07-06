@@ -44,12 +44,10 @@ export class DrizzleTaskQueries implements TaskQueries {
 
 /**
  * Normalize a stored `success.artifacts` entry to its wire identity — the
- * artifact's POSIX path relative to the task's `artifact/` dir. New rows
- * already store this relative form, so it passes straight through. Rows
- * written before the switch to relative storage hold an absolute path; we
- * strip the `/<id>/artifact/` prefix (the id is a unique per-task segment,
- * an unambiguous anchor) to recover the same identity. A migration shim for
- * pre-existing rows, not a permanent transform.
+ * artifact's POSIX path relative to the task's `artifact/` dir. A relative
+ * entry passes straight through; an absolute entry is reduced by stripping
+ * the `/<id>/artifact/` prefix (the id is a unique per-task segment, an
+ * unambiguous anchor) so both forms yield the same relative identity.
  */
 export function normalizeArtifactRel(entry: string, id: string): string {
   const posix = entry.replace(/\\/g, "/");
@@ -60,8 +58,7 @@ export function normalizeArtifactRel(entry: string, id: string): string {
 
 /**
  * Normalize a stored `TaskSuccess`'s `artifacts` to their relative wire
- * identity. New rows already store relative paths (no-op); pre-existing
- * absolute rows are converted, so consumers see one uniform shape.
+ * identity so consumers see one uniform shape.
  */
 function relativizeArtifacts(success: TaskSuccess, id: string): TaskSuccess {
   if (success.artifacts === undefined) return success;

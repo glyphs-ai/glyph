@@ -27,7 +27,6 @@ export type { DatabaseUnavailable, TaskNotFound } from "../domain/task-repositor
 export type {
   ArtifactListingFailed,
   WorkdirFailed,
-  WorkdirRemovalFailed,
 } from "../domain/task-sandbox.js";
 export { type TaskStatus, TaskStatusSchema, type TerminalStatus } from "../domain/task-status.js";
 export { type TaskSuccess, TaskSuccessSchema } from "../domain/task-success.js";

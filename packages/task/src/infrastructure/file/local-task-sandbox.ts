@@ -14,10 +14,11 @@ import type {
 /**
  * On-disk task layout contract. A task's workdir lives at
  * `<workspaceDir>/tasks/<taskId>/`; user-visible output goes under the
- * `artifact/` subdir. This sandbox materializes the layout; the task
- * module (to build the sandbox root) and the workflow worker runner
- * (to relativize a node's task artifacts) read the same contract from
- * these exports, so the layout has one source of truth.
+ * `artifact/` subdir. `tasksRoot` builds the per-workspace root and
+ * `TASK_ARTIFACT_SUBDIR` names the output dir, giving the layout one source
+ * of truth shared by this sandbox (which materializes and scans it) and the
+ * read-side query projection (which relativizes stored artifact paths
+ * against it).
  */
 const TASKS_SUBDIR = "tasks";
 
@@ -58,10 +59,9 @@ function formatTaskMd(brief: string, details: string | undefined): string {
  * `<root>/<id>/`; the branded task-id format (digits + hex, no path
  * separators) keeps the join under root without a separate traversal guard.
  *
- * `reserve` first ensures `<root>` exists (each package owns its own subdir
- * under the workspace dir; the workspace no longer pre-creates it), then
- * creates the per-id dir with `{recursive: false}` so a colliding id
- * surfaces as EEXIST.
+ * `reserve` first ensures `<root>` exists (each package owns and creates its
+ * own subdir under the workspace dir), then creates the per-id dir with
+ * `{recursive: false}` so a colliding id surfaces as EEXIST.
  */
 export class LocalTaskSandbox implements TaskSandbox {
   private readonly root: string;
