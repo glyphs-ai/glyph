@@ -17,10 +17,10 @@ their own table definitions / service / repository / drizzle module:
 | ------------------------ | -------------------------------------------------------------------------- |
 | `@glyphs-ai/runtime`     | Runtime adapter registry (`copilot`, ...).                                 |
 | `@glyphs-ai/terminal`    | Thin PTY / shell wrapper: spawn / quoting / platform primitives.           |
-| `@glyphs-ai/api`         | Composition root that wires T0 / T1 modules into per-workspace contexts; also owns the wire contracts under its `wire/` surface. |
+| `@glyphs-ai/api`         | Composition root that wires T0 / T1 modules into per-workspace contexts; also owns the HTTP route factories under `src/routes/` (OpenAPIHono, composing the domain packages' zod schemas). |
 | `@glyphs-ai/server`      | Transport adapter: Hono routes + middleware over the api composition.     |
 | `@glyphs-ai/cli`         | Surface: command registrars over the typed HTTP client.                    |
-| `@glyphs-ai/sdk`         | Generated, browser-safe HTTP client + re-derived wire types. No `src` hand-written beyond thin helpers. |
+| `@glyphs-ai/sdk`         | Generated, browser-safe HTTP client: one operation per route + every request / response type. No `src` hand-written beyond the `unwrap` / `GlyphError` helpers. |
 | `@glyphs-ai/dashboard`   | Surface: browser SPA (Vite + React); tests use MSW.                       |
 | `@glyphs-ai/e2e`         | Tests-only: no `src/`, no published API.                                   |
 
@@ -303,7 +303,7 @@ layout convention" rule 2).
 
 ## Where DTOs live
 
-> See [docs/architecture.md § The three layers](./architecture.md#the-three-layers) for the Row / Entity / DTO split that motivates the surface rule.
+> See [docs/architecture.md § Module + repository pattern](./architecture.md#module--repository-pattern) for the Row / Entity / DTO split that motivates the surface rule.
 
 Each use-case owns its own **public contracts**: a `RequestSchema` and
 `ResponseSchema` (zod; the TS type is `z.infer<typeof ...>`) plus an `Error`
@@ -335,7 +335,7 @@ The only exceptions to "use-cases own their types" are:
 
 ## Type placement (which package owns this type?)
 
-> See [docs/architecture.md § The three layers](./architecture.md#the-three-layers) for the Row / Entity / DTO split inside one package. This section covers the orthogonal question: *which package* should host a given type.
+> See [docs/architecture.md § Module + repository pattern](./architecture.md#module--repository-pattern) for the Row / Entity / DTO split inside one package. This section covers the orthogonal question: *which package* should host a given type.
 
 The "Where DTOs live" section above governs *intra-package* type layout
 (per-use-case `Request`/`Response` schemas in `application/<use-case>.ts`, shared
@@ -346,36 +346,34 @@ location kinds should host it.
 | Kind of type | Lives in | One-line test |
 |---|---|---|
 | A single BC's entity / DTO / error / option shape | the owning domain pkg's `domain/<entity>-entity.ts`, per-use-case `application/<use-case>.ts` (Request/Response/Error union), or domain value objects (`domain/<entity>-{id,name}.ts`) | "Does it belong to one BC only? Would you delete it if you deleted that BC?" |
-| HTTP wire contract OR cross-package path / route constant the surfaces need at compile time | `@glyphs-ai/api`'s `wire/` surface (fenced consumers see it via `@glyphs-ai/sdk`) | "Will it appear in a Network tab payload, OR is it a pure type / side-effect-free constant the dashboard / cli reaches for?" |
+| HTTP request / response body (the wire contract) | the owning domain pkg's `application/<use-case>.ts` as a zod `*RequestSchema` / `*ResponseSchema`; the `@glyphs-ai/api` `routes/<domain>.ts` factory composes it, and fenced consumers see the generated type via `@glyphs-ai/sdk` | "Will it appear in a Network tab payload for one bounded context's endpoint?" |
 | In-process composition / runtime container holding live service instances or callbacks | `@glyphs-ai/api` | "Does it own `Promise<Service>` / a `(c) => Service` resolver, OR a cross-BC composition shape constructed once per workspace?" |
 | HTTP-transport-internal type (`Hono.Context`-flavoured, route-resolver, middleware) | `@glyphs-ai/server` | "Does its signature reference `Hono.Context`, request bodies, or Express-style middleware?" |
 
 ### Decision rules (sharp edges)
 
-1. **Types crossing the public boundary → `@glyphs-ai/api`'s `wire/` surface. Cross-BC composition / live-instance shapes → the rest of `@glyphs-ai/api`.**
-   `@glyphs-ai/api` holds both halves: the `wire/` surface (pure types,
-   side-effect-free route / path constants, zero orchestration) and the
-   composition root that wires T0/T1 into per-workspace contexts. The
-   api barrel re-exports `wire/` so the in-process server imports both
-   via a single specifier; the fenced consumers
-   (`@glyphs-ai/dashboard`, `@glyphs-ai/cli`) never import `api` — they
-   get the same wire types from `@glyphs-ai/sdk`, whose self-contained
-   `wire.ts` re-derives them from the generated client. Domain pkgs can
-   `import type` from the api `wire/` surface when projecting their
-   internal DTOs to wire shape — the inverse (a `wire/` file importing
-   values from a domain pkg) is also fine because the wire surface is
-   type-only and the value graph stays clean.
+1. **Wire request / response schema → the owning domain pkg's `application/<use-case>.ts`. Cross-BC composition / live-instance shapes → `@glyphs-ai/api`.**
+   The wire contract is a zod `*RequestSchema` / `*ResponseSchema`
+   defined next to the use-case that serves it (for example
+   `DispatchTaskRequestSchema` in
+   `packages/task/src/application/dispatch-task.ts`). `@glyphs-ai/api`
+   does not redefine those shapes — its `routes/<domain>.ts` factory
+   imports them into a `createRoute(...)` and the OpenAPI generator
+   projects them onto the wire. What lives in `api` is the *other* half:
+   the composition root that wires T0/T1 into per-workspace contexts,
+   plus the route factories and the shared Problem-envelope error
+   surface. The fenced consumers (`@glyphs-ai/dashboard`,
+   `@glyphs-ai/cli`) never import `api` — they get the generated
+   request / response types from `@glyphs-ai/sdk`.
 
-2. **Single domain's entity / DTO / error → that domain's pkg, never the api `wire/` surface.**
+2. **Single domain's entity / DTO / error → that domain's pkg.**
    If `Task` only makes sense as part of the task BC, it lives in
    `@glyphs-ai/task` domain/use-case modules, for example
-   `packages/task/src/domain/task-entity.ts` or
-   `packages/task/src/application/list-tasks.ts`. The api `wire/`
-   surface re-exports the subset of domain types that actually appear on
-   the HTTP wire (api depends on the domain pkgs for the type-only
-   re-export). The server imports through `@glyphs-ai/api` and the
-   surfaces import through `@glyphs-ai/sdk`, while the domain pkg owns
-   the definition.
+   `packages/task/src/domain/task-entity.ts` (the entity) or
+   `packages/task/src/application/list-tasks.ts` (the
+   `ListTasksResponseSchema` read projection). The same domain pkg owns
+   both the internal entity *and* the wire schema for its endpoints;
+   `@glyphs-ai/api` only wires those schemas into routes.
    `@glyphs-ai/api`'s composition layer owns *cross-BC composition* types
    only — never single-domain DTOs.
 
@@ -404,17 +402,19 @@ location kinds should host it.
 ### Corollaries
 
 - **Wire types vs domain types: when they diverge.** A domain pkg's
-  internal `XxxEntity` and the wire `Xxx` DTO drift over time
+  internal `XxxEntity` and the wire `Xxx` shape drift over time
   (`createdAt: Date` → `createdAt: string`, soft-delete fields hidden).
-  When that happens, the wire shape moves to the api `wire/` surface;
-  the entity stays in the domain. The service in the domain pkg owns
-  the projection.
+  When that happens, the domain pkg keeps *both* — the entity in
+  `domain/`, and a distinct `*ResponseSchema` projection in
+  `application/<use-case>.ts`. The use-case owns the projection.
 
 - **Errors that cross the wire.** Errors are discriminated-union atoms
   (`{ readonly type: "AgentNotFound"; ... }`). If a `type` literal
-  appears in an HTTP error response the client branches on, it is
-  wire-shape and should be re-declared in the api `wire/` surface. The
-  atom type stays in the domain pkg's repository or entity module. Cross-pkg
+  appears in an HTTP error response the client branches on, the response
+  body is projected through the api route's Problem envelope
+  (`packages/api/src/schemas/problem.ts` plus the domain's
+  `_error-policies/` table). The atom type stays in the domain pkg's
+  repository or entity module. Cross-pkg
   consumers branch on `err.type === "AgentNotFound"` — never `instanceof`
   (no class hierarchy) and never `err.name` (that is the old class-error
   convention). Rule 4 still forbids runtime cross-BC value imports.
@@ -432,20 +432,19 @@ location kinds should host it.
 
 ### Pitfalls observed in real PRs
 
-- Putting a wire shape in the originating domain pkg "because it's
-  defined there" — couples the wire to the domain. **Fix:** move it
-  to the api `wire/` surface; have the domain pkg `import type` it for
-  projection.
+- Redefining a domain pkg's wire schema inside `@glyphs-ai/api` "because
+  the route lives there" — duplicates the shape and invites drift.
+  **Fix:** import the domain pkg's `*RequestSchema` / `*ResponseSchema`
+  into the route factory; the schema stays in the domain pkg.
 
 - Putting an in-process resolver type in `@glyphs-ai/api` "because it's
   used by routes" — pollutes the api pkg with `Hono.Context`.
   **Fix:** keep in `server`.
 
-- Adding a type to `@glyphs-ai/api` (its composition layer or `wire/`
-  surface) "because multiple downstreams use it" when it's actually a
-  single-domain concept — bloats T2. **Fix:** put it in the owning
-  domain pkg; re-export from the api `wire/` surface only if it
-  genuinely appears in a Network-tab payload.
+- Adding a type to `@glyphs-ai/api`'s composition layer "because
+  multiple downstreams use it" when it's actually a single-domain
+  concept — bloats T2. **Fix:** put it in the owning domain pkg; wire it
+  into a route only if it genuinely appears in a Network-tab payload.
 
 - A domain pkg value-importing another domain pkg's service or error
   type — silently builds a runtime cross-BC dep. **Fix:** use
@@ -546,8 +545,9 @@ the `*Request` body holds only payload fields and never repeats the `id`:
 - server-minted id → `verb(input)`: `register(input)`.
 - id-only operation → `verb(id)`: `open(id)`, `get(id)`, `delete(id)`.
 
-Path params are their own wire type (`*PathParams`), held separate from
-the `*Request` body.
+Path params ride in their own zod schema on the route (`*PathSchema` /
+`*PathParamsSchema` in `packages/api/src/routes/<domain>.ts`), held
+separate from the `*Request` body.
 
 ### Constructors take one named-deps object
 
@@ -590,118 +590,136 @@ boolean, or a `*Row`.
 
 ## Wire / HTTP layer conventions
 
-> Applies to `@glyphs-ai/api`'s `wire/` surface — the wire / HTTP layer.
-> The `## Naming conventions` rules above govern *pkg-internal* types
-> (`*Row` / `*Entity` / use-case `Request` / `Response`). This section
-> governs the *cross-the-wire* types that live under
-> `packages/api/src/wire/`: HTTP request / response bodies and the
-> per-endpoint projections of pkg types.
+> Applies to the **wire request / response schemas** — the zod
+> `*RequestSchema` / `*ResponseSchema` (and their projections) that the
+> domain packages define in `application/<use-case>.ts` and that
+> `@glyphs-ai/api`'s `routes/<domain>.ts` factories compose into the HTTP
+> surface. The `## Naming conventions` rules above govern *pkg-internal*
+> types (`*Row` / `*Entity` / use-case `Request` / `Response`); this
+> section governs the *cross-the-wire* shapes: HTTP request / response
+> bodies and the per-endpoint projections of pkg types.
 
-The wire surface is **only** JSON-over-HTTP. Four rules govern wire type
-names:
+Every wire shape is a zod schema **owned by a domain package** in its
+`application/<use-case>.ts`; `@glyphs-ai/api`'s `routes/<domain>.ts`
+factory imports those schemas into `createRoute(...)` and never
+redeclares them, and the fenced consumers (`dashboard` / `cli`) read the
+projected types through `@glyphs-ai/sdk`. Four rules govern how the
+schemas and their inferred types are named. (Every symbol below is real
+on `main`.)
 
-### Rule 1 — Same shape as the owning pkg DTO → re-export, don't redefine
+### Rule 1 — The domain pkg owns the schema; the route imports it, never redefines it
 
-When a wire type is structurally identical to a DTO already owned by a
-domain pkg, **re-export it** instead of hand-copying a second
-definition.
+A request / response body is a zod `*RequestSchema` / `*ResponseSchema`
+declared next to the use-case that serves it. The `api` route factory
+`import`s it and hands it to `createRoute` — it authors no second copy.
 
 ```ts
-// packages/api/src/wire/workflows.ts
-import type {
-  WorkflowStatus,
-  WorkflowSuccess,
+// packages/workflow/src/application/add-workflow-subgraph.ts — the owner
+export const AddWorkflowSubgraphRequestSchema = z
+  .object({ workflowId: WorkflowIdSchema, nodes: /* … */, edges: /* … */ })
+  .strict();
+export type AddWorkflowSubgraphRequest = z.infer<typeof AddWorkflowSubgraphRequestSchema>;
+export const AddWorkflowSubgraphResponseSchema = z.object({ insertedNodes: /* … */ });
+
+// packages/api/src/routes/workflows.ts — the route only composes it
+import {
+  AddWorkflowSubgraphRequestSchema,
+  AddWorkflowSubgraphResponseSchema,
 } from "@glyphs-ai/workflow";
 
-export type { WorkflowStatus, WorkflowSuccess } from "@glyphs-ai/workflow";
+createRoute({
+  method: "post",
+  path: "/{wfid}/subgraph",
+  request: { body: jsonRequest(AddWorkflowSubgraphRequestSchema.omit({ workflowId: true })) },
+  responses: { 200: jsonResponse(AddWorkflowSubgraphResponseSchema, "Inserted nodes") },
+});
 ```
 
-Re-export keeps the wire layer DRY and turns any drift in the owning
-pkg into a `tsc` error here, immediately. A second `interface
-Workflow` in the wire surface that is byte-identical to the pkg DTO is the
-anti-pattern (`WorkflowStatusWire = "running" | …` vs the pkg's
-`WorkflowStatus` — two names for exactly one thing). All re-exports are
-`type`-only, so no runtime dep crosses into the dashboard / CLI
-bundles.
+The anti-pattern is a second `export interface AddSubgraphRequest {…}`
+hand-written inside the route file: two shapes for one endpoint that
+drift apart. Importing the owner's schema turns any drift into a `tsc`
+error at the route. Re-usable **domain value objects**
+(`WorkflowStatusSchema`, `WorkflowSuccessSchema` in
+`packages/workflow/src/domain/workflow/`) compose into these schemas
+inside the owning pkg; they are never re-declared in `api` either.
 
-### Rule 2 — Different shape (subset / extension / projection) → descriptive suffix, never `Wire`
+### Rule 2 — Projections get an intent-named alias, never a `Wire` tag
 
-When the wire shape is a projection — a trimmed list row, a denormed
-snapshot, a flattened envelope — give it a name that states the
-*intent*, never a `Wire` tag.
+When an endpoint returns a projection — a trimmed list row, a denormed
+snapshot — the owning pkg names its response schema for the *use-case*,
+and fenced consumers alias the generated type for the *intent*. Never a
+`Wire` suffix.
 
-| Use case | Suffix | Example |
+| Projection intent | Owning-pkg response schema | Consumer-side generated alias |
 |---|---|---|
-| List / summary row (trimmed) | `Header` | `WorkflowHeader`, `ScheduleHeader` |
-| Full detail (when it differs from the list row) | `Detail` | `WorkflowDetail` |
-| Endpoint-specific projection | concrete noun | `WorkflowDag`, `WorkflowNode`, `WorkflowEdge` |
-| Terminal / outcome payload | the concept | `WorkflowSuccess`, `WorkflowFailure`, `WorkflowCancellation` |
-| Polymorphic spec union | concept (+ subtype on the arms) | `WorkflowNodeSpec` |
+| List / header row | `ListWorkflowsResponseSchema`, `GetWorkflowResponseSchema` | `WorkflowHeader` |
+| Full DAG snapshot | `GetWorkflowDagResponseSchema` | `WorkflowDag` |
+| Sub-shape of a snapshot | (indexed off the parent) | `WorkflowNode`, `WorkflowEdge`, `WorkflowNodeSpec` |
+| Terminal / outcome payload (domain VO) | `WorkflowSuccessSchema`, `WorkflowFailureSchema`, `WorkflowCancellationSchema` | `WorkflowSuccess`, `WorkflowFailure`, `WorkflowCancellation` |
 
 ```ts
-// Wire projection of a workflow header — mirrors WorkflowEntity but
-// adds awaitingHumanCount and drops pkg-private columns.
-export interface WorkflowHeader {
-  readonly id: string;
-  readonly status: WorkflowStatus; // re-exported per Rule 1
-  readonly awaitingHumanCount: number;
-  // …
-}
+// packages/dashboard/src/api/workflows.ts — the consumer names the intent
+export type WorkflowHeader = GetApiWorkspacesByIdWorkflowsByWfidResponse;
+export type WorkflowDag = GetApiWorkspacesByIdWorkflowsByWfidDagResponse;
+export type WorkflowNode = WorkflowDag["nodes"][number];
 ```
 
-`WorkflowHeader` tells a reader it is the list / summary projection.
-`WorkflowHeaderWire` told them nothing — not whether it was a list row,
-a detail, or a request body.
+`WorkflowHeader` tells a reader it is the summary projection;
+`WorkflowHeaderWire` told them nothing. The domain pkg keeps the
+verb-oriented `Get… / List…ResponseSchema` name (one schema per
+use-case) and `@hey-api/openapi-ts` generates the `GetApi…Response` type
+the alias points at.
 
-### Rule 3 — Request / response bodies → `*Request` / `*Response` (full word, no `Req` / `Res`)
+### Rule 3 — Bodies are `*RequestSchema` / `*ResponseSchema` (full word, no `Req` / `Res`)
 
-HTTP bodies are named for their direction with the full word — never
-the `Req` / `Res` abbreviations.
+The zod pair for an HTTP body is named for its direction with the full
+word — never the `Req` / `Res` abbreviations — mirroring the pkg-internal
+use-case `Request` / `Response` DTO one-to-one (they are the same
+`z.infer` type).
 
 ```ts
-export interface AddNodeRequest {
-  readonly kind: WorkflowNodeKind;
-  readonly spec: unknown;
-  readonly parents: readonly string[];
-}
-
-export interface AddNodeResponse {
-  readonly nodeId: string;
-  readonly phase: number;
-}
+// packages/task/src/application/dispatch-task.ts
+export const DispatchTaskRequestSchema = z.object({ /* … */ }).strict();
+export type DispatchTaskRequest = z.infer<typeof DispatchTaskRequestSchema>;
+export const DispatchTaskResponseSchema = z.object({ /* … */ });
 ```
 
-This aligns with the route manifest's `RouteReq<K>` / `RouteRes<K>`
-roots and the standard `*Request` / `*Response` HTTP convention. A request
-body that re-uses a re-exported pkg DTO unchanged still follows Rule 1
-(re-export); `*Request` / `*Response` is for bodies that have their own
-shape.
+`packages/api/src/routes/tasks.ts` imports `DispatchTaskRequestSchema` /
+`DispatchTaskResponseSchema` (and the sibling `List… / Get…` schemas)
+straight from `@glyphs-ai/task`. A body that re-uses a domain VO
+unchanged composes it per Rule 1; `*RequestSchema` / `*ResponseSchema` is
+for bodies with their own shape.
 
-### Rule 4 — Nested sub-structures → flat naming, repo-wide
+### Rule 4 — Nested sub-structures → flat schema `const`s, repo-wide
 
-A type nested inside a request / response body is named by
-concatenating its parent's name with its role — **flat**, no TypeScript
-`namespace`. Pick one style and keep it repo-wide; glyph uses flat.
+A schema nested inside a request / response body is a top-level `const`
+composed into its parent — **flat**, no TypeScript `namespace`, one style
+repo-wide.
 
 ```ts
-export interface AddSubgraphRequest {
-  readonly nodes: readonly AddSubgraphRequestNode[];
-  readonly edges: readonly AddSubgraphRequestEdge[];
-}
+// packages/workflow/src/application/add-workflow-subgraph.ts
+const SubgraphNodeSchema = z
+  .object({ tempId: z.string(), kind: WorkflowNodeKindSchema, spec: z.unknown() })
+  .strict();
+const SubgraphEdgeSchema = z.object({ from: NodeRefSchema, to: NodeRefSchema }).strict();
 
-export interface AddSubgraphRequestNode {
-  readonly tempId: string;
-  readonly kind: WorkflowNodeKind;
-  readonly spec: unknown;
-}
-
-export interface AddSubgraphResponse {
-  readonly insertedNodes: readonly AddSubgraphResponseInsertedNode[];
-}
+export const AddWorkflowSubgraphRequestSchema = z
+  .object({
+    workflowId: WorkflowIdSchema,
+    nodes: z.array(SubgraphNodeSchema).readonly(),
+    edges: z.array(SubgraphEdgeSchema).readonly(),
+  })
+  .strict();
 ```
 
-Flat names keep every wire type reachable by a single `grep` and avoid
-the `Parent.Child` import friction a `namespace` introduces.
+Flat `const` schemas keep every wire shape reachable by a single `grep`
+and avoid the `Parent.Child` import friction a `namespace` introduces.
+When a projected value exists only as a TS type in a T0/T1 runtime (no
+zod to import), the route file authors a **local** api-owned schema for
+the OpenAPI surface — see the `ActivityItem` timeline schemas in
+`packages/api/src/routes/tasks.ts`, the one sanctioned place `api`
+declares a wire schema, precisely because there is no owning-pkg schema
+to compose.
 
 ## Repository contract
 

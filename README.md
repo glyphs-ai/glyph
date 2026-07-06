@@ -134,11 +134,13 @@ two layers of commands:
 
 ### API client (talk to a running server)
 
-Every typed route — wrapped 1:1 by the CLI's `client.call(...)` surface;
-the typed manifest in `packages/api/src/wire/routes.ts` is the single
-source of truth that both the server registers handlers against and
-the CLI builds typed calls from. Adding a route on either side
-without updating the other fails CI.
+Every command here calls the generated `@glyphs-ai/sdk` client — one typed
+operation per route, codegenned from the server's OpenAPI spec. The single
+source of truth is the set of `OpenAPIHono` route definitions in
+`packages/api/src/routes/` (each route is declared next to its request /
+response zod schemas); the server mounts them, and the SDK is regenerated
+from the resulting `/api/openapi.json`. A route that drifts from the
+generated client is caught by the OpenAPI snapshot test in CI.
 
 ```sh
 # server connection (default: http://127.0.0.1:8787, picked up from
@@ -160,6 +162,11 @@ glyph session list --agent writer --json
 glyph task dispatch --agent triage --brief "Scan recent issues"
 glyph task list --status running,succeeded
 glyph task activity <tid>   # runtime-parsed activity timeline (JSON)
+
+# workflows (workspace-scoped DAG runs — the third mode alongside sessions and tasks)
+glyph workflow create --coord-agent official/coordinator --brief "Triage and fan out"
+glyph workflow list
+glyph workflow dag <workflow-id>   # full DAG snapshot: header + nodes + edges
 
 # catalog
 glyph catalog overview

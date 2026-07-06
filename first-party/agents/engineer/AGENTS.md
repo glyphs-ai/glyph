@@ -2,7 +2,7 @@
 name: engineer
 scope: official
 description: "Engineering agent for glyph — implements features, fixes bugs, and opens PRs on glyphs-ai/glyph"
-version: 0.2.1
+version: 0.2.2
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/git-pr"
@@ -57,7 +57,7 @@ If you only touched one package, narrow the test step with `--filter` to save ti
 ```
 T_top  surfaces       dashboard, cli
 T3     host           server
-T2     application    api (orchestration + wire types), sdk (generated client)
+T2     application    api (orchestration + OpenAPIHono route factories), sdk (generated client)
 T1     modes          session, task, workflow
 T0     foundations    catalog, runtime, schedule, terminal, workspace
 ```
@@ -76,7 +76,7 @@ packages/
   session/        T1  interactive sessions
   task/           T1  headless one-shot tasks
   workflow/       T1  multi-task DAG (workflows + workflow_nodes + workflow_edges, mutated by coordinator nodes)
-  api/            T2  cross-T0/T1 orchestration + wire DTOs under src/wire/ (no HTTP transport)
+  api/            T2  cross-T0/T1 orchestration + OpenAPIHono route factories under src/routes/ (no HTTP transport)
   sdk/            T2  generated typed HTTP client + wire types; browser-safe, consumed by dashboard/cli
   server/         T3  HTTP routes, error sanitization, the binary's entrypoint
   dashboard/      T_top  React UI + MSW mocks
@@ -169,9 +169,9 @@ function parseConfig(raw: unknown): Config {
 const cfg = JSON.parse(text) as any;
 ```
 
-### Wire DTOs live in api's `wire/` surface
+### Wire schemas live in the domain packages; routes live in `api`
 
-If you add a new HTTP route, the request and response types belong in `packages/api/src/wire/` (declare the route in `packages/api/src/wire/routes/<domain>.ts`), NOT inline in the route handler. `dashboard` and `cli` import wire types from `@glyphs-ai/sdk` only — they MUST NOT import from `@glyphs-ai/api` or any deeper tier (enforced by the tier-invisibility test).
+If you add a new HTTP route, the request / response **zod schemas** belong in the owning domain package's `application/<use-case>.ts` module (e.g. `DispatchTaskRequestSchema` in `packages/task/src/application/dispatch-task.ts`), and the route itself is a `createRoute(...)` entry in that domain's `OpenAPIHono` factory under `packages/api/src/routes/<domain>.ts` — never inline in a server handler. `server` only mounts the factories; `@glyphs-ai/sdk` is regenerated from the resulting OpenAPI spec. `dashboard` and `cli` import the generated operations + types from `@glyphs-ai/sdk` only — they MUST NOT import from `@glyphs-ai/api` or any deeper tier (enforced by the tier-invisibility test).
 
 ## Testing
 
@@ -207,7 +207,7 @@ On Windows from PowerShell, always use `gh pr edit --body-file <utf8-file>`, nev
 
 - Read `docs/architecture.md` and `docs/pkg-template.md` before editing a package you haven't touched recently.
 - Run `pnpm build && pnpm typecheck && pnpm test && pnpm lint` before opening a PR.
-- Use the existing `repository pattern` / `atomic-write helpers` / api `wire/` surface — don't invent parallel conventions.
+- Use the existing `repository pattern` / `atomic-write helpers` / api route factories — don't invent parallel conventions.
 - Keep PRs surgical: one PR, one problem, one reviewable diff.
 - Write tests for new behavior in the same PR as the source change.
 - Use conventional commits and link the PR to the relevant issue if there is one.
@@ -217,7 +217,7 @@ On Windows from PowerShell, always use `gh pr edit --body-file <utf8-file>`, nev
 - Adding a new `packages/<pkg>` (use `pnpm new-pkg` and confirm it fits the tier model).
 - Adding a new top-level dependency to root or any package (lockfile churn + supply-chain surface).
 - Changing the drizzle schema (`packages/<pkg>/src/schema.ts`) — requires a `db:generate` migration and an inline-migrations refresh.
-- Changing the wire contract (`packages/api/src/wire/`) in a backward-incompatible way.
+- Changing the wire contract (a domain package's request / response zod schema, or a route in `packages/api/src/routes/`) in a backward-incompatible way.
 - Changing CI workflows in `.github/workflows/`.
 
 ### 🚫 Never
