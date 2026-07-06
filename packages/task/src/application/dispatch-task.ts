@@ -3,7 +3,6 @@ import { err, errAsync, ok, safeTry } from "neverthrow";
 import { z } from "zod";
 import { TaskBriefSchema } from "../domain/task-brief.js";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
-import type { TaskEntity } from "../domain/task-entity.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { type TaskId, TaskIdSchema } from "../domain/task-id.js";
 import type { DatabaseUnavailable } from "../domain/task-repository.js";
@@ -218,7 +217,22 @@ export class DispatchTaskUseCase
         metadata: parsed.metadata,
         subprocessEnv: parsed.subprocessEnv,
       });
-      return ok<DispatchTaskResponse, DispatchTaskError>(toDispatchTaskResponse(entity));
+      return ok<DispatchTaskResponse, DispatchTaskError>({
+        id: entity.id,
+        agent: entity.agent,
+        brief: entity.brief,
+        ...(entity.details !== undefined ? { details: entity.details } : {}),
+        origin: entity.origin,
+        ...(entity.originId !== undefined ? { originId: entity.originId } : {}),
+        status: entity.status,
+        metadata: { ...entity.metadata },
+        createdAt: entity.createdAt,
+        startedAt: entity.startedAt,
+        ...(entity.endedAt !== undefined ? { endedAt: entity.endedAt } : {}),
+        ...(entity.success !== undefined ? { success: entity.success } : {}),
+        ...(entity.failure !== undefined ? { failure: entity.failure } : {}),
+        ...(entity.cancellation !== undefined ? { cancellation: entity.cancellation } : {}),
+      });
     });
   }
 }
@@ -235,23 +249,4 @@ function firstKernelEnvCollision(env: Readonly<Record<string, string>> | undefin
 /** Narrow a runtime to one that can launch headless tasks. */
 function isLaunchable(runtime: Runtime): runtime is LaunchableRuntime {
   return typeof runtime.launchHeadless === "function";
-}
-
-function toDispatchTaskResponse(task: TaskEntity): DispatchTaskResponse {
-  return {
-    id: task.id,
-    agent: task.agent,
-    brief: task.brief,
-    ...(task.details !== undefined ? { details: task.details } : {}),
-    origin: task.origin,
-    ...(task.originId !== undefined ? { originId: task.originId } : {}),
-    status: task.status,
-    metadata: { ...task.metadata },
-    createdAt: task.createdAt,
-    startedAt: task.startedAt,
-    ...(task.endedAt !== undefined ? { endedAt: task.endedAt } : {}),
-    ...(task.success !== undefined ? { success: task.success } : {}),
-    ...(task.failure !== undefined ? { failure: task.failure } : {}),
-    ...(task.cancellation !== undefined ? { cancellation: task.cancellation } : {}),
-  };
 }

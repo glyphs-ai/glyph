@@ -8,19 +8,16 @@ import { mcps } from "../../infrastructure/drizzle/mcp-schema.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { collectReferencedMcpFqns } from "./mcp-reads.js";
 
-const McpSchema = z.object({
+export const GetMcpRequestSchema = z.object({ id: McpFqnSchema });
+export type GetMcpRequest = z.infer<typeof GetMcpRequestSchema>;
+export const GetMcpResponseSchema = z.object({
   fqn: z.string(),
   origin: z.string(),
   orphaned: z.boolean(),
   installedAt: z.string(),
   updatedAt: z.string(),
 });
-type Mcp = z.infer<typeof McpSchema>;
-
-export const GetMcpRequestSchema = z.object({ id: McpFqnSchema });
-export type GetMcpRequest = z.infer<typeof GetMcpRequestSchema>;
-export const GetMcpResponseSchema = McpSchema;
-export type GetMcpResponse = Mcp;
+export type GetMcpResponse = z.infer<typeof GetMcpResponseSchema>;
 export type GetMcpError = McpNotFound | DatabaseUnavailable;
 export interface GetMcpDeps {
   readonly queries: CatalogQueries;
@@ -32,7 +29,7 @@ export class GetMcpUseCase implements UseCase<GetMcpRequest, GetMcpResponse, Get
   execute(request: GetMcpRequest): UseCaseResult<GetMcpResponse, GetMcpError> {
     const { id } = request;
     return this.deps.queries
-      .query((db): Mcp | undefined => {
+      .query((db): GetMcpResponse | undefined => {
         const row = db.select().from(mcps).where(eq(mcps.fqn, id)).get();
         if (row === undefined) return undefined;
         const referenced = collectReferencedMcpFqns(db);

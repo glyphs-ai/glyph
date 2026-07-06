@@ -12,60 +12,52 @@ import {
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { selectAllAgents } from "./agent-reads.js";
 
-const DependencyRefSchema = z.object({ fqn: z.string() });
-
-const AgentDependenciesSchema = z
-  .object({
-    skills: z.array(DependencyRefSchema).optional(),
-    mcps: z.array(DependencyRefSchema).optional(),
-    agents: z.array(DependencyRefSchema).optional(),
-  })
-  .optional();
-
-const AgentSchema = z.object({
-  fqn: z.string(),
-  origin: z.string(),
-  description: z.string(),
-  version: z.string(),
-  prereqs: z.string().optional(),
-  prereqsAck: z.boolean(),
-  disabledByUser: z.boolean(),
-  installedAt: z.string(),
-  updatedAt: z.string(),
-  dependencies: AgentDependenciesSchema,
-});
-
-const SkillDependenciesSchema = z
-  .object({
-    skills: z.array(DependencyRefSchema).optional(),
-    mcps: z.array(DependencyRefSchema).optional(),
-  })
-  .optional();
-
-const SkillSchema = z.object({
-  fqn: z.string(),
-  origin: z.string(),
-  description: z.string(),
-  version: z.string(),
-  prereqs: z.string().optional(),
-  prereqsAck: z.boolean(),
-  orphaned: z.boolean(),
-  installedAt: z.string(),
-  updatedAt: z.string(),
-  dependencies: SkillDependenciesSchema,
-});
-
 export const ResolveAgentRequestSchema = z.object({ id: AgentFqnSchema });
 export type ResolveAgentRequest = z.infer<typeof ResolveAgentRequestSchema>;
-const ResolvedSkillSchema = z.object({ skill: SkillSchema });
-const ResolvedMcpSchema = z.object({ fqn: z.string() });
 export const ResolveAgentResponseSchema = z.object({
-  agent: AgentSchema,
-  skills: z.array(ResolvedSkillSchema),
-  mcps: z.array(ResolvedMcpSchema),
+  agent: z.object({
+    fqn: z.string(),
+    origin: z.string(),
+    description: z.string(),
+    version: z.string(),
+    prereqs: z.string().optional(),
+    prereqsAck: z.boolean(),
+    disabledByUser: z.boolean(),
+    installedAt: z.string(),
+    updatedAt: z.string(),
+    dependencies: z
+      .object({
+        skills: z.array(z.object({ fqn: z.string() })).optional(),
+        mcps: z.array(z.object({ fqn: z.string() })).optional(),
+        agents: z.array(z.object({ fqn: z.string() })).optional(),
+      })
+      .optional(),
+  }),
+  skills: z.array(
+    z.object({
+      skill: z.object({
+        fqn: z.string(),
+        origin: z.string(),
+        description: z.string(),
+        version: z.string(),
+        prereqs: z.string().optional(),
+        prereqsAck: z.boolean(),
+        orphaned: z.boolean(),
+        installedAt: z.string(),
+        updatedAt: z.string(),
+        dependencies: z
+          .object({
+            skills: z.array(z.object({ fqn: z.string() })).optional(),
+            mcps: z.array(z.object({ fqn: z.string() })).optional(),
+          })
+          .optional(),
+      }),
+    }),
+  ),
+  mcps: z.array(z.object({ fqn: z.string() })),
 });
-type ResolvedSkill = z.infer<typeof ResolvedSkillSchema>;
-type ResolvedMcp = z.infer<typeof ResolvedMcpSchema>;
+type ResolvedSkill = z.infer<typeof ResolveAgentResponseSchema>["skills"][number];
+type ResolvedMcp = z.infer<typeof ResolveAgentResponseSchema>["mcps"][number];
 export type ResolveAgentResponse = z.infer<typeof ResolveAgentResponseSchema>;
 export type ResolveAgentError = AgentNotFound | DatabaseUnavailable;
 export interface ResolveAgentDeps {

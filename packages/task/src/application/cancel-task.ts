@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
-import type { CorruptedTask, InvalidTransition, TaskEntity } from "../domain/task-entity.js";
+import type { CorruptedTask, InvalidTransition } from "../domain/task-entity.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { TaskIdSchema } from "../domain/task-id.js";
 import type { DatabaseUnavailable, TaskNotFound } from "../domain/task-repository.js";
@@ -54,25 +54,21 @@ export class CancelTaskUseCase
 
   execute(request: CancelTaskRequest): UseCaseResult<CancelTaskResponse, CancelTaskError> {
     const { id } = CancelTaskRequestSchema.parse(request);
-    return this.deps.supervisor.cancel(id).map(toCancelTaskResponse);
+    return this.deps.supervisor.cancel(id).map((task) => ({
+      id: task.id,
+      agent: task.agent,
+      brief: task.brief,
+      ...(task.details !== undefined ? { details: task.details } : {}),
+      origin: task.origin,
+      ...(task.originId !== undefined ? { originId: task.originId } : {}),
+      status: task.status,
+      metadata: { ...task.metadata },
+      createdAt: task.createdAt,
+      startedAt: task.startedAt,
+      ...(task.endedAt !== undefined ? { endedAt: task.endedAt } : {}),
+      ...(task.success !== undefined ? { success: task.success } : {}),
+      ...(task.failure !== undefined ? { failure: task.failure } : {}),
+      ...(task.cancellation !== undefined ? { cancellation: task.cancellation } : {}),
+    }));
   }
-}
-
-function toCancelTaskResponse(task: TaskEntity): CancelTaskResponse {
-  return {
-    id: task.id,
-    agent: task.agent,
-    brief: task.brief,
-    ...(task.details !== undefined ? { details: task.details } : {}),
-    origin: task.origin,
-    ...(task.originId !== undefined ? { originId: task.originId } : {}),
-    status: task.status,
-    metadata: { ...task.metadata },
-    createdAt: task.createdAt,
-    startedAt: task.startedAt,
-    ...(task.endedAt !== undefined ? { endedAt: task.endedAt } : {}),
-    ...(task.success !== undefined ? { success: task.success } : {}),
-    ...(task.failure !== undefined ? { failure: task.failure } : {}),
-    ...(task.cancellation !== undefined ? { cancellation: task.cancellation } : {}),
-  };
 }

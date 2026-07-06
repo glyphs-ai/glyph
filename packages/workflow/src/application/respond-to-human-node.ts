@@ -2,15 +2,8 @@ import { err, ok, ResultAsync } from "neverthrow";
 import { z } from "zod";
 import { HumanNodeResponseSchema, type HumanNodeSpec } from "../domain/node/workflow-human-node.js";
 import { WorkflowNodeIdSchema } from "../domain/node/workflow-node-id.js";
-import {
-  HUMAN_KIND,
-  type WorkflowNodeKind,
-  WorkflowNodeKindSchema,
-} from "../domain/node/workflow-node-kind.js";
-import {
-  type WorkflowNodeStatus,
-  WorkflowNodeStatusSchema,
-} from "../domain/node/workflow-node-status.js";
+import { HUMAN_KIND, WorkflowNodeKindSchema } from "../domain/node/workflow-node-kind.js";
+import { WorkflowNodeStatusSchema } from "../domain/node/workflow-node-status.js";
 import type { WorkflowNodeNotFound } from "../domain/workflow/workflow-entity-errors.js";
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
 import type {
@@ -21,7 +14,15 @@ import type {
 import type { WorkflowDispatchCoordinator } from "./engine/workflow-engine.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-const WorkflowNodeViewSchema = z.object({
+export const RespondToHumanNodeRequestSchema = z
+  .object({
+    workflowId: WorkflowIdSchema,
+    nodeId: WorkflowNodeIdSchema,
+    response: HumanNodeResponseSchema,
+  })
+  .strict();
+export type RespondToHumanNodeRequest = z.infer<typeof RespondToHumanNodeRequestSchema>;
+export const RespondToHumanNodeResponseSchema = z.object({
   id: WorkflowNodeIdSchema,
   workflowId: WorkflowIdSchema,
   kind: WorkflowNodeKindSchema,
@@ -34,16 +35,6 @@ const WorkflowNodeViewSchema = z.object({
   runningAt: z.string().optional(),
   endedAt: z.string().optional(),
 });
-
-export const RespondToHumanNodeRequestSchema = z
-  .object({
-    workflowId: WorkflowIdSchema,
-    nodeId: WorkflowNodeIdSchema,
-    response: HumanNodeResponseSchema,
-  })
-  .strict();
-export type RespondToHumanNodeRequest = z.infer<typeof RespondToHumanNodeRequestSchema>;
-export const RespondToHumanNodeResponseSchema = WorkflowNodeViewSchema;
 export type RespondToHumanNodeResponse = z.infer<typeof RespondToHumanNodeResponseSchema>;
 export type HumanNodeResponseInvalid = {
   readonly type: "HumanNodeResponseInvalid";
@@ -150,85 +141,20 @@ export class RespondToHumanNodeUseCase
         const saved = await this.deps.repo.save(workflow.value);
         if (saved.isErr()) return err(saved.error);
         this.deps.coordinator.triggerWorkflowTick(parsed.workflowId);
-        return ok(
-          toWorkflowNodeView({
-            id: updated.id,
-            workflowId: updated.workflowId,
-            kind: updated.kind,
-            specJson: JSON.stringify(updated.spec),
-            phase: updated.phase,
-            status: updated.status,
-            metadata: JSON.stringify(updated.metadata),
-            createdAt: updated.createdAt,
-            readyAt: updated.readyAt ?? null,
-            runningAt: updated.runningAt ?? null,
-            endedAt: updated.endedAt ?? null,
-          }),
-        );
+        return ok({
+          id: updated.id,
+          workflowId: updated.workflowId,
+          kind: updated.kind,
+          spec: updated.spec,
+          phase: updated.phase,
+          status: updated.status,
+          metadata: updated.metadata,
+          createdAt: updated.createdAt,
+          ...(updated.readyAt !== undefined ? { readyAt: updated.readyAt } : {}),
+          ...(updated.runningAt !== undefined ? { runningAt: updated.runningAt } : {}),
+          ...(updated.endedAt !== undefined ? { endedAt: updated.endedAt } : {}),
+        });
       })(),
     );
   }
-}
-
-function toWorkflowNodeView(row: {
-  readonly id: string;
-  readonly workflowId: string;
-  readonly kind: string;
-  readonly specJson: string;
-  readonly phase: number;
-  readonly status: string;
-  readonly metadata: string;
-  readonly createdAt: string;
-  readonly readyAt: string | null;
-  readonly runningAt: string | null;
-  readonly endedAt: string | null;
-}): RespondToHumanNodeResponse {
-  return {
-    id: coerceWorkflowNodeId(row.id),
-    workflowId: coerceWorkflowId(row.workflowId),
-    kind: coerceNodeKind(row.kind),
-    spec: parseJsonValue<unknown>(row.specJson),
-    phase: row.phase,
-    status: coerceNodeStatus(row.status),
-    metadata: parseJsonObject(row.metadata),
-    createdAt: row.createdAt,
-    ...(row.readyAt !== null ? { readyAt: row.readyAt } : {}),
-    ...(row.runningAt !== null ? { runningAt: row.runningAt } : {}),
-    ...(row.endedAt !== null ? { endedAt: row.endedAt } : {}),
-  };
-}
-
-function parseJsonValue<T>(raw: string): T {
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return raw as T;
-  }
-}
-
-function parseJsonObject(raw: string): Record<string, unknown> {
-  const parsed = parseJsonValue<unknown>(raw);
-  return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-    ? { ...(parsed as Record<string, unknown>) }
-    : {};
-}
-
-function coerceWorkflowId(raw: string): RespondToHumanNodeResponse["workflowId"] {
-  const parsed = WorkflowIdSchema.safeParse(raw);
-  return parsed.success ? parsed.data : (raw as RespondToHumanNodeResponse["workflowId"]);
-}
-
-function coerceWorkflowNodeId(raw: string): RespondToHumanNodeResponse["id"] {
-  const parsed = WorkflowNodeIdSchema.safeParse(raw);
-  return parsed.success ? parsed.data : (raw as RespondToHumanNodeResponse["id"]);
-}
-
-function coerceNodeStatus(raw: string): WorkflowNodeStatus {
-  const parsed = WorkflowNodeStatusSchema.safeParse(raw);
-  return parsed.success ? parsed.data : "not_started";
-}
-
-function coerceNodeKind(raw: string): WorkflowNodeKind {
-  const parsed = WorkflowNodeKindSchema.safeParse(raw);
-  return parsed.success ? parsed.data : "worker";
 }

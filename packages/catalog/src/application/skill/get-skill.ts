@@ -7,16 +7,9 @@ import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-querie
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { collectReferencedSkillFqns, selectSkillByFqn } from "./skill-reads.js";
 
-const DependencyRefSchema = z.object({ fqn: z.string() });
-
-const SkillDependenciesSchema = z
-  .object({
-    skills: z.array(DependencyRefSchema).optional(),
-    mcps: z.array(DependencyRefSchema).optional(),
-  })
-  .optional();
-
-const SkillSchema = z.object({
+export const GetSkillRequestSchema = z.object({ id: SkillFqnSchema });
+export type GetSkillRequest = z.infer<typeof GetSkillRequestSchema>;
+export const GetSkillResponseSchema = z.object({
   fqn: z.string(),
   origin: z.string(),
   description: z.string(),
@@ -26,14 +19,14 @@ const SkillSchema = z.object({
   orphaned: z.boolean(),
   installedAt: z.string(),
   updatedAt: z.string(),
-  dependencies: SkillDependenciesSchema,
+  dependencies: z
+    .object({
+      skills: z.array(z.object({ fqn: z.string() })).optional(),
+      mcps: z.array(z.object({ fqn: z.string() })).optional(),
+    })
+    .optional(),
 });
-type Skill = z.infer<typeof SkillSchema>;
-
-export const GetSkillRequestSchema = z.object({ id: SkillFqnSchema });
-export type GetSkillRequest = z.infer<typeof GetSkillRequestSchema>;
-export const GetSkillResponseSchema = SkillSchema;
-export type GetSkillResponse = Skill;
+export type GetSkillResponse = z.infer<typeof GetSkillResponseSchema>;
 export type GetSkillError = SkillNotFound | DatabaseUnavailable;
 export interface GetSkillDeps {
   readonly queries: CatalogQueries;
@@ -45,7 +38,7 @@ export class GetSkillUseCase implements UseCase<GetSkillRequest, GetSkillRespons
   execute(request: GetSkillRequest): UseCaseResult<GetSkillResponse, GetSkillError> {
     const { id } = request;
     return this.deps.queries
-      .query((db): Skill | undefined => {
+      .query((db): GetSkillResponse | undefined => {
         const skill = selectSkillByFqn(db, id);
         if (skill === undefined) return undefined;
         const referencedSkillFqns = collectReferencedSkillFqns(db);

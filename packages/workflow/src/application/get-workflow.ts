@@ -24,7 +24,9 @@ import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries
 import type { WorkflowRow } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-const WorkflowViewSchema = z.object({
+export const GetWorkflowRequestSchema = z.object({ workflowId: WorkflowIdSchema }).strict();
+export type GetWorkflowRequest = z.infer<typeof GetWorkflowRequestSchema>;
+export const GetWorkflowResponseSchema = z.object({
   id: WorkflowIdSchema,
   brief: z.string(),
   details: z.string().optional(),
@@ -40,10 +42,6 @@ const WorkflowViewSchema = z.object({
   failure: WorkflowFailureSchema.optional(),
   cancellation: WorkflowCancellationSchema.optional(),
 });
-
-export const GetWorkflowRequestSchema = z.object({ workflowId: WorkflowIdSchema }).strict();
-export type GetWorkflowRequest = z.infer<typeof GetWorkflowRequestSchema>;
-export const GetWorkflowResponseSchema = WorkflowViewSchema;
 export type GetWorkflowResponse = z.infer<typeof GetWorkflowResponseSchema>;
 export type GetWorkflowError = WorkflowNotFound | WorkflowEntityCorruption | DatabaseUnavailable;
 export interface GetWorkflowDeps {
@@ -61,12 +59,12 @@ export class GetWorkflowUseCase
       .andThen((row) =>
         row === undefined
           ? errAsync({ type: "WorkflowNotFound" as const, workflowId })
-          : q.query(() => toWorkflowView(row)),
+          : q.query(() => toGetWorkflowResponse(row)),
       );
   }
 }
 
-function toWorkflowView(row: WorkflowRow): GetWorkflowResponse {
+function toGetWorkflowResponse(row: WorkflowRow): GetWorkflowResponse {
   return {
     id: coerceWorkflowId(row.id),
     brief: row.brief,

@@ -15,12 +15,12 @@ export const AggregateByOriginRequestSchema = z
 export type AggregateByOriginRequest = z.infer<typeof AggregateByOriginRequestSchema>;
 
 /** Per-origin aggregate counts for one `originId`. */
-export interface OriginAggregate {
+interface AggregateByOriginEntry {
   readonly totalCount: number;
   readonly runningCount: number;
 }
 
-export type AggregateByOriginResponse = ReadonlyMap<string, OriginAggregate>;
+export type AggregateByOriginResponse = ReadonlyMap<string, AggregateByOriginEntry>;
 
 export type AggregateByOriginError = DatabaseUnavailable;
 
@@ -59,7 +59,7 @@ export class AggregateByOriginUseCase
           .all();
       })
       .map((rows) => {
-        const map = new Map<string, OriginAggregate>();
+        const map = new Map<string, AggregateByOriginEntry>();
         for (const row of rows) {
           if (row.originId === null) continue;
           const current = map.get(row.originId) ?? { totalCount: 0, runningCount: 0 };

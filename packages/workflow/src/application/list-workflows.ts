@@ -19,23 +19,6 @@ import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries
 import type { WorkflowRow } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-const WorkflowViewSchema = z.object({
-  id: WorkflowIdSchema,
-  brief: z.string(),
-  details: z.string().optional(),
-  coordinatorAgent: z.string(),
-  status: WorkflowStatusSchema,
-  origin: z.string(),
-  originId: z.string().optional(),
-  metadata: z.record(z.string(), z.unknown()),
-  createdAt: z.string(),
-  startedAt: z.string().optional(),
-  endedAt: z.string().optional(),
-  success: WorkflowSuccessSchema.optional(),
-  failure: WorkflowFailureSchema.optional(),
-  cancellation: WorkflowCancellationSchema.optional(),
-});
-
 export const ListWorkflowsRequestSchema = z
   .object({
     coordinatorAgent: z.string().optional(),
@@ -47,7 +30,26 @@ export const ListWorkflowsRequestSchema = z
   .strict()
   .default({});
 export type ListWorkflowsRequest = z.infer<typeof ListWorkflowsRequestSchema>;
-export const ListWorkflowsResponseSchema = z.array(WorkflowViewSchema).readonly();
+export const ListWorkflowsResponseSchema = z
+  .array(
+    z.object({
+      id: WorkflowIdSchema,
+      brief: z.string(),
+      details: z.string().optional(),
+      coordinatorAgent: z.string(),
+      status: WorkflowStatusSchema,
+      origin: z.string(),
+      originId: z.string().optional(),
+      metadata: z.record(z.string(), z.unknown()),
+      createdAt: z.string(),
+      startedAt: z.string().optional(),
+      endedAt: z.string().optional(),
+      success: WorkflowSuccessSchema.optional(),
+      failure: WorkflowFailureSchema.optional(),
+      cancellation: WorkflowCancellationSchema.optional(),
+    }),
+  )
+  .readonly();
 export type ListWorkflowsResponse = z.infer<typeof ListWorkflowsResponseSchema>;
 export type ListWorkflowsError = DatabaseUnavailable;
 export interface ListWorkflowsDeps {
@@ -85,12 +87,12 @@ export class ListWorkflowsUseCase
         where === undefined
           ? db.select().from(q.workflows).orderBy(desc(q.workflows.createdAt)).all()
           : db.select().from(q.workflows).where(where).orderBy(desc(q.workflows.createdAt)).all();
-      return rows.map(toWorkflowView);
+      return rows.map(toListWorkflowsEntry);
     });
   }
 }
 
-function toWorkflowView(row: WorkflowRow): ListWorkflowsResponse[number] {
+function toListWorkflowsEntry(row: WorkflowRow): ListWorkflowsResponse[number] {
   return {
     id: coerceWorkflowId(row.id),
     brief: row.brief,

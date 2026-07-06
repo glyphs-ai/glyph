@@ -29,15 +29,15 @@ export const TASK_ACTIVITY_DEFAULT_LIMIT = 50;
 // numbers from in-process callers; `z.coerce` lets the one schema validate
 // both. `id` is the only non-coercible field, so an HTTP surface projects
 // the query shape with `.omit({ id: true })`.
-const ActivityCursorSchema = z.coerce.number().int().nonnegative();
-const ActivityLimitSchema = z.coerce.number().int().min(1).max(TASK_ACTIVITY_MAX_LIMIT);
+const getTaskActivityCursor = z.coerce.number().int().nonnegative();
+const getTaskActivityLimit = z.coerce.number().int().min(1).max(TASK_ACTIVITY_MAX_LIMIT);
 
 export const GetTaskActivityRequestSchema = z
   .object({
     id: TaskIdSchema,
-    before: ActivityCursorSchema.optional(),
-    after: ActivityCursorSchema.optional(),
-    limit: ActivityLimitSchema.default(TASK_ACTIVITY_DEFAULT_LIMIT),
+    before: getTaskActivityCursor.optional(),
+    after: getTaskActivityCursor.optional(),
+    limit: getTaskActivityLimit.default(TASK_ACTIVITY_DEFAULT_LIMIT),
   })
   .strict();
 // `z.input`, not `z.infer`: `limit` carries a `.default()`, so the caller-facing

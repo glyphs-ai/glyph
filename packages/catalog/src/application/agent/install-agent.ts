@@ -15,15 +15,13 @@ export type AgentOriginConflict = {
   readonly attemptedOrigin: string;
 };
 
-const AgentDependencyRefsSchema = z.object({
-  skills: z.array(z.string()),
-  mcps: z.array(z.string()),
-  agents: z.array(z.string()),
-});
-
 export const InstallAgentRequestSchema = z.object({
   origin: z.string(),
-  dependencyRefs: AgentDependencyRefsSchema,
+  dependencyRefs: z.object({
+    skills: z.array(z.string()),
+    mcps: z.array(z.string()),
+    agents: z.array(z.string()),
+  }),
 });
 export type InstallAgentRequest = z.infer<typeof InstallAgentRequestSchema>;
 
