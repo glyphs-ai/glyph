@@ -37,13 +37,9 @@ import type {
 } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-export const WorkflowEdgeViewSchema = z.object({
-  workflowId: WorkflowIdSchema,
-  from: WorkflowNodeIdSchema,
-  to: WorkflowNodeIdSchema,
-});
-export type WorkflowEdgeView = z.infer<typeof WorkflowEdgeViewSchema>;
-export const WorkflowDagSnapshotSchema = z.object({
+export const GetWorkflowDagRequestSchema = z.object({ workflowId: WorkflowIdSchema }).strict();
+export type GetWorkflowDagRequest = z.infer<typeof GetWorkflowDagRequestSchema>;
+export const GetWorkflowDagResponseSchema = z.object({
   workflow: z.object({
     id: WorkflowIdSchema,
     brief: z.string(),
@@ -77,14 +73,22 @@ export const WorkflowDagSnapshotSchema = z.object({
       }),
     )
     .readonly(),
-  edges: z.array(WorkflowEdgeViewSchema).readonly(),
+  edges: z
+    .array(
+      z.object({
+        workflowId: WorkflowIdSchema,
+        from: WorkflowNodeIdSchema,
+        to: WorkflowNodeIdSchema,
+      }),
+    )
+    .readonly(),
 });
-export type WorkflowDagSnapshot = z.infer<typeof WorkflowDagSnapshotSchema>;
-
-export const GetWorkflowDagRequestSchema = z.object({ workflowId: WorkflowIdSchema }).strict();
-export type GetWorkflowDagRequest = z.infer<typeof GetWorkflowDagRequestSchema>;
-export const GetWorkflowDagResponseSchema = WorkflowDagSnapshotSchema;
 export type GetWorkflowDagResponse = z.infer<typeof GetWorkflowDagResponseSchema>;
+// Retained as the public identity of the workflow package (consumed by
+// `@glyphs-ai/api` tests); a plain type alias keeps the wire contract stable
+// without introducing a schema-level alias to `GetWorkflowDagResponseSchema`.
+export type WorkflowDagSnapshot = GetWorkflowDagResponse;
+export type WorkflowEdgeView = GetWorkflowDagResponse["edges"][number];
 export type GetWorkflowDagError = WorkflowNotFound | WorkflowEntityCorruption | DatabaseUnavailable;
 export interface GetWorkflowDagDeps {
   readonly query: WorkflowQueries;
@@ -132,9 +136,7 @@ export class GetWorkflowDagUseCase
   }
 }
 
-function toGetWorkflowDagWorkflow(
-  row: WorkflowRow,
-): z.infer<typeof WorkflowDagSnapshotSchema>["workflow"] {
+function toGetWorkflowDagWorkflow(row: WorkflowRow): GetWorkflowDagResponse["workflow"] {
   return {
     id: coerceWorkflowId(row.id),
     brief: row.brief,
@@ -155,9 +157,7 @@ function toGetWorkflowDagWorkflow(
   };
 }
 
-function toGetWorkflowDagNode(
-  row: WorkflowNodeRow,
-): z.infer<typeof WorkflowDagSnapshotSchema>["nodes"][number] {
+function toGetWorkflowDagNode(row: WorkflowNodeRow): GetWorkflowDagResponse["nodes"][number] {
   return {
     id: coerceWorkflowNodeId(row.id),
     workflowId: coerceWorkflowId(row.workflowId),
@@ -173,7 +173,7 @@ function toGetWorkflowDagNode(
   };
 }
 
-function toGetWorkflowDagEdge(row: WorkflowEdgeRow): z.infer<typeof WorkflowEdgeViewSchema> {
+function toGetWorkflowDagEdge(row: WorkflowEdgeRow): GetWorkflowDagResponse["edges"][number] {
   return {
     workflowId: coerceWorkflowId(row.workflowId),
     from: coerceWorkflowNodeId(row.fromNodeId),

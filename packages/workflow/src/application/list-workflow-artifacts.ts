@@ -33,27 +33,30 @@ export type WorkflowArtifactEntry =
       readonly modifiedAt: string;
     };
 
-export const WorkflowArtifactEntrySchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("workflow-summary"),
-      relPath: z.string(),
-      size: z.number(),
-      modifiedAt: z.string(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("node"),
-      nodeId: z.string(),
-      relPath: z.string(),
-      size: z.number(),
-      modifiedAt: z.string(),
-    })
-    .strict(),
-]);
 export const ListWorkflowArtifactsResponseSchema = z.object({
-  artifacts: z.array(WorkflowArtifactEntrySchema).readonly(),
+  artifacts: z
+    .array(
+      z.discriminatedUnion("kind", [
+        z
+          .object({
+            kind: z.literal("workflow-summary"),
+            relPath: z.string(),
+            size: z.number(),
+            modifiedAt: z.string(),
+          })
+          .strict(),
+        z
+          .object({
+            kind: z.literal("node"),
+            nodeId: z.string(),
+            relPath: z.string(),
+            size: z.number(),
+            modifiedAt: z.string(),
+          })
+          .strict(),
+      ]),
+    )
+    .readonly(),
 });
 export interface ListWorkflowArtifactsResponse {
   readonly artifacts: readonly WorkflowArtifactEntry[];
