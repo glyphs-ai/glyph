@@ -70,7 +70,7 @@ interface Runtime {
   launchHeadless?(opts: LaunchHeadlessOpts): Promise<RuntimeHandle>;
 
   // Observability
-  readMetadata?(runtimeSessionId: string): Promise<RuntimeSessionMetadata | null>;
+  readMetadata(runtimeSessionId: string): Promise<RuntimeSessionMetadata | null>;
   readActivity?(runtimeSessionId: string, opts?: ReadActivityOpts): Promise<ActivityResult | null>;
   getLastAgentActivity?(runtimeSessionId: string): Promise<AgentActivity | null>;
   streamActivity?(runtimeSessionId: string, opts?: StreamActivityOpts): AsyncIterable<ActivityItem>;
@@ -106,9 +106,7 @@ registry.register(runtime);
 
 `buildInteractiveLaunch` emits `copilot --session-id=<id> --yolo`
 (falling back to `--yolo` alone for a fresh session). The package is
-verified empirically against Copilot CLI 1.0.44 (see the class jsdoc in
-`copilot/copilot-runtime.ts` and `copilot/trust.ts` for the per-feature
-verification notes).
+verified empirically against Copilot CLI 1.0.44.
 
 ## Env contract
 

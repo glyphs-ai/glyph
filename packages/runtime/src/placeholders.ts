@@ -2,10 +2,10 @@
  * Placeholder substitution for runtime-projected configuration strings.
  *
  * Portable MCP specs cannot embed machine-specific absolute paths and
- * cannot rely on shell variable expansion (the MCP
- * spec at modelcontextprotocol.io has no `${VAR}` mechanism, and
- * wrapping commands in `bash -c "..."` so the shell does the expansion
- * breaks Windows immediately). This module provides glyph's own
+ * cannot rely on shell variable expansion (the MCP spec has no `${VAR}`
+ * mechanism, and wrapping commands in `bash -c "..."` so the shell does
+ * the expansion breaks Windows immediately). This module provides
+ * glyph's own
  * placeholder grammar — a tiny, scheme-free `${name}` syntax with a
  * fixed vocabulary — so spec authors can write portable references
  * without leaking the host OS into their JSON.

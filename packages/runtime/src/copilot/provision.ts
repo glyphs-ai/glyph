@@ -101,13 +101,10 @@ const DEFAULT_SCOPE_PREFIX = "public/";
  *
  * Note: no `git init` is run. Copilot CLI loads hooks from
  * `<cwd>/.github/hooks/*.json` directly — it does not require a `.git/`
- * directory and does not walk up to find a git root (per the official
- * hooks reference at
- * docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference).
- * Skipping `git init` removes a hard dependency on the host's `git`
- * binary and avoids planting `.git/` directories that would otherwise
- * need cleanup when the owning session, task, or workflow artifacts are
- * purged.
+ * directory and does not walk up to find a git root. Skipping `git init`
+ * removes a hard dependency on the host's `git` binary and avoids
+ * planting `.git/` directories that would otherwise need cleanup when the
+ * owning session, task, or workflow artifacts are purged.
  *
  * Source data is pulled from the catalog as `AsyncIterable<{relPath, content}>`
  * streams (see {@link AgentContentSource.skillEntries} /
