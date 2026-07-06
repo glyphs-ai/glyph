@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
+import { CoordinatorAgentSchema } from "../domain/workflow/coordinator-agent.js";
 import {
   type WorkflowCancellation,
   WorkflowCancellationSchema,
@@ -9,6 +10,7 @@ import {
   WorkflowFailureSchema,
 } from "../domain/workflow/workflow-failure.js";
 import { WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
+import { WorkflowOriginSchema } from "../domain/workflow/workflow-origin.js";
 import type { DatabaseUnavailable } from "../domain/workflow/workflow-repository.js";
 import { type WorkflowStatus, WorkflowStatusSchema } from "../domain/workflow/workflow-status.js";
 import {
@@ -21,15 +23,17 @@ import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const ListWorkflowsRequestSchema = z
   .object({
-    coordinatorAgent: z.string().optional(),
+    coordinatorAgent: CoordinatorAgentSchema.optional(),
     createdSince: z.string().optional(),
     idLike: z.string().optional(),
-    origin: z.union([z.string(), z.array(z.string()).readonly()]).optional(),
+    origin: z.union([WorkflowOriginSchema, z.array(WorkflowOriginSchema).readonly()]).optional(),
     originId: z.string().optional(),
   })
   .strict()
   .default({});
-export type ListWorkflowsRequest = z.infer<typeof ListWorkflowsRequestSchema>;
+// `z.input`: `coordinatorAgent` is a branded value object, so the caller-facing
+// filter stays a raw `string` — the use-case's own `.parse()` brands it.
+export type ListWorkflowsRequest = z.input<typeof ListWorkflowsRequestSchema>;
 export const ListWorkflowsResponseSchema = z
   .array(
     z.object({

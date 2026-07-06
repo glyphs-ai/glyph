@@ -49,6 +49,8 @@ export {
   TERMINAL_WORKFLOW_NODE_STATUSES,
   WorkflowNodeStatusSchema,
 } from "../domain/node/workflow-node-status.js";
+export type { CoordinatorAgent } from "../domain/workflow/coordinator-agent.js";
+export { CoordinatorAgentSchema } from "../domain/workflow/coordinator-agent.js";
 export type {
   WorkflowArtifactFile,
   WorkflowArtifactListingFailed,
