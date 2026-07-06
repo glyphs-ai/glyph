@@ -9,6 +9,11 @@ import { collectReferencedSkillFqns } from "./skill-reads.js";
 
 export const AcknowledgePrereqsRequestSchema = z.object({ id: SkillFqnSchema });
 export type AcknowledgePrereqsRequest = z.infer<typeof AcknowledgePrereqsRequestSchema>;
+// Deliberate duplication: this skill projection is intentionally NOT shared
+// with the sibling skill use cases that expose the same shape (get-skill,
+// get-skill-entry, list-skill-entries, list-skills). Each owns its V1 response
+// so a later evolution of one caller never drags the others along in lockstep.
+// Redundancy > coupling.
 export const AcknowledgePrereqsResponseSchema = z.object({
   fqn: z.string(),
   origin: z.string(),

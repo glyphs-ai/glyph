@@ -35,6 +35,10 @@ export const GetSkillEntryRequestSchema = z.object({ id: SkillFqnSchema });
 export type GetSkillEntryRequest = z.infer<typeof GetSkillEntryRequestSchema>;
 export const GetSkillEntryResponseSchema = z
   .object({
+    // Deliberate duplication: this skill projection is intentionally NOT shared
+    // with the sibling skill use cases that expose the same shape. Each owns its
+    // V1 response so a later evolution of one caller never drags the others
+    // along in lockstep. Redundancy > coupling.
     skill: z.object({
       fqn: z.string(),
       origin: z.string(),

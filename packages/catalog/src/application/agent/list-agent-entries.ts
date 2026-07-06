@@ -32,6 +32,10 @@ export const ListAgentEntriesRequestSchema = z.object({});
 export type ListAgentEntriesRequest = z.infer<typeof ListAgentEntriesRequestSchema>;
 export const ListAgentEntriesResponseSchema = z.array(
   z.object({
+    // Deliberate duplication: this agent projection is intentionally NOT shared
+    // with the sibling agent use cases that expose the same shape. Each owns its
+    // V1 response so a later evolution of one caller never drags the others
+    // along in lockstep. Redundancy > coupling.
     agent: z.object({
       fqn: z.string(),
       origin: z.string(),

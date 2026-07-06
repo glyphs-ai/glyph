@@ -10,6 +10,10 @@ import type { UseCase, UseCaseResult } from "../use-case.js";
 export const DisableAgentRequestSchema = z.object({ id: AgentFqnSchema });
 export type DisableAgentRequest = z.infer<typeof DisableAgentRequestSchema>;
 
+// Deliberate duplication: this agent projection is intentionally NOT shared
+// with the sibling agent use cases that expose the same shape. Each owns its
+// V1 response so a later evolution of one caller never drags the others along
+// in lockstep. Redundancy > coupling.
 export const DisableAgentResponseSchema = z.object({
   fqn: z.string(),
   origin: z.string(),
