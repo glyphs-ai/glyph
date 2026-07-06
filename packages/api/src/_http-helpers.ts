@@ -141,7 +141,7 @@ const OPENAPI_HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
  * `server/src/index.ts` (mirrored by the codegen and snapshot assemblies),
  * so `@hono/zod-openapi` composes `{id}` into each operation's path
  * template. The leaf `createRoute`s never declare `id` though: it is a
- * mount-level concern resolved by `workspaceContextMiddleware`, not a
+ * mount-level concern resolved by `resolveWorkspaceMiddleware`, not a
  * per-route validated param. The generated document would therefore carry
  * a path-template variable with no matching parameter — invalid OpenAPI
  * that also leaves the generated SDK unable to substitute the workspace

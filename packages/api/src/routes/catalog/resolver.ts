@@ -3,7 +3,7 @@ import type { Context } from "hono";
 
 /**
  * Pulls the per-workspace `CatalogModule` off the Hono request context.
- * Set up by the workspace middleware (see `workspaceContextMiddleware`
+ * Set up by the workspace middleware (see `resolveWorkspaceMiddleware`
  * in server `index.ts`).
  *
  * Tests can pass a `CatalogModule` directly instead of going through

@@ -46,7 +46,7 @@ export const COLD_LOAD_RACE_MS = 500;
  * entirely; slow loads hand the client a typed 202 to back off on
  * instead of a stalled connection.
  */
-export function workspaceContextMiddleware(
+export function resolveWorkspaceMiddleware(
   application: Application,
   logger: PinoLogger,
 ): MiddlewareHandler<{ Variables: WorkspaceVars }> {

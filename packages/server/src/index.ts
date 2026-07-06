@@ -41,7 +41,7 @@ import { buildLogger, type Logger, type LogLevel } from "./log/build-logger.js";
 import { accessLog } from "./middleware/access-log.js";
 import { requestId } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/request-logger.js";
-import { type WorkspaceVars, workspaceContextMiddleware } from "./middleware/workspace-context.js";
+import { resolveWorkspaceMiddleware, type WorkspaceVars } from "./middleware/resolve-workspace.js";
 import { createApiApp, registerOpenApiDoc } from "./routes/_openapi.js";
 import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-env.js";
 
@@ -59,7 +59,7 @@ import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-
 export * from "./glyph-home.js";
 
 /**
- * Per-request variables stashed on the Hono context by `workspaceContextMiddleware`.
+ * Per-request variables stashed on the Hono context by `resolveWorkspaceMiddleware`.
  * Both managers point at the same workspace; routes pull whichever they need.
  *
  * The type itself is re-exported via the middleware module so route
@@ -273,7 +273,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // c.var; each route family reads the bits it needs. 404 if id is not
   // registered; 5xx if workspace.db cannot be opened.
   const sessionsApp = createApiApp<{ Variables: WorkspaceVars }>();
-  sessionsApp.use("/:id/sessions/*", workspaceContextMiddleware(application, logger));
+  sessionsApp.use("/:id/sessions/*", resolveWorkspaceMiddleware(application, logger));
   sessionsApp.route(
     "/:id/sessions",
     sessionsRoutes((c) => c.get("workspaceContext")),
@@ -281,7 +281,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", sessionsApp);
 
   const tasksApp = createApiApp<{ Variables: WorkspaceVars }>();
-  tasksApp.use("/:id/tasks/*", workspaceContextMiddleware(application, logger));
+  tasksApp.use("/:id/tasks/*", resolveWorkspaceMiddleware(application, logger));
   tasksApp.route(
     "/:id/tasks",
     tasksRoutes((c) => c.get("workspaceContext").tasks),
@@ -295,7 +295,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // layer, not the service layer, keeps the seam at the URL where it
   // belongs.
   const scheduledTasksApp = createApiApp<{ Variables: WorkspaceVars }>();
-  scheduledTasksApp.use("/:id/scheduled-tasks/*", workspaceContextMiddleware(application, logger));
+  scheduledTasksApp.use("/:id/scheduled-tasks/*", resolveWorkspaceMiddleware(application, logger));
   scheduledTasksApp.route(
     "/:id/scheduled-tasks",
     scheduledTasksRoutes((c) => c.get("workspaceContext").tasks),
@@ -308,7 +308,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   const scheduledWorkflowsApp = createApiApp<{ Variables: WorkspaceVars }>();
   scheduledWorkflowsApp.use(
     "/:id/scheduled-workflows/*",
-    workspaceContextMiddleware(application, logger),
+    resolveWorkspaceMiddleware(application, logger),
   );
   scheduledWorkflowsApp.route(
     "/:id/scheduled-workflows",
@@ -321,7 +321,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // the one kindless endpoint (a cron calculator, touches no stored row). All
   // share the same workspace-scoped per-context state via one middleware.
   const schedulesApp = createApiApp<{ Variables: WorkspaceVars }>();
-  schedulesApp.use("/:id/schedules/*", workspaceContextMiddleware(application, logger));
+  schedulesApp.use("/:id/schedules/*", resolveWorkspaceMiddleware(application, logger));
   schedulesApp.route(
     "/:id/schedules/task",
     schedulesTaskRoutes((c) => c.get("workspaceContext").schedules),
@@ -344,7 +344,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // projection in `routes/_workflow-projection.ts` flattens the
   // per-kind shapes for the dashboard / CLI.
   const workflowsApp = createApiApp<{ Variables: WorkspaceVars }>();
-  workflowsApp.use("/:id/workflows/*", workspaceContextMiddleware(application, logger));
+  workflowsApp.use("/:id/workflows/*", resolveWorkspaceMiddleware(application, logger));
   workflowsApp.route(
     "/:id/workflows",
     workflowsRoutes(
@@ -356,7 +356,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", workflowsApp);
 
   const catalogApp = createApiApp<{ Variables: WorkspaceVars }>();
-  catalogApp.use("/:id/catalog/*", workspaceContextMiddleware(application, logger));
+  catalogApp.use("/:id/catalog/*", resolveWorkspaceMiddleware(application, logger));
   catalogApp.route(
     "/:id/catalog",
     catalogRoutes((c) => c.get("workspaceContext").catalog),
@@ -436,7 +436,7 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // the full fan-out becomes N × 500ms (50s at N=100). The HTTP
   // listener is up before this loop starts; in-flight cold-load
   // requests are handled by the 202 / 503 protocol in
-  // `workspaceContextMiddleware`.
+  // `resolveWorkspaceMiddleware`.
   if (wsList.length > 0) {
     const prewarmStart = performance.now();
     logger.info({ count: wsList.length }, "pre-warming workspace contexts (background)");
