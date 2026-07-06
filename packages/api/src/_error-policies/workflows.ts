@@ -167,9 +167,9 @@ const WORKFLOW_ATOM_TABLE = {
  * for "bad node spec" whether or not a typed cause is attached.
  * `WorkflowWorkerNotInCoordMenuError` is the exception: its message would
  * enumerate the coordinator's dispatch menu (internal topology), so it
- * stays opaque (`detail = INTERNAL`) and keeps its existing status rather
- * than presenting as a caller-fixable 422 — but still exposes its `name`
- * as `code` so a client can branch.
+ * collapses to an opaque 500 (`detail = INTERNAL`) rather than presenting
+ * as a caller-fixable 422 — but still exposes its `name` as `code` so a
+ * client can branch.
  */
 const SPEC_CAUSE_TABLE: Readonly<Record<string, ProblemDef>> = {
   WorkflowCoordAgentNotCapableError: {
@@ -182,7 +182,7 @@ const SPEC_CAUSE_TABLE: Readonly<Record<string, ProblemDef>> = {
     }),
   },
   WorkflowWorkerNotInCoordMenuError: {
-    status: 400,
+    status: 500,
     title: "Internal error",
     detail: () => INTERNAL,
   },
