@@ -63,8 +63,6 @@ export const ApplyPlanResponseSchema = z.object({
   orphansFlagged: z.array(OrphanSchema),
 });
 export type ApplyPlanResponse = z.infer<typeof ApplyPlanResponseSchema>;
-export type CatalogApplyResult = ApplyPlanResponse;
-
 export type ApplyPlanError = never;
 
 export interface ApplyPlanDeps {

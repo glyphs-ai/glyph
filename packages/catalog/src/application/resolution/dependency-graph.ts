@@ -5,7 +5,8 @@
  *
  * A `ResolvedGraph` is the deduped reachable closure from a root: one
  * `ResolvedNode` per origin plus the `CatalogConflict`s for nodes that
- * couldn't enter (source failure or dependency cycle). The application
+ * couldn't enter (a source fetch/parse failure, or an origin conflict with
+ * an already-installed entry). The application
  * services `get-tree` (installed graph, from repos) and `get-upstream-tree`
  * (source graph, from upstream manifests) are PARALLEL producers that each
  * populate this same model — they depend on this domain model, never on
@@ -46,7 +47,7 @@ const ConflictReasonSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("origin-conflict"), existingOrigin: z.string() }),
 ]);
 
-/** A node that couldn't enter the graph — source failure or dependency cycle. */
+/** A node that couldn't enter the graph — a source fetch/parse failure or an origin conflict. */
 export const ConflictSchema = z.object({
   kind: CatalogKindSchema,
   origin: z.string(),

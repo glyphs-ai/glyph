@@ -32,7 +32,6 @@ type Skill = z.infer<typeof SkillSchema>;
 
 export const AcknowledgePrereqsRequestSchema = z.object({ id: SkillFqnSchema });
 export type AcknowledgePrereqsRequest = z.infer<typeof AcknowledgePrereqsRequestSchema>;
-export const AcknowledgePrereqsResponseSchema = SkillSchema;
 export type AcknowledgePrereqsResponse = Skill;
 export type AcknowledgePrereqsError = SkillNotFound | DatabaseUnavailable;
 export interface AcknowledgePrereqsDeps {

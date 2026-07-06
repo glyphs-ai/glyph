@@ -72,7 +72,6 @@ export {
   type GetAgentFileRequest,
   GetAgentFileRequestSchema,
   type GetAgentFileResponse,
-  GetAgentFileResponseSchema,
 } from "./application/agent/get-agent-file.js";
 export {
   type InstallAgentError,
@@ -173,7 +172,6 @@ export {
   ApplyPlanRequestSchema,
   type ApplyPlanResponse,
   ApplyPlanResponseSchema,
-  type CatalogApplyResult,
 } from "./application/resolution/apply-plan.js";
 export type {
   CatalogConflict,
@@ -209,7 +207,6 @@ export {
   type AcknowledgePrereqsRequest,
   AcknowledgePrereqsRequestSchema,
   type AcknowledgePrereqsResponse,
-  AcknowledgePrereqsResponseSchema,
 } from "./application/skill/acknowledge-skill-prereqs.js";
 export {
   type GetSkillError,
@@ -244,7 +241,6 @@ export {
   type GetSkillFileRequest,
   GetSkillFileRequestSchema,
   type GetSkillFileResponse,
-  GetSkillFileResponseSchema,
 } from "./application/skill/get-skill-file.js";
 // ─── skill domain error atom (defined alongside its use-case) ──────────
 export type { SkillOriginConflict } from "./application/skill/install-skill.js";

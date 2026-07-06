@@ -2,8 +2,9 @@
  * Use case: walk the UPSTREAM source graph from a root origin and return the
  * deduped reachable graph (one node per origin + verbatim dep edges). Always
  * fetches every node — no install short-circuit — so callers can spot version
- * churn. Cycles and source failures become `graph.conflicts`, never errors;
- * the only error channel is unused (sources translate IO faults to conflicts).
+ * churn. Source failures become `graph.conflicts`, never errors, and the walk
+ * dedups by origin so cycles terminate safely; the only error channel is
+ * unused (sources translate IO faults to conflicts).
  */
 
 import { ResultAsync } from "neverthrow";
