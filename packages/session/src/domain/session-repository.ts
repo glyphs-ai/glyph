@@ -20,9 +20,10 @@ export type SessionNotFound = {
 
 /**
  * Write-side persistence port for the session aggregate. Pure reads
- * (findById / findAll) live on the read-side {@link SessionQueries}. `get`
- * loads the aggregate for mutation (asserting existence); `save` is an
- * upsert keyed on the repository's change-tracker (a freshly `create()`d
+ * live on the read-side {@link SessionQueries}, which exposes the table
+ * for read use-cases to compose their own SELECTs. `get` loads the
+ * aggregate for mutation (asserting existence); `save` is an upsert
+ * keyed on the repository's change-tracker (a freshly `create()`d
  * aggregate INSERTs; a loaded one UPDATEs).
  */
 export interface SessionRepository {
