@@ -46,7 +46,7 @@ import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { respondScheduleError } from "../../_error-policies/schedules.js";
 import { respondTaskError } from "../../_error-policies/tasks.js";
-import { logEvent } from "../../_http-errors.js";
+import { logEvent, problemResponse } from "../../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../../_http-helpers.js";
 
 type ScheduleServiceResolver = (c: Context) => ScheduleModule;
@@ -471,7 +471,10 @@ export function scheduledTasksRoutes(resolve: (c: Context) => TaskModule): OpenA
       if (createdSince !== undefined) {
         const t = Date.parse(createdSince);
         if (Number.isNaN(t)) {
-          return c.json({ error: "createdSince must be an ISO 8601 timestamp" }, 400);
+          return problemResponse(c, 400, {
+            code: "BadRequest",
+            detail: "createdSince must be an ISO 8601 timestamp",
+          });
         }
         createdSinceIso = new Date(t).toISOString();
       }

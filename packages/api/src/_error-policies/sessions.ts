@@ -1,16 +1,16 @@
 /**
- * Per-domain error response builder for the sessions routes.
+ * Problem table for the sessions routes.
  *
  * @glyphs-ai/session returns errors as discriminated-union values (not
  * thrown classes), so the route catches a `Result.Err` value and passes
- * it through {@link respondSessionError}. The status and wire `code`
- * derive from the value's `.type` discriminator; 5xx tech failures are
- * logged via `logFault` and collapsed to an opaque body so a `cause`
+ * it through {@link respondSessionError}. Status + `title` derive from the
+ * value's `.type` discriminator via {@link SESSION_TABLE}; 5xx tech
+ * failures collapse to the opaque `"internal error"` detail so a `cause`
  * carrying DB internals or host paths never reaches the wire.
  *
  * Malformed path ids are a separate path: the use-case re-parses its
  * request through `SessionIdSchema` and a malformed id surfaces as a
- * thrown `ZodError` that `createApiApp`'s onError renders as a 400.
+ * thrown `ZodError` that `respondProblem` renders as a 400 ValidationError.
  */
 
 import type {
@@ -20,8 +20,8 @@ import type {
   ListSessionsError,
 } from "@glyphs-ai/session";
 import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { logFault } from "../_http-errors.js";
+import type { DomainProblemTable, ProblemTable } from "../_http-errors.js";
+import { respondProblem } from "../_http-errors.js";
 
 /** Every DU error value a session route can surface from `.execute()`. */
 export type SessionRouteError =
@@ -30,31 +30,27 @@ export type SessionRouteError =
   | GetSessionError
   | ListSessionsError;
 
-type SessionErrorType = SessionRouteError["type"];
+const INTERNAL = "internal error";
 
-const STATUS_BY_TYPE: Readonly<Record<SessionErrorType, ContentfulStatusCode>> = {
-  SessionNotFound: 404,
-  AgentNotFound: 400,
-  UnknownRuntime: 400,
-  RuntimeStateDeletionFailed: 409,
-  SandboxRemovalFailed: 409,
-  AgentResolutionFailed: 500,
-  SandboxProvisionFailed: 500,
-  RuntimeProvisionFailed: 500,
-  DatabaseUnavailable: 500,
-};
-
-const MESSAGE_BY_TYPE: Readonly<Record<SessionErrorType, string>> = {
-  SessionNotFound: "session not found",
-  AgentNotFound: "agent not found",
-  UnknownRuntime: "unknown runtime",
-  RuntimeStateDeletionFailed: "runtime state deletion failed",
-  SandboxRemovalFailed: "sandbox removal failed",
-  AgentResolutionFailed: "internal error",
-  SandboxProvisionFailed: "internal error",
-  RuntimeProvisionFailed: "internal error",
-  DatabaseUnavailable: "internal error",
-};
+export const SESSION_TABLE = {
+  SessionNotFound: { status: 404, title: "Session not found", detail: () => "session not found" },
+  AgentNotFound: { status: 400, title: "Agent not found", detail: () => "agent not found" },
+  UnknownRuntime: { status: 400, title: "Unknown runtime", detail: () => "unknown runtime" },
+  RuntimeStateDeletionFailed: {
+    status: 409,
+    title: "Runtime state deletion failed",
+    detail: () => "runtime state deletion failed",
+  },
+  SandboxRemovalFailed: {
+    status: 409,
+    title: "Sandbox removal failed",
+    detail: () => "sandbox removal failed",
+  },
+  AgentResolutionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  SandboxProvisionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  RuntimeProvisionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  DatabaseUnavailable: { status: 500, title: "Internal error", detail: () => INTERNAL },
+} satisfies DomainProblemTable<SessionRouteError>;
 
 export interface RespondSessionErrorOpts {
   readonly route: string;
@@ -62,19 +58,18 @@ export interface RespondSessionErrorOpts {
 }
 
 /**
- * Render a session route's `Result.Err` DU value as an HTTP response:
- * status + `code = err.type` from the static tables above. 5xx tech
- * failures emit the structured `logFault` line; the wire body for those
- * is the opaque `"internal error"` message so a `cause` never leaks.
+ * Render a session route's `Result.Err` DU value as an
+ * `application/problem+json` response: status + `title` from
+ * {@link SESSION_TABLE}, `detail` from the row's builder. 5xx tech failures
+ * are logged + collapsed to the opaque detail by `respondProblem`.
  */
 export function respondSessionError(
   c: Context,
   err: SessionRouteError,
   opts: RespondSessionErrorOpts,
 ): Response {
-  const status = STATUS_BY_TYPE[err.type];
-  if (status >= 500) {
-    logFault(c, err, `${opts.route}: 5xx fault`, opts.meta);
-  }
-  return c.json({ error: MESSAGE_BY_TYPE[err.type], code: err.type }, status);
+  return respondProblem(c, err, SESSION_TABLE as ProblemTable, {
+    route: opts.route,
+    ...(opts.meta !== undefined ? { meta: opts.meta } : {}),
+  });
 }

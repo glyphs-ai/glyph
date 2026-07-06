@@ -1,10 +1,11 @@
 import {
   type Application,
-  errorBody,
+  PROBLEM_CONTENT_TYPE,
+  toProblem,
   type WorkspaceContext,
   WorkspaceLoadError,
 } from "@glyphs-ai/api";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { Logger as PinoLogger } from "pino";
 
 /**
@@ -15,6 +16,20 @@ import type { Logger as PinoLogger } from "pino";
 export type WorkspaceVars = {
   workspaceContext: WorkspaceContext;
 };
+
+/** `workspace "<id>" not found` as an RFC 9457 Problem 404. */
+function workspaceNotFound(c: Context, id: string): Response {
+  return c.json(
+    toProblem({
+      status: 404,
+      title: "Workspace not found",
+      detail: `workspace "${id}" not found`,
+      code: "WorkspaceNotFound",
+    }),
+    404,
+    { "content-type": PROBLEM_CONTENT_TYPE },
+  );
+}
 
 /**
  * Time the middleware is willing to block on a cold per-workspace
@@ -40,7 +55,7 @@ export const COLD_LOAD_RACE_MS = 500;
  *     fresh load is still pending after the grace window
  *   - 503 + `Retry-After: 5` if the per-workspace `load()` throws —
  *     surfaces the failure as `WorkspaceLoadError` through the
- *     standard `errorBody` envelope (no host paths leak)
+ *     standard RFC 9457 Problem envelope (no host paths leak)
  *
  * The grace window lets fast cold loads bypass the warming round-trip
  * entirely; slow loads hand the client a typed 202 to back off on
@@ -52,12 +67,23 @@ export function resolveWorkspaceMiddleware(
 ): MiddlewareHandler<{ Variables: WorkspaceVars }> {
   return async (c, next) => {
     const id = c.req.param("id");
-    if (!id) return c.json({ error: "missing workspace id" }, 400);
+    if (!id) {
+      return c.json(
+        toProblem({
+          status: 400,
+          title: "Missing workspace id",
+          detail: "missing workspace id",
+          code: "MissingWorkspaceId",
+        }),
+        400,
+        { "content-type": PROBLEM_CONTENT_TYPE },
+      );
+    }
 
     const state = await application.peekContextState(id);
 
     if (state === "not-registered") {
-      return c.json({ error: `workspace "${id}" not found`, code: "WorkspaceNotFound" }, 404);
+      return workspaceNotFound(c, id);
     }
 
     if (state === "loading") {
@@ -70,7 +96,7 @@ export function resolveWorkspaceMiddleware(
         // Race: a concurrent invalidate wiped the entry between
         // peek and get. Surface as 404 — caller's next request will
         // see "not-registered" on peek.
-        return c.json({ error: `workspace "${id}" not found`, code: "WorkspaceNotFound" }, 404);
+        return workspaceNotFound(c, id);
       }
       c.set("workspaceContext", ctx);
       return next();
@@ -114,13 +140,22 @@ export function resolveWorkspaceMiddleware(
           ? winner.err
           : new WorkspaceLoadError(id, winner.err);
       logger.error({ err: wrapped, workspaceId: id }, "workspace cold-load failed");
-      return c.json(errorBody(wrapped), 503, { "Retry-After": "5" });
+      return c.json(
+        toProblem({
+          status: 503,
+          title: "Workspace failed to load",
+          detail: wrapped.message,
+          code: "WorkspaceLoadError",
+        }),
+        503,
+        { "content-type": PROBLEM_CONTENT_TYPE, "Retry-After": "5" },
+      );
     }
 
     if (!winner.ctx) {
       // Workspace was unregistered between peek and load — surface
       // as 404 like a stable not-registered.
-      return c.json({ error: `workspace "${id}" not found`, code: "WorkspaceNotFound" }, 404);
+      return workspaceNotFound(c, id);
     }
 
     c.set("workspaceContext", winner.ctx);

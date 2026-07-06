@@ -15,6 +15,7 @@
  * than terminals, so deterministic columns beat fancy formatting.
  */
 
+import type { Problem } from "@glyphs-ai/sdk";
 import type { CommandResult } from "./result.js";
 import { ApiError } from "./sdk-client.js";
 
@@ -77,8 +78,8 @@ export function formatRecord(record: Record<string, unknown>): string {
  *  - 1 — generic / unknown
  *
  * For an {@link ApiError} the message includes:
- *  - the server's `error` field
- *  - the optional `code` field (so users can tell `WorkspaceNotFoundError`
+ *  - the server's `detail` field
+ *  - the optional `code` field (so users can tell `WorkspaceNotFound`
  *    apart from `BadRequest` apart from `EntryNotReady` without
  *    parsing the prose)
  *  - `EntryNotReady`-specific structured hints (the agent FQN and
@@ -92,7 +93,7 @@ export function formatRecord(record: Record<string, unknown>): string {
 export function formatError(err: unknown): CommandResult {
   if (err instanceof ApiError) {
     const lines: string[] = [];
-    const code = pickStringField(err.body, "code");
+    const code = err.body?.code;
     const headline = code
       ? `${err.message} (HTTP ${err.status}, ${code})`
       : `${err.message} (HTTP ${err.status})`;
@@ -114,18 +115,6 @@ export function formatError(err: unknown): CommandResult {
 }
 
 /**
- * Read a string-typed field off a parsed JSON error body. Defensive
- * because `body` is typed `unknown` — the server contract says it's
- * `{error, code?, ...}` but we don't want a malformed reply to throw
- * inside an error formatter.
- */
-function pickStringField(body: unknown, key: string): string | undefined {
-  if (typeof body !== "object" || body === null) return undefined;
-  const v = (body as Record<string, unknown>)[key];
-  return typeof v === "string" && v !== "" ? v : undefined;
-}
-
-/**
  * Render the `EntryNotReady` envelope extension shipped by
  * `POST /api/workspaces/:id/tasks` (see
  * `packages/api/src/routes/tasks.ts`). Mirrors the dashboard's
@@ -133,13 +122,12 @@ function pickStringField(body: unknown, key: string): string | undefined {
  * the user at the matching CLI subcommand so the terminal experience
  * matches the web UI.
  */
-function formatEntryNotReadyHint(body: unknown): string[] {
-  if (typeof body !== "object" || body === null) return [];
-  const obj = body as Record<string, unknown>;
+function formatEntryNotReadyHint(body: Problem | undefined): string[] {
+  if (!body) return [];
   const lines: string[] = [];
-  const agent = typeof obj.agent === "string" ? obj.agent : undefined;
+  const agent = typeof body.agent === "string" ? body.agent : undefined;
   if (agent) lines.push(`  agent: ${agent}`);
-  const reason = obj.reason;
+  const reason = body.reason;
   if (typeof reason !== "object" || reason === null) return lines;
   // Snapshot line count BEFORE the reason-specific branches so we can
   // detect "reason was an object but none of our known fields matched".
@@ -239,8 +227,8 @@ export function isStatusError(err: unknown, status: number): boolean {
  */
 export function isInvalidTransition(err: unknown, transition?: string): boolean {
   if (!(err instanceof ApiError)) return false;
-  const body = err.body as { code?: unknown; transition?: unknown } | undefined;
-  if (typeof body !== "object" || body === null) return false;
+  const body = err.body;
+  if (!body) return false;
   if (body.code !== "InvalidTransition") return false;
   if (transition === undefined) return true;
   return body.transition === transition;

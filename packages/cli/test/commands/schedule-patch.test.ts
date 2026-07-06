@@ -30,6 +30,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { schedulePatch } from "../../src/commands/schedule.js";
+import { problemBody } from "../_helpers/problem.js";
 import { runCli } from "../_helpers/run-cli.js";
 
 const SERVER_URL = "http://stub.local";
@@ -450,10 +451,7 @@ describe("schedulePatch — server error envelopes", () => {
       { status: 200, body: JSON.stringify(sampleScheduleGet) },
       {
         status: 404,
-        body: JSON.stringify({
-          error: `schedule "${SID}" not found`,
-          code: "ScheduleNotFoundError",
-        }),
+        body: problemBody(404, "ScheduleNotFoundError", `schedule "${SID}" not found`),
       },
     ]);
     const r = await schedulePatch(SID, { ...commonOpts(), cron: "0 10 * * *", json: true });
@@ -466,10 +464,7 @@ describe("schedulePatch — server error envelopes", () => {
     const { calls } = stubFetchMulti([
       {
         status: 404,
-        body: JSON.stringify({
-          error: `schedule "${SID}" not found`,
-          code: "ScheduleNotFoundError",
-        }),
+        body: problemBody(404, "ScheduleNotFoundError", `schedule "${SID}" not found`),
       },
     ]);
     const r = await schedulePatch(SID, { ...commonOpts(), cron: "0 10 * * *" });

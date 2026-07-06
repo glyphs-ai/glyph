@@ -428,7 +428,7 @@ describe("scheduledTasksRoutes", () => {
     const res = await scheduledTasksRoutes(() => m).request("/?createdSince=not-a-date");
     expect(res.status).toBe(400);
     const body = await jsonBody(res);
-    expect(body.error).toMatch(/ISO 8601/);
+    expect(body.detail).toMatch(/ISO 8601/);
     expect(m.list).not.toHaveBeenCalled();
   });
 

@@ -5,9 +5,10 @@
  *
  *  - {@link unwrap} — the result-tuple → success-payload / throw mapping
  *    the CLI's exit-code policy depends on. The mapping: 2xx → data, 204 →
- *    `{}`, non-2xx → {@link ApiError} (message = `body.error` when a string,
- *    else `HTTP <status>`), and a missing `response` (transport failure) →
- *    rethrow the original error untouched.
+ *    `{}`, non-2xx → {@link ApiError} (message = `body.detail` when the
+ *    error body is an RFC 9457 Problem, else `HTTP <status>`; `body` is the
+ *    typed Problem or `undefined`), and a missing `response` (transport
+ *    failure) → rethrow the original error untouched.
  *  - {@link configureClient} — request serialization pinned byte-for-byte
  *    to the former hand-rolled client: blanket `Accept: application/json`,
  *    `Content-Type` only on body-bearing requests, `URLSearchParams` query
@@ -35,19 +36,29 @@ describe("unwrap", () => {
     expect(unwrap({ data: {}, response: res(204) })).toEqual({});
   });
 
-  it("throws ApiError with the body's `error` string as the message", () => {
+  it("throws ApiError with the body's `detail` string as the message", () => {
+    const problem = {
+      type: "https://errors.glyph.ai/validation-error",
+      title: "Validation error",
+      status: 400,
+      detail: "name is required (string)",
+      code: "ValidationError",
+    };
     try {
-      unwrap({ error: { error: "name is required (string)" }, response: res(400) });
+      unwrap({ error: problem, response: res(400) });
       expect.fail("expected ApiError");
     } catch (err) {
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).status).toBe(400);
       expect((err as ApiError).message).toBe("name is required (string)");
-      expect((err as ApiError).body).toEqual({ error: "name is required (string)" });
+      expect((err as ApiError).body).toEqual(problem);
     }
   });
 
-  it("falls back to `HTTP <status>` when the body has no string `error`", () => {
+  it("falls back to `HTTP <status>` and drops a non-Problem error body", () => {
+    // A body that isn't a well-formed RFC 9457 Problem (here a bare
+    // string) must not be surfaced as a typed `body`; the message falls
+    // back to the status line.
     try {
       unwrap({ error: "oops", response: res(500) });
       expect.fail("expected ApiError");
@@ -55,7 +66,7 @@ describe("unwrap", () => {
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).status).toBe(500);
       expect((err as ApiError).message).toBe("HTTP 500");
-      expect((err as ApiError).body).toBe("oops");
+      expect((err as ApiError).body).toBeUndefined();
     }
   });
 

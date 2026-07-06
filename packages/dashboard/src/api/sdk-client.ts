@@ -12,17 +12,17 @@
  *    `fetch` is deliberately left unset so the SDK resolves
  *    `globalThis.fetch` at call time — the test suite swaps that global.
  *  - {@link unwrap} — turns a result tuple into the success payload or throws
- *    the dashboard's {@link ApiError}, reproducing `http.ts`'s exact error
- *    semantics: the structured `code` / `field` envelope, the 202 "warming"
- *    surface (`code: "WorkspaceWarming"`), and the transport-error
- *    passthrough.
+ *    the dashboard's {@link ApiError}, mirroring `http.ts`'s error semantics:
+ *    the RFC 9457 Problem envelope (`detail` → message, plus `code` / `field`),
+ *    the 202 "warming" surface (`code: "WorkspaceWarming"`), and the
+ *    transport-error passthrough.
  *
  * The SDK's own `unwrap` / `GlyphError` are intentionally NOT used: the
  * dashboard's UI surfaces branch on `ApiError.code` / `.field` / `.status`,
  * which `GlyphError` does not carry in the shape they expect.
  */
 
-import { client } from "@glyphs-ai/sdk";
+import { client, isProblem } from "@glyphs-ai/sdk";
 import { ApiError, getActiveWorkspace } from "./http.js";
 
 /**
@@ -70,29 +70,34 @@ configureSdkClient();
 
 /**
  * Build (do NOT throw) an {@link ApiError} from a server error body,
- * mirroring `http.ts`'s `extractErrorEnvelope`: the structured 4xx
- * `{ error, code, field }` envelope, plus the 202 `{ state: "warming",
- * workspaceId }` surface that becomes `code: "WorkspaceWarming"`.
+ * mirroring `http.ts`'s `buildApiError`: the RFC 9457 Problem envelope
+ * (`{ type, title, status, detail, code, field?, ... }`) maps `detail` →
+ * message and carries `code` / `field`; the 202 `{ state: "warming",
+ * workspaceId }` surface becomes `code: "WorkspaceWarming"`.
  */
 function buildApiError(status: number, body: unknown): ApiError {
-  let message = `${status}`;
-  let code: string | undefined;
-  let field: string | undefined;
+  // hey-api decodes the `application/problem+json` error body into `body`;
+  // narrow it to the typed Problem so the user-visible message is the
+  // server's `detail`, not the bare status.
+  if (isProblem(body)) {
+    return new ApiError(body.detail, {
+      status,
+      code: body.code,
+      ...(typeof body.field === "string" ? { field: body.field } : {}),
+    });
+  }
+  // The 202 warming envelope ({state, workspaceId}) is the one non-Problem
+  // error body; it rides in `data` (202 is response.ok).
   if (body !== null && typeof body === "object") {
     const b = body as Record<string, unknown>;
-    if (typeof b.error === "string") message = b.error;
-    if (typeof b.code === "string") code = b.code;
-    if (typeof b.field === "string") field = b.field;
     if (b.state === "warming" && typeof b.workspaceId === "string") {
-      code = "WorkspaceWarming";
-      message = `workspace "${b.workspaceId}" is warming up`;
+      return new ApiError(`workspace "${b.workspaceId}" is warming up`, {
+        status,
+        code: "WorkspaceWarming",
+      });
     }
   }
-  return new ApiError(message, {
-    status,
-    ...(code !== undefined ? { code } : {}),
-    ...(field !== undefined ? { field } : {}),
-  });
+  return new ApiError(`${status}`, { status });
 }
 
 /**

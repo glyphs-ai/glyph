@@ -7,7 +7,7 @@ import {
 } from "@glyphs-ai/catalog";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { catalogErrorPolicy } from "../../_error-policies/catalog.js";
-import { logEvent, respondError } from "../../_http-errors.js";
+import { logEvent, problemResponse, respondError } from "../../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../../_http-helpers.js";
 import { planStoreFor } from "./plan-store.js";
 import { planToManifest, ResolveManifestSchema } from "./plan-to-manifest.js";
@@ -193,13 +193,10 @@ export function mcpsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono {
       const body = c.req.valid("json");
       const plan = planStoreFor(catalog).take(body.planToken);
       if (plan === null) {
-        return c.json(
-          {
-            error: "preview expired or already applied; re-preview to continue",
-            code: "PlanTokenInvalid",
-          },
-          410,
-        );
+        return problemResponse(c, 410, {
+          code: "PlanTokenInvalid",
+          detail: "preview expired or already applied; re-preview to continue",
+        });
       }
       try {
         const result = (await catalog.applyPlan.execute({ plan }))._unsafeUnwrap();

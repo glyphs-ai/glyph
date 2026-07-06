@@ -31,25 +31,32 @@ export {
   respondSessionError,
   type SessionRouteError,
 } from "./_error-policies/sessions.js";
+export { TASK_TABLE, type TaskRouteError } from "./_error-policies/tasks.js";
 export {
-  type TaskRouteError,
-  taskErrorWireBody,
-  taskUnionCodeStatuses,
-} from "./_error-policies/tasks.js";
-export {
+  type RespondWorkflowErrorOpts,
   respondWorkflowError,
   type WorkflowRouteError,
-  workflowCustomDeleteBody,
   workflowsErrorPolicy,
 } from "./_error-policies/workflows.js";
 export {
-  type ErrorPolicy,
-  errorBody,
+  type RespondWorkspaceErrorOpts,
+  respondWorkspaceError,
+  type WorkspaceRouteError,
+} from "./_error-policies/workspaces.js";
+export {
+  type DomainProblemTable,
   INTERNAL_ERROR_NAMES,
   logEvent,
   logFault,
-  type RespondErrorOpts,
+  type ProblemDef,
+  type ProblemTable,
+  problemResponse,
+  type ResolvedProblem,
+  type RespondProblemOpts,
+  readErrorCode,
+  resolveProblem,
   respondError,
+  respondProblem,
   SAFE_ERROR_NAMES,
   unmappedFaultMeta,
 } from "./_http-errors.js";
@@ -59,6 +66,7 @@ export {
 export {
   createApiApp,
   errorResponse,
+  finalizeOpenApiDoc,
   injectWorkspaceIdParam,
   jsonRequest,
   jsonResponse,
@@ -84,6 +92,20 @@ export { sessionsRoutes } from "./routes/sessions.js";
 export { tasksRoutes } from "./routes/tasks.js";
 export { workflowsRoutes } from "./routes/workflows.js";
 export { workspacesRoutes } from "./routes/workspaces.js";
+// RFC 9457 Problem envelope — the global HTTP error wire shape.
+export {
+  PROBLEM_CONTENT_TYPE,
+  PROBLEM_JSON_SCHEMA,
+  PROBLEM_TYPE_PREFIX,
+  type Problem,
+  type ProblemInput,
+  type ProblemIssue,
+  ProblemIssueSchema,
+  ProblemSchema,
+  problemTypeUri,
+  toProblem,
+  validationProblem,
+} from "./schemas/problem.js";
 export {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,

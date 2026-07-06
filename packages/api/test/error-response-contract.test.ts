@@ -12,9 +12,8 @@
  *      through" log line for unrecognised errors, closing the
  *      observability gap for that file.
  *   3. `InvalidTransition` carries the route-context `transition`
- *      verb ("cancel" vs "delete") in its 409 body, proving that the
- *      per-call `customBody` parameter forwards route state through
- *      the helper.
+ *      verb ("cancel" vs "delete") in its 409 Problem body, proving
+ *      that the route forwards its state through `opts.transition`.
  *   4. `EntryNotReady` keeps its structured `{ agent, reason }`
  *      fields on the 409 body via the Result-native task error
  *      responder.
@@ -44,6 +43,7 @@ import {
 } from "../src/routes/schedules/scheduled-tasks.js";
 import { tasksRoutes } from "../src/routes/tasks.js";
 import { workspacesRoutes } from "../src/routes/workspaces.js";
+import { toProblem } from "../src/schemas/problem.js";
 import { captureLogger } from "./_capture-logger.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: transport tests assert on dynamically-shaped JSON bodies
@@ -118,7 +118,14 @@ describe("respondError contract — cross-domain status preservation", () => {
     });
     expect(res.status).toBe(400);
     const body = await jsonBody(res);
-    expect(body).toEqual({ error: "agent not found", code: "AgentNotFound" });
+    expect(body).toEqual(
+      toProblem({
+        status: 400,
+        title: "Agent not found",
+        detail: "agent not found",
+        code: "AgentNotFound",
+      }),
+    );
   });
 
   it("schedule route's AgentNotFound union detail (via kind handler) → 400", async () => {
@@ -190,9 +197,9 @@ describe("respondError contract — unmapped-fault observability gap-closes", ()
       body: JSON.stringify({ name: "demo" }),
     });
     expect(res.status).toBe(500);
-    const body = (await jsonBody(res)) as { code: string; error: string };
+    const body = (await jsonBody(res)) as { code: string; detail: string };
     expect(body.code).toBe("ProvisioningFailed");
-    expect(body.error).toBe("internal error");
+    expect(body.detail).toBe("internal error");
 
     const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
     expect(fault).toBeDefined();
@@ -219,7 +226,14 @@ describe("respondError contract — unmapped-fault observability gap-closes", ()
     const res = await app.request("/");
     expect(res.status).toBe(500);
     const body = await jsonBody(res);
-    expect(body).toEqual({ error: "internal error", code: "DatabaseUnavailable" });
+    expect(body).toEqual(
+      toProblem({
+        status: 500,
+        title: "Internal error",
+        detail: "internal error",
+        code: "DatabaseUnavailable",
+      }),
+    );
     const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
     expect(fault).toBeDefined();
     expect(fault?.msg).toBe("scheduled-tasks.list: 5xx fault");
@@ -238,12 +252,15 @@ describe("respondError contract — route-dependent custom body", () => {
     const res = await tasksRoutes(() => m).request(`/${sampleTask.id}/cancel`, { method: "POST" });
     expect(res.status).toBe(409);
     const body = await jsonBody(res);
-    expect(body).toEqual({
-      error: "illegal task state transition",
-      code: "InvalidTransition",
-      status: "succeeded",
-      transition: "cancel",
-    });
+    expect(body).toEqual(
+      toProblem({
+        status: 409,
+        title: "Invalid transition",
+        detail: "illegal task state transition",
+        code: "InvalidTransition",
+        extensions: { fromStatus: "succeeded", transition: "cancel" },
+      }),
+    );
   });
 
   it("tasks.delete returns transition: 'delete' in InvalidTransition 409", async () => {
@@ -257,12 +274,15 @@ describe("respondError contract — route-dependent custom body", () => {
     const res = await tasksRoutes(() => m).request(`/${sampleTask.id}`, { method: "DELETE" });
     expect(res.status).toBe(409);
     const body = await jsonBody(res);
-    expect(body).toEqual({
-      error: "illegal task state transition",
-      code: "InvalidTransition",
-      status: "running",
-      transition: "delete",
-    });
+    expect(body).toEqual(
+      toProblem({
+        status: 409,
+        title: "Invalid transition",
+        detail: "illegal task state transition",
+        code: "InvalidTransition",
+        extensions: { fromStatus: "running", transition: "delete" },
+      }),
+    );
   });
 });
 
@@ -324,7 +344,14 @@ describe("respondError contract — 5xx fault log separation", () => {
     });
     expect(res.status).toBe(500);
     const body = await jsonBody(res);
-    expect(body).toEqual({ error: "internal error", code: "DatabaseUnavailable" });
+    expect(body).toEqual(
+      toProblem({
+        status: 500,
+        title: "Internal error",
+        detail: "internal error",
+        code: "DatabaseUnavailable",
+      }),
+    );
 
     const fivexx = cap.entries.find((e) => e.msg === "tasks: 5xx fault");
     expect(fivexx).toBeDefined();
@@ -336,19 +363,21 @@ describe("respondError contract — 5xx fault log separation", () => {
 describe("respondError contract — AgentResolutionFailed 500 path", () => {
   // The three AgentResolutionFailed flows (task / schedule's-own /
   // schedule-run-delegated-to-task) all collapse to the SAME opaque
-  // wire envelope: `{ error: "internal error", code:
-  // "AgentResolutionFailed" }`. The shape is the contract.
+  // wire Problem: 500 with `detail: "internal error"` and
+  // `code: "AgentResolutionFailed"`. The shape is the contract.
   // Each test pins:
   //   - response status === 500
-  //   - body.toEqual({ error: "internal error", code: "AgentResolutionFailed" })
+  //   - body.toEqual(the opaque Problem)
   //     (status-only assertions are explicitly rejected by the brief)
   //   - the `5xx fault` log line fires (so the operator-visible
   //     diagnostic channel still has the cause)
 
-  const TASK_OPAQUE_BODY = {
-    error: "internal error",
+  const TASK_OPAQUE_BODY = toProblem({
+    status: 500,
+    title: "Internal error",
+    detail: "internal error",
     code: "AgentResolutionFailed",
-  };
+  });
 
   it("tasks route AgentResolutionFailed → 500 + opaque body + 5xx fault log", async () => {
     const m = stubTaskModule({

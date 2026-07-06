@@ -6,33 +6,36 @@
  * three pieces the CLI layers on top of that:
  *
  *  - {@link ApiError} — the CLI's HTTP error type. `output.ts` pattern-matches
- *    on `err.status` / `err.body` (the parsed error envelope: `code`,
- *    `transition`, the `EntryNotReady` reason tree, …), so the throw path
- *    must carry the full parsed body.
+ *    on `err.status` / `err.body` (the decoded RFC 9457 Problem envelope:
+ *    `code`, `transition`, the `EntryNotReady` reason tree, …), so the throw
+ *    path must carry the decoded body.
  *  - {@link unwrap} — turns a result tuple into the success payload or throws,
  *    pinning the exact status → message → body mapping and the
  *    transport-error passthrough the CLI's exit-code policy depends on. The
- *    SDK's own `unwrap`/`GlyphError` are deliberately NOT used: `GlyphError`
- *    drops the full error body the CLI renders.
+ *    SDK's own `unwrap`/`GlyphError` are deliberately NOT used: the CLI's
+ *    `ApiError` shape (`status` + typed `body`) is what `output.ts` renders.
  *  - {@link configureClient} — points the shared SDK `client` singleton at the
  *    resolved base URL and pins request serialization (URLSearchParams query
  *    encoding + a blanket `Accept: application/json`) so the wire stays
  *    byte-identical to the contract `dashboard` and `server` agree on.
  */
 
-import { client } from "@glyphs-ai/sdk";
+import { client, isProblem, type Problem } from "@glyphs-ai/sdk";
 
 /**
  * Thrown when the server responds with a non-2xx / non-204 status.
- * `body` is the parsed response payload (JSON when the response was
- * `application/json`; raw text otherwise) so callers can pattern-match
- * on `body.code` / `body.error` from the standard error envelope.
+ * `body` is the decoded RFC 9457 Problem envelope
+ * (`application/problem+json`) when the response carried one, so callers
+ * can pattern-match on `body.code` / `body.detail` / `body.reason`
+ * without re-narrowing an untyped value. `undefined` for a non-Problem
+ * error body (non-JSON, or a body the server didn't tag as Problem
+ * details).
  */
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
-    public readonly body?: unknown,
+    public readonly body?: Problem,
   ) {
     super(message);
     this.name = "ApiError";
@@ -58,9 +61,10 @@ export interface SdkResult<T> {
  *  - no `response` (fetch threw: ECONNREFUSED, DNS, abort) → rethrow the
  *    original transport error so `formatError` maps it to exit code 3;
  *  - `response.ok` → return `data` (the parsed JSON body; `{}` for a 204);
- *  - otherwise → throw {@link ApiError} carrying the status and the full
- *    parsed error body, with the same message derivation the CLI shows
- *    today (`body.error` when it's a string, else `HTTP <status>`).
+ *  - otherwise → throw {@link ApiError} carrying the status and the decoded
+ *    Problem body, with the same message derivation the CLI shows today
+ *    (`body.detail` when the envelope is an RFC 9457 Problem, else
+ *    `HTTP <status>`).
  */
 export function unwrap<T>(result: SdkResult<T>): NonNullable<T> {
   const { response, error } = result;
@@ -70,14 +74,12 @@ export function unwrap<T>(result: SdkResult<T>): NonNullable<T> {
   if (response.ok) {
     return result.data as NonNullable<T>;
   }
-  const message =
-    typeof error === "object" &&
-    error !== null &&
-    "error" in error &&
-    typeof (error as { error: unknown }).error === "string"
-      ? (error as { error: string }).error
-      : `HTTP ${response.status}`;
-  throw new ApiError(response.status, message, error);
+  // hey-api decodes the error body from the `application/problem+json`
+  // response into `error`; narrow it to the typed Problem so `output.ts`
+  // reads `body.code` / `body.reason` without re-narrowing an unknown.
+  const problem = isProblem(error) ? error : undefined;
+  const message = problem?.detail ?? `HTTP ${response.status}`;
+  throw new ApiError(response.status, message, problem);
 }
 
 /**

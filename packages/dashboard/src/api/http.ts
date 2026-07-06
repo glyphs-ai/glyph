@@ -9,6 +9,8 @@
 // in sync; api helpers below pull from it at call time so callers don't
 // have to thread a workspace argument through every signature.
 
+import { parseProblem } from "@glyphs-ai/sdk";
+
 let activeWorkspace: string | null = null;
 
 /** Called by the route layout whenever the URL's workspaceId segment changes. */
@@ -53,8 +55,8 @@ export const fetchJson = async <T>(path: string, label: string): Promise<T> => {
  * Structured error thrown by {@link mutate} and {@link mutateJson} on a
  * non-OK response. Extends `Error`
  * so UI surfaces can use `instanceof Error` / `err.message`; the
- * message field carries the server-provided `error` text (or the
- * bare HTTP status as fallback).
+ * message field carries the server-provided `detail` text from the
+ * RFC 9457 Problem envelope (or the bare HTTP status as fallback).
  *
  * The extra fields let typed UI surfaces (e.g. the create-workflow
  * modal pinning a `coordinatorAgent` rejection inline next to the
@@ -77,67 +79,59 @@ export class ApiError extends Error {
 }
 
 /**
- * Best-effort extraction of a server-provided error message from a
- * non-OK fetch response. Falls back to the bare HTTP status if the body
- * isn't JSON or doesn't carry an `error` field. Used by both `mutate`
- * (which discards the body) and `mutateJson` (which returns the parsed
- * success body).
- */
-export async function extractError(r: Response): Promise<string> {
-  return (await extractErrorEnvelope(r)).message;
-}
-
-/**
- * Internal counterpart to {@link extractError} that preserves the
- * structured `code` / `field` slots from the server's 4xx envelope
- * alongside the message. Used by the `mutate*` helpers below to build
- * an {@link ApiError} that typed UI surfaces can branch on without
- * string-matching the message.
- */
-async function extractErrorEnvelope(
-  r: Response,
-): Promise<{ message: string; code?: string; field?: string }> {
-  let message = `${r.status}`;
-  let code: string | undefined;
-  let field: string | undefined;
-  try {
-    const body = await r.json();
-    if (body && typeof body.error === "string") message = body.error;
-    if (body && typeof body.code === "string") code = body.code;
-    if (body && typeof body.field === "string") field = body.field;
-    // Warming-up envelope (202): server returns `{state: "warming",
-    // workspaceId}` instead of the typed `{error, code}` shape. Surface
-    // that as a structured error so UI surfaces can branch on
-    // `code === "WorkspaceWarming"` and the message names the
-    // workspace.
-    if (body && body.state === "warming" && typeof body.workspaceId === "string") {
-      code = "WorkspaceWarming";
-      message = `workspace "${body.workspaceId}" is warming up`;
-    }
-  } catch {
-    // body not JSON; keep status
-  }
-  return {
-    message,
-    ...(code !== undefined ? { code } : {}),
-    ...(field !== undefined ? { field } : {}),
-  };
-}
-
-/**
  * Build (do NOT throw) an {@link ApiError} from a non-OK fetch response.
  * Call sites use the literal `throw await buildApiError(r)` form so the
  * `throw` keyword stays textually visible in the transport — a grep for
  * `throw` over `http.ts` surfaces every error branch, instead of hiding
  * them inside a helper named `throwApiError` that returns `never`.
+ *
+ * The error body is decoded through the SDK's shared {@link parseProblem}
+ * so the dashboard and CLI narrow the RFC 9457 envelope one identical way.
+ * The one non-Problem surface is the 202 warming envelope
+ * (`{ state: "warming", workspaceId }`), which rides in `application/json`
+ * — `parseProblem` leaves it unread (wrong content-type) so it is handled
+ * here.
  */
 async function buildApiError(r: Response): Promise<ApiError> {
-  const { message, code, field } = await extractErrorEnvelope(r);
-  return new ApiError(message, {
-    status: r.status,
-    ...(code !== undefined ? { code } : {}),
-    ...(field !== undefined ? { field } : {}),
-  });
+  const problem = await parseProblem(r);
+  if (problem) {
+    return new ApiError(problem.detail, {
+      status: r.status,
+      code: problem.code,
+      ...(typeof problem.field === "string" ? { field: problem.field } : {}),
+    });
+  }
+  const warmingWorkspace = await readWarmingWorkspace(r);
+  if (warmingWorkspace !== undefined) {
+    return new ApiError(`workspace "${warmingWorkspace}" is warming up`, {
+      status: r.status,
+      code: "WorkspaceWarming",
+    });
+  }
+  return new ApiError(`${r.status}`, { status: r.status });
+}
+
+/**
+ * Read the workspace id off a 202 warming envelope
+ * (`{ state: "warming", workspaceId }`), or `undefined` if the body isn't
+ * that shape. Defensive: a non-JSON body must not throw inside the error
+ * path.
+ */
+async function readWarmingWorkspace(r: Response): Promise<string | undefined> {
+  try {
+    const body: unknown = await r.json();
+    if (
+      body !== null &&
+      typeof body === "object" &&
+      (body as { state?: unknown }).state === "warming" &&
+      typeof (body as { workspaceId?: unknown }).workspaceId === "string"
+    ) {
+      return (body as { workspaceId: string }).workspaceId;
+    }
+  } catch {
+    // body not JSON; not a warming envelope
+  }
+  return undefined;
 }
 
 export const mutate = async (path: string, init: RequestInit): Promise<void> => {

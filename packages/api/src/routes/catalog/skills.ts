@@ -10,7 +10,7 @@ import {
 } from "@glyphs-ai/catalog";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { catalogErrorPolicy } from "../../_error-policies/catalog.js";
-import { logEvent, respondError } from "../../_http-errors.js";
+import { logEvent, problemResponse, respondError } from "../../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../../_http-helpers.js";
 import { mimeFromExt } from "./mime.js";
 import { planStoreFor } from "./plan-store.js";
@@ -163,7 +163,8 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
             catalog.getSkillFile.execute({ id: fqn as SkillFqn, relPath }),
             "skill",
           );
-          if (buf === null) return c.json({ error: "not found", code: "NotFound" }, 404);
+          if (buf === null)
+            return problemResponse(c, 404, { code: "NotFound", detail: "not found" });
           const ab = new ArrayBuffer(buf.byteLength);
           new Uint8Array(ab).set(buf);
           return new Response(ab, {
@@ -217,7 +218,7 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
           catalog.getSkillEntry.execute({ id: fqn as SkillFqn }),
           "skill",
         );
-        if (!entry) return c.json({ error: "not found", code: "NotFound" }, 404);
+        if (!entry) return problemResponse(c, 404, { code: "NotFound", detail: "not found" });
         const content = await unwrapCatalog(
           catalog.getSkillContent.execute({ id: fqn as SkillFqn }),
           "skill",
@@ -338,13 +339,10 @@ export function skillsRoutes(arg: CatalogResolver | CatalogModule): OpenAPIHono 
         // re-preview. 410 Gone matches the "the resource you referenced
         // is no longer available" semantics; PlanTokenInvalid is the
         // single code the dashboard branches on to re-run resolve.
-        return c.json(
-          {
-            error: "preview expired or already applied; re-preview to continue",
-            code: "PlanTokenInvalid",
-          },
-          410,
-        );
+        return problemResponse(c, 410, {
+          code: "PlanTokenInvalid",
+          detail: "preview expired or already applied; re-preview to continue",
+        });
       }
       try {
         const result = (await catalog.applyPlan.execute({ plan }))._unsafeUnwrap();

@@ -9,7 +9,7 @@ import {
 } from "@glyphs-ai/workspace";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { respondWorkspaceError } from "../_error-policies/workspaces.js";
-import { logEvent } from "../_http-errors.js";
+import { logEvent, problemResponse } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
 import type { Application } from "../application.js";
 
@@ -174,7 +174,10 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       return res.match(
         (view) => {
           if (!view) {
-            return c.json({ error: "workspace not found", code: "WorkspaceNotFound" }, 404);
+            return problemResponse(c, 404, {
+              code: "WorkspaceNotFound",
+              detail: "workspace not found",
+            });
           }
           return c.json(view);
         },
@@ -218,7 +221,10 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       return res.match(
         (view) => {
           if (!view) {
-            return c.json({ error: "workspace not found", code: "WorkspaceNotFound" }, 404);
+            return problemResponse(c, 404, {
+              code: "WorkspaceNotFound",
+              detail: "workspace not found",
+            });
           }
           logEvent(c, "workspace updated", { workspaceId: id, newName: body.name });
           return c.json(view);
@@ -293,7 +299,10 @@ export function workspacesRoutes(application: Application): OpenAPIHono {
       try {
         const view = await application.reloadWorkspace(id);
         if (view === null) {
-          return c.json({ error: "workspace not found", code: "WorkspaceNotFound" }, 404);
+          return problemResponse(c, 404, {
+            code: "WorkspaceNotFound",
+            detail: "workspace not found",
+          });
         }
         logEvent(c, "workspace reload requested via API", { workspaceId: id });
         return c.body(null, 204);

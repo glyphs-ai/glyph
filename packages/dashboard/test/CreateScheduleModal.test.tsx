@@ -294,10 +294,10 @@ describe("CreateScheduleModal", () => {
       target: { value: "y" },
     });
     await flushDebounce();
-    // Server-error path: extractError preserves the body's `error`
-    // field, so the thrown Error.message is the verbatim server
-    // string. The "schedule preview: 400" generic form is a
-    // regression of the extractError contract.
+    // Server-error path: the SDK unwrap seam maps the Problem `detail`
+    // onto the thrown ApiError.message, so it is the verbatim server
+    // string. The "schedule preview: 400" generic form is a regression
+    // of that detail-preservation contract.
     mockCreateSchedule.mockRejectedValueOnce(new Error("Invalid cron expression: not a cron"));
     const submit = screen.getByTestId("create-schedule-submit") as HTMLButtonElement;
     await waitFor(() => expect(submit.disabled).toBe(false));

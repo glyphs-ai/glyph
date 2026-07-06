@@ -4,9 +4,9 @@
  * Every route module builds its sub-app with {@link createApiApp} so the
  * whole mount tree is `OpenAPIHono` and the assembled spec carries every
  * route. The factory installs a `defaultHook` that converts a failed zod
- * request validation into a structured 400 envelope — `{ error, code,
- * issues }` — consistent with the hand-rolled `{ error, code? }` envelope
- * that `respondError` produces for business errors.
+ * request validation into the RFC 9457 `ValidationError` Problem
+ * (`application/problem+json`), consistent with the Problem envelope that
+ * `respondProblem` produces for business errors.
  *
  * ## Why responses are declared the way they are
  *
@@ -18,10 +18,10 @@
  * only switches a route's handler into "strict" return typing (where
  * the handler may return ONLY typed responses) when EVERY declared
  * response has `content`. Our handlers return business errors through
- * `respondError`, which yields a plain `Response` with a runtime-computed
+ * `respondProblem`, which yields a plain `Response` with a runtime-computed
  * status — not a statically-typed `TypedResponse`. Declaring at least
  * one contentless response keeps the handler return type permissive
- * (`... | Response`) so `respondError` stays valid without per-call-site
+ * (`... | Response`) so `respondProblem` stays valid without per-call-site
  * casts. Success-body shape is still locked: handlers annotate their
  * `c.json<Wire>(…)` payloads against the wire types, which the
  * wire-schema parity test pins to these very schemas.
@@ -29,8 +29,14 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Env } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { ZodType } from "zod";
+import type { ZodError as ZodErrorType, ZodType } from "zod";
 import { ZodError } from "zod";
+import {
+  PROBLEM_CONTENT_TYPE,
+  PROBLEM_JSON_SCHEMA,
+  type ProblemIssue,
+  validationProblem,
+} from "./schemas/problem.js";
 
 /**
  * Construct an `OpenAPIHono` sub-app with the shared validation hook.
@@ -41,55 +47,42 @@ export function createApiApp<E extends Env = Env>(): OpenAPIHono<E> {
   const app = new OpenAPIHono<E>({
     defaultHook: (result, c) => {
       if (!result.success) {
-        return c.json(
-          {
-            error: "request validation failed",
-            code: "ValidationError",
-            issues: result.error.issues.map((issue) => ({
-              path: issue.path.map(String).join("."),
-              message: issue.message,
-            })),
-          },
-          400,
-        );
+        return c.json(validationProblem(zodValidationIssues(result.error)), 400, {
+          "content-type": PROBLEM_CONTENT_TYPE,
+        });
       }
     },
   });
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
       if (err.status === 400 && err.message === "Malformed JSON in request body") {
-        return c.json(
-          {
-            error: "request validation failed",
-            code: "ValidationError",
-            issues: [{ path: "", message: err.message }],
-          },
-          400,
-        );
+        return c.json(validationProblem([{ path: "", message: err.message }]), 400, {
+          "content-type": PROBLEM_CONTENT_TYPE,
+        });
       }
       return err.getResponse();
     }
     // Service-layer input-schema parse failures (a `Schema.parse(...)`
     // call in `WorkspaceService.register` / `open` etc.) surface here
     // as a thrown `ZodError`. Convert to the same `ValidationError`
-    // envelope `defaultHook` produces so body validation and
+    // Problem `defaultHook` produces so body validation and
     // service-input validation look identical on the wire.
     if (err instanceof ZodError) {
-      return c.json(
-        {
-          error: "request validation failed",
-          code: "ValidationError",
-          issues: err.issues.map((issue) => ({
-            path: issue.path.map(String).join("."),
-            message: issue.message,
-          })),
-        },
-        400,
-      );
+      return c.json(validationProblem(zodValidationIssues(err)), 400, {
+        "content-type": PROBLEM_CONTENT_TYPE,
+      });
     }
     throw err;
   });
   return app;
+}
+
+/** Map a `ZodError`'s issues into the wire `{ path, message }[]` shape. */
+function zodValidationIssues(err: ZodErrorType): ProblemIssue[] {
+  return err.issues.map((issue) => ({
+    path: issue.path.map(String).join("."),
+    message: issue.message,
+  }));
 }
 
 /**
@@ -166,4 +159,50 @@ export function injectWorkspaceIdParam(doc: OpenApiDocument): OpenApiDocument {
     }
   }
   return doc;
+}
+
+/**
+ * Finalise the assembled OpenAPI document for both production serving and
+ * SDK codegen. Runs {@link injectWorkspaceIdParam}, registers the shared
+ * `Problem` component schema, and attaches an `application/problem+json`
+ * response body (referencing that schema) to every documented error status
+ * (`>= 400`) that was declared contentless via {@link errorResponse}.
+ *
+ * The error responses stay contentless at the hono route level on purpose
+ * (see the module doc — it keeps handler return typing permissive). This
+ * pass runs on the plain JSON document AFTER hono has compiled the routes,
+ * so it documents the Problem wire shape without affecting compile-time
+ * response types. Existing content (success bodies, or any error response
+ * that already declares content) is left untouched.
+ */
+export function finalizeOpenApiDoc(doc: OpenApiDocument): OpenApiDocument {
+  const withParam = injectWorkspaceIdParam(doc);
+
+  const components = (withParam.components ?? {}) as {
+    schemas?: Record<string, unknown>;
+  };
+  components.schemas = { ...(components.schemas ?? {}), Problem: PROBLEM_JSON_SCHEMA };
+  (withParam as { components?: unknown }).components = components;
+
+  const paths = withParam.paths;
+  if (paths) {
+    for (const item of Object.values(paths)) {
+      if (!item) continue;
+      for (const method of OPENAPI_HTTP_METHODS) {
+        const op = item[method];
+        if (!op?.responses) continue;
+        const responses = op.responses as Record<string, { content?: Record<string, unknown> }>;
+        for (const [statusStr, resp] of Object.entries(responses)) {
+          const status = Number(statusStr);
+          if (!Number.isInteger(status) || status < 400) continue;
+          if (!resp || typeof resp !== "object") continue;
+          if (resp.content && Object.keys(resp.content).length > 0) continue;
+          resp.content = {
+            [PROBLEM_CONTENT_TYPE]: { schema: { $ref: "#/components/schemas/Problem" } },
+          };
+        }
+      }
+    }
+  }
+  return withParam;
 }

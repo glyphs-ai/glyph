@@ -387,9 +387,9 @@ describe("workflowsRoutes — create", () => {
     expect(body.code).toBe("WorkflowCoordAgentNotCapableError");
     expect(body.field).toBe("coordinatorAgent");
     expect(body.agent).toBe("official/engineer");
-    expect(typeof body.error).toBe("string");
-    expect(body.error as string).toContain("official/engineer");
-    expect(body.error as string).toMatch(/dispatch menu|dependencies\.agents/);
+    expect(typeof body.detail).toBe("string");
+    expect(body.detail as string).toContain("official/engineer");
+    expect(body.detail as string).toMatch(/dispatch menu|dependencies\.agents/);
   });
 
   // Sibling of the capability-error test above. The coord runner's
@@ -420,7 +420,7 @@ describe("workflowsRoutes — create", () => {
     expect(res.status).not.toBe(500);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("WorkflowCoordSpecError");
-    expect(body.error).toBe("Coord node spec requires non-empty agent");
+    expect(body.detail).toBe("Coord node spec requires non-empty agent");
   });
 });
 

@@ -4,6 +4,28 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+/**
+ * RFC 9457 Problem Details error envelope.
+ */
+export type Problem = {
+    type: string;
+    title: string;
+    status: number;
+    detail: string;
+    instance?: string;
+    code: string;
+    agent?: string;
+    reason?: unknown;
+    transition?: string;
+    fromStatus?: string;
+    field?: string;
+    issues?: Array<{
+        path: string;
+        message: string;
+    }>;
+    [key: string]: unknown;
+};
+
 export type GetApiHealthData = {
     body?: never;
     path?: never;
@@ -15,8 +37,10 @@ export type GetApiHealthErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiHealthError = GetApiHealthErrors[keyof GetApiHealthErrors];
 
 export type GetApiHealthResponses = {
     /**
@@ -45,8 +69,10 @@ export type GetApiConfigErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiConfigError = GetApiConfigErrors[keyof GetApiConfigErrors];
 
 export type GetApiConfigResponses = {
     /**
@@ -77,8 +103,10 @@ export type GetApiRuntimesErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiRuntimesError = GetApiRuntimesErrors[keyof GetApiRuntimesErrors];
 
 export type GetApiRuntimesResponses = {
     /**
@@ -105,8 +133,10 @@ export type GetApiWorkspacesErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesError = GetApiWorkspacesErrors[keyof GetApiWorkspacesErrors];
 
 export type GetApiWorkspacesResponses = {
     /**
@@ -137,16 +167,18 @@ export type PostApiWorkspacesErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Workspace directory already registered
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesError = PostApiWorkspacesErrors[keyof PostApiWorkspacesErrors];
 
 export type PostApiWorkspacesResponses = {
     /**
@@ -174,8 +206,10 @@ export type GetApiWorkspacesCurrentErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesCurrentError = GetApiWorkspacesCurrentErrors[keyof GetApiWorkspacesCurrentErrors];
 
 export type GetApiWorkspacesCurrentResponses = {
     /**
@@ -201,16 +235,18 @@ export type PutApiWorkspacesCurrentErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Workspace not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PutApiWorkspacesCurrentError = PutApiWorkspacesCurrentErrors[keyof PutApiWorkspacesCurrentErrors];
 
 export type PutApiWorkspacesCurrentResponses = {
     /**
@@ -236,8 +272,10 @@ export type DeleteApiWorkspacesByIdErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdError = DeleteApiWorkspacesByIdErrors[keyof DeleteApiWorkspacesByIdErrors];
 
 export type DeleteApiWorkspacesByIdResponses = {
     /**
@@ -261,12 +299,14 @@ export type GetApiWorkspacesByIdErrors = {
     /**
      * Workspace not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdError = GetApiWorkspacesByIdErrors[keyof GetApiWorkspacesByIdErrors];
 
 export type GetApiWorkspacesByIdResponses = {
     /**
@@ -298,16 +338,18 @@ export type PatchApiWorkspacesByIdErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Workspace not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PatchApiWorkspacesByIdError = PatchApiWorkspacesByIdErrors[keyof PatchApiWorkspacesByIdErrors];
 
 export type PatchApiWorkspacesByIdResponses = {
     /**
@@ -337,16 +379,18 @@ export type PostApiWorkspacesByIdReloadErrors = {
     /**
      * Workspace not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Workspace has live tasks
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdReloadError = PostApiWorkspacesByIdReloadErrors[keyof PostApiWorkspacesByIdReloadErrors];
 
 export type PostApiWorkspacesByIdReloadResponses = {
     /**
@@ -374,12 +418,14 @@ export type GetApiWorkspacesByIdSessionsErrors = {
     /**
      * Malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSessionsError = GetApiWorkspacesByIdSessionsErrors[keyof GetApiWorkspacesByIdSessionsErrors];
 
 export type GetApiWorkspacesByIdSessionsResponses = {
     /**
@@ -416,12 +462,14 @@ export type PostApiWorkspacesByIdSessionsErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdSessionsError = PostApiWorkspacesByIdSessionsErrors[keyof PostApiWorkspacesByIdSessionsErrors];
 
 export type PostApiWorkspacesByIdSessionsResponses = {
     /**
@@ -458,12 +506,14 @@ export type DeleteApiWorkspacesByIdSessionsBySidErrors = {
     /**
      * Runtime state / workdir removal failed
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdSessionsBySidError = DeleteApiWorkspacesByIdSessionsBySidErrors[keyof DeleteApiWorkspacesByIdSessionsBySidErrors];
 
 export type DeleteApiWorkspacesByIdSessionsBySidResponses = {
     /**
@@ -488,12 +538,14 @@ export type GetApiWorkspacesByIdSessionsBySidErrors = {
     /**
      * Session not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSessionsBySidError = GetApiWorkspacesByIdSessionsBySidErrors[keyof GetApiWorkspacesByIdSessionsBySidErrors];
 
 export type GetApiWorkspacesByIdSessionsBySidResponses = {
     /**
@@ -530,12 +582,14 @@ export type PostApiWorkspacesByIdSessionsBySidSpawnErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdSessionsBySidSpawnError = PostApiWorkspacesByIdSessionsBySidSpawnErrors[keyof PostApiWorkspacesByIdSessionsBySidSpawnErrors];
 
 export type PostApiWorkspacesByIdSessionsBySidSpawnResponses = {
     /**
@@ -573,12 +627,14 @@ export type GetApiWorkspacesByIdTasksErrors = {
     /**
      * Malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdTasksError = GetApiWorkspacesByIdTasksErrors[keyof GetApiWorkspacesByIdTasksErrors];
 
 export type GetApiWorkspacesByIdTasksResponses = {
     /**
@@ -644,12 +700,14 @@ export type PostApiWorkspacesByIdTasksErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdTasksError = PostApiWorkspacesByIdTasksErrors[keyof PostApiWorkspacesByIdTasksErrors];
 
 export type PostApiWorkspacesByIdTasksResponses = {
     /**
@@ -713,12 +771,14 @@ export type GetApiWorkspacesByIdTasksByOriginErrors = {
     /**
      * Missing or malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdTasksByOriginError = GetApiWorkspacesByIdTasksByOriginErrors[keyof GetApiWorkspacesByIdTasksByOriginErrors];
 
 export type GetApiWorkspacesByIdTasksByOriginResponses = {
     /**
@@ -782,16 +842,18 @@ export type DeleteApiWorkspacesByIdTasksByTidErrors = {
     /**
      * Task not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Task is not terminal
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdTasksByTidError = DeleteApiWorkspacesByIdTasksByTidErrors[keyof DeleteApiWorkspacesByIdTasksByTidErrors];
 
 export type DeleteApiWorkspacesByIdTasksByTidResponses = {
     /**
@@ -816,12 +878,14 @@ export type GetApiWorkspacesByIdTasksByTidErrors = {
     /**
      * Task not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdTasksByTidError = GetApiWorkspacesByIdTasksByTidErrors[keyof GetApiWorkspacesByIdTasksByTidErrors];
 
 export type GetApiWorkspacesByIdTasksByTidResponses = {
     /**
@@ -883,20 +947,22 @@ export type PostApiWorkspacesByIdTasksByTidCancelErrors = {
     /**
      * Task not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Task already terminal
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
     /**
      * Server shutting down
      */
-    503: unknown;
+    503: Problem;
 };
+
+export type PostApiWorkspacesByIdTasksByTidCancelError = PostApiWorkspacesByIdTasksByTidCancelErrors[keyof PostApiWorkspacesByIdTasksByTidCancelErrors];
 
 export type PostApiWorkspacesByIdTasksByTidCancelResponses = {
     /**
@@ -960,16 +1026,18 @@ export type GetApiWorkspacesByIdTasksByTidArtifactErrors = {
     /**
      * Malformed artifact name
      */
-    400: unknown;
+    400: Problem;
     /**
      * Artifact not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdTasksByTidArtifactError = GetApiWorkspacesByIdTasksByTidArtifactErrors[keyof GetApiWorkspacesByIdTasksByTidArtifactErrors];
 
 export type GetApiWorkspacesByIdTasksByTidArtifactResponses = {
     /**
@@ -996,16 +1064,18 @@ export type GetApiWorkspacesByIdTasksByTidActivityErrors = {
     /**
      * Malformed pagination
      */
-    400: unknown;
+    400: Problem;
     /**
      * Task or activity not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdTasksByTidActivityError = GetApiWorkspacesByIdTasksByTidActivityErrors[keyof GetApiWorkspacesByIdTasksByTidActivityErrors];
 
 export type GetApiWorkspacesByIdTasksByTidActivityResponses = {
     /**
@@ -1129,12 +1199,14 @@ export type GetApiWorkspacesByIdTasksByTidActivityStreamErrors = {
     /**
      * Task or stream not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdTasksByTidActivityStreamError = GetApiWorkspacesByIdTasksByTidActivityStreamErrors[keyof GetApiWorkspacesByIdTasksByTidActivityStreamErrors];
 
 export type GetApiWorkspacesByIdTasksByTidActivityStreamResponses = {
     /**
@@ -1257,12 +1329,14 @@ export type GetApiWorkspacesByIdScheduledTasksErrors = {
     /**
      * Malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdScheduledTasksError = GetApiWorkspacesByIdScheduledTasksErrors[keyof GetApiWorkspacesByIdScheduledTasksErrors];
 
 export type GetApiWorkspacesByIdScheduledTasksResponses = {
     /**
@@ -1325,8 +1399,10 @@ export type GetApiWorkspacesByIdScheduledWorkflowsErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdScheduledWorkflowsError = GetApiWorkspacesByIdScheduledWorkflowsErrors[keyof GetApiWorkspacesByIdScheduledWorkflowsErrors];
 
 export type GetApiWorkspacesByIdScheduledWorkflowsResponses = {
     /**
@@ -1382,12 +1458,14 @@ export type GetApiWorkspacesByIdSchedulesTaskErrors = {
     /**
      * Malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSchedulesTaskError = GetApiWorkspacesByIdSchedulesTaskErrors[keyof GetApiWorkspacesByIdSchedulesTaskErrors];
 
 export type GetApiWorkspacesByIdSchedulesTaskResponses = {
     /**
@@ -1444,16 +1522,18 @@ export type PostApiWorkspacesByIdSchedulesTaskErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Agent not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdSchedulesTaskError = PostApiWorkspacesByIdSchedulesTaskErrors[keyof PostApiWorkspacesByIdSchedulesTaskErrors];
 
 export type PostApiWorkspacesByIdSchedulesTaskResponses = {
     /**
@@ -1497,16 +1577,18 @@ export type DeleteApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Schedule enabled or has in-flight dispatch
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdSchedulesTaskBySidError = DeleteApiWorkspacesByIdSchedulesTaskBySidErrors[keyof DeleteApiWorkspacesByIdSchedulesTaskBySidErrors];
 
 export type DeleteApiWorkspacesByIdSchedulesTaskBySidResponses = {
     /**
@@ -1534,12 +1616,14 @@ export type GetApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidError = GetApiWorkspacesByIdSchedulesTaskBySidErrors[keyof GetApiWorkspacesByIdSchedulesTaskBySidErrors];
 
 export type GetApiWorkspacesByIdSchedulesTaskBySidResponses = {
     /**
@@ -1598,16 +1682,18 @@ export type PatchApiWorkspacesByIdSchedulesTaskBySidErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PatchApiWorkspacesByIdSchedulesTaskBySidError = PatchApiWorkspacesByIdSchedulesTaskBySidErrors[keyof PatchApiWorkspacesByIdSchedulesTaskBySidErrors];
 
 export type PatchApiWorkspacesByIdSchedulesTaskBySidResponses = {
     /**
@@ -1651,12 +1737,14 @@ export type PostApiWorkspacesByIdSchedulesTaskBySidRunErrors = {
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdSchedulesTaskBySidRunError = PostApiWorkspacesByIdSchedulesTaskBySidRunErrors[keyof PostApiWorkspacesByIdSchedulesTaskBySidRunErrors];
 
 export type PostApiWorkspacesByIdSchedulesTaskBySidRunResponses = {
     /**
@@ -1685,16 +1773,18 @@ export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewErrors = {
     /**
      * Malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewError = GetApiWorkspacesByIdSchedulesTaskBySidPreviewErrors[keyof GetApiWorkspacesByIdSchedulesTaskBySidPreviewErrors];
 
 export type GetApiWorkspacesByIdSchedulesTaskBySidPreviewResponses = {
     /**
@@ -1724,12 +1814,14 @@ export type GetApiWorkspacesByIdSchedulesWorkflowErrors = {
     /**
      * Malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSchedulesWorkflowError = GetApiWorkspacesByIdSchedulesWorkflowErrors[keyof GetApiWorkspacesByIdSchedulesWorkflowErrors];
 
 export type GetApiWorkspacesByIdSchedulesWorkflowResponses = {
     /**
@@ -1788,16 +1880,18 @@ export type PostApiWorkspacesByIdSchedulesWorkflowErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Coordinator agent not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdSchedulesWorkflowError = PostApiWorkspacesByIdSchedulesWorkflowErrors[keyof PostApiWorkspacesByIdSchedulesWorkflowErrors];
 
 export type PostApiWorkspacesByIdSchedulesWorkflowResponses = {
     /**
@@ -1844,16 +1938,18 @@ export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Schedule enabled or has in-flight dispatch
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidError = DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors[keyof DeleteApiWorkspacesByIdSchedulesWorkflowBySidErrors];
 
 export type DeleteApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
     /**
@@ -1881,12 +1977,14 @@ export type GetApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidError = GetApiWorkspacesByIdSchedulesWorkflowBySidErrors[keyof GetApiWorkspacesByIdSchedulesWorkflowBySidErrors];
 
 export type GetApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
     /**
@@ -1947,16 +2045,18 @@ export type PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PatchApiWorkspacesByIdSchedulesWorkflowBySidError = PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors[keyof PatchApiWorkspacesByIdSchedulesWorkflowBySidErrors];
 
 export type PatchApiWorkspacesByIdSchedulesWorkflowBySidResponses = {
     /**
@@ -2003,12 +2103,14 @@ export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors = {
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunError = PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors[keyof PostApiWorkspacesByIdSchedulesWorkflowBySidRunErrors];
 
 export type PostApiWorkspacesByIdSchedulesWorkflowBySidRunResponses = {
     /**
@@ -2037,16 +2139,18 @@ export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewErrors = {
     /**
      * Malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Schedule not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewError = GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewErrors[keyof GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewErrors];
 
 export type GetApiWorkspacesByIdSchedulesWorkflowBySidPreviewResponses = {
     /**
@@ -2077,12 +2181,14 @@ export type GetApiWorkspacesByIdSchedulesPreviewCronErrors = {
     /**
      * Missing or malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdSchedulesPreviewCronError = GetApiWorkspacesByIdSchedulesPreviewCronErrors[keyof GetApiWorkspacesByIdSchedulesPreviewCronErrors];
 
 export type GetApiWorkspacesByIdSchedulesPreviewCronResponses = {
     /**
@@ -2113,12 +2219,14 @@ export type GetApiWorkspacesByIdWorkflowsErrors = {
     /**
      * Malformed query
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdWorkflowsError = GetApiWorkspacesByIdWorkflowsErrors[keyof GetApiWorkspacesByIdWorkflowsErrors];
 
 export type GetApiWorkspacesByIdWorkflowsResponses = {
     /**
@@ -2175,16 +2283,18 @@ export type PostApiWorkspacesByIdWorkflowsErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Coordinator agent not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdWorkflowsError = PostApiWorkspacesByIdWorkflowsErrors[keyof PostApiWorkspacesByIdWorkflowsErrors];
 
 export type PostApiWorkspacesByIdWorkflowsResponses = {
     /**
@@ -2240,16 +2350,18 @@ export type DeleteApiWorkspacesByIdWorkflowsByWfidErrors = {
     /**
      * Workflow not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Workflow not terminal or has in-flight tasks
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdWorkflowsByWfidError = DeleteApiWorkspacesByIdWorkflowsByWfidErrors[keyof DeleteApiWorkspacesByIdWorkflowsByWfidErrors];
 
 export type DeleteApiWorkspacesByIdWorkflowsByWfidResponses = {
     /**
@@ -2274,12 +2386,14 @@ export type GetApiWorkspacesByIdWorkflowsByWfidErrors = {
     /**
      * Workflow not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdWorkflowsByWfidError = GetApiWorkspacesByIdWorkflowsByWfidErrors[keyof GetApiWorkspacesByIdWorkflowsByWfidErrors];
 
 export type GetApiWorkspacesByIdWorkflowsByWfidResponses = {
     /**
@@ -2333,12 +2447,14 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagErrors = {
     /**
      * Workflow not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdWorkflowsByWfidDagError = GetApiWorkspacesByIdWorkflowsByWfidDagErrors[keyof GetApiWorkspacesByIdWorkflowsByWfidDagErrors];
 
 export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
     /**
@@ -2415,12 +2531,14 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidErrors = {
     /**
      * Workflow or node not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidError = GetApiWorkspacesByIdWorkflowsByWfidNodesByNidErrors[keyof GetApiWorkspacesByIdWorkflowsByWfidNodesByNidErrors];
 
 export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses = {
     /**
@@ -2464,20 +2582,22 @@ export type PostApiWorkspacesByIdWorkflowsByWfidCancelErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Workflow not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Workflow already terminal
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdWorkflowsByWfidCancelError = PostApiWorkspacesByIdWorkflowsByWfidCancelErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidCancelErrors];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidCancelResponses = {
     /**
@@ -2531,12 +2651,14 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsErrors = {
     /**
      * Workflow not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsError = GetApiWorkspacesByIdWorkflowsByWfidArtifactsErrors[keyof GetApiWorkspacesByIdWorkflowsByWfidArtifactsErrors];
 
 export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsResponses = {
     /**
@@ -2575,16 +2697,18 @@ export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathErrors = {
     /**
      * Malformed artifact path
      */
-    400: unknown;
+    400: Problem;
     /**
      * Artifact not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathError = GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathErrors[keyof GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathErrors];
 
 export type GetApiWorkspacesByIdWorkflowsByWfidArtifactsByEncodedPathResponses = {
     /**
@@ -2630,20 +2754,22 @@ export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Workflow not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Workflow already terminal
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphError = PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidSubgraphErrors];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses = {
     /**
@@ -2675,16 +2801,18 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelErrors = {
     /**
      * Workflow or node not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Node not mutable
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelError = PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelErrors];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses = {
     /**
@@ -2734,20 +2862,22 @@ export type PostApiWorkspacesByIdWorkflowsByWfidFinishErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Workflow not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Workflow already terminal
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdWorkflowsByWfidFinishError = PostApiWorkspacesByIdWorkflowsByWfidFinishErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidFinishErrors];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidFinishResponses = {
     /**
@@ -2807,20 +2937,22 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Workflow or node not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Node not awaiting input
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondError = PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondErrors];
 
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses = {
     /**
@@ -2858,8 +2990,10 @@ export type GetApiWorkspacesByIdCatalogSkillsErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogSkillsError = GetApiWorkspacesByIdCatalogSkillsErrors[keyof GetApiWorkspacesByIdCatalogSkillsErrors];
 
 export type GetApiWorkspacesByIdCatalogSkillsResponses = {
     /**
@@ -2923,12 +3057,14 @@ export type PostApiWorkspacesByIdCatalogSkillsErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogSkillsError = PostApiWorkspacesByIdCatalogSkillsErrors[keyof PostApiWorkspacesByIdCatalogSkillsErrors];
 
 export type PostApiWorkspacesByIdCatalogSkillsResponses = {
     /**
@@ -2994,12 +3130,14 @@ export type PostApiWorkspacesByIdCatalogSkillsResolveErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogSkillsResolveError = PostApiWorkspacesByIdCatalogSkillsResolveErrors[keyof PostApiWorkspacesByIdCatalogSkillsResolveErrors];
 
 export type PostApiWorkspacesByIdCatalogSkillsResolveResponses = {
     /**
@@ -3090,8 +3228,10 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorError = GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorErrors[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorErrors];
 
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameAnchorResponses = {
     /**
@@ -3121,12 +3261,14 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesErrors = {
     /**
      * File not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesError = GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesErrors[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesErrors];
 
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameFilesResponses = {
     /**
@@ -3155,12 +3297,14 @@ export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
     /**
      * Skill still has dependents
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameError = DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors[keyof DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameErrors];
 
 export type DeleteApiWorkspacesByIdCatalogSkillsByScopeByNameResponses = {
     /**
@@ -3188,12 +3332,14 @@ export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameErrors = {
     /**
      * Skill not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameError = GetApiWorkspacesByIdCatalogSkillsByScopeByNameErrors[keyof GetApiWorkspacesByIdCatalogSkillsByScopeByNameErrors];
 
 export type GetApiWorkspacesByIdCatalogSkillsByScopeByNameResponses = {
     /**
@@ -3258,8 +3404,10 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveError = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveErrors[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveErrors];
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResolveResponses = {
     /**
@@ -3352,16 +3500,18 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Plan token expired or already applied
      */
-    410: unknown;
+    410: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncError = PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncErrors];
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameSyncResponses = {
     /**
@@ -3427,8 +3577,10 @@ export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsErr
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsError = PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsErrors[keyof PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsErrors];
 
 export type PostApiWorkspacesByIdCatalogSkillsByScopeByNameAcknowledgePrereqsResponses = {
     /**
@@ -3470,8 +3622,10 @@ export type GetApiWorkspacesByIdCatalogAgentsErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogAgentsError = GetApiWorkspacesByIdCatalogAgentsErrors[keyof GetApiWorkspacesByIdCatalogAgentsErrors];
 
 export type GetApiWorkspacesByIdCatalogAgentsResponses = {
     /**
@@ -3539,12 +3693,14 @@ export type PostApiWorkspacesByIdCatalogAgentsErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogAgentsError = PostApiWorkspacesByIdCatalogAgentsErrors[keyof PostApiWorkspacesByIdCatalogAgentsErrors];
 
 export type PostApiWorkspacesByIdCatalogAgentsResponses = {
     /**
@@ -3610,12 +3766,14 @@ export type PostApiWorkspacesByIdCatalogAgentsResolveErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogAgentsResolveError = PostApiWorkspacesByIdCatalogAgentsResolveErrors[keyof PostApiWorkspacesByIdCatalogAgentsResolveErrors];
 
 export type PostApiWorkspacesByIdCatalogAgentsResolveResponses = {
     /**
@@ -3706,8 +3864,10 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorError = GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorErrors[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorErrors];
 
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameAnchorResponses = {
     /**
@@ -3737,12 +3897,14 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesErrors = {
     /**
      * File not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesError = GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesErrors[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesErrors];
 
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameFilesResponses = {
     /**
@@ -3771,12 +3933,14 @@ export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
     /**
      * Agent still has dependents
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameError = DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors[keyof DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameErrors];
 
 export type DeleteApiWorkspacesByIdCatalogAgentsByScopeByNameResponses = {
     /**
@@ -3804,12 +3968,14 @@ export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameErrors = {
     /**
      * Agent not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameError = GetApiWorkspacesByIdCatalogAgentsByScopeByNameErrors[keyof GetApiWorkspacesByIdCatalogAgentsByScopeByNameErrors];
 
 export type GetApiWorkspacesByIdCatalogAgentsByScopeByNameResponses = {
     /**
@@ -3878,8 +4044,10 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveErrors];
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResolveResponses = {
     /**
@@ -3972,16 +4140,18 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Plan token expired or already applied
      */
-    410: unknown;
+    410: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncErrors];
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameSyncResponses = {
     /**
@@ -4047,8 +4217,10 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsErr
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsErrors];
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameAcknowledgePrereqsResponses = {
     /**
@@ -4095,8 +4267,10 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableErrors];
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameDisableResponses = {
     /**
@@ -4143,8 +4317,10 @@ export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableError = PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableErrors[keyof PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableErrors];
 
 export type PostApiWorkspacesByIdCatalogAgentsByScopeByNameEnableResponses = {
     /**
@@ -4189,8 +4365,10 @@ export type GetApiWorkspacesByIdCatalogMcpsErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogMcpsError = GetApiWorkspacesByIdCatalogMcpsErrors[keyof GetApiWorkspacesByIdCatalogMcpsErrors];
 
 export type GetApiWorkspacesByIdCatalogMcpsResponses = {
     /**
@@ -4222,12 +4400,14 @@ export type PostApiWorkspacesByIdCatalogMcpsErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogMcpsError = PostApiWorkspacesByIdCatalogMcpsErrors[keyof PostApiWorkspacesByIdCatalogMcpsErrors];
 
 export type PostApiWorkspacesByIdCatalogMcpsResponses = {
     /**
@@ -4293,12 +4473,14 @@ export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
     /**
      * MCP still has dependents
      */
-    409: unknown;
+    409: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameError = DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors[keyof DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameErrors];
 
 export type DeleteApiWorkspacesByIdCatalogMcpsByScopeByNameResponses = {
     /**
@@ -4326,12 +4508,14 @@ export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameErrors = {
     /**
      * MCP not found
      */
-    404: unknown;
+    404: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameError = GetApiWorkspacesByIdCatalogMcpsByScopeByNameErrors[keyof GetApiWorkspacesByIdCatalogMcpsByScopeByNameErrors];
 
 export type GetApiWorkspacesByIdCatalogMcpsByScopeByNameResponses = {
     /**
@@ -4364,8 +4548,10 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveError = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveErrors[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveErrors];
 
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResolveResponses = {
     /**
@@ -4458,16 +4644,18 @@ export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors = {
     /**
      * Malformed request body
      */
-    400: unknown;
+    400: Problem;
     /**
      * Plan token expired or already applied
      */
-    410: unknown;
+    410: Problem;
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncError = PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors[keyof PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncErrors];
 
 export type PostApiWorkspacesByIdCatalogMcpsByScopeByNameSyncResponses = {
     /**
@@ -4531,8 +4719,10 @@ export type GetApiWorkspacesByIdCatalogOverviewErrors = {
     /**
      * Internal error
      */
-    500: unknown;
+    500: Problem;
 };
+
+export type GetApiWorkspacesByIdCatalogOverviewError = GetApiWorkspacesByIdCatalogOverviewErrors[keyof GetApiWorkspacesByIdCatalogOverviewErrors];
 
 export type GetApiWorkspacesByIdCatalogOverviewResponses = {
     /**
