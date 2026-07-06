@@ -21,7 +21,7 @@ export const DeleteScheduleRequestSchema = z
   .strict();
 export type DeleteScheduleRequest = z.infer<typeof DeleteScheduleRequestSchema>;
 
-export const DeleteScheduleResponseSchema = z.object({ deletedDispatchCount: z.number() });
+export const DeleteScheduleResponseSchema = z.object({ deletedDispatchCount: z.number() }).strict();
 export type DeleteScheduleResponse = z.infer<typeof DeleteScheduleResponseSchema>;
 
 export type DeleteScheduleError =
