@@ -41,7 +41,7 @@ import {
 import { workspacePrefix } from "./http.js";
 import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 
-// Local type aliases for catalog shapes (previously exported from sdk/wire.ts).
+// Local type aliases for catalog shapes derived from the SDK's generated response types.
 export type AgentEntry = GetApiWorkspacesByIdCatalogAgentsResponse[number];
 export type Agent = AgentEntry["agent"];
 export type SkillEntry = GetApiWorkspacesByIdCatalogSkillsResponse[number];

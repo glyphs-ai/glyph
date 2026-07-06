@@ -59,7 +59,7 @@ export interface ScheduleFormFieldsProps {
    * Optional suffix appended to the Details label after `"Details
    * (optional"`. `EditScheduleModal` passes `" — clear to remove"`
    * to surface the "clearing the textarea removes the existing
-   * value via RFC 7396 null" behaviour to the user; Create has no
+   * value via a `null` deep-merge delete" behaviour to the user; Create has no
    * existing value to clear so the suffix is omitted.
    */
   detailsLabelSuffix?: string;

@@ -19,7 +19,7 @@ import {
 import { fetchJson, jsonInit, mutateJson, workspacePrefix } from "./http.js";
 import { requireWorkspaceId, unwrap } from "./sdk-client.js";
 
-// Local type aliases for workflow shapes (previously exported from sdk/wire.ts).
+// Local type aliases for workflow shapes derived from the SDK's generated response types.
 export type WorkflowHeader = GetApiWorkspacesByIdWorkflowsByWfidResponse;
 export type WorkflowDag = GetApiWorkspacesByIdWorkflowsByWfidDagResponse;
 export type WorkflowNode = WorkflowDag["nodes"][number];

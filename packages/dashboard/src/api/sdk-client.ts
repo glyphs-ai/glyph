@@ -13,7 +13,8 @@
  *    `globalThis.fetch` at call time — the test suite swaps that global.
  *  - {@link unwrap} — turns a result tuple into the success payload or throws
  *    the dashboard's {@link ApiError}, mirroring `http.ts`'s error semantics:
- *    the RFC 9457 Problem envelope (`detail` → message, plus `code` / `field`),
+ *    the `application/problem+json` Problem envelope (`detail` → message,
+ *    plus `code` / `field`),
  *    the 202 "warming" surface (`code: "WorkspaceWarming"`), and the
  *    transport-error passthrough.
  *
@@ -70,7 +71,7 @@ configureSdkClient();
 
 /**
  * Build (do NOT throw) an {@link ApiError} from a server error body,
- * mirroring `http.ts`'s `buildApiError`: the RFC 9457 Problem envelope
+ * mirroring `http.ts`'s `buildApiError`: the `application/problem+json` Problem envelope
  * (`{ type, title, status, detail, code, field?, ... }`) maps `detail` →
  * message and carries `code` / `field`; the 202 `{ state: "warming",
  * workspaceId }` surface becomes `code: "WorkspaceWarming"`.
