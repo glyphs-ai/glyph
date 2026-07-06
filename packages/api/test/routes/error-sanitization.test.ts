@@ -1,6 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { catalogErrorPolicy } from "../../src/_error-policies/catalog.js";
-import { INTERNAL_ERROR_NAMES, readErrorCode, resolveProblem } from "../../src/_http-errors.js";
+import { readErrorCode, resolveProblem } from "../../src/_http-errors.js";
+
+// Static roster of error classes that packages export but whose messages
+// stay off the HTTP wire (host paths, operator diagnostics, or coord
+// topology). Not consumed by production code — the error seam relies on
+// "not in SAFE_ERROR_NAMES ⇒ opaque", so this list is a test-only fixture
+// documenting the audited surface. Keep it in sync with public error
+// exports from `@glyphs-ai/*` (every exported error class should be here,
+// in `SAFE_ERROR_NAMES`, or in a route table with a custom opaque detail).
+const INTERNAL_ERROR_NAMES: readonly string[] = [
+  // @glyphs-ai/cli / @glyphs-ai/dashboard
+  "ApiError",
+  // @glyphs-ai/api
+  "WorkflowWorkerNotInCoordMenuError",
+  // @glyphs-ai/runtime
+  "CopilotSdkUnavailableError",
+  "UnknownPlaceholderError",
+  // @glyphs-ai/schedule
+  "ScheduleKindMismatchError",
+  "ScheduleKindAlreadyRegisteredError",
+  "ScheduleKindNotRegisteredError",
+  "ScheduleKindRegistryFrozenError",
+  // @glyphs-ai/catalog / @glyphs-ai/session / @glyphs-ai/task / @glyphs-ai/workflow
+  // use DU errors and export no internal error classes (the opaque DU codes
+  // — AgentUnresolvable, WorkflowInvariantViolation — are rendered opaque by
+  // their route tables, not by class name).
+];
 
 // These tests pin the security-critical behavior of the error seam: only
 // glyph's own typed errors (class `name` in `SAFE_ERROR_NAMES`) leak their

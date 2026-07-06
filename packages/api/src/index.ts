@@ -45,7 +45,6 @@ export {
 } from "./_error-policies/workspaces.js";
 export {
   type DomainProblemTable,
-  INTERNAL_ERROR_NAMES,
   logEvent,
   logFault,
   type ProblemDef,
@@ -93,16 +92,16 @@ export { tasksRoutes } from "./routes/tasks.js";
 export { workflowsRoutes } from "./routes/workflows.js";
 export { workspacesRoutes } from "./routes/workspaces.js";
 // RFC 9457 Problem envelope — the global HTTP error wire shape.
+// Only the symbols external consumers (server middleware, tests, and
+// downstream clients that hand-build a Problem) actually need are exposed.
+// `kebabCase` / `problemTypeUri` / `PROBLEM_TYPE_PREFIX` / `PROBLEM_JSON_SCHEMA`
+// / `ProblemInput` / `ProblemIssue` / `ProblemIssueSchema` / `ProblemSchema`
+// stay package-private — `toProblem` derives the URI internally, the JSON
+// schema is only used by the openapi finalizer inside the api package, and
+// the extra issue types are implementation details of `validationProblem`.
 export {
   PROBLEM_CONTENT_TYPE,
-  PROBLEM_JSON_SCHEMA,
-  PROBLEM_TYPE_PREFIX,
   type Problem,
-  type ProblemInput,
-  type ProblemIssue,
-  ProblemIssueSchema,
-  ProblemSchema,
-  problemTypeUri,
   toProblem,
   validationProblem,
 } from "./schemas/problem.js";

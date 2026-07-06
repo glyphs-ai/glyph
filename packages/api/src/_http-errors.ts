@@ -88,39 +88,6 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "WorkflowSubgraphInvalidError",
 ]);
 
-/**
- * Error classes exported by (or reachable from) glyph packages whose
- * messages intentionally stay off the HTTP wire. They either carry
- * host paths / underlying causes, represent boot-time or
- * operator-configuration faults, or are projected to a route-specific
- * envelope before they reach the error seam.
- *
- * Keep this list in sync with public error exports from `@glyphs-ai/*`:
- * every exported error class should be present here, in
- * `SAFE_ERROR_NAMES`, or in a route table with a custom opaque detail.
- */
-export const INTERNAL_ERROR_NAMES = new Set<string>([
-  // @glyphs-ai/cli / @glyphs-ai/dashboard
-  "ApiError",
-  // @glyphs-ai/api
-  "WorkflowWorkerNotInCoordMenuError",
-  // @glyphs-ai/catalog uses DU errors and has no exported error classes.
-  // @glyphs-ai/runtime
-  "CopilotSdkUnavailableError",
-  "UnknownPlaceholderError",
-  // @glyphs-ai/session / @glyphs-ai/task use DU errors and export no
-  // internal error classes (AgentUnresolvable is a DU code rendered
-  // opaque by the task / schedule / workflow route tables, not a class).
-  // @glyphs-ai/schedule
-  "ScheduleKindMismatchError",
-  "ScheduleKindAlreadyRegisteredError",
-  "ScheduleKindNotRegisteredError",
-  "ScheduleKindRegistryFrozenError",
-  // @glyphs-ai/workflow uses DU errors and exports no internal error
-  // classes (WorkflowInvariantViolation is a DU code rendered opaque by
-  // the workflows route table).
-]);
-
 type LoggerContext = Context<{ Variables: { logger?: Logger } }>;
 
 /**
