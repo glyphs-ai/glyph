@@ -42,11 +42,10 @@ export class WorkflowHumanSpecError extends Error {
 
 export interface HumanNodeRunnerOpts {
   readonly getModule?: () => WorkflowModule;
-  readonly getService?: () => WorkflowModule;
 }
 
 export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunner {
-  const getModule = opts.getModule ?? opts.getService;
+  const getModule = opts.getModule;
   const workflowIdsByNodeId = new Map<string, string>();
 
   return {
@@ -137,7 +136,6 @@ export function makeHumanNodeRunner(opts: HumanNodeRunnerOpts): WorkflowNodeRunn
             }
           }
 
-          // Return the validated/normalized spec
           const validated: HumanNodeSpec = {
             prompt: s.prompt as string,
             promptStyle,

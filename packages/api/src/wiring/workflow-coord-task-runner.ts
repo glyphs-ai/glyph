@@ -26,15 +26,15 @@
  *     `{ agent, brief, details?, runtime? }`). Extra keys are
  *     rejected (strict).
  *   - The task's `brief` / `details` come from the workflow header
- *     (read via `getService().getWorkflow(workflowId)` at dispatch
+ *     (read via `getModule().getWorkflow(workflowId)` at dispatch
  *     time), NOT from the node spec. Coordinators are launched at
  *     workflow-create time with `{ agent: args.coordinatorAgent }`
  *     and inherit the workflow's prose for their TASK.md body.
- *   - Two-phase init via the `getService` thunk: the workflow
- *     service is constructed by `composeWorkflowModule`, which
+ *   - Two-phase init via the `getModule` thunk: the workflow
+ *     module is constructed by `composeWorkflowModule`, which
  *     itself requires the runners. The thunk lets the caller
- *     assign the service ref after compose returns — mirrors the
- *     engine ↔ service two-phase init in `@glyphs-ai/workflow`.
+ *     assign the module ref after compose returns — mirrors the
+ *     engine ↔ module two-phase init in `@glyphs-ai/workflow`.
  *
  * # Why `setInterval` lives here, not in `@glyphs-ai/workflow/_engine.ts`
  *
@@ -185,10 +185,9 @@ export interface MakeCoordNodeRunnerOpts {
    * impossible for the caller to construct the runner before compose
    * returns. The thunk lets the caller capture a ref, build the
    * runner, call compose, then assign the ref — mirrors the engine
-   * ↔ service two-phase init in `@glyphs-ai/workflow`.
+   * ↔ module two-phase init in `@glyphs-ai/workflow`.
    */
   readonly getModule?: () => WorkflowModule;
-  readonly getService?: () => WorkflowModule;
   /**
    * Absolute path to the workspace root. The runner needs it so it
    * can resolve the per-workflow shared dir via
@@ -233,7 +232,7 @@ export function makeCoordNodeRunner(
 ): WorkflowNodeRunner & { dispose(): Promise<void> } {
   const tasks = opts.tasks;
   const catalog = opts.catalog;
-  const getModule = opts.getModule ?? opts.getService;
+  const getModule = opts.getModule;
   const workspaceDir = opts.workspaceDir;
   const logger = opts.logger ?? silentLogger;
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_COORD_POLL_INTERVAL_MS;
@@ -330,8 +329,8 @@ export function makeCoordNodeRunner(
     dispatch(opts) {
       return new ResultAsync(
         (async (): Promise<Result<void, RunnerFault>> => {
-          // Resolve the service exactly once per dispatch — see the
-          // `getService` thunk JSDoc above. The substrate guarantees the
+          // Resolve the module exactly once per dispatch — see the
+          // `getModule` thunk JSDoc above. The substrate guarantees the
           // ref is assigned by the time dispatch fires (post-compose),
           // but the runner should fail loudly rather than silently
           // dereference if a caller wires the runner without ever

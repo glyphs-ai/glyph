@@ -1,6 +1,6 @@
 /**
  * Routes for `/api/workspaces/:id/workflows`. Workspace-scoped read
- * + lifecycle + coord-callback mutation surface over `WorkflowService`,
+ * + lifecycle + coord-callback mutation surface over `WorkflowModule`,
  * plus dashboard-facing artifact list / static-bytes routes that
  * bridge the substrate's on-disk artifact dirs to the browser.
  *
@@ -8,8 +8,9 @@
  * `{ kind, spec: unknown }`; read routes return the workflow package's
  * read-model shapes directly.
  *
- * Resolver-injection pattern matches `routes/schedules.ts` /
- * `routes/tasks.ts`: the mount point in `server/src/index.ts` hands
+ * Resolver-injection pattern matches the sibling `routes/tasks.ts` and
+ * the `routes/schedules/` route modules: the mount point in
+ * `server/src/index.ts` hands
  * in three functions that pull the workspace-scoped services and the
  * workspace fs root out of Hono's per-request context. The route
  * file never touches workspace resolution, only the workflow + tasks
@@ -36,7 +37,7 @@
  * Every mutation route forwards `workflowId` from the URL path and
  * NOTHING ELSE about the caller. The substrate re-checks the workflow's
  * lifecycle status inside its mutation tx and rejects mutations against
- * a terminal workflow with `WorkflowAlreadyTerminalError` → 409 from the
+ * a terminal workflow with `WorkflowAlreadyTerminal` → 409 from the
  * policy below.
  *
  * ## Cancel response
@@ -683,7 +684,7 @@ export function workflowsRoutes(
   //     (runtime state + task workdirs) + shared workflow dir.
   //
   // Lifecycle constraint: the workflow must be terminal. A running
-  // workflow yields 409 `WorkflowDeleteRequiresTerminalError` with
+  // workflow yields 409 `WorkflowDeleteRequiresTerminal` with
   // a typed body so the dashboard can render the "Cancel first" CTA
   // (mirrors task's `transition: 'delete'` envelope).
   //
@@ -693,7 +694,7 @@ export function workflowsRoutes(
   //      non-terminal, reject the whole operation with a 409 BEFORE
   //      any destructive write — the cascade is all-or-nothing.
   //      Without this gate, a workflow that has just transitioned to
-  //      `succeeded` (via `WorkflowService.finishWorkflow`, which
+  //      `succeeded` (via `WorkflowModule.finishWorkflow`, which
   //      intentionally does not await the coordinator task's exit;
   //      see the `excludeRunningCoords: true` branch) would pass the
   //      `wf.status === "running"` check, partially delete its other
@@ -706,7 +707,7 @@ export function workflowsRoutes(
   //      but the `InvalidTransition` customBody branch is kept as
   //      defense-in-depth against a tight TOCTOU race.
   //   3. Drop the workflow substrate's own rows + (if purging) shared
-  //      dir via `WorkflowService.deleteWorkflow`.
+  //      dir via `WorkflowModule.deleteWorkflow`.
   app.openapi(
     createRoute({
       method: "delete",

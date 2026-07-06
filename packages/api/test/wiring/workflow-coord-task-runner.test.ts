@@ -10,10 +10,10 @@
  *
  *   - validate: strict coord spec shape + agent-existence lookup
  *     (`AgentNotFound` / `AgentUnresolvable` task unions)
- *   - dispatch: reads the workflow header via `getService` thunk;
+ *   - dispatch: reads the workflow header via `getModule` thunk;
  *     synthesises `origin: 'workflow'` + canonical
  *     node id in the typed `origin_id` column (reverse-lookup); conditional
- *     `details` spread; throws if `getService()` returns null/undefined
+ *     `details` spread; throws if `getModule()` returns null/undefined
  *   - poll loop status→terminal mapping (`succeeded` / `failed` /
  *     `cancelled` / `null` task), runner-local error budget exhaustion
  *   - hasInFlightForNode delegation to
@@ -149,7 +149,7 @@ function stubDeps(
   });
   const fakeService = { getWorkflow: { execute: getWorkflow } } as unknown as WorkflowModule;
   const serviceFromThunk = "serviceFromThunk" in opts ? opts.serviceFromThunk : fakeService;
-  const getService = vi.fn(() => serviceFromThunk as unknown as WorkflowModule);
+  const getModule = vi.fn(() => serviceFromThunk as unknown as WorkflowModule);
 
   return {
     catalog,
@@ -161,7 +161,7 @@ function stubDeps(
     listInFlightForWorkflowNode,
     cancel,
     getWorkflow,
-    getService,
+    getModule,
   };
 }
 
@@ -198,7 +198,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     const result = (await r.validate({ agent: "x" }, NODE_VALIDATE_CTX))._unsafeUnwrap();
@@ -212,7 +212,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate({}, NODE_VALIDATE_CTX))).toBeInstanceOf(
@@ -230,7 +230,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate({ agent: "" }, NODE_VALIDATE_CTX))).toBeInstanceOf(
@@ -248,7 +248,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate({ agent: "   " }, NODE_VALIDATE_CTX))).toBeInstanceOf(
@@ -262,7 +262,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate({ agent: "x", extra: 1 }, NODE_VALIDATE_CTX))).toBeInstanceOf(
@@ -276,7 +276,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate(null, NODE_VALIDATE_CTX))).toBeInstanceOf(
@@ -290,7 +290,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate("x", NODE_VALIDATE_CTX))).toBeInstanceOf(
@@ -304,7 +304,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate([], NODE_VALIDATE_CTX))).toBeInstanceOf(
@@ -318,7 +318,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate({ agent: "missing" }, NODE_VALIDATE_CTX))).toMatchObject({
@@ -334,7 +334,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     const captured = await errCause(r.validate({ agent: "x" }, NODE_VALIDATE_CTX));
@@ -363,7 +363,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     const result = (
@@ -384,7 +384,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(await errCause(r.validate({ agent: "bare-coord" }, NODE_VALIDATE_CTX))).toBeInstanceOf(
@@ -408,7 +408,7 @@ describe("makeCoordNodeRunner — validate", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     expect(
@@ -419,7 +419,7 @@ describe("makeCoordNodeRunner — validate", () => {
 });
 
 describe("makeCoordNodeRunner — dispatch", () => {
-  it("U11: reads workflow header via getService and calls tasks.dispatchTask.execute with brief+details from header", async () => {
+  it("U11: reads workflow header via getModule and calls tasks.dispatchTask.execute with brief+details from header", async () => {
     const deps = stubDeps({
       getWorkflowReturn: fakeWorkflowRow({ brief: "wf brief", details: "wf details" }),
       // biome-ignore lint/suspicious/noExplicitAny: stub return shape mirrors fakeTaskRow.
@@ -428,7 +428,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100_000, // never poll during this test
     });
@@ -438,7 +438,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
         onTerminal: () => {},
       })
     )._unsafeUnwrap();
-    expect(deps.getService).toHaveBeenCalledTimes(1);
+    expect(deps.getModule).toHaveBeenCalledTimes(1);
     expect(deps.getWorkflow).toHaveBeenCalledWith({ workflowId: "20260101-deadbeef" });
     expect(deps.dispatch).toHaveBeenCalledWith({
       agent: "coord-agent",
@@ -474,7 +474,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       // Concrete deterministic value so the assertion below can pin
       // the exact resolved path rather than only a contains-match.
       workspaceDir: "/concrete-ws",
@@ -501,7 +501,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100_000,
     });
@@ -535,7 +535,7 @@ describe("makeCoordNodeRunner — dispatch", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100_000,
     });
@@ -577,12 +577,12 @@ describe("makeCoordNodeRunner — dispatch", () => {
     await r.dispose();
   });
 
-  it("U13: throws an actionable error when getService() returns null", async () => {
+  it("U13: throws an actionable error when getModule() returns null", async () => {
     const deps = stubDeps({ serviceFromThunk: null });
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100_000,
     });
@@ -610,7 +610,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100,
     });
@@ -632,7 +632,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100,
     });
@@ -655,7 +655,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100,
     });
@@ -678,7 +678,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100,
     });
@@ -699,7 +699,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100,
       maxPollErrors: 3,
@@ -721,7 +721,7 @@ describe("makeCoordNodeRunner — poll loop terminal mapping", () => {
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
       pollIntervalMs: 100,
     });
@@ -742,7 +742,7 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     const result = (
@@ -766,7 +766,7 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
       const r = makeCoordNodeRunner({
         catalog: deps.catalog,
         tasks: deps.tasks,
-        getService: deps.getService,
+        getModule: deps.getModule,
         workspaceDir: TEST_WORKSPACE_DIR,
         pollIntervalMs: 100,
       });
@@ -808,7 +808,7 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
     const r = makeCoordNodeRunner({
       catalog: deps.catalog,
       tasks: deps.tasks,
-      getService: deps.getService,
+      getModule: deps.getModule,
       workspaceDir: TEST_WORKSPACE_DIR,
     });
     // Should NOT throw; the runner logs and continues.
@@ -824,7 +824,7 @@ describe("makeCoordNodeRunner — hasInFlightForNode + cancel + dispose", () => 
       const r = makeCoordNodeRunner({
         catalog: deps.catalog,
         tasks: deps.tasks,
-        getService: deps.getService,
+        getModule: deps.getModule,
         workspaceDir: TEST_WORKSPACE_DIR,
         pollIntervalMs: 100,
       });

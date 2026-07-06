@@ -12,7 +12,7 @@ interface TaskTargetData {
   readonly runtime?: string;
 }
 
-/** RFC 7396 deep-merge patch for a task target (`null` deletes an optional). */
+/** Deep-merge patch for a task target (`null` deletes an optional). */
 interface TaskTargetPatch {
   readonly agent?: string;
   readonly brief?: string;
@@ -36,7 +36,7 @@ interface CatalogAgentLookup {
  *
  *   - task-target shape validation
  *   - agent existence lookup
- *   - RFC 7396 deep-merge of task target patches
+ *   - deep-merge of task target patches
  *   - origin/originId synthesis for `tasks.dispatchTask.execute`
  *   - lifecycle delegation for `hasInFlightForSchedule` /
  *     `deleteForSchedule`

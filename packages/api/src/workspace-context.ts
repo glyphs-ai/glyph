@@ -456,10 +456,10 @@ export class WorkspaceContextRegistry {
     let workflowModule: Awaited<ReturnType<typeof composeWorkflowModule>>;
     // Two-phase init seam: the coord runner needs a ref to the
     // `WorkflowModule` it lives inside (to read header `brief` /
-    // `details` at dispatch time), but the service is constructed
+    // `details` at dispatch time), but the module is constructed
     // by `composeWorkflowModule` which itself requires the runner.
     // The thunk lets us build the runner first, call compose, then
-    // assign the ref. Mirrors the engine ↔ service two-phase init
+    // assign the ref. Mirrors the engine ↔ module two-phase init
     // in `@glyphs-ai/workflow`.
     let workflowRef: WorkflowModule | null = null;
     const getWorkflowModule = (): WorkflowModule => {
@@ -555,7 +555,7 @@ export class WorkspaceContextRegistry {
       // dispatch workflow-kind schedules whose next fire is in the
       // past at boot. Build runners first — `composeWorkflowModule`
       // requires them in its opts object — and capture the workflow
-      // service ref via the `getWorkflowService` thunk for the coord
+      // module ref via the `getWorkflowModule` thunk for the coord
       // runner.
       const coordRunner = makeCoordNodeRunner({
         tasks: taskModule,

@@ -15,7 +15,7 @@
  *   - `GET    /`             — list task schedules; `?agent=`, `?enabled=`
  *   - `POST   /`             — create a task schedule
  *   - `GET    /:sid`         — get one (enriched with derived `describe`)
- *   - `PATCH  /:sid`         — RFC 7396 deep-merge patch
+ *   - `PATCH  /:sid`         — deep-merge patch (`null` clears an optional field)
  *   - `DELETE /:sid`         — delete a disabled, idle schedule
  *   - `POST   /:sid/run`     — manual fire-now
  *   - `GET    /:sid/preview` — upcoming fire timestamps; `?n=` in `[1, 100]`
