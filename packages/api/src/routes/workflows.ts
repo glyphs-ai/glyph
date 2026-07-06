@@ -87,10 +87,9 @@ import type { Result } from "neverthrow";
 import {
   respondWorkflowError,
   type WorkflowRouteError,
-  workflowCustomDeleteBody,
   workflowsErrorPolicy,
 } from "../_error-policies/workflows.js";
-import { logEvent, respondError } from "../_http-errors.js";
+import { logEvent, problemResponse, respondError } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
 import { contentTypeFor, streamFileAsResponse } from "./_artifact-stream.js";
 
@@ -160,10 +159,10 @@ export function workflowsRoutes(
       // shape works — reject only obviously malformed input at the boundary.
       const createdSince = c.req.query("createdSince");
       if (createdSince !== undefined && Number.isNaN(Date.parse(createdSince))) {
-        return c.json(
-          { error: "createdSince must be an ISO 8601 timestamp", code: "WorkflowError" },
-          400,
-        );
+        return problemResponse(c, 400, {
+          code: "WorkflowError",
+          detail: "createdSince must be an ISO 8601 timestamp",
+        });
       }
       const q = c.req.query("q");
       const coordinatorAgent = c.req.query("coordinatorAgent");
@@ -436,11 +435,17 @@ export function workflowsRoutes(
       try {
         decoded = decodeURIComponent(encoded);
       } catch {
-        return c.json({ error: "encodedPath is not a valid percent-encoded string" }, 400);
+        return problemResponse(c, 400, {
+          code: "BadRequest",
+          detail: "encodedPath is not a valid percent-encoded string",
+        });
       }
 
       if (decoded.includes("..") || decoded.includes("\0")) {
-        return c.json({ error: "traversal segment in artifact path" }, 400);
+        return problemResponse(c, 400, {
+          code: "BadRequest",
+          detail: "traversal segment in artifact path",
+        });
       }
 
       let ref: WorkflowArtifactRef;
@@ -449,7 +454,10 @@ export function workflowsRoutes(
       if (decoded.startsWith("summary/")) {
         const rest = decoded.slice("summary/".length);
         if (rest === "" || rest.startsWith("/")) {
-          return c.json({ error: "summary path missing trailing segments" }, 400);
+          return problemResponse(c, 400, {
+            code: "BadRequest",
+            detail: "summary path missing trailing segments",
+          });
         }
         ref = { kind: "summary", relPath: rest };
         cacheControl = "no-store";
@@ -457,7 +465,10 @@ export function workflowsRoutes(
         const tail = decoded.slice("nodes/".length);
         const sep = tail.indexOf("/");
         if (sep <= 0 || sep === tail.length - 1) {
-          return c.json({ error: "nodes path must be nodes/<nodeId>/<rest>" }, 400);
+          return problemResponse(c, 400, {
+            code: "BadRequest",
+            detail: "nodes path must be nodes/<nodeId>/<rest>",
+          });
         }
         ref = {
           kind: "node",
@@ -466,7 +477,10 @@ export function workflowsRoutes(
         };
         cacheControl = "max-age=300";
       } else {
-        return c.json({ error: "artifact path must start with summary/ or nodes/<nid>/" }, 400);
+        return problemResponse(c, 400, {
+          code: "BadRequest",
+          detail: "artifact path must start with summary/ or nodes/<nid>/",
+        });
       }
 
       const result = await resolve(c).resolveWorkflowArtifactPath.execute({
@@ -482,19 +496,19 @@ export function workflowsRoutes(
 
       const absPath = result.value;
       if (absPath === null) {
-        return c.json(
-          { error: ref.kind === "node" ? "no such node in workflow" : "artifact not found" },
-          404,
-        );
+        return problemResponse(c, 404, {
+          code: "NotFound",
+          detail: ref.kind === "node" ? "no such node in workflow" : "artifact not found",
+        });
       }
 
       try {
         const st = await stat(absPath);
         if (!st.isFile()) {
-          return c.json({ error: "artifact not found" }, 404);
+          return problemResponse(c, 404, { code: "NotFound", detail: "artifact not found" });
         }
       } catch {
-        return c.json({ error: "artifact not found" }, 404);
+        return problemResponse(c, 404, { code: "NotFound", detail: "artifact not found" });
       }
 
       return streamFileAsResponse(absPath, {
@@ -738,19 +752,15 @@ export function workflowsRoutes(
         }
         if (holdoutNodeIds.length > 0) {
           const plural = holdoutNodeIds.length === 1 ? "" : "s";
-          return c.json(
-            {
-              error:
-                `workflow ${wfid} has ${holdoutNodeIds.length} in-flight ` +
-                `node task${plural}; cancel the workflow first or wait for ` +
-                `task${plural} to finish (holdout node id${plural}: ` +
-                `${holdoutNodeIds.join(", ")})`,
-              code: "WorkflowDeleteHasInFlightTasks",
-              transition: "delete",
-              holdoutNodeIds,
-            },
-            409,
-          );
+          return problemResponse(c, 409, {
+            code: "WorkflowDeleteHasInFlightTasks",
+            detail:
+              `workflow ${wfid} has ${holdoutNodeIds.length} in-flight ` +
+              `node task${plural}; cancel the workflow first or wait for ` +
+              `task${plural} to finish (holdout node id${plural}: ` +
+              `${holdoutNodeIds.join(", ")})`,
+            extensions: { transition: "delete", holdoutNodeIds },
+          });
         }
         for (const node of snapshot.nodes) {
           const found = await tasks.findLatestByOrigin.execute({
@@ -777,7 +787,7 @@ export function workflowsRoutes(
           route: "workflows.delete",
           policy: workflowsErrorPolicy,
           meta: { workflowId: wfid as WorkflowId, purge },
-          customBody: workflowCustomDeleteBody,
+          transition: "delete",
         });
       }
     },

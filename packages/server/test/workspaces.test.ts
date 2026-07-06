@@ -338,7 +338,7 @@ describe("workspacesRoutes — POST /:id/reload", () => {
       method: "POST",
     });
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string; code: string };
+    const body = (await res.json()) as { detail: string; code: string };
     expect(body.code).toBe("WorkspaceNotFound");
   });
 
@@ -355,9 +355,9 @@ describe("workspacesRoutes — POST /:id/reload", () => {
 
     const res = await app.request(`/${id}/reload`, { method: "POST" });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string; code: string };
+    const body = (await res.json()) as { detail: string; code: string };
     expect(body.code).toBe("WorkspaceHasLiveTasksError");
-    expect(body.error).toContain("3 live task");
+    expect(body.detail).toContain("3 live task");
     const stillCached = await application.getContext(id);
     expect(stillCached).toBe(ctx);
   });

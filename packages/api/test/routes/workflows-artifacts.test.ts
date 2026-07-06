@@ -184,7 +184,7 @@ describe("workflowsRoutes — artifacts bytes", () => {
     const res = await mountRoutes(stubModule()).request(`/${WID}/artifacts/${encoded}`);
 
     expect(res.status).toBe(404);
-    expect(((await res.json()) as { error: string }).error).toBe("no such node in workflow");
+    expect(((await res.json()) as { detail: string }).detail).toBe("no such node in workflow");
   });
 
   it("rejects traversal attempts in the artifact path with 400", async () => {

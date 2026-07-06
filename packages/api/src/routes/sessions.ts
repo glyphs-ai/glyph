@@ -11,7 +11,7 @@ import {
 } from "@glyphs-ai/session";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { respondSessionError } from "../_error-policies/sessions.js";
-import { logEvent } from "../_http-errors.js";
+import { logEvent, problemResponse } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
 import type { WorkspaceContext } from "../workspace-context.js";
 
@@ -61,21 +61,23 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       // as dates). Accepting arbitrary Date.parse-able input and forwarding
       // it raw would break that compare, so parse leniently here and
       // forward canonical ISO.
-      const canonicalise = (raw: string, label: string): string | { error: string } => {
+      const canonicalise = (raw: string, label: string): string | { detail: string } => {
         const t = Date.parse(raw);
-        if (Number.isNaN(t)) return { error: `${label} must be an ISO 8601 timestamp` };
+        if (Number.isNaN(t)) return { detail: `${label} must be an ISO 8601 timestamp` };
         return new Date(t).toISOString();
       };
       let createdSinceIso: string | undefined;
       if (createdSince !== undefined) {
         const r = canonicalise(createdSince, "createdSince");
-        if (typeof r !== "string") return c.json(r, 400);
+        if (typeof r !== "string")
+          return problemResponse(c, 400, { code: "BadRequest", detail: r.detail });
         createdSinceIso = r;
       }
       let activeSinceIso: string | undefined;
       if (activeSince !== undefined) {
         const r = canonicalise(activeSince, "activeSince");
-        if (typeof r !== "string") return c.json(r, 400);
+        if (typeof r !== "string")
+          return problemResponse(c, 400, { code: "BadRequest", detail: r.detail });
         activeSinceIso = r;
       }
       const opts: { agent?: string; createdSince?: string; activeSince?: string } = {};
@@ -148,7 +150,11 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       const res = await resolve(c).sessions.getSession.execute({ id: id as SessionId });
       return res.match(
         (rec) => {
-          if (!rec) return c.json({ error: "session not found", code: "SessionNotFound" }, 404);
+          if (!rec)
+            return problemResponse(c, 404, {
+              code: "SessionNotFound",
+              detail: "session not found",
+            });
           return c.json(rec);
         },
         (err) => respondSessionError(c, err, { route: "sessions.get", meta: { sessionId: id } }),

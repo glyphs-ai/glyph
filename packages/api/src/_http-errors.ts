@@ -2,6 +2,13 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { Logger } from "pino";
 import { ZodError } from "zod";
+import {
+  PROBLEM_CONTENT_TYPE,
+  type Problem,
+  type ProblemIssue,
+  toProblem,
+  validationProblem,
+} from "./schemas/problem.js";
 
 /**
  * Allow-list of error class `name`s whose `.message` is safe to surface in
@@ -12,8 +19,9 @@ import { ZodError } from "zod";
  *
  * Anything outside this list — generic `Error`, `EACCES`/`ENOENT` from
  * the filesystem, syntax errors, third-party errors — collapses to a
- * generic "internal error" to avoid leaking host paths or implementation
- * details (e.g. `EACCES: permission denied, open '/etc/shadow'`).
+ * generic "internal error" `detail` (with an opaque `InternalError` code)
+ * to avoid leaking host paths or implementation details (e.g. `EACCES:
+ * permission denied, open '/etc/shadow'`).
  *
  * Adding a new error class? Audit its `super(...)` template before
  * adding it here:
@@ -34,7 +42,7 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   "WorkspaceHasLiveTasksError",
   "WorkspaceLoadError",
   // @glyphs-ai/catalog exposes DU errors; catalog route responses are
-  // projected directly from policy code matches rather than class names.
+  // projected directly from the domain table rather than class names.
   // `AgentNotFoundError` is shared across session / schedule / task —
   // one allow-list entry covers all three. Each owning pkg audits its own
   // super(...) template for safety per the rules above.
@@ -63,8 +71,8 @@ export const SAFE_ERROR_NAMES = new Set<string>([
   //   classes — covered by the entries in the @glyphs-ai/api section.
   //   DU-based: `WorkspaceNotFound` / `WorkspacePathConflict` /
   //   `DatabaseUnavailable` /
-  //   `ProvisioningFailed` flow through `respondWorkspaceError`,
-  //   which builds the wire body directly from the DU `type` and
+  //   `ProvisioningFailed` flow through the workspace table,
+  //   which builds the Problem directly from the DU `type` and
   //   bypasses this allow-list entirely.
   // @glyphs-ai/workflow
   "WorkflowError",
@@ -100,11 +108,11 @@ export const SAFE_ERROR_NAMES = new Set<string>([
  * messages intentionally stay off the HTTP wire. They either carry
  * host paths / underlying causes, represent boot-time or
  * operator-configuration faults, or are projected to a route-specific
- * envelope before they reach `errorBody`.
+ * envelope before they reach the error seam.
  *
  * Keep this list in sync with public error exports from `@glyphs-ai/*`:
  * every exported error class should be present here, in
- * `SAFE_ERROR_NAMES`, or in a route policy with a custom opaque body.
+ * `SAFE_ERROR_NAMES`, or in a route table with a custom opaque detail.
  */
 export const INTERNAL_ERROR_NAMES = new Set<string>([
   // @glyphs-ai/cli / @glyphs-ai/dashboard
@@ -138,7 +146,7 @@ type LoggerContext = Context<{ Variables: { logger?: Logger } }>;
  * through silently when no logger is on the context (e.g. tests that
  * mount routes standalone). Returns void.
  *
- * `respondError` calls this for both the "5xx fault" and "unmapped error
+ * `respondProblem` calls this for both the "5xx fault" and "unmapped error
  * fell through" structured log entries.
  */
 export function logFault(
@@ -177,36 +185,13 @@ export function logEvent(c: Context, msg: string, meta?: Record<string, unknown>
 }
 
 /**
- * Standard error response shape: `{ error, code? }`. The `code` field
- * carries the error class name so the dashboard can render typed UI without
- * string-matching the message.
+ * Shared meta builder for the "unmapped fell through" log entry. Pulls
+ * the unknown error's `name` and `message` onto the structured log line
+ * (in addition to the full `err` serialiser pino already attaches via
+ * `logFault`) so the operator can `jq` for unmapped error classes without
+ * parsing every nested `err.type`.
  *
- * Errors NOT in `SAFE_ERROR_NAMES` are flattened to `"internal error"` so
- * that filesystem error messages, third-party stack traces, and
- * caller-controlled echoes never reach the client. Routes that map a
- * specific typed error to a specific HTTP status before calling this
- * helper still get the original message + code.
- */
-export function errorBody(err: unknown): { error: string; code?: string } {
-  if (err instanceof Error) {
-    if (SAFE_ERROR_NAMES.has(err.name)) {
-      return { error: err.message, code: err.name };
-    }
-    if (INTERNAL_ERROR_NAMES.has(err.name)) {
-      return { error: "internal error" };
-    }
-  }
-  return { error: "internal error" };
-}
-
-/**
- * Shared meta builder for the "unmapped fell through to 400" log
- * entry. Pulls the unknown error's `name` and `message` onto the
- * structured log line (in addition to the full `err` serialiser pino
- * already attaches via `logFault`) so the operator can `jq` for
- * unmapped error classes without parsing every nested `err.type`.
- *
- * Consumed by `respondError`; routes never call this directly.
+ * Consumed by `respondProblem`; routes never call this directly.
  */
 export function unmappedFaultMeta(
   err: unknown,
@@ -221,51 +206,58 @@ export function unmappedFaultMeta(
 }
 
 /**
- * One entry on an {@link ErrorPolicy}: an error class, the HTTP status
- * it maps to, and an optional class-stable body builder.
+ * One row of a {@link ProblemTable}: the HTTP status + fixed `title` for a
+ * `code`, plus optional builders for the per-occurrence `detail` string
+ * and the extension members (`agent`, `reason`, `transition`, …).
  *
- * Use the third slot ONLY for envelopes whose shape depends on the
- * error value alone — not on the route. Example: `EntryNotReady`
- * always returns `{ error, code, agent, reason }` regardless of which
- * route caught it, so its body builder lives on the policy entry.
- *
- * Counter-example: `InvalidTransition` returns
- * `{ error, code, status, transition }` where `transition` is `"cancel"`
- * on `tasks.cancel` and `"delete"` on `tasks.delete`. That body is
- * route-dependent — pass it via `RespondErrorOpts.customBody`, not here.
+ * `title` is the RFC 9457 problem-type summary — stable across
+ * occurrences. `detail` is the occurrence-specific message (today's
+ * flattened error string). `extension` carries the atom-specific fields
+ * the CLI / dashboard branch on. Both builders receive the route `opts`
+ * so route-dependent bodies (e.g. `InvalidTransition`'s `transition`
+ * verb) can read `opts.transition`.
  */
-type StatusEntry = readonly [
-  klass: new (...args: never[]) => Error,
-  status: ContentfulStatusCode,
-  classStableBody?: (err: Error) => Record<string, unknown>,
-];
-
-export type CodeStatusEntry = readonly [
-  code: string,
-  status: ContentfulStatusCode,
-  codeStableBody?: (err: unknown) => Record<string, unknown>,
-];
-
-/**
- * A per-domain error policy — ordered lists of `(class, status, body?)`
- * and `(code, status, body?)` triples plus an optional default status.
- * Each domain (tasks / schedules / sessions / workspaces / catalog)
- * maintains its own policy so name-equal classes or code-equal tagged
- * errors from different domains map independently.
- */
-export interface ErrorPolicy {
-  readonly name: string;
-  readonly statuses: ReadonlyArray<StatusEntry>;
-  readonly codeStatuses?: ReadonlyArray<CodeStatusEntry>;
-  /**
-   * Status used when no `statuses` entry matches the thrown error.
-   * Defaults to 400. Some routes (read-only / server-failure paths)
-   * override per-call via `RespondErrorOpts.defaultStatus`.
-   */
-  readonly defaultStatus?: ContentfulStatusCode;
+export interface ProblemDef {
+  readonly status: ContentfulStatusCode;
+  readonly title: string;
+  readonly detail?: (err: never, opts: RespondProblemOpts) => string;
+  readonly extension?: (
+    err: never,
+    opts: RespondProblemOpts,
+  ) => Record<string, unknown> | undefined;
 }
 
-export interface RespondErrorOpts {
+/**
+ * A per-domain error table: `code → {status, title, detail?, extension?}`.
+ * Replaces the old twin `STATUS_BY_TYPE` + `MESSAGE_BY_TYPE` maps with a
+ * single composite lookup. Each domain (tasks / sessions / workspaces /
+ * schedules / workflows / catalog) owns its own table so same-named codes
+ * from different domains map independently.
+ */
+export type ProblemTable = Readonly<Record<string, ProblemDef>>;
+
+/**
+ * Typed builder for a discriminated-union domain table. Maps every member
+ * of the union `E` (keyed by its `.type`) to a row whose `detail` /
+ * `extension` builders are narrowed to that exact member — so a row can
+ * read member-specific fields (`err.agent`, `err.from`, …) without a cast.
+ * The resulting object is assignable to {@link ProblemTable} because the
+ * builders' member param is contravariantly compatible with `ProblemDef`'s
+ * `never`.
+ */
+export type DomainProblemTable<E extends { type: string }> = {
+  readonly [K in E["type"]]: {
+    readonly status: ContentfulStatusCode;
+    readonly title: string;
+    readonly detail?: (err: Extract<E, { type: K }>, opts: RespondProblemOpts) => string;
+    readonly extension?: (
+      err: Extract<E, { type: K }>,
+      opts: RespondProblemOpts,
+    ) => Record<string, unknown> | undefined;
+  };
+};
+
+export interface RespondProblemOpts {
   /**
    * Route label that lands on the structured log line, e.g.
    * `"tasks.cancel"` / `"sessions.create"`. Used as the message prefix
@@ -273,135 +265,206 @@ export interface RespondErrorOpts {
    * entries so operators can grep by route.
    */
   readonly route: string;
-  readonly policy: ErrorPolicy;
   /**
    * Extra meta fields to attach to the structured log line
    * (`taskId`, `sessionId`, etc.). Forwarded verbatim to
    * {@link logFault}; included in `unmappedFaultMeta` when the error
-   * class is unmapped.
+   * is unmapped.
    */
   readonly meta?: Record<string, unknown>;
   /**
-   * Per-call body builder that takes precedence over both the matched
-   * entry's class-stable body and the default `errorBody`. Used for
-   * route-dependent envelopes (e.g. `InvalidTransition` with verb).
-   * Return `null` to fall back to the class-stable / default body.
-   */
-  readonly customBody?: (
-    err: unknown,
-    status: ContentfulStatusCode,
-  ) => Record<string, unknown> | null;
-  /**
-   * Per-call override of `policy.defaultStatus`. Mapped-class status
-   * (from `policy.statuses`) always wins; this only changes the
-   * fallthrough for unmapped errors.
+   * Status used when no table row matches the error (and it is not a
+   * safe class error). Defaults to 400.
    */
   readonly defaultStatus?: ContentfulStatusCode;
+  /** Route-supplied verb for `InvalidTransition`-style bodies (`"cancel"` / `"delete"`). */
+  readonly transition?: string;
 }
 
 /**
- * Centralised catch-block body for route handlers. Resolves status via
- * the per-domain `ErrorPolicy`, emits the structured "5xx fault" or
- * "unmapped error fell through" log line via {@link logFault}, and
- * returns the JSON response.
- *
- * Status resolution:
- *   - First `instanceof` match in `policy.statuses` wins (order is
- *     significant — list subclasses before their bases).
- *   - If no class matches, first `.code` match in `policy.codeStatuses`
- *     wins.
- *   - On no match: status falls back to
- *     `opts.defaultStatus ?? policy.defaultStatus ?? 400`, and the
- *     entry is flagged `isUnmapped` so the log path fires.
- *
- * Body precedence:
- *   1. `opts.customBody(err, status)` when defined AND returns non-null
- *   2. The matched entry's `classStableBody(err)` if present
- *   3. The matched entry's `codeStableBody(err)` if present
- *   4. {@link errorBody} fallback (collapses unrecognised classes to
- *      `{ error: "internal error" }` per `SAFE_ERROR_NAMES`)
+ * Resolve an error `code` from a value: DU `.code` / `.type` first, then
+ * an `Error` instance's class `.name` (so class-based errors match a
+ * table row keyed by their name).
  */
-export function respondError(c: Context, err: unknown, opts: RespondErrorOpts): Response {
-  // Input-schema parse failures (service-layer `Schema.parse(...)`)
-  // surface as ZodError. Map them to the same 400 `ValidationError`
-  // envelope that `createApiApp`'s request `defaultHook` produces, so a
-  // failed request-body/param validation and a failed service-input
-  // validation look identical on the wire.
+export function readErrorCode(err: unknown): string | undefined {
+  if (typeof err === "object" && err !== null) {
+    const rec = err as { code?: unknown; type?: unknown };
+    if (typeof rec.code === "string") return rec.code;
+    if (typeof rec.type === "string") return rec.type;
+  }
+  if (err instanceof Error) return err.name;
+  return undefined;
+}
+
+/**
+ * Humanise a `code` into a fixed problem `title` for the fallback path
+ * (a safe class error with no explicit table row). `AgentNotFoundError`
+ * → `"Agent not found"`.
+ */
+function humanizeCode(code: string): string {
+  const stem = code.endsWith("Error") ? code.slice(0, -5) : code;
+  const spaced = stem
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .toLowerCase()
+    .trim();
+  if (spaced === "") return "Error";
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** The opaque Problem for an unrecognised / internal error — no leak. */
+function opaqueProblem(status: ContentfulStatusCode): Problem {
+  return toProblem({
+    status,
+    title: "Internal error",
+    detail: "internal error",
+    code: "InternalError",
+  });
+}
+
+/** Outcome of {@link resolveProblem}: the wire Problem + whether it was unmapped. */
+export interface ResolvedProblem {
+  readonly problem: Problem;
+  /** True when no table row matched — drives the "unmapped fell through" log line. */
+  readonly isUnmapped: boolean;
+}
+
+/**
+ * Pure projection of an error value into a {@link Problem} against a
+ * domain {@link ProblemTable}. No transport, no logging — the hono-aware
+ * {@link respondProblem} wraps this and writes the response.
+ *
+ * Resolution order:
+ *   1. `ZodError` → the shared 400 `ValidationError` Problem.
+ *   2. First table row whose key equals the resolved `code`
+ *      (`.code` / `.type` / class `.name`) → status + title from the row,
+ *      detail + extensions from its builders.
+ *   3. No row + safe class error → the class `.message` as `detail`, class
+ *      `.name` as `code`, humanised title, at `opts.defaultStatus ?? 400`.
+ *   4. Anything else → opaque `InternalError` Problem so host paths /
+ *      third-party messages never reach the wire.
+ */
+export function resolveProblem(
+  err: unknown,
+  table: ProblemTable,
+  opts: RespondProblemOpts,
+): ResolvedProblem {
   if (err instanceof ZodError) {
-    return c.json(
-      {
-        error: "request validation failed",
-        code: "ValidationError",
-        issues: err.issues.map((issue) => ({
-          path: issue.path.map(String).join("."),
-          message: issue.message,
-        })),
-      },
-      400,
-    );
+    return { problem: validationProblem(zodIssues(err)), isUnmapped: false };
   }
 
-  let status: ContentfulStatusCode | undefined;
-  let classStableBody: ((err: Error) => Record<string, unknown>) | undefined;
-  let codeStableBody: ((err: unknown) => Record<string, unknown>) | undefined;
-
-  if (err instanceof Error) {
-    for (const entry of opts.policy.statuses) {
-      const [klass, entryStatus, bodyBuilder] = entry;
-      if (err instanceof klass) {
-        status = entryStatus;
-        classStableBody = bodyBuilder;
-        break;
-      }
-    }
+  const code = readErrorCode(err);
+  const row = code !== undefined ? table[code] : undefined;
+  if (code !== undefined && row !== undefined) {
+    const detail = row.detail ? row.detail(err as never, opts) : row.title;
+    const extensions = row.extension ? row.extension(err as never, opts) : undefined;
+    const problem = toProblem({
+      status: row.status,
+      title: row.title,
+      detail,
+      code,
+      ...(extensions !== undefined ? { extensions } : {}),
+    });
+    return { problem, isUnmapped: false };
   }
 
-  const errorCode = readErrorCode(err);
-  if (status === undefined && errorCode !== undefined) {
-    for (const entry of opts.policy.codeStatuses ?? []) {
-      const [code, entryStatus, bodyBuilder] = entry;
-      if (errorCode === code) {
-        status = entryStatus;
-        codeStableBody = bodyBuilder;
-        break;
-      }
-    }
+  const fallbackStatus = opts.defaultStatus ?? 400;
+  if (err instanceof Error && SAFE_ERROR_NAMES.has(err.name)) {
+    const problem = toProblem({
+      status: fallbackStatus,
+      title: humanizeCode(err.name),
+      detail: err.message,
+      code: err.name,
+    });
+    return { problem, isUnmapped: true };
   }
+  return { problem: opaqueProblem(fallbackStatus), isUnmapped: true };
+}
 
-  const isUnmapped = status === undefined;
-  const finalStatus: ContentfulStatusCode =
-    status ?? opts.defaultStatus ?? opts.policy.defaultStatus ?? 400;
-
-  if (finalStatus >= 500) {
+/**
+ * Centralised catch-block responder for route handlers. Projects the
+ * error into a {@link Problem} via {@link resolveProblem}, emits the
+ * structured "5xx fault" or "unmapped error fell through" log line via
+ * {@link logFault}, and writes the `application/problem+json` response.
+ */
+export function respondProblem(
+  c: Context,
+  err: unknown,
+  table: ProblemTable,
+  opts: RespondProblemOpts,
+): Response {
+  const { problem, isUnmapped } = resolveProblem(err, table, opts);
+  const status = problem.status as ContentfulStatusCode;
+  if (status >= 500) {
     logFault(c, err, `${opts.route}: 5xx fault`, opts.meta);
   } else if (isUnmapped) {
     logFault(
       c,
       err,
-      `${opts.route}: unmapped error fell through to ${finalStatus}`,
+      `${opts.route}: unmapped error fell through to ${status}`,
       unmappedFaultMeta(err, opts.meta),
     );
   }
-
-  let body: Record<string, unknown>;
-  const fromCustom = opts.customBody?.(err, finalStatus);
-  if (fromCustom !== undefined && fromCustom !== null) {
-    body = fromCustom;
-  } else if (classStableBody !== undefined && err instanceof Error) {
-    body = classStableBody(err);
-  } else if (codeStableBody !== undefined) {
-    body = codeStableBody(err);
-  } else {
-    body = errorBody(err);
-  }
-
-  return c.json(body, finalStatus);
+  return c.json(problem, status, { "content-type": PROBLEM_CONTENT_TYPE });
 }
 
-function readErrorCode(err: unknown): string | undefined {
-  if (typeof err !== "object" || err === null) return undefined;
-  const rec = err as { code?: unknown; type?: unknown };
-  if (typeof rec.code === "string") return rec.code;
-  if (typeof rec.type === "string") return rec.type;
-  return undefined;
+/**
+ * Generic table-driven responder kept for the catalog routes, which pass
+ * their domain table as `policy`. Thin adapter over {@link respondProblem}
+ * that defaults unmapped errors to `500` (an unrecognised catalog error is
+ * a server fault, not a bad request).
+ */
+export function respondError(
+  c: Context,
+  err: unknown,
+  opts: {
+    readonly route: string;
+    readonly policy: ProblemTable;
+    readonly meta?: Record<string, unknown>;
+    readonly defaultStatus?: ContentfulStatusCode;
+  },
+): Response {
+  return respondProblem(c, err, opts.policy, {
+    route: opts.route,
+    ...(opts.meta !== undefined ? { meta: opts.meta } : {}),
+    defaultStatus: opts.defaultStatus ?? 500,
+  });
+}
+
+/**
+ * Emit a one-off {@link Problem} for a route's own inline guards (path /
+ * query validation, `null`-row not-founds, precondition conflicts) that
+ * don't flow from a domain `Result.Err`. Writes the same
+ * `application/problem+json` envelope {@link respondProblem} produces, so
+ * every error response — table-driven or inline — is byte-shape-identical
+ * on the wire. `title` defaults to a humanised `code`; pass an explicit
+ * `title` only when the derived one reads poorly. Extension members
+ * (`transition`, `field`, …) go in `extensions`.
+ */
+export function problemResponse(
+  c: Context,
+  status: ContentfulStatusCode,
+  input: {
+    readonly code: string;
+    readonly detail: string;
+    readonly title?: string;
+    readonly extensions?: Record<string, unknown>;
+  },
+): Response {
+  const problem = toProblem({
+    status,
+    title: input.title ?? humanizeCode(input.code),
+    detail: input.detail,
+    code: input.code,
+    ...(input.extensions !== undefined ? { extensions: input.extensions } : {}),
+  });
+  return c.json(problem, status, { "content-type": PROBLEM_CONTENT_TYPE });
+}
+
+/** Map a `ZodError`'s issues into the wire `{ path, message }[]` shape. */
+function zodIssues(err: ZodError): ProblemIssue[] {
+  return err.issues.map((issue) => ({
+    path: issue.path.map(String).join("."),
+    message: issue.message,
+  }));
 }

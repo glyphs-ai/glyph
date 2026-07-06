@@ -1,6 +1,6 @@
 /**
  * Helpers for task use-case discriminated-union errors that pass through
- * schedule / workflow `ErrorPolicy` handling.
+ * the schedule / workflow Problem-table handling.
  */
 
 import type { AgentNotFound, AgentResolutionFailed } from "@glyphs-ai/task";

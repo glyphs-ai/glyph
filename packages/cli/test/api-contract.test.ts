@@ -153,13 +153,16 @@ describe("API contract — `glyph task dispatch` server-side error mapping", () 
     // The argv layer rejects missing `--agent` / `--brief` / newline
     // briefs (see argv-validation.test.ts); the case here is a
     // well-formed request that the server refuses. We pin that the
-    // error envelope ({error, code}) round-trips through
+    // RFC 9457 Problem envelope ({ detail, code }) round-trips through
     // formatError into a non-zero exit + a stderr line naming both
     // the server's message and the typed code.
     const cap = stubFetch({
       status: 404,
       body: JSON.stringify({
-        error: 'agent "ghost" not installed',
+        type: "https://errors.glyph.ai/entry-not-found-error",
+        title: "Entry not found",
+        status: 404,
+        detail: 'agent "ghost" not installed',
         code: "EntryNotFoundError",
       }),
     });

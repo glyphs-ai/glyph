@@ -19,13 +19,17 @@ describe("unwrap", () => {
     readonly message: string;
     readonly code: string | undefined;
     readonly issues: ReadonlyArray<{ path: string; message: string }> | undefined;
+    readonly hasBody: boolean;
   }
 
   const errorCases: readonly ErrorCase[] = [
     {
-      name: "400 ValidationError envelope",
+      name: "400 ValidationError Problem",
       error: {
-        error: "request validation failed",
+        type: "https://errors.glyph.ai/validation-error",
+        title: "Validation error",
+        status: 400,
+        detail: "request validation failed",
         code: "ValidationError",
         issues: [{ path: "body.name", message: "Required" }],
       },
@@ -34,15 +38,23 @@ describe("unwrap", () => {
       message: "request validation failed",
       code: "ValidationError",
       issues: [{ path: "body.name", message: "Required" }],
+      hasBody: true,
     },
     {
-      name: "500 { error } business envelope",
-      error: { error: "internal boom" },
+      name: "500 internal Problem",
+      error: {
+        type: "https://errors.glyph.ai/internal-error",
+        title: "Internal error",
+        status: 500,
+        detail: "internal boom",
+        code: "InternalError",
+      },
       response: response(500),
       status: 500,
       message: "internal boom",
-      code: undefined,
+      code: "InternalError",
       issues: undefined,
+      hasBody: true,
     },
     {
       name: "502 non-JSON body falls back to status text",
@@ -52,6 +64,7 @@ describe("unwrap", () => {
       message: "Bad Gateway",
       code: undefined,
       issues: undefined,
+      hasBody: false,
     },
   ];
 
@@ -71,6 +84,11 @@ describe("unwrap", () => {
       expect(ge.code).toBe(tc.code);
       expect(ge.issues).toEqual(tc.issues);
       expect(ge.response).toBe(tc.response);
+      if (tc.hasBody) {
+        expect(ge.body).toEqual(tc.error);
+      } else {
+        expect(ge.body).toBeUndefined();
+      }
     });
   }
 

@@ -99,7 +99,7 @@ describe("sessionsRoutes", () => {
     expect(res.status).toBe(400);
     expect(m.listSessions.execute).not.toHaveBeenCalled();
     const body = await jsonBody(res);
-    expect(body.error).toMatch(/ISO 8601/);
+    expect(body.detail).toMatch(/ISO 8601/);
   });
 
   it("GET /?createdSince=<non-ISO-but-parseable> normalises to canonical ISO", async () => {
@@ -117,7 +117,7 @@ describe("sessionsRoutes", () => {
     expect(res.status).toBe(400);
     expect(m.listSessions.execute).not.toHaveBeenCalled();
     const body = await jsonBody(res);
-    expect(body.error).toMatch(/activeSince must be an ISO 8601 timestamp/);
+    expect(body.detail).toMatch(/activeSince must be an ISO 8601 timestamp/);
   });
 
   it("GET /?createdSince + ?activeSince combine", async () => {
@@ -241,7 +241,7 @@ describe("sessionsRoutes", () => {
     expect(res.status).toBe(500);
     const body = await jsonBody(res);
     expect(body.code).toBe("RuntimeProvisionFailed");
-    expect(body.error).toBe("internal error");
+    expect(body.detail).toBe("internal error");
   });
 
   it("GET /:id returns 404 when not found", async () => {

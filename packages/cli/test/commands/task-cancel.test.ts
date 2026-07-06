@@ -18,6 +18,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { taskCancel } from "../../src/commands/task.js";
+import { problemBody } from "../_helpers/problem.js";
 
 const SERVER_URL = "http://test.local";
 const WSID = "ws-abc";
@@ -79,10 +80,8 @@ describe("glyph task cancel", () => {
   it("surfaces a 409 InvalidTransition as exit 4 with the typed code", async () => {
     stubFetch({
       status: 409,
-      body: JSON.stringify({
-        error: 'invalid transition: cannot apply "cancel" to a task in "success"',
-        code: "InvalidTransition",
-        status: "success",
+      body: problemBody(409, "InvalidTransition", "illegal task state transition", {
+        fromStatus: "success",
         transition: "cancel",
       }),
     });
@@ -95,10 +94,7 @@ describe("glyph task cancel", () => {
   it("surfaces a 503 ManagerShuttingDown as exit 4 with the typed code", async () => {
     stubFetch({
       status: 503,
-      body: JSON.stringify({
-        error: "task manager is shutting down",
-        code: "ManagerShuttingDown",
-      }),
+      body: problemBody(503, "ManagerShuttingDown", "task manager is shutting down"),
     });
     const res = await taskCancel(TID, OPTS);
     expect(res.exitCode).toBe(4);

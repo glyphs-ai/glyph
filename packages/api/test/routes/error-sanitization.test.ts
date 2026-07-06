@@ -1,42 +1,58 @@
 import { describe, expect, it } from "vitest";
 import { catalogErrorPolicy } from "../../src/_error-policies/catalog.js";
-import { errorBody, INTERNAL_ERROR_NAMES } from "../../src/_http-errors.js";
+import { INTERNAL_ERROR_NAMES, readErrorCode, resolveProblem } from "../../src/_http-errors.js";
 
-// These tests pin the security-critical behavior of `errorBody`: only
-// glyph's own typed errors leak their `.message` to the client. Any
-// other error (generic Error, FS errors, third-party library errors)
-// flattens to the opaque "internal error" so host paths and stack
-// traces never reach the dashboard.
+// These tests pin the security-critical behavior of the error seam: only
+// glyph's own typed errors (class `name` in `SAFE_ERROR_NAMES`) leak their
+// `.message` to the client as the Problem `detail`. Any other error
+// (generic Error, FS errors, third-party library errors) flattens to the
+// opaque `"internal error"` detail with an `"InternalError"` code so host
+// paths and stack traces never reach the dashboard.
+//
+// `resolveProblem(err, {}, …)` is exercised with an EMPTY table so only the
+// SAFE / INTERNAL / opaque allow-list decides the outcome — the domain
+// tables (which DO map specific codes) are tested separately per route.
+
+const OPTS = { route: "test", defaultStatus: 500 } as const;
 
 /**
- * Walks `catalogErrorPolicy.codeStatuses` like respondError does, returning
- * the first matching status or `null` if no entry matches. Used here
- * to test the policy data without coupling these cases to the full
- * respondError + Hono mount.
+ * Project `err` through the error seam with NO domain table and return the
+ * wire-visible `{ detail, code }`. Mirrors what a route's catch block emits
+ * for an error its table doesn't recognise.
+ */
+function sanitize(err: unknown): { detail: string; code: string } {
+  const { problem } = resolveProblem(err, {}, OPTS);
+  return { detail: problem.detail, code: problem.code };
+}
+
+const OPAQUE = { detail: "internal error", code: "InternalError" } as const;
+
+/**
+ * Looks up `catalogErrorPolicy[code].status` like `respondError` does,
+ * returning the mapped status or `null` if no entry matches. Used here to
+ * test the policy data without coupling these cases to the full
+ * `respondError` + Hono mount.
  */
 function catalogPolicyStatus(err: unknown): number | null {
-  if (typeof err !== "object" || err === null || !("code" in err)) return null;
-  const code = err.code;
-  if (typeof code !== "string") return null;
-  for (const [entryCode, status] of catalogErrorPolicy.codeStatuses ?? []) {
-    if (code === entryCode) return status;
-  }
-  return null;
+  const code = readErrorCode(err);
+  if (code === undefined) return null;
+  return catalogErrorPolicy[code]?.status ?? null;
 }
 
 function catalogRouteError(code: string): unknown {
   return { tag: "CatalogRouteError", code, message: `canonical message for ${code}` };
 }
 
-describe("errorBody", () => {
+describe("error sanitization", () => {
   it("keeps catalog DU route errors out of the global class allow-list", () => {
-    expect(errorBody(catalogRouteError("SkillNotFound"))).toEqual({ error: "internal error" });
+    // A `{ tag, code, message }` carrier is not an `Error` instance, so with
+    // no catalog table in scope it stays opaque — the catalog table (tested
+    // below) is what maps these codes on the real route.
+    expect(sanitize(catalogRouteError("SkillNotFound"))).toEqual(OPAQUE);
   });
 
   it("flattens generic Error to 'internal error' (no leak)", () => {
-    expect(errorBody(new Error("EACCES: permission denied, open '/etc/shadow'"))).toEqual({
-      error: "internal error",
-    });
+    expect(sanitize(new Error("EACCES: permission denied, open '/etc/shadow'"))).toEqual(OPAQUE);
   });
 
   it("flattens unknown error class to 'internal error'", () => {
@@ -46,14 +62,14 @@ describe("errorBody", () => {
         this.name = "SomeLibError";
       }
     }
-    expect(errorBody(new FromSomeLib())).toEqual({ error: "internal error" });
+    expect(sanitize(new FromSomeLib())).toEqual(OPAQUE);
   });
 
   it("flattens non-Error throwables (string, object) to 'internal error'", () => {
-    expect(errorBody("a string thrown by accident")).toEqual({ error: "internal error" });
-    expect(errorBody({ secret: "shhh" })).toEqual({ error: "internal error" });
-    expect(errorBody(null)).toEqual({ error: "internal error" });
-    expect(errorBody(undefined)).toEqual({ error: "internal error" });
+    expect(sanitize("a string thrown by accident")).toEqual(OPAQUE);
+    expect(sanitize({ secret: "shhh" })).toEqual(OPAQUE);
+    expect(sanitize(null)).toEqual(OPAQUE);
+    expect(sanitize(undefined)).toEqual(OPAQUE);
   });
 
   it("handles all known safe error names across packages", () => {
@@ -79,9 +95,9 @@ describe("errorBody", () => {
       "ScheduleNotFoundError",
       // workspace (api owns WorkspaceLoadError + WorkspaceHasLiveTasksError;
       // the workspace pkg returns DU values for the rest — they bypass
-      // SAFE_ERROR_NAMES since `respondWorkspaceError` writes the body
-      // directly from the DU `type` discriminator and doesn't go
-      // through `errorBody`).
+      // SAFE_ERROR_NAMES since `respondWorkspaceError` builds the Problem
+      // directly from the DU `type` discriminator and doesn't go through
+      // this allow-list).
       // api / workflow
       "WorkspaceHasLiveTasksError",
       "InvalidWorkflowIdError",
@@ -112,8 +128,8 @@ describe("errorBody", () => {
     for (const name of safeNames) {
       const err = new Error(`canonical message for ${name}`);
       err.name = name;
-      expect(errorBody(err)).toEqual({
-        error: `canonical message for ${name}`,
+      expect(sanitize(err)).toEqual({
+        detail: `canonical message for ${name}`,
         code: name,
       });
     }
@@ -123,7 +139,7 @@ describe("errorBody", () => {
     for (const name of INTERNAL_ERROR_NAMES) {
       const err = new Error(`sensitive diagnostic for ${name}: C:\\Users\\me\\.glyph`);
       err.name = name;
-      expect(errorBody(err)).toEqual({ error: "internal error" });
+      expect(sanitize(err)).toEqual(OPAQUE);
     }
   });
 });

@@ -44,8 +44,60 @@ import { store } from "./store.js";
 
 const W = ":workspaceId";
 
+/**
+ * Assemble an RFC 9457 Problem body for the mock error paths so designer
+ * mode and dashboard tests see the same `application/problem+json` envelope
+ * the real server emits: `{ type, title, status, detail, code, ...ext }`.
+ * Accepts the legacy `{ error, code?, ... }` shape used at the call sites and
+ * reshapes `error` → `detail`, filling `type`/`title`/`code` defaults. The
+ * `title` is humanized from the code the same way the server's fallback does
+ * (`packages/api/src/_http-errors.ts` `humanizeCode`), so the mock envelope
+ * reads like the real one instead of echoing the raw `code`.
+ */
+function humanizeProblemCode(code: string): string {
+  const stem = code.endsWith("Error") ? code.slice(0, -5) : code;
+  const spaced = stem
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .toLowerCase()
+    .trim();
+  if (spaced === "") return "Error";
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function mockProblem(
+  status: number,
+  body: { error?: string; detail?: string; code?: string; field?: string } & Record<
+    string,
+    unknown
+  >,
+): HttpResponse<DefaultBodyType> {
+  const { error, detail, code, ...rest } = body;
+  const resolvedCode =
+    code ??
+    (status >= 500
+      ? "InternalError"
+      : status === 404
+        ? "NotFound"
+        : status === 409
+          ? "Conflict"
+          : "BadRequest");
+  const kebab = resolvedCode.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+  return HttpResponse.json(
+    {
+      type: `https://errors.glyph.ai/${kebab}`,
+      title: humanizeProblemCode(resolvedCode),
+      status,
+      detail: detail ?? error ?? "",
+      code: resolvedCode,
+      ...rest,
+    },
+    { status, headers: { "content-type": "application/problem+json" } },
+  );
+}
+
 function notFound(message: string): HttpResponse<DefaultBodyType> {
-  return HttpResponse.json({ error: message }, { status: 404 });
+  return mockProblem(404, { error: message });
 }
 
 /**
@@ -315,7 +367,7 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/schedules/task`, async ({ request }) => {
     const body = (await request.json()) as CreateTaskScheduleRequest;
     if (typeof body.name !== "string" || body.name.trim() === "") {
-      return HttpResponse.json({ error: "name must be a non-empty string" }, { status: 400 });
+      return mockProblem(400, { error: "name must be a non-empty string" });
     }
     if (
       body.target === undefined ||
@@ -323,10 +375,7 @@ export const handlers = [
       typeof body.target.agent !== "string" ||
       typeof body.target.brief !== "string"
     ) {
-      return HttpResponse.json(
-        { error: "target must be { agent, brief, details?, runtime? }" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "target must be { agent, brief, details?, runtime? }" });
     }
     if (
       body.trigger === undefined ||
@@ -335,10 +384,7 @@ export const handlers = [
       typeof body.trigger.expr !== "string" ||
       typeof body.trigger.tz !== "string"
     ) {
-      return HttpResponse.json(
-        { error: "trigger must be { kind: 'cron', expr, tz }" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "trigger must be { kind: 'cron', expr, tz }" });
     }
     const id = `sched-${cryptoRandom8()}`;
     const now = new Date().toISOString();
@@ -370,7 +416,7 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/schedules/workflow`, async ({ request }) => {
     const body = (await request.json()) as CreateWorkflowScheduleRequest;
     if (typeof body.name !== "string" || body.name.trim() === "") {
-      return HttpResponse.json({ error: "name must be a non-empty string" }, { status: 400 });
+      return mockProblem(400, { error: "name must be a non-empty string" });
     }
     if (
       body.target === undefined ||
@@ -378,10 +424,7 @@ export const handlers = [
       typeof body.target.coordinatorAgent !== "string" ||
       typeof body.target.brief !== "string"
     ) {
-      return HttpResponse.json(
-        { error: "target must be { coordinatorAgent, brief, details? }" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "target must be { coordinatorAgent, brief, details? }" });
     }
     if (
       body.trigger === undefined ||
@@ -390,10 +433,7 @@ export const handlers = [
       typeof body.trigger.expr !== "string" ||
       typeof body.trigger.tz !== "string"
     ) {
-      return HttpResponse.json(
-        { error: "trigger must be { kind: 'cron', expr, tz }" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "trigger must be { kind: 'cron', expr, tz }" });
     }
     const id = `sched-${cryptoRandom8()}`;
     const now = new Date().toISOString();
@@ -431,7 +471,7 @@ export const handlers = [
     const expr = u.searchParams.get("expr") ?? "";
     const tz = u.searchParams.get("tz") ?? "";
     if (!expr || !tz) {
-      return HttpResponse.json({ error: "expr+tz required" }, { status: 400 });
+      return mockProblem(400, { error: "expr+tz required" });
     }
     const rawN = u.searchParams.get("n");
     const n = Math.min(100, Math.max(1, Number.parseInt(rawN ?? "5", 10) || 5));
@@ -639,13 +679,10 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/workflows`, async ({ request }) => {
     const body = (await request.json()) as CreateWorkflowRequest;
     if (typeof body.brief !== "string" || body.brief.trim() === "") {
-      return HttpResponse.json({ error: "brief must be a non-empty string" }, { status: 400 });
+      return mockProblem(400, { error: "brief must be a non-empty string" });
     }
     if (typeof body.coordinatorAgent !== "string" || body.coordinatorAgent.trim() === "") {
-      return HttpResponse.json(
-        { error: "coordinatorAgent must be a non-empty agent FQN" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "coordinatorAgent must be a non-empty agent FQN" });
     }
     const id = `wf-${cryptoRandom8()}`;
     const now = new Date().toISOString();
@@ -698,10 +735,9 @@ export const handlers = [
     if (idx === -1) return notFound("workflow not found");
     const current = workflowsState[idx]!;
     if (current.status !== "running") {
-      return HttpResponse.json(
-        { error: `workflow is already ${current.status}; cancel is a no-op` },
-        { status: 409 },
-      );
+      return mockProblem(409, {
+        error: `workflow is already ${current.status}; cancel is a no-op`,
+      });
     }
     // Wire shape: `{ cancellation: { kind?: 'user', message } }`. The
     // mock parses the message into the persisted `cancellation`
@@ -751,10 +787,10 @@ export const handlers = [
     try {
       decoded = decodeURIComponent(encodedPath);
     } catch {
-      return HttpResponse.json({ error: "bad encoding" }, { status: 400 });
+      return mockProblem(400, { error: "bad encoding" });
     }
     if (decoded.includes("..") || decoded.includes("\0")) {
-      return HttpResponse.json({ error: "traversal" }, { status: 400 });
+      return mockProblem(400, { error: "traversal" });
     }
     // Designer mode serves a tiny stub blob keyed on extension so
     // the Artifacts tab can render markdown / image / generic
@@ -774,7 +810,7 @@ export const handlers = [
       }
       return false;
     });
-    if (!exists) return HttpResponse.json({ error: "artifact not found" }, { status: 404 });
+    if (!exists) return mockProblem(404, { error: "artifact not found" });
     const ext = decoded.slice(decoded.lastIndexOf(".") + 1).toLowerCase();
     if (ext === "md") {
       return new HttpResponse(
@@ -812,16 +848,10 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/tasks`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     if (typeof body.agent !== "string" || body.agent.trim() === "") {
-      return HttpResponse.json(
-        { error: "agent must be a non-empty string", code: "VALIDATION" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "agent must be a non-empty string", code: "VALIDATION" });
     }
     if (typeof body.brief !== "string" || body.brief.trim() === "") {
-      return HttpResponse.json(
-        { error: "brief must be a non-empty string", code: "VALIDATION" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "brief must be a non-empty string", code: "VALIDATION" });
     }
     const now = new Date().toISOString();
     const id = `${now.slice(0, 10).replace(/-/g, "")}-${cryptoRandom8()}`;
@@ -848,10 +878,10 @@ export const handlers = [
     const task = store.tasks.find((t) => t.id === params.taskId);
     if (!task) return notFound("task not found");
     if (task.status !== "running") {
-      return HttpResponse.json(
-        { error: `task is already ${task.status}`, code: "InvalidTransition" },
-        { status: 409 },
-      );
+      return mockProblem(409, {
+        error: `task is already ${task.status}`,
+        code: "InvalidTransition",
+      });
     }
     const now = new Date().toISOString();
     task.status = "cancelled";
@@ -864,10 +894,7 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/sessions`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     if (typeof body.agent !== "string" || body.agent.trim() === "") {
-      return HttpResponse.json(
-        { error: "agent must be a non-empty string", code: "VALIDATION" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "agent must be a non-empty string", code: "VALIDATION" });
     }
     const now = new Date().toISOString();
     const id = `sess-${cryptoRandom8()}`;
@@ -891,10 +918,7 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/catalog/agents`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     if (typeof body.origin !== "string" || body.origin.trim() === "") {
-      return HttpResponse.json(
-        { error: "origin must be a non-empty string", code: "VALIDATION" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "origin must be a non-empty string", code: "VALIDATION" });
     }
     const origin = (body.origin as string).trim();
     const fqn = deriveFqnFromOrigin(origin, "agent");
@@ -931,10 +955,7 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/catalog/skills`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     if (typeof body.origin !== "string" || body.origin.trim() === "") {
-      return HttpResponse.json(
-        { error: "origin must be a non-empty string", code: "VALIDATION" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "origin must be a non-empty string", code: "VALIDATION" });
     }
     const origin = (body.origin as string).trim();
     const fqn = deriveFqnFromOrigin(origin, "skill");
@@ -970,10 +991,7 @@ export const handlers = [
   http.post(`/api/workspaces/${W}/catalog/mcps`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     if (typeof body.origin !== "string" || body.origin.trim() === "") {
-      return HttpResponse.json(
-        { error: "origin must be a non-empty string", code: "VALIDATION" },
-        { status: 400 },
-      );
+      return mockProblem(400, { error: "origin must be a non-empty string", code: "VALIDATION" });
     }
     const origin = (body.origin as string).trim();
     const fqn = deriveFqnFromOrigin(origin, "mcp");

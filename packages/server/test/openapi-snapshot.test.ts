@@ -18,8 +18,8 @@ import type { Application, WorkspaceContext } from "@glyphs-ai/api";
 import {
   catalogRoutes,
   configRoutes,
+  finalizeOpenApiDoc,
   healthRoutes,
-  injectWorkspaceIdParam,
   runtimesRoutes,
   scheduledTasksRoutes,
   scheduledWorkflowsRoutes,
@@ -141,7 +141,7 @@ function buildOpenApiAppForTest(): OpenAPIHono {
 describe("openapi spec", () => {
   it("assembled /api/openapi.json matches the committed snapshot", () => {
     const app = buildOpenApiAppForTest();
-    const doc = injectWorkspaceIdParam(
+    const doc = finalizeOpenApiDoc(
       app.getOpenAPI31Document({
         openapi: "3.1.0",
         info: { title: "@glyphs-ai/server", version: "0.0.0" },
@@ -165,7 +165,7 @@ describe("openapi spec", () => {
     expect(doc.openapi).toBe("3.1.0");
     expect(doc.paths["/api/health"]).toBeDefined();
     // The mount-level workspace `id` is injected into every nested
-    // operation's parameters (see `injectWorkspaceIdParam`).
+    // operation's parameters (see `finalizeOpenApiDoc`).
     const nested = doc.paths["/api/workspaces/{id}/workflows"]?.get;
     expect(nested?.parameters?.some((p) => p.name === "id" && p.in === "path")).toBe(true);
   });

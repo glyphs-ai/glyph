@@ -511,7 +511,7 @@ describe("tasksRoutes", () => {
     expect(res.status).toBe(409);
     const body = await jsonBody(res);
     expect(body.code).toBe("EntryNotReady");
-    expect(body.error).toContain("not ready");
+    expect(body.detail).toContain("not ready");
     // The structured reason is what lets the dashboard render the
     // right CTA (here: Acknowledge prereqs) without string parsing.
     expect(body.agent).toBe("public/writer");
@@ -735,7 +735,7 @@ describe("tasksRoutes", () => {
       expect(res.status).toBe(400);
       const body = await jsonBody(res);
       expect(body.code).toBe("BadRequest");
-      expect(body.error).toContain("mutually exclusive");
+      expect(body.detail).toContain("mutually exclusive");
     });
 
     // Field-level faults (bad cursors / out-of-range limit) are rejected by
@@ -921,9 +921,9 @@ describe("tasksRoutes", () => {
       // Structured envelope so the dashboard branches on code (the
       // 409 contract pinned by `error-response-contract.test.ts`).
       expect(body.code).toBe("InvalidTransition");
-      expect(body.status).toBe("success");
+      expect(body.fromStatus).toBe("success");
       expect(body.transition).toBe("cancel");
-      expect(typeof body.error).toBe("string");
+      expect(typeof body.detail).toBe("string");
     });
 
     it("503 when the manager is shutting down", async () => {
@@ -955,9 +955,9 @@ describe("tasksRoutes", () => {
       // transition discriminator differs so the dashboard can branch
       // its 409 handler typed.
       expect(body.code).toBe("InvalidTransition");
-      expect(body.status).toBe("running");
+      expect(body.fromStatus).toBe("running");
       expect(body.transition).toBe("delete");
-      expect(typeof body.error).toBe("string");
+      expect(typeof body.detail).toBe("string");
     });
   });
 
@@ -1051,11 +1051,11 @@ describe("tasksRoutes", () => {
   //
   // Error classes not recognised by the route policy (for example a
   // bare runtime-adapter `Error`) still return the anti-leakage
-  // `{ error: "internal error" }` body, but also emit a structured log
+  // `{ detail: "internal error" }` body, but also emit a structured log
   // line so the operator can `jq` for "unmapped" in
   // <glyphHome>/logs/server-*.log. Tests below pin both halves:
   //
-  //   - the wire body is still `{ error: "internal error" }`
+  //   - the wire body is still `{ detail: "internal error" }`
   //   - the log carries the message suffix "unmapped error fell
   //     through to 400" plus the underlying error's `name` and
   //     `message` (so a future grep doesn't require parsing the
@@ -1098,7 +1098,7 @@ describe("tasksRoutes", () => {
       const res = await app.request("/");
       expect(res.status).toBe(500);
       const body = await jsonBody(res);
-      expect(body.error).toBe("internal error");
+      expect(body.detail).toBe("internal error");
 
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
       expect(fault).toBeDefined();
@@ -1128,7 +1128,7 @@ describe("tasksRoutes", () => {
       // Wire body unchanged — SAFE_ERROR_NAMES whitelist still flattens.
       expect(res.status).toBe(500);
       const body = await jsonBody(res);
-      expect(body.error).toBe("internal error");
+      expect(body.detail).toBe("internal error");
 
       // Server log gained a structured entry the operator can grep for.
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
@@ -1241,7 +1241,7 @@ describe("tasksRoutes", () => {
       const res = await app.request(`/${sampleTask.id}/artifact?path=out.txt`);
       expect(res.status).toBe(500);
       const body = await jsonBody(res);
-      expect(body.error).toBe("internal error");
+      expect(body.detail).toBe("internal error");
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
       expect(fault).toBeDefined();
       expect(fault?.msg).toBe("tasks.artifact: 5xx fault");
@@ -1267,7 +1267,7 @@ describe("tasksRoutes", () => {
       const res = await app.request(`/${sampleTask.id}/activity/stream`);
       expect(res.status).toBe(500);
       const body = await jsonBody(res);
-      expect(body.error).toBe("internal error");
+      expect(body.detail).toBe("internal error");
       const fault = cap.entries.find((e) => e.msg?.includes("5xx fault"));
       expect(fault).toBeDefined();
       expect(fault?.msg).toBe("tasks.activity.stream: 5xx fault");

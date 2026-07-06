@@ -8,8 +8,15 @@
  * client is inlined — so it is safe to bundle for the browser.
  */
 
-// Thin ergonomics layer we own: the normalised HTTP error type + guard.
-export { GlyphError, type GlyphIssue, isGlyphError } from "./errors.js";
+// Thin ergonomics layer we own: the normalised HTTP error type + guards.
+export {
+  GlyphError,
+  type GlyphIssue,
+  isGlyphError,
+  isProblem,
+  type Problem,
+  parseProblem,
+} from "./errors.js";
 
 // The generated barrel omits the default client instance (it lives in
 // `client.gen`); re-export it so consumers can point the SDK at a base

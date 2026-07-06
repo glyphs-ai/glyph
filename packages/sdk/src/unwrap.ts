@@ -7,7 +7,7 @@
  * every consumer treats failures identically.
  */
 
-import { GlyphError, type GlyphIssue } from "./errors.js";
+import { GlyphError, type GlyphIssue, isProblem } from "./errors.js";
 
 /** The subset of hey-api's result tuple these helpers depend on. */
 export interface ResultLike<T> {
@@ -18,16 +18,20 @@ export interface ResultLike<T> {
   readonly response?: Response;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 function toIssues(raw: unknown): ReadonlyArray<GlyphIssue> | undefined {
   if (!Array.isArray(raw)) return undefined;
   const issues: GlyphIssue[] = [];
   for (const item of raw) {
-    if (isRecord(item) && typeof item.path === "string" && typeof item.message === "string") {
-      issues.push({ path: item.path, message: item.message });
+    if (
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as { path?: unknown }).path === "string" &&
+      typeof (item as { message?: unknown }).message === "string"
+    ) {
+      issues.push({
+        path: (item as { path: string }).path,
+        message: (item as { message: string }).message,
+      });
     }
   }
   return issues.length > 0 ? issues : undefined;
@@ -35,20 +39,20 @@ function toIssues(raw: unknown): ReadonlyArray<GlyphIssue> | undefined {
 
 /**
  * Normalise a non-2xx response into a `GlyphError`:
- *   - `{ error, code: "ValidationError", issues }` → keeps code + issues,
- *   - `{ error, code? }`                           → keeps the message (+ code),
+ *   - an RFC 9457 Problem body → message from `detail`, plus `code`,
+ *     `issues` (for a `ValidationError`), and the decoded `body`,
  *   - anything else (non-JSON / unrecognised body) → falls back to the
  *     response's status text.
  */
 function toGlyphError(error: unknown, response: Response): GlyphError {
-  if (isRecord(error) && typeof error.error === "string") {
-    const code = typeof error.code === "string" ? error.code : undefined;
+  if (isProblem(error)) {
     return new GlyphError({
       status: response.status,
-      code,
-      message: error.error,
-      issues: code === "ValidationError" ? toIssues(error.issues) : undefined,
+      code: error.code,
+      message: error.detail,
+      issues: error.code === "ValidationError" ? toIssues(error.issues) : undefined,
       response,
+      body: error,
     });
   }
   return new GlyphError({

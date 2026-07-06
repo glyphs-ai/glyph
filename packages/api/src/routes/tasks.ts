@@ -18,7 +18,7 @@ import {
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { respondTaskError } from "../_error-policies/tasks.js";
-import { logEvent } from "../_http-errors.js";
+import { logEvent, problemResponse } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
 import { contentTypeFor, streamFileAsResponse } from "./_artifact-stream.js";
 
@@ -199,7 +199,10 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       if (createdSince !== undefined) {
         const t = Date.parse(createdSince);
         if (Number.isNaN(t)) {
-          return c.json({ error: "createdSince must be an ISO 8601 timestamp" }, 400);
+          return problemResponse(c, 400, {
+            code: "BadRequest",
+            detail: "createdSince must be an ISO 8601 timestamp",
+          });
         }
         createdSinceIso = new Date(t).toISOString();
       }
@@ -328,7 +331,8 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       const res = await resolve(c).getTask.execute({ id: id as TaskId });
       return res.match(
         (task) => {
-          if (task === null) return c.json({ error: "not found", code: "TaskNotFound" }, 404);
+          if (task === null)
+            return problemResponse(c, 404, { code: "TaskNotFound", detail: "not found" });
           return c.json(task);
         },
         (err) => respondTaskError(c, err, { route: "tasks.get", meta: { taskId: id } }),
@@ -431,7 +435,10 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
         relPath.includes("\\") ||
         relPath.split("/").includes("..")
       ) {
-        return c.json({ error: "artifact path must be a relative path", code: "BadRequest" }, 400);
+        return problemResponse(c, 400, {
+          code: "BadRequest",
+          detail: "artifact path must be a relative path",
+        });
       }
 
       const res = await resolve(c).resolveArtifactPath.execute({ id: id as TaskId, relPath });
@@ -443,15 +450,15 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       }
       const absPath = res.value;
       if (absPath === null) {
-        return c.json({ error: "artifact not found", code: "NotFound" }, 404);
+        return problemResponse(c, 404, { code: "NotFound", detail: "artifact not found" });
       }
       try {
         const st = await stat(absPath);
         if (!st.isFile()) {
-          return c.json({ error: "artifact not found", code: "NotFound" }, 404);
+          return problemResponse(c, 404, { code: "NotFound", detail: "artifact not found" });
         }
       } catch {
-        return c.json({ error: "artifact not found", code: "NotFound" }, 404);
+        return problemResponse(c, 404, { code: "NotFound", detail: "artifact not found" });
       }
 
       return streamFileAsResponse(absPath, {
@@ -492,10 +499,10 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       // to the runtime. (Malformed/out-of-range values are already rejected
       // upstream by the shared query schema as a ValidationError.)
       if (before !== undefined && after !== undefined) {
-        return c.json(
-          { error: "before and after are mutually exclusive", code: "BadRequest" },
-          400,
-        );
+        return problemResponse(c, 400, {
+          code: "BadRequest",
+          detail: "before and after are mutually exclusive",
+        });
       }
 
       const res = await resolve(c).getTaskActivity.execute({
@@ -507,10 +514,10 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       return res.match(
         (payload) => {
           if (payload === null) {
-            return c.json(
-              { error: "no activity is available for this task", code: "NoEventsYet" },
-              404,
-            );
+            return problemResponse(c, 404, {
+              code: "NoEventsYet",
+              detail: "no activity is available for this task",
+            });
           }
           return c.json(TaskActivityResponseSchema.parse(payload));
         },
@@ -558,10 +565,10 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       }
       const stream = res.value;
       if (stream === null) {
-        return c.json(
-          { error: "no streaming activity available for this task", code: "NoEventsYet" },
-          404,
-        );
+        return problemResponse(c, 404, {
+          code: "NoEventsYet",
+          detail: "no streaming activity available for this task",
+        });
       }
 
       const encoder = new TextEncoder();

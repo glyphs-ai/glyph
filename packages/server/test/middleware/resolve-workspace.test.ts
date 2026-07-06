@@ -62,7 +62,7 @@ describe("resolveWorkspaceMiddleware", () => {
 
     const res = await app.request("/ws-x/probe");
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string; code: string };
+    const body = (await res.json()) as { detail: string; code: string };
     expect(body.code).toBe("WorkspaceNotFound");
     expect(application.getContext).not.toHaveBeenCalled();
   });
@@ -155,11 +155,11 @@ describe("resolveWorkspaceMiddleware", () => {
     const res = await app.request("/ws-1/probe");
     expect(res.status).toBe(503);
     expect(res.headers.get("Retry-After")).toBe("5");
-    const body = (await res.json()) as { error: string; code: string };
+    const body = (await res.json()) as { detail: string; code: string };
     expect(body.code).toBe("WorkspaceLoadError");
     // Body MUST NOT echo the host path that the underlying error carried.
-    expect(body.error).not.toContain("/home/");
-    expect(body.error).toMatch(/workspace "ws-1" failed to load/);
+    expect(body.detail).not.toContain("/home/");
+    expect(body.detail).toMatch(/workspace "ws-1" failed to load/);
 
     // The wrapped error must be logged with the cause so operators can triage.
     const logged = cap.entries.find((e) => e.msg === "workspace cold-load failed");

@@ -33,6 +33,7 @@ import {
   workflowRm,
   workflowShow,
 } from "../../src/commands/workflow.js";
+import { problemBody } from "../_helpers/problem.js";
 import { runCli } from "../_helpers/run-cli.js";
 
 const SERVER_URL = "http://stub.local";
@@ -167,7 +168,7 @@ describe("workflowList — server error envelope", () => {
     stubFetchMulti([
       {
         status: 400,
-        body: JSON.stringify({ error: "bad status", code: "WorkflowError" }),
+        body: problemBody(400, "WorkflowError", "bad status"),
       },
     ]);
     const r = await workflowList(commonOpts());
@@ -324,10 +325,11 @@ describe("workflowCreate — server error envelope", () => {
     stubFetchMulti([
       {
         status: 400,
-        body: JSON.stringify({
-          error: "coordinatorAgent must declare official/workflow-coordination",
-          code: "CoordinatorAgentInvalidError",
-        }),
+        body: problemBody(
+          400,
+          "CoordinatorAgentInvalidError",
+          "coordinatorAgent must declare official/workflow-coordination",
+        ),
       },
     ]);
     const r = await workflowCreate({
@@ -455,10 +457,7 @@ describe("workflowShow — server error envelope", () => {
     stubFetchMulti([
       {
         status: 404,
-        body: JSON.stringify({
-          error: `workflow "${WFID}" not found`,
-          code: "WorkflowNotFoundError",
-        }),
+        body: problemBody(404, "WorkflowNotFoundError", `workflow "${WFID}" not found`),
       },
     ]);
     const r = await workflowShow(WFID, { ...commonOpts() });
@@ -529,10 +528,11 @@ describe("workflowNodeShow — server error envelope", () => {
     stubFetchMulti([
       {
         status: 404,
-        body: JSON.stringify({
-          error: `node "${NODE_SHOW_NID}" not found in workflow "${WFID}"`,
-          code: "WorkflowNodeNotFoundError",
-        }),
+        body: problemBody(
+          404,
+          "WorkflowNodeNotFoundError",
+          `node "${NODE_SHOW_NID}" not found in workflow "${WFID}"`,
+        ),
       },
     ]);
     const r = await workflowNodeShow(WFID, NODE_SHOW_NID, { ...commonOpts() });
@@ -631,10 +631,7 @@ describe("workflowDag — server error envelope", () => {
     stubFetchMulti([
       {
         status: 404,
-        body: JSON.stringify({
-          error: `workflow "${WFID}" not found`,
-          code: "WorkflowNotFoundError",
-        }),
+        body: problemBody(404, "WorkflowNotFoundError", `workflow "${WFID}" not found`),
       },
     ]);
     const r = await workflowDag(WFID, { ...commonOpts() });
@@ -717,10 +714,7 @@ describe("workflowCancel — server error envelope", () => {
     stubFetchMulti([
       {
         status: 409,
-        body: JSON.stringify({
-          error: "workflow already terminal",
-          code: "InvalidTransition",
-        }),
+        body: problemBody(409, "InvalidTransition", "workflow already terminal"),
       },
     ]);
     const r = await workflowCancel(WFID, { ...commonOpts() });
@@ -769,11 +763,12 @@ describe("workflowRm — server error envelope", () => {
     stubFetchMulti([
       {
         status: 409,
-        body: JSON.stringify({
-          error: "workflow must be terminal before delete",
-          code: "WorkflowDeleteRequiresTerminalError",
-          transition: "delete",
-        }),
+        body: problemBody(
+          409,
+          "WorkflowDeleteRequiresTerminalError",
+          "workflow must be terminal before delete",
+          { transition: "delete" },
+        ),
       },
     ]);
     const r = await workflowRm(WFID, { ...commonOpts() });
@@ -998,10 +993,7 @@ describe("workflowAddNode", () => {
     stubFetchMulti([
       {
         status: 409,
-        body: JSON.stringify({
-          error: "workflow already terminal",
-          code: "WorkflowAlreadyTerminalError",
-        }),
+        body: problemBody(409, "WorkflowAlreadyTerminalError", "workflow already terminal"),
       },
     ]);
     const r = await workflowAddNode(WFID, {
@@ -1093,7 +1085,7 @@ describe("workflowCancelNode", () => {
     stubFetchMulti([
       {
         status: 409,
-        body: JSON.stringify({ error: "not mutable", code: "WorkflowNodeNotMutableError" }),
+        body: problemBody(409, "WorkflowNodeNotMutableError", "not mutable"),
       },
     ]);
     const r = await workflowCancelNode(WFID, NID, { ...commonOpts() });
