@@ -358,8 +358,10 @@ describe("workflowsRoutes — create", () => {
   // inside createWorkflow MUST map to a structured 4xx with a
   // field-pin envelope, never to a 500. The dashboard renders the
   // body inline next to the coord-agent select via the `field`
-  // pointer.
-  it("POST / maps WorkflowCoordAgentNotCapableError to a structured 400 (never 500)", async () => {
+  // pointer. 422 (not 400): the payload is well-formed but the
+  // coordinator agent is semantically incapable — same status as the
+  // parent NodeSpecError row this cause unwraps from.
+  it("POST / maps WorkflowCoordAgentNotCapableError to a structured 422 (never 500)", async () => {
     const createWorkflow = {
       execute: vi.fn(() =>
         errAsync({
@@ -379,7 +381,7 @@ describe("workflowsRoutes — create", () => {
         coordinatorAgent: "official/engineer",
       }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     // Regression: a substrate-thrown capability error must never
     // reach the framework's generic 500 handler.
     expect(res.status).not.toBe(500);
@@ -394,9 +396,9 @@ describe("workflowsRoutes — create", () => {
 
   // Sibling of the capability-error test above. The coord runner's
   // strict-shape guards (non-object spec / missing-or-empty `agent` /
-  // unknown key) return typed 400s via the workflows error policy and
+  // unknown key) return typed 422s via the workflows error policy and
   // SAFE_ERROR_NAMES allow-list, so the message survives.
-  it("POST / maps WorkflowCoordSpecError to a 400 (never 500)", async () => {
+  it("POST / maps WorkflowCoordSpecError to a 422 (never 500)", async () => {
     const createWorkflow = {
       execute: vi.fn(() =>
         errAsync({
@@ -416,7 +418,7 @@ describe("workflowsRoutes — create", () => {
         coordinatorAgent: "official/engineer",
       }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(res.status).not.toBe(500);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("WorkflowCoordSpecError");

@@ -107,7 +107,7 @@ describe("respondError contract — cross-domain status preservation", () => {
   // different carriers. Per-domain policies keep those routes
   // independent.
 
-  it("task route's AgentNotFound union detail → 400", async () => {
+  it("task route's AgentNotFound union detail → 404", async () => {
     const m = stubTaskModule({
       dispatchTask: { execute: vi.fn(() => errAsync({ type: "AgentNotFound", agent: "ghost" })) },
     });
@@ -116,11 +116,11 @@ describe("respondError contract — cross-domain status preservation", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ agent: "ghost", brief: "go" }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
     const body = await jsonBody(res);
     expect(body).toEqual(
       toProblem({
-        status: 400,
+        status: 404,
         title: "Agent not found",
         detail: "agent not found",
         code: "AgentNotFound",
@@ -128,12 +128,12 @@ describe("respondError contract — cross-domain status preservation", () => {
     );
   });
 
-  it("schedule route's AgentNotFound union detail (via kind handler) → 400", async () => {
+  it("schedule route's AgentNotFound union detail (via kind handler) → 404", async () => {
     // The schedule pkg is kind-agnostic and does not own an
     // agent-not-found class. The task-kind handler (in
     // `packages/api/src/wiring/schedule-task-handler.ts`) raises
     // a raw AgentNotFound atom on catalog miss, and the schedules policy
-    // maps that code to 400 (one row covers
+    // maps that code to 404 (one row covers
     // both the validation and dispatch paths).
     const create = vi.fn(() =>
       errAsync({ type: "AgentNotFound", agent: "ghost" } as AgentNotFound),
@@ -148,7 +148,7 @@ describe("respondError contract — cross-domain status preservation", () => {
         trigger: { kind: "cron", expr: "* * * * *", tz: "UTC" },
       }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
     const body = await jsonBody(res);
     expect(body.code).toBe("AgentNotFound");
   });
@@ -207,7 +207,7 @@ describe("respondError contract — unmapped-fault observability gap-closes", ()
     expect(fault?.msg).toBe("workspaces.create: 5xx fault");
   });
 
-  it("scheduled-tasks unmapped error → 400 + log line (sanity check)", async () => {
+  it("scheduled-tasks unmapped error → 503 + log line (sanity check)", async () => {
     // Confirms the route still uses tasksErrorPolicy and the
     // pre-existing scheduled-tasks.list log message is preserved.
     const m = stubTaskModule({
@@ -224,11 +224,11 @@ describe("respondError contract — unmapped-fault observability gap-closes", ()
       );
     });
     const res = await app.request("/");
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     const body = await jsonBody(res);
     expect(body).toEqual(
       toProblem({
-        status: 500,
+        status: 503,
         title: "Internal error",
         detail: "internal error",
         code: "DatabaseUnavailable",
@@ -321,7 +321,7 @@ describe("respondError contract — union-stable body", () => {
 });
 
 describe("respondError contract — 5xx fault log separation", () => {
-  it("task 5xx fault → 500 + '5xx fault' log, NOT 'unmapped'", async () => {
+  it("task 5xx fault → 503 + '5xx fault' log, NOT 'unmapped'", async () => {
     // Mapped task 5xx faults stay on the "5xx fault" message, not
     // accidentally relabeled as "unmapped".
     const m = stubTaskModule({
@@ -342,11 +342,11 @@ describe("respondError contract — 5xx fault log separation", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ agent: "writer", brief: "go" }),
     });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     const body = await jsonBody(res);
     expect(body).toEqual(
       toProblem({
-        status: 500,
+        status: 503,
         title: "Internal error",
         detail: "internal error",
         code: "DatabaseUnavailable",

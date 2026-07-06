@@ -80,37 +80,37 @@ const WORKFLOW_ATOM_TABLE = {
     detail: (err) => `workflow node not found: ${err.nodeId}`,
   },
   NodeSpecError: {
-    status: 400,
+    status: 422,
     title: "Node spec invalid",
     detail: (err) => err.reason,
   },
   EmptyParents: {
-    status: 400,
+    status: 422,
     title: "Node must have a parent",
     detail: () => "node must have at least one parent",
   },
   WorkflowSubgraphEmpty: {
-    status: 400,
+    status: 422,
     title: "Subgraph empty",
     detail: () => "subgraph must contain at least one node",
   },
   WorkflowSubgraphTempIdInvalid: {
-    status: 400,
+    status: 422,
     title: "Subgraph temp id invalid",
     detail: (err) => err.reason,
   },
   WorkflowSubgraphTempParentless: {
-    status: 400,
+    status: 422,
     title: "Subgraph temp node parentless",
     detail: (err) => `temp node has no parent: ${err.tempId}`,
   },
   WorkflowSubgraphNodeRefUnresolved: {
-    status: 400,
+    status: 422,
     title: "Subgraph node ref unresolved",
     detail: (err) => `subgraph node ref unresolved: ${err.refValue}`,
   },
   HumanNodeResponseInvalid: {
-    status: 400,
+    status: 422,
     title: "Human node response invalid",
     detail: (err) => err.reason,
   },
@@ -152,12 +152,12 @@ const WORKFLOW_ATOM_TABLE = {
       `parent ${err.parentNodeId} is ${err.parentStatus}; cannot attach ${err.nodeKind}`,
   },
   WorkflowSubgraphCyclic: {
-    status: 409,
+    status: 422,
     title: "Subgraph cyclic",
     detail: () => "subgraph would create a cycle",
   },
   WorkflowSubgraphMultipleCoordTemps: {
-    status: 409,
+    status: 422,
     title: "Subgraph has multiple coordinator temps",
     detail: () => "subgraph contains multiple coordinator temp nodes",
   },
@@ -170,19 +170,26 @@ const WORKFLOW_ATOM_TABLE = {
   WorkflowEnumValueCorruption: { status: 500, title: "Internal error", detail: () => INTERNAL },
   WorkflowNodeKindShape: { status: 500, title: "Internal error", detail: () => INTERNAL },
   WorkflowNodeKindCorruption: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  DatabaseUnavailable: { status: 500, title: "Internal error", detail: () => INTERNAL },
-  WorkflowDirReservationFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  DatabaseUnavailable: { status: 503, title: "Internal error", detail: () => INTERNAL },
+  WorkflowDirReservationFailed: { status: 503, title: "Internal error", detail: () => INTERNAL },
 } satisfies DomainProblemTable<WorkflowRouteError>;
 
 /**
  * Rows for the spec-class causes a `NodeSpecError` can wrap. Keyed by the
- * class `name` (the wire `code`). `WorkflowWorkerNotInCoordMenuError` stays
- * opaque — its message enumerates the coordinator's dispatch menu (internal
- * topology) — but keeps its `name` as `code` so a client can still branch.
+ * class `name` (the wire `code`). These are semantic spec-validation
+ * failures — the payload is well-formed but the agent spec is invalid or
+ * the coordinator agent lacks the required capability — so they carry the
+ * same 422 as the parent `NodeSpecError` row, and a client sees one status
+ * for "bad node spec" whether or not a typed cause is attached.
+ * `WorkflowWorkerNotInCoordMenuError` is the exception: its message would
+ * enumerate the coordinator's dispatch menu (internal topology), so it
+ * stays opaque (`detail = INTERNAL`) and keeps its existing status rather
+ * than presenting as a caller-fixable 422 — but still exposes its `name`
+ * as `code` so a client can branch.
  */
 const SPEC_CAUSE_TABLE: Readonly<Record<string, ProblemDef>> = {
   WorkflowCoordAgentNotCapableError: {
-    status: 400,
+    status: 422,
     title: "Coordinator agent not capable",
     detail: (err) => (err as unknown as WorkflowCoordAgentNotCapableError).message,
     extension: (err) => ({
@@ -196,17 +203,17 @@ const SPEC_CAUSE_TABLE: Readonly<Record<string, ProblemDef>> = {
     detail: () => INTERNAL,
   },
   WorkflowCoordSpecError: {
-    status: 400,
+    status: 422,
     title: "Coordinator spec invalid",
     detail: (err) => (err as unknown as Error).message,
   },
   WorkflowWorkerSpecError: {
-    status: 400,
+    status: 422,
     title: "Worker spec invalid",
     detail: (err) => (err as unknown as Error).message,
   },
   WorkflowHumanSpecError: {
-    status: 400,
+    status: 422,
     title: "Human node spec invalid",
     detail: (err) => (err as unknown as Error).message,
   },

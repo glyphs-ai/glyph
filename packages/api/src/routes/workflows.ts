@@ -150,7 +150,7 @@ export function workflowsRoutes(
       responses: {
         200: jsonResponse(ListWorkflowsResponseSchema, "Workflows"),
         400: errorResponse("Malformed query"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -209,7 +209,11 @@ export function workflowsRoutes(
         201: jsonResponse(GetWorkflowResponseSchema, "Created workflow"),
         400: errorResponse("Malformed request body"),
         404: errorResponse("Coordinator agent not found"),
+        409: errorResponse("Workflow state conflict"),
+        422: errorResponse("Unprocessable entity"),
         500: errorResponse("Internal error"),
+        501: errorResponse("Runtime does not support tasks"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -250,6 +254,7 @@ export function workflowsRoutes(
         200: jsonResponse(GetWorkflowResponseSchema, "Workflow header"),
         404: errorResponse("Workflow not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -281,6 +286,7 @@ export function workflowsRoutes(
         200: jsonResponse(GetWorkflowDagResponseSchema, "DAG snapshot"),
         404: errorResponse("Workflow not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -315,6 +321,7 @@ export function workflowsRoutes(
         200: jsonResponse(GetWorkflowNodeResponseSchema, "Workflow node"),
         404: errorResponse("Workflow or node not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -358,6 +365,7 @@ export function workflowsRoutes(
         404: errorResponse("Workflow not found"),
         409: errorResponse("Workflow already terminal"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -539,7 +547,10 @@ export function workflowsRoutes(
         400: errorResponse("Malformed request body"),
         404: errorResponse("Workflow not found"),
         409: errorResponse("Workflow already terminal"),
+        422: errorResponse("Unprocessable entity"),
         500: errorResponse("Internal error"),
+        501: errorResponse("Runtime does not support tasks"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -581,6 +592,7 @@ export function workflowsRoutes(
         404: errorResponse("Workflow or node not found"),
         409: errorResponse("Node not mutable"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -631,6 +643,7 @@ export function workflowsRoutes(
         404: errorResponse("Workflow not found"),
         409: errorResponse("Workflow already terminal"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -709,6 +722,7 @@ export function workflowsRoutes(
         404: errorResponse("Workflow not found"),
         409: errorResponse("Workflow not terminal or has in-flight tasks"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -810,8 +824,9 @@ export function workflowsRoutes(
         200: jsonResponse(GetWorkflowNodeResponseSchema, "Updated node"),
         400: errorResponse("Malformed request body"),
         404: errorResponse("Workflow or node not found"),
-        409: errorResponse("Node not awaiting input"),
+        422: errorResponse("Unprocessable entity"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {

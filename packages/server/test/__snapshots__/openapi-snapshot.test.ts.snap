@@ -294,7 +294,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Registered workspaces",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -302,7 +302,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List registered workspaces",
@@ -399,6 +399,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Internal error",
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
         },
         "summary": "Create a workspace",
         "tags": [
@@ -431,7 +441,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Current workspace id (or null)",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -439,7 +449,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get the current workspace id",
@@ -511,7 +521,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Workspace not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -519,7 +529,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Set the current workspace",
@@ -544,7 +554,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           "204": {
             "description": "Deleted (no content)",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -552,7 +562,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete a workspace",
@@ -620,7 +630,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Workspace not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -628,7 +638,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a workspace",
@@ -725,7 +735,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Workspace not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -733,7 +743,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Rename a workspace",
@@ -1249,7 +1259,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed request body",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1257,7 +1267,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Agent not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Install an agent from an origin",
@@ -1643,7 +1663,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed request body",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1651,7 +1671,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Agent not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Preview an agent install",
@@ -1712,6 +1742,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Deleted",
           },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Agent not found",
+          },
           "409": {
             "content": {
               "application/problem+json": {
@@ -1722,7 +1762,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Agent still has dependents",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1730,7 +1770,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete an agent",
@@ -1987,7 +2027,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Agent not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1995,7 +2035,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get an agent with content",
@@ -2131,7 +2171,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Agent",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2139,7 +2179,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Agent not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Acknowledge an agent's prereqs",
@@ -2197,7 +2247,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Anchor content",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2205,7 +2255,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Agent not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Get an agent's anchor content",
@@ -2341,7 +2401,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Agent",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2349,7 +2409,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Agent not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Disable an agent",
@@ -2485,7 +2555,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Agent",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2493,7 +2563,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Agent not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Enable an agent",
@@ -2576,7 +2656,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "File not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2584,7 +2664,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List an agent's files, or read one file's bytes",
@@ -2891,16 +2971,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Plan token expired or already applied",
-          },
-          "500": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem",
-                },
-              },
-            },
-            "description": "Internal error",
           },
         },
         "summary": "Apply an agent sync",
@@ -3274,7 +3344,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Resolve manifest",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3282,7 +3352,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Agent not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Preview an agent sync",
@@ -3627,7 +3707,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed request body",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3635,7 +3715,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "MCP not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Install an MCP from an origin",
@@ -3696,6 +3786,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Deleted",
           },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "MCP not found",
+          },
           "409": {
             "content": {
               "application/problem+json": {
@@ -3706,7 +3806,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "MCP still has dependents",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3714,7 +3814,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete an MCP",
@@ -3800,7 +3900,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "MCP not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3808,7 +3908,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get an MCP with content",
@@ -4115,16 +4215,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Plan token expired or already applied",
-          },
-          "500": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem",
-                },
-              },
-            },
-            "description": "Internal error",
           },
         },
         "summary": "Apply an MCP sync",
@@ -4498,7 +4588,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Resolve manifest",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4506,7 +4596,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "MCP not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Preview an MCP sync",
@@ -5076,7 +5176,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed request body",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5084,7 +5184,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Skill not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Install a skill from an origin",
@@ -5470,7 +5580,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed request body",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5478,7 +5588,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Skill not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Preview a skill install",
@@ -5539,6 +5659,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Deleted",
           },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Skill not found",
+          },
           "409": {
             "content": {
               "application/problem+json": {
@@ -5549,7 +5679,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Skill still has dependents",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5557,7 +5687,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete a skill",
@@ -5796,7 +5926,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Skill not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5804,7 +5934,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a skill with content",
@@ -5926,7 +6056,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Skill",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5934,7 +6064,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Skill not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Acknowledge a skill's prereqs",
@@ -5992,7 +6132,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Anchor content",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6000,7 +6140,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Skill not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a skill's anchor content",
@@ -6083,7 +6233,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "File not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6091,7 +6241,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List a skill's files, or read one file's bytes",
@@ -6398,16 +6548,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Plan token expired or already applied",
-          },
-          "500": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem",
-                },
-              },
-            },
-            "description": "Internal error",
           },
         },
         "summary": "Apply a skill sync",
@@ -6781,7 +6921,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Resolve manifest",
           },
-          "500": {
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6789,7 +6929,17 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Skill not found",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Preview a skill sync",
@@ -7110,7 +7260,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed query",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7118,7 +7268,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List schedule-launched tasks",
@@ -7292,7 +7442,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Workflows",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7300,7 +7450,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List schedule-origin workflows",
@@ -7535,7 +7685,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed query",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7543,7 +7693,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List task schedules",
@@ -7749,6 +7899,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Internal error",
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
         },
         "summary": "Create a task schedule",
         "tags": [
@@ -7802,6 +7962,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Delete outcome",
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Invalid schedule id",
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -7831,6 +8001,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete a task schedule",
@@ -7949,6 +8129,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Task schedule",
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Invalid schedule id",
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -7959,7 +8149,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Schedule not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7967,7 +8157,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a task schedule",
@@ -8178,6 +8368,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Internal error",
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
         },
         "summary": "Patch a task schedule",
         "tags": [
@@ -8261,7 +8461,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Schedule not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8269,7 +8469,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Preview a task schedule's upcoming fires",
@@ -8317,6 +8517,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Dispatch id",
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Invalid schedule id",
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -8336,6 +8546,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Manually fire a task schedule",
@@ -8490,7 +8710,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed query",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8498,7 +8718,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List workflow schedules",
@@ -8694,16 +8914,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed request body",
           },
-          "404": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem",
-                },
-              },
-            },
-            "description": "Coordinator agent not found",
-          },
           "500": {
             "content": {
               "application/problem+json": {
@@ -8713,6 +8923,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Create a workflow schedule",
@@ -8767,6 +8987,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Delete outcome",
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Invalid schedule id",
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -8796,6 +9026,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete a workflow schedule",
@@ -8927,6 +9167,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Workflow schedule",
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Invalid schedule id",
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -8937,7 +9187,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Schedule not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8945,7 +9195,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a workflow schedule",
@@ -9163,6 +9413,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Internal error",
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
         },
         "summary": "Patch a workflow schedule",
         "tags": [
@@ -9246,7 +9506,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Schedule not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9254,7 +9514,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Preview a workflow schedule's upcoming fires",
@@ -9302,6 +9562,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Dispatch id",
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Invalid schedule id",
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -9321,6 +9591,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Manually fire a workflow schedule",
@@ -9447,7 +9727,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed query",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9455,7 +9735,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List sessions",
@@ -9576,6 +9856,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed request body",
           },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Agent not found",
+          },
           "500": {
             "content": {
               "application/problem+json": {
@@ -9585,6 +9875,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Create a session",
@@ -9625,6 +9925,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
           "204": {
             "description": "Deleted (no content)",
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Unknown runtime",
+          },
           "409": {
             "content": {
               "application/problem+json": {
@@ -9635,7 +9945,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Runtime state / workdir removal failed",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9643,7 +9953,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete a session",
@@ -9752,7 +10062,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Session not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9760,7 +10070,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a session",
@@ -10143,7 +10453,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed query",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10151,7 +10461,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List standalone tasks",
@@ -10398,6 +10708,36 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed request body",
           },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Agent not found",
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Task entry not ready",
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Unprocessable entity",
+          },
           "500": {
             "content": {
               "application/problem+json": {
@@ -10407,6 +10747,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "501": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Runtime does not support tasks",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Dispatch a task",
@@ -10646,7 +11006,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Missing or malformed query",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10654,7 +11014,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Find the latest task by (origin, originId)",
@@ -10724,6 +11084,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete a task",
@@ -10951,7 +11321,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Task not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10959,7 +11329,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a task",
@@ -11469,6 +11839,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Internal error",
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
         },
         "summary": "Get a task's activity timeline",
         "tags": [
@@ -11891,7 +12271,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Task or stream not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11899,7 +12279,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Stream a task's activity (SSE)",
@@ -11961,7 +12341,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Artifact not found",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11969,7 +12349,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "Download a task artifact",
@@ -12424,7 +12804,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Malformed query",
           },
-          "500": {
+          "503": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12432,7 +12812,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Internal error",
+            "description": "Service unavailable",
           },
         },
         "summary": "List workflows",
@@ -12640,6 +13020,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Coordinator agent not found",
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Workflow state conflict",
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Unprocessable entity",
+          },
           "500": {
             "content": {
               "application/problem+json": {
@@ -12649,6 +13049,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "501": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Runtime does not support tasks",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Create a workflow",
@@ -12721,6 +13141,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Delete a workflow",
@@ -12908,6 +13338,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a workflow header",
@@ -13349,6 +13789,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Internal error",
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
         },
         "summary": "Cancel a workflow",
         "tags": [
@@ -13637,6 +14087,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Internal error",
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
         },
         "summary": "Get the full DAG snapshot",
         "tags": [
@@ -13920,6 +14380,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Internal error",
           },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
         },
         "summary": "Finish a workflow",
         "tags": [
@@ -14043,6 +14513,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Get a single workflow node",
@@ -14177,6 +14657,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Cancel a worker node",
@@ -14329,7 +14819,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Workflow or node not found",
           },
-          "409": {
+          "422": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14337,7 +14827,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Node not awaiting input",
+            "description": "Unprocessable entity",
           },
           "500": {
             "content": {
@@ -14348,6 +14838,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Respond to a human node",
@@ -14589,6 +15089,16 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             },
             "description": "Workflow already terminal",
           },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Unprocessable entity",
+          },
           "500": {
             "content": {
               "application/problem+json": {
@@ -14598,6 +15108,26 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               },
             },
             "description": "Internal error",
+          },
+          "501": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Runtime does not support tasks",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
           },
         },
         "summary": "Add a subgraph batch",

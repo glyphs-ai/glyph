@@ -189,7 +189,7 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       responses: {
         200: jsonResponse(ListTasksResponseSchema, "Tasks"),
         400: errorResponse("Malformed query"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -252,7 +252,12 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       responses: {
         201: jsonResponse(DispatchTaskResponseSchema, "Dispatched task"),
         400: errorResponse("Malformed request body"),
+        404: errorResponse("Agent not found"),
+        409: errorResponse("Task entry not ready"),
+        422: errorResponse("Unprocessable entity"),
         500: errorResponse("Internal error"),
+        501: errorResponse("Runtime does not support tasks"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -300,7 +305,7 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
           "Latest task for the origin pair, or null",
         ),
         400: errorResponse("Missing or malformed query"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -323,7 +328,7 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       responses: {
         200: jsonResponse(GetTaskResponseSchema, "Task"),
         404: errorResponse("Task not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -355,6 +360,7 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
         404: errorResponse("Task not found"),
         409: errorResponse("Task is not terminal"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -420,7 +426,7 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
         200: errorResponse("Artifact file stream"),
         400: errorResponse("Malformed artifact name"),
         404: errorResponse("Artifact not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -488,6 +494,7 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
         400: errorResponse("Malformed pagination"),
         404: errorResponse("Task or activity not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -542,7 +549,7 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
           content: { "text/event-stream": { schema: ActivityStreamEventSchema } },
         },
         404: errorResponse("Task or stream not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {

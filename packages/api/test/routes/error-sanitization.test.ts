@@ -158,7 +158,7 @@ describe("catalogErrorPolicy mapping", () => {
     ["McpOriginConflict", catalogRouteError("McpOriginConflict"), 409],
 
     ["SourceUnavailable", catalogRouteError("SourceUnavailable"), 502],
-    ["DatabaseUnavailable", catalogRouteError("DatabaseUnavailable"), 500],
+    ["DatabaseUnavailable", catalogRouteError("DatabaseUnavailable"), 503],
   ];
 
   it.each(cases)("maps catalog DU code %s to %d", (_label, err, status) => {

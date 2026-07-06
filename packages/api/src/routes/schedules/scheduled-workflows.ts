@@ -149,7 +149,7 @@ export function schedulesWorkflowRoutes(
           "Workflow schedules",
         ),
         400: errorResponse("Malformed query"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -200,8 +200,8 @@ export function schedulesWorkflowRoutes(
           "Created schedule",
         ),
         400: errorResponse("Malformed request body"),
-        404: errorResponse("Coordinator agent not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -253,8 +253,9 @@ export function schedulesWorkflowRoutes(
           }),
           "Workflow schedule",
         ),
+        400: errorResponse("Invalid schedule id"),
         404: errorResponse("Schedule not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -310,6 +311,7 @@ export function schedulesWorkflowRoutes(
         400: errorResponse("Malformed request body"),
         404: errorResponse("Schedule not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -364,9 +366,11 @@ export function schedulesWorkflowRoutes(
           DeleteScheduleResponseSchema.extend({ ok: z.literal(true) }),
           "Delete outcome",
         ),
+        400: errorResponse("Invalid schedule id"),
         404: errorResponse("Schedule not found"),
         409: errorResponse("Schedule enabled or has in-flight dispatch"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -398,8 +402,10 @@ export function schedulesWorkflowRoutes(
       request: { params: z.object({ sid: z.string() }) },
       responses: {
         200: jsonResponse(RunScheduleResponseSchema, "Dispatch id"),
+        400: errorResponse("Invalid schedule id"),
         404: errorResponse("Schedule not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -433,7 +439,7 @@ export function schedulesWorkflowRoutes(
         200: jsonResponse(PreviewScheduleResponseSchema, "Schedule preview"),
         400: errorResponse("Malformed query"),
         404: errorResponse("Schedule not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -495,7 +501,7 @@ export function scheduledWorkflowsRoutes(
       request: { query: z.object({ scheduleId: z.string().optional() }) },
       responses: {
         200: jsonResponse(ListWorkflowsResponseSchema, "Workflows"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {

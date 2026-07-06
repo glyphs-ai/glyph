@@ -44,7 +44,7 @@ const CATALOG_TABLE: Record<string, CatalogDef> = {
   HasDependents: { status: 409, title: "Catalog entry has dependents", detail: echo },
 
   SourceUnavailable: { status: 502, title: "Catalog source unavailable", detail: echo },
-  DatabaseUnavailable: { status: 500, title: "Internal error", detail: () => "internal error" },
+  DatabaseUnavailable: { status: 503, title: "Internal error", detail: () => "internal error" },
 };
 
 /**

@@ -49,7 +49,7 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       responses: {
         200: jsonResponse(ListSessionsResponseSchema, "Sessions"),
         400: errorResponse("Malformed query"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -103,7 +103,9 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       responses: {
         201: jsonResponse(CreateSessionResponseSchema, "Created session"),
         400: errorResponse("Malformed request body"),
+        404: errorResponse("Agent not found"),
         500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -142,7 +144,7 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       responses: {
         200: jsonResponse(GetSessionResponseSchema, "Session"),
         404: errorResponse("Session not found"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {
@@ -180,8 +182,9 @@ export function sessionsRoutes(resolve: WorkspaceContextResolver): OpenAPIHono {
       },
       responses: {
         204: errorResponse("Deleted (no content)"),
+        400: errorResponse("Unknown runtime"),
         409: errorResponse("Runtime state / workdir removal failed"),
-        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
       },
     }),
     async (c) => {

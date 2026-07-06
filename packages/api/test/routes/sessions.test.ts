@@ -132,14 +132,14 @@ describe("sessionsRoutes", () => {
     });
   });
 
-  it("GET / surfaces DatabaseUnavailable as 500", async () => {
+  it("GET / surfaces DatabaseUnavailable as 503", async () => {
     const m = stubModule({
       listSessions: {
         execute: vi.fn(() => errAsync({ type: "DatabaseUnavailable", cause: null })),
       },
     });
     const res = await sessionsRoutes(() => stubContext(m)).request("/");
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     expect((await jsonBody(res)).code).toBe("DatabaseUnavailable");
   });
 
@@ -197,7 +197,7 @@ describe("sessionsRoutes", () => {
     expect(m.createSession.execute).toHaveBeenCalledWith({ agent: "demo", runtime: "claude" });
   });
 
-  it("POST / maps AgentNotFound to 400", async () => {
+  it("POST / maps AgentNotFound to 404", async () => {
     const m = stubModule({
       createSession: { execute: vi.fn(() => errAsync({ type: "AgentNotFound", agent: "ghost" })) },
     });
@@ -206,7 +206,7 @@ describe("sessionsRoutes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ agent: "ghost" }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
     expect((await jsonBody(res)).code).toBe("AgentNotFound");
   });
 
