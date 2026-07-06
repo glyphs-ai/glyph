@@ -60,7 +60,7 @@ export function pwshQuote(s: string): string {
  *
  * Returns an empty array when `env` is `undefined`.
  */
-export function filterStringEntries(
+function filterStringEntries(
   env: Readonly<Record<string, string>> | undefined,
 ): [string, string][] {
   if (env === undefined) return [];

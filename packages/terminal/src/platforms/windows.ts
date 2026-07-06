@@ -20,7 +20,7 @@ import type { LaunchCommand, SpawnTerminalDeps, SpawnTerminalResult } from "../t
  * `platform: "win32"` while running on Linux/macOS CI runners — host-relative
  * path.join would mix separators and miss the WindowsApps stub.
  *
- * NOTE: the `exists` check must handle App Execution Aliases (0-byte reparse
+ * The `exists` check must handle App Execution Aliases (0-byte reparse
  * points with tag `IO_REPARSE_TAG_APPEXECLINK`). `fs.existsSync` follows the
  * reparse point and returns false for these — if not handled the wt branch
  * is silently unreachable even when Windows Terminal is installed. Default
@@ -120,8 +120,7 @@ export async function spawnWindows(
  * least powershell.exe, so this path is essentially unreachable.
  *
  * CRITICAL — wt.exe semicolon escaping:
- * `wt.exe` interprets `;` as its OWN command separator (per
- * https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments).
+ * `wt.exe` interprets `;` as its OWN command separator.
  * Even when `;` appears inside what we think is a single argv element,
  * wt's parser splits the whole command line on unescaped `;` and
  * spawns a new tab/window for each chunk. That's why an unescaped

@@ -23,7 +23,7 @@ export function validateLaunchCommand(cmd: LaunchCommand): void {
   }
 }
 
-export function assertPortableEnvName(name: string): void {
+function assertPortableEnvName(name: string): void {
   if (!PORTABLE_ENV_NAME_RE.test(name)) {
     throw new InvalidLaunchCommandError(
       `environment variable name ${JSON.stringify(name)} is not portable`,
