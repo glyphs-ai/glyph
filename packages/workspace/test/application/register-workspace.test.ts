@@ -100,7 +100,6 @@ describe("RegisterWorkspaceUseCase — error channel", () => {
     const res = await useCase.execute(req("Demo", ABS_DIR));
     const err = res._unsafeUnwrapErr();
     expect(err.type).toBe("WorkspacePathConflict");
-    if (err.type === "WorkspacePathConflict") expect(err.existingId).toBe(OTHER_ID);
     expect(provisioner.provision).not.toHaveBeenCalled();
     expect(repo.save).not.toHaveBeenCalled();
   });

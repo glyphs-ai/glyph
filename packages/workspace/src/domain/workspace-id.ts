@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 /**
- * RFC-4122 workspace UUID, branded so raw strings cannot cross
- * boundaries that require a validated workspace id.
+ * Canonical 8-4-4-4-12 hex workspace UUID, branded so raw strings cannot
+ * cross boundaries that require a validated workspace id.
  */
 export const WorkspaceIdSchema = z
   .string()

@@ -35,19 +35,13 @@ export type RegisterWorkspaceResponse = z.infer<typeof RegisterWorkspaceResponse
 
 /**
  * The requested `workspaceDir` is already registered to another
- * workspace. A `register`-owned business error, surfaced by the
- * pre-flight uniqueness query (SQLite constraints are no longer
- * translated — a failed INSERT is a `DatabaseUnavailable`).
+ * workspace. A `register`-owned business error raised by the pre-flight
+ * uniqueness query; an INSERT that trips the unique constraint surfaces
+ * as `DatabaseUnavailable`, not this typed conflict.
  */
 export type WorkspacePathConflict = {
   readonly type: "WorkspacePathConflict";
   readonly workspaceDir: string;
-  /**
-   * The id of the workspace already registered at this path. May be
-   * absent in the rare case the row was concurrently deleted between
-   * the uniqueness check and the id lookup.
-   */
-  readonly existingId: WorkspaceId | undefined;
 };
 
 export type RegisterWorkspaceError =
@@ -105,7 +99,6 @@ export class RegisterWorkspaceUseCase
           ? errAsync({
               type: "WorkspacePathConflict" as const,
               workspaceDir,
-              existingId: existing.id as WorkspaceId,
             })
           : okAsync(undefined),
       )
