@@ -111,25 +111,21 @@ export class CreateScheduleUseCase
       }
       yield* deps.repo.save(entity);
       if (entity.enabled) deps.engine.arm(entity);
-      return ok(toScheduleView(entity));
+      return ok({
+        id: entity.id,
+        name: entity.name,
+        trigger: entity.trigger,
+        target: entity.target,
+        enabled: entity.enabled,
+        createdAt: entity.createdAt,
+        updatedAt: entity.updatedAt,
+        ...(entity.lastFiredAt !== undefined ? { lastFiredAt: entity.lastFiredAt } : {}),
+        ...(entity.nextFireAt !== undefined ? { nextFireAt: entity.nextFireAt } : {}),
+      });
     });
   }
 }
 
 function isNonEmptyName(name: string): boolean {
   return name.trim().length > 0;
-}
-
-function toScheduleView(entity: ScheduleEntity): CreateScheduleResponse {
-  return {
-    id: entity.id,
-    name: entity.name,
-    trigger: entity.trigger,
-    target: entity.target,
-    enabled: entity.enabled,
-    createdAt: entity.createdAt,
-    updatedAt: entity.updatedAt,
-    ...(entity.lastFiredAt !== undefined ? { lastFiredAt: entity.lastFiredAt } : {}),
-    ...(entity.nextFireAt !== undefined ? { nextFireAt: entity.nextFireAt } : {}),
-  };
 }

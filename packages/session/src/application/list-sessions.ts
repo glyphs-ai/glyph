@@ -65,7 +65,7 @@ export class ListSessionsUseCase
         return filters.length > 0 ? select.where(and(...filters)).all() : select.all();
       })
       .andThen((rows) =>
-        ResultAsync.fromSafePromise(Promise.all(rows.map((r) => projectAndRefresh(deps, r)))),
+        ResultAsync.fromSafePromise(Promise.all(rows.map((r) => toListSessionsEntry(deps, r)))),
       )
       .map((views) => {
         const survivors = views.filter((v): v is ListSessionsResponse[number] => v !== null);
@@ -83,7 +83,7 @@ export class ListSessionsUseCase
   }
 }
 
-async function projectAndRefresh(
+async function toListSessionsEntry(
   deps: ListSessionsDeps,
   row: SessionRow,
 ): Promise<ListSessionsResponse[number] | null> {

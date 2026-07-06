@@ -166,21 +166,17 @@ export class PatchScheduleUseCase
       if (existing.enabled && (triggerChanged || enabledChanged)) {
         deps.engine.arm(existing);
       }
-      return ok(toScheduleView(existing));
+      return ok({
+        id: existing.id,
+        name: existing.name,
+        trigger: existing.trigger,
+        target: existing.target,
+        enabled: existing.enabled,
+        createdAt: existing.createdAt,
+        updatedAt: existing.updatedAt,
+        ...(existing.lastFiredAt !== undefined ? { lastFiredAt: existing.lastFiredAt } : {}),
+        ...(existing.nextFireAt !== undefined ? { nextFireAt: existing.nextFireAt } : {}),
+      });
     });
   }
-}
-
-function toScheduleView(entity: ScheduleEntity): PatchScheduleResponse {
-  return {
-    id: entity.id,
-    name: entity.name,
-    trigger: entity.trigger,
-    target: entity.target,
-    enabled: entity.enabled,
-    createdAt: entity.createdAt,
-    updatedAt: entity.updatedAt,
-    ...(entity.lastFiredAt !== undefined ? { lastFiredAt: entity.lastFiredAt } : {}),
-    ...(entity.nextFireAt !== undefined ? { nextFireAt: entity.nextFireAt } : {}),
-  };
 }

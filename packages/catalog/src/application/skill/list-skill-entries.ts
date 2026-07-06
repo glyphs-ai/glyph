@@ -5,47 +5,21 @@ import { selectInstalledMcpFqns } from "../mcp/mcp-reads.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { collectReferencedSkillFqns, type SkillView, selectAllSkills } from "./skill-reads.js";
 
-const DependencyRefSchema = z.object({ fqn: z.string() });
-
-const SkillDependenciesSchema = z
-  .object({
-    skills: z.array(DependencyRefSchema).optional(),
-    mcps: z.array(DependencyRefSchema).optional(),
-  })
-  .optional();
-
-const SkillSchema = z.object({
-  fqn: z.string(),
-  origin: z.string(),
-  description: z.string(),
-  version: z.string(),
-  prereqs: z.string().optional(),
-  prereqsAck: z.boolean(),
-  orphaned: z.boolean(),
-  installedAt: z.string(),
-  updatedAt: z.string(),
-  dependencies: SkillDependenciesSchema,
-});
-const MissingDepSchema = z.object({
+const listSkillEntriesMissingDep = z.object({
   kind: z.enum(["skill", "mcp"]),
   name: z.string(),
 });
-type MissingDep = z.infer<typeof MissingDepSchema>;
+type MissingDep = z.infer<typeof listSkillEntriesMissingDep>;
 
-const BlockedDepSchema = z.object({
+const listSkillEntriesBlockedDep = z.object({
   kind: z.enum(["skill", "mcp"]),
   fqn: z.string(),
 });
-type BlockedDep = z.infer<typeof BlockedDepSchema>;
+type BlockedDep = z.infer<typeof listSkillEntriesBlockedDep>;
 
-const BlockedReasonSchema = z.object({
-  needsPrereqsAck: z.literal(true).optional(),
-  disabledByUser: z.literal(true).optional(),
-  orphaned: z.literal(true).optional(),
-  missingDeps: z.array(MissingDepSchema).optional(),
-  blockedDeps: z.array(BlockedDepSchema).optional(),
-});
-type BlockedReason = z.infer<typeof BlockedReasonSchema>;
+type BlockedReason = NonNullable<
+  z.infer<typeof ListSkillEntriesResponseSchema>[number]["blockedReason"]
+>;
 
 interface ComputedStatus {
   readonly status: "ready" | "blocked";
@@ -53,13 +27,38 @@ interface ComputedStatus {
 }
 export const ListSkillEntriesRequestSchema = z.object({});
 export type ListSkillEntriesRequest = z.infer<typeof ListSkillEntriesRequestSchema>;
-const ListSkillEntrySchema = z.object({
-  skill: SkillSchema,
-  status: z.enum(["ready", "blocked"]),
-  blockedReason: BlockedReasonSchema.optional(),
-  missingDeps: z.array(MissingDepSchema).optional(),
-});
-export const ListSkillEntriesResponseSchema = z.array(ListSkillEntrySchema);
+export const ListSkillEntriesResponseSchema = z.array(
+  z.object({
+    skill: z.object({
+      fqn: z.string(),
+      origin: z.string(),
+      description: z.string(),
+      version: z.string(),
+      prereqs: z.string().optional(),
+      prereqsAck: z.boolean(),
+      orphaned: z.boolean(),
+      installedAt: z.string(),
+      updatedAt: z.string(),
+      dependencies: z
+        .object({
+          skills: z.array(z.object({ fqn: z.string() })).optional(),
+          mcps: z.array(z.object({ fqn: z.string() })).optional(),
+        })
+        .optional(),
+    }),
+    status: z.enum(["ready", "blocked"]),
+    blockedReason: z
+      .object({
+        needsPrereqsAck: z.literal(true).optional(),
+        disabledByUser: z.literal(true).optional(),
+        orphaned: z.literal(true).optional(),
+        missingDeps: z.array(listSkillEntriesMissingDep).optional(),
+        blockedDeps: z.array(listSkillEntriesBlockedDep).optional(),
+      })
+      .optional(),
+    missingDeps: z.array(listSkillEntriesMissingDep).optional(),
+  }),
+);
 export type ListSkillEntriesResponse = z.infer<typeof ListSkillEntriesResponseSchema>;
 export type ListSkillEntriesError = DatabaseUnavailable;
 export interface ListSkillEntriesDeps {

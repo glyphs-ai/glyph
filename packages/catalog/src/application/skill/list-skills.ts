@@ -8,16 +8,14 @@ import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-querie
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { collectReferencedSkillFqns, selectAllSkills } from "./skill-reads.js";
 
-const DependencyRefSchema = z.object({ fqn: z.string() });
-
-const SkillDependenciesSchema = z
+const listSkillsDependencies = z
   .object({
-    skills: z.array(DependencyRefSchema).optional(),
-    mcps: z.array(DependencyRefSchema).optional(),
+    skills: z.array(z.object({ fqn: z.string() })).optional(),
+    mcps: z.array(z.object({ fqn: z.string() })).optional(),
   })
   .optional();
 
-const SkillSchema = z.object({
+const listSkillsEntry = z.object({
   fqn: z.string(),
   origin: z.string(),
   description: z.string(),
@@ -27,12 +25,12 @@ const SkillSchema = z.object({
   orphaned: z.boolean(),
   installedAt: z.string(),
   updatedAt: z.string(),
-  dependencies: SkillDependenciesSchema,
+  dependencies: listSkillsDependencies,
 });
 
 export const ListSkillsRequestSchema = z.object({});
 export type ListSkillsRequest = z.infer<typeof ListSkillsRequestSchema>;
-export const ListSkillsResponseSchema = z.array(SkillSchema);
+export const ListSkillsResponseSchema = z.array(listSkillsEntry);
 export type ListSkillsResponse = z.infer<typeof ListSkillsResponseSchema>;
 export type ListSkillsError = DatabaseUnavailable;
 

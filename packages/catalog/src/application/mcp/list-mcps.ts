@@ -5,7 +5,7 @@ import { mcps } from "../../infrastructure/drizzle/mcp-schema.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { collectReferencedMcpFqns } from "./mcp-reads.js";
 
-const McpSchema = z.object({
+const listMcpsEntry = z.object({
   fqn: z.string(),
   origin: z.string(),
   orphaned: z.boolean(),
@@ -15,7 +15,7 @@ const McpSchema = z.object({
 
 export const ListMcpsRequestSchema = z.object({});
 export type ListMcpsRequest = z.infer<typeof ListMcpsRequestSchema>;
-export const ListMcpsResponseSchema = z.array(McpSchema);
+export const ListMcpsResponseSchema = z.array(listMcpsEntry);
 export type ListMcpsResponse = z.infer<typeof ListMcpsResponseSchema>;
 export type ListMcpsError = DatabaseUnavailable;
 export interface ListMcpsDeps {

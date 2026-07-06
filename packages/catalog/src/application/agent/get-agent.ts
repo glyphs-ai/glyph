@@ -6,8 +6,6 @@ import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-querie
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { selectAgentByFqn } from "./agent-reads.js";
 
-const DependencyRefSchema = z.object({ fqn: z.string() });
-
 export const GetAgentRequestSchema = z.object({ id: AgentFqnSchema });
 export type GetAgentRequest = z.infer<typeof GetAgentRequestSchema>;
 
@@ -23,9 +21,9 @@ export const GetAgentResponseSchema = z.object({
   updatedAt: z.string(),
   dependencies: z
     .object({
-      skills: z.array(DependencyRefSchema).optional(),
-      mcps: z.array(DependencyRefSchema).optional(),
-      agents: z.array(DependencyRefSchema).optional(),
+      skills: z.array(z.object({ fqn: z.string() })).optional(),
+      mcps: z.array(z.object({ fqn: z.string() })).optional(),
+      agents: z.array(z.object({ fqn: z.string() })).optional(),
     })
     .optional(),
 });

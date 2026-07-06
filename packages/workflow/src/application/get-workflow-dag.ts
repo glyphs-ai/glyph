@@ -37,35 +37,6 @@ import type {
 } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-const WorkflowViewSchema = z.object({
-  id: WorkflowIdSchema,
-  brief: z.string(),
-  details: z.string().optional(),
-  coordinatorAgent: z.string(),
-  status: WorkflowStatusSchema,
-  origin: z.string(),
-  originId: z.string().optional(),
-  metadata: z.record(z.string(), z.unknown()),
-  createdAt: z.string(),
-  startedAt: z.string().optional(),
-  endedAt: z.string().optional(),
-  success: WorkflowSuccessSchema.optional(),
-  failure: WorkflowFailureSchema.optional(),
-  cancellation: WorkflowCancellationSchema.optional(),
-});
-const WorkflowNodeViewSchema = z.object({
-  id: WorkflowNodeIdSchema,
-  workflowId: WorkflowIdSchema,
-  kind: WorkflowNodeKindSchema,
-  spec: z.unknown(),
-  phase: z.number(),
-  status: WorkflowNodeStatusSchema,
-  metadata: z.record(z.string(), z.unknown()),
-  createdAt: z.string(),
-  readyAt: z.string().optional(),
-  runningAt: z.string().optional(),
-  endedAt: z.string().optional(),
-});
 export const WorkflowEdgeViewSchema = z.object({
   workflowId: WorkflowIdSchema,
   from: WorkflowNodeIdSchema,
@@ -73,8 +44,39 @@ export const WorkflowEdgeViewSchema = z.object({
 });
 export type WorkflowEdgeView = z.infer<typeof WorkflowEdgeViewSchema>;
 export const WorkflowDagSnapshotSchema = z.object({
-  workflow: WorkflowViewSchema,
-  nodes: z.array(WorkflowNodeViewSchema).readonly(),
+  workflow: z.object({
+    id: WorkflowIdSchema,
+    brief: z.string(),
+    details: z.string().optional(),
+    coordinatorAgent: z.string(),
+    status: WorkflowStatusSchema,
+    origin: z.string(),
+    originId: z.string().optional(),
+    metadata: z.record(z.string(), z.unknown()),
+    createdAt: z.string(),
+    startedAt: z.string().optional(),
+    endedAt: z.string().optional(),
+    success: WorkflowSuccessSchema.optional(),
+    failure: WorkflowFailureSchema.optional(),
+    cancellation: WorkflowCancellationSchema.optional(),
+  }),
+  nodes: z
+    .array(
+      z.object({
+        id: WorkflowNodeIdSchema,
+        workflowId: WorkflowIdSchema,
+        kind: WorkflowNodeKindSchema,
+        spec: z.unknown(),
+        phase: z.number(),
+        status: WorkflowNodeStatusSchema,
+        metadata: z.record(z.string(), z.unknown()),
+        createdAt: z.string(),
+        readyAt: z.string().optional(),
+        runningAt: z.string().optional(),
+        endedAt: z.string().optional(),
+      }),
+    )
+    .readonly(),
   edges: z.array(WorkflowEdgeViewSchema).readonly(),
 });
 export type WorkflowDagSnapshot = z.infer<typeof WorkflowDagSnapshotSchema>;
@@ -117,9 +119,9 @@ export class GetWorkflowDagUseCase
           .orderBy(asc(q.workflowEdges.fromNodeId), asc(q.workflowEdges.toNodeId))
           .all();
         return {
-          workflow: toWorkflowView(workflow),
-          nodes: nodes.map(toWorkflowNodeView),
-          edges: edges.map(toWorkflowEdgeView),
+          workflow: toGetWorkflowDagWorkflow(workflow),
+          nodes: nodes.map(toGetWorkflowDagNode),
+          edges: edges.map(toGetWorkflowDagEdge),
         };
       })
       .andThen((snapshot) =>
@@ -130,7 +132,9 @@ export class GetWorkflowDagUseCase
   }
 }
 
-function toWorkflowView(row: WorkflowRow): z.infer<typeof WorkflowViewSchema> {
+function toGetWorkflowDagWorkflow(
+  row: WorkflowRow,
+): z.infer<typeof WorkflowDagSnapshotSchema>["workflow"] {
   return {
     id: coerceWorkflowId(row.id),
     brief: row.brief,
@@ -151,7 +155,9 @@ function toWorkflowView(row: WorkflowRow): z.infer<typeof WorkflowViewSchema> {
   };
 }
 
-function toWorkflowNodeView(row: WorkflowNodeRow): z.infer<typeof WorkflowNodeViewSchema> {
+function toGetWorkflowDagNode(
+  row: WorkflowNodeRow,
+): z.infer<typeof WorkflowDagSnapshotSchema>["nodes"][number] {
   return {
     id: coerceWorkflowNodeId(row.id),
     workflowId: coerceWorkflowId(row.workflowId),
@@ -167,7 +173,7 @@ function toWorkflowNodeView(row: WorkflowNodeRow): z.infer<typeof WorkflowNodeVi
   };
 }
 
-function toWorkflowEdgeView(row: WorkflowEdgeRow): z.infer<typeof WorkflowEdgeViewSchema> {
+function toGetWorkflowDagEdge(row: WorkflowEdgeRow): z.infer<typeof WorkflowEdgeViewSchema> {
   return {
     workflowId: coerceWorkflowId(row.workflowId),
     from: coerceWorkflowNodeId(row.fromNodeId),

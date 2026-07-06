@@ -30,7 +30,7 @@ export interface SkillView {
 
 type SkillRow = typeof skills.$inferSelect;
 
-function toView(row: SkillRow, dependencyRefs: SkillDependencyRefs): SkillView {
+function toSkillView(row: SkillRow, dependencyRefs: SkillDependencyRefs): SkillView {
   return {
     fqn: row.fqn,
     origin: row.origin,
@@ -67,7 +67,7 @@ function assembleSkill(db: Db, row: SkillRow): SkillView {
     .from(skillMcpDeps)
     .where(eq(skillMcpDeps.sourceFqn, row.fqn))
     .all();
-  return toView(row, {
+  return toSkillView(row, {
     skills: skillDeps.map((d) => d.target),
     mcps: mcpDeps.map((d) => d.target),
   });
@@ -101,7 +101,7 @@ export function selectAllSkills(db: Db): SkillView[] {
       .all(),
   );
   return rows.map((row) =>
-    toView(row, { skills: skillDeps.get(row.fqn) ?? [], mcps: mcpDeps.get(row.fqn) ?? [] }),
+    toSkillView(row, { skills: skillDeps.get(row.fqn) ?? [], mcps: mcpDeps.get(row.fqn) ?? [] }),
   );
 }
 

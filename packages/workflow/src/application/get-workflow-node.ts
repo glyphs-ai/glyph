@@ -20,7 +20,11 @@ import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries
 import type { WorkflowNodeRow } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-const WorkflowNodeViewSchema = z.object({
+export const GetWorkflowNodeRequestSchema = z
+  .object({ workflowId: WorkflowIdSchema, nodeId: WorkflowNodeIdSchema })
+  .strict();
+export type GetWorkflowNodeRequest = z.infer<typeof GetWorkflowNodeRequestSchema>;
+export const GetWorkflowNodeResponseSchema = z.object({
   id: WorkflowNodeIdSchema,
   workflowId: WorkflowIdSchema,
   kind: WorkflowNodeKindSchema,
@@ -33,12 +37,6 @@ const WorkflowNodeViewSchema = z.object({
   runningAt: z.string().optional(),
   endedAt: z.string().optional(),
 });
-
-export const GetWorkflowNodeRequestSchema = z
-  .object({ workflowId: WorkflowIdSchema, nodeId: WorkflowNodeIdSchema })
-  .strict();
-export type GetWorkflowNodeRequest = z.infer<typeof GetWorkflowNodeRequestSchema>;
-export const GetWorkflowNodeResponseSchema = WorkflowNodeViewSchema;
 export type GetWorkflowNodeResponse = z.infer<typeof GetWorkflowNodeResponseSchema>;
 export type GetWorkflowNodeError =
   | WorkflowNodeNotFound
@@ -61,12 +59,12 @@ export class GetWorkflowNodeUseCase
       .andThen((row) =>
         row === undefined || row.workflowId !== workflowId
           ? errAsync({ type: "WorkflowNodeNotFound" as const, workflowId, nodeId })
-          : q.query(() => toWorkflowNodeView(row)),
+          : q.query(() => toGetWorkflowNodeResponse(row)),
       );
   }
 }
 
-function toWorkflowNodeView(row: WorkflowNodeRow): GetWorkflowNodeResponse {
+function toGetWorkflowNodeResponse(row: WorkflowNodeRow): GetWorkflowNodeResponse {
   return {
     id: coerceWorkflowNodeId(row.id),
     workflowId: coerceWorkflowId(row.workflowId),

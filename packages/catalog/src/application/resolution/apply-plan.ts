@@ -33,34 +33,34 @@ import {
 export const ApplyPlanRequestSchema = z.object({ plan: ResolvePlanResponseSchema });
 export type ApplyPlanRequest = z.infer<typeof ApplyPlanRequestSchema>;
 
-const InstalledSchema = z.object({
+const applyPlanInstalled = z.object({
   kind: z.enum(["skill", "agent", "mcp"]),
   fqn: z.string(),
   prereqs: z.string().optional(),
   prereqsAck: z.boolean().optional(),
 });
-const SkippedSchema = z.object({
+const applyPlanSkipped = z.object({
   kind: z.enum(["skill", "agent", "mcp"]),
   fqn: z.string(),
   reason: z.enum(["already-installed", "up-to-date", "dep-failed"]),
 });
-const FailedSchema = z.object({
+const applyPlanFailed = z.object({
   kind: z.enum(["skill", "agent", "mcp"]),
   fqn: z.string(),
   error: z.object({ name: z.string(), message: z.string() }),
 });
-const OrphanSchema = z.object({
+const applyPlanOrphan = z.object({
   kind: z.enum(["skill", "mcp"]),
   fqn: z.string(),
   origin: z.string(),
 });
 
 export const ApplyPlanResponseSchema = z.object({
-  installed: z.array(InstalledSchema),
-  skipped: z.array(SkippedSchema),
-  failed: z.array(FailedSchema),
+  installed: z.array(applyPlanInstalled),
+  skipped: z.array(applyPlanSkipped),
+  failed: z.array(applyPlanFailed),
   conflicts: z.array(ConflictSchema),
-  orphansFlagged: z.array(OrphanSchema),
+  orphansFlagged: z.array(applyPlanOrphan),
 });
 export type ApplyPlanResponse = z.infer<typeof ApplyPlanResponseSchema>;
 export type ApplyPlanError = never;

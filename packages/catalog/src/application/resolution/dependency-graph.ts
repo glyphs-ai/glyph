@@ -20,7 +20,7 @@
 import { z } from "zod";
 import { CatalogKindSchema } from "../../domain/catalog-kind.js";
 
-const DependencyRefsSchema = z.object({
+const resolvedNodeDependencyRefs = z.object({
   skills: z.array(z.string()),
   mcps: z.array(z.string()),
   agents: z.array(z.string()),
@@ -37,11 +37,11 @@ export const ResolvedNodeSchema = z.object({
   /** mcp spec bytes; "" for skill/agent (version drives their diff). */
   content: z.string(),
   /** Verbatim dep origins; agents[] empty for skill, all empty for mcp. */
-  dependencyRefs: DependencyRefsSchema,
+  dependencyRefs: resolvedNodeDependencyRefs,
 });
 export type ResolvedNode = z.infer<typeof ResolvedNodeSchema>;
 
-const ConflictReasonSchema = z.discriminatedUnion("kind", [
+const conflictReason = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("fetch-failed"), cause: z.unknown() }),
   z.object({ kind: z.literal("parse-failed"), cause: z.unknown() }),
   z.object({ kind: z.literal("origin-conflict"), existingOrigin: z.string() }),
@@ -52,7 +52,7 @@ export const ConflictSchema = z.object({
   kind: CatalogKindSchema,
   origin: z.string(),
   fqn: z.string().nullable(),
-  reason: ConflictReasonSchema,
+  reason: conflictReason,
 });
 export type CatalogConflict = z.infer<typeof ConflictSchema>;
 

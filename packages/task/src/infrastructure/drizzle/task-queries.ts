@@ -67,6 +67,15 @@ function relativizeArtifacts(success: TaskSuccess, id: string): TaskSuccess {
 
 /**
  * Read-side projection: map a stored row straight to the wire task view.
+ *
+ * Deliberately shared across all task read use-cases (`get-task`,
+ * `list-tasks`, `find-latest-by-origin`, `list-in-flight-by-origin`,
+ * `get-task-activity`, `get-task-activity-stream`) — every use-case's
+ * `ResponseSchema` is an inline literal of this exact shape, and duplicating
+ * this projection into six identical wrappers would be pure ceremony
+ * (pure functions do not drift; if the wire shape changes, every
+ * `ResponseSchema` must change alongside this projection).
+ *
  * Unlike the domain's `TaskEntity.rehydrate` (write path), this does NOT
  * validate field shapes — the read model trusts rows our own mapper wrote and
  * only re-inflates JSON columns + folds the promoted `runtime` column back

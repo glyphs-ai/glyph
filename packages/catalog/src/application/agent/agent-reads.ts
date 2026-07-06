@@ -35,7 +35,7 @@ export interface AgentView {
 
 type AgentRow = typeof agents.$inferSelect;
 
-function toView(row: AgentRow, dependencyRefs: AgentDependencyRefs): AgentView {
+function toAgentView(row: AgentRow, dependencyRefs: AgentDependencyRefs): AgentView {
   return {
     fqn: row.fqn,
     origin: row.origin,
@@ -78,7 +78,7 @@ function assembleAgent(db: Db, row: AgentRow): AgentView {
     .from(agentAgentDeps)
     .where(eq(agentAgentDeps.sourceFqn, row.fqn))
     .all();
-  return toView(row, {
+  return toAgentView(row, {
     skills: skillDeps.map((d) => d.target),
     mcps: mcpDeps.map((d) => d.target),
     agents: agentDeps.map((d) => d.target),
@@ -119,7 +119,7 @@ export function selectAllAgents(db: Db): AgentView[] {
       .all(),
   );
   return rows.map((row) =>
-    toView(row, {
+    toAgentView(row, {
       skills: skillDeps.get(row.fqn) ?? [],
       mcps: mcpDeps.get(row.fqn) ?? [],
       agents: agentDeps.get(row.fqn) ?? [],

@@ -7,16 +7,9 @@ import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-querie
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { collectReferencedSkillFqns } from "./skill-reads.js";
 
-const DependencyRefSchema = z.object({ fqn: z.string() });
-
-const SkillDependenciesSchema = z
-  .object({
-    skills: z.array(DependencyRefSchema).optional(),
-    mcps: z.array(DependencyRefSchema).optional(),
-  })
-  .optional();
-
-const SkillSchema = z.object({
+export const AcknowledgePrereqsRequestSchema = z.object({ id: SkillFqnSchema });
+export type AcknowledgePrereqsRequest = z.infer<typeof AcknowledgePrereqsRequestSchema>;
+export const AcknowledgePrereqsResponseSchema = z.object({
   fqn: z.string(),
   origin: z.string(),
   description: z.string(),
@@ -26,13 +19,14 @@ const SkillSchema = z.object({
   orphaned: z.boolean(),
   installedAt: z.string(),
   updatedAt: z.string(),
-  dependencies: SkillDependenciesSchema,
+  dependencies: z
+    .object({
+      skills: z.array(z.object({ fqn: z.string() })).optional(),
+      mcps: z.array(z.object({ fqn: z.string() })).optional(),
+    })
+    .optional(),
 });
-type Skill = z.infer<typeof SkillSchema>;
-
-export const AcknowledgePrereqsRequestSchema = z.object({ id: SkillFqnSchema });
-export type AcknowledgePrereqsRequest = z.infer<typeof AcknowledgePrereqsRequestSchema>;
-export type AcknowledgePrereqsResponse = Skill;
+export type AcknowledgePrereqsResponse = z.infer<typeof AcknowledgePrereqsResponseSchema>;
 export type AcknowledgePrereqsError = SkillNotFound | DatabaseUnavailable;
 export interface AcknowledgePrereqsDeps {
   readonly skillRepo: SkillRepository;

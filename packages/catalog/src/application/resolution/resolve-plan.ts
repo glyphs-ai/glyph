@@ -33,16 +33,14 @@ import {
 import type { GetTreeUseCase } from "./get-tree.js";
 import type { GetUpstreamTreeUseCase } from "./get-upstream-tree.js";
 
-const KindSchema = CatalogKindSchema;
-
-const DependencyRefsSchema = z.object({
+const resolvePlanDependencyRefs = z.object({
   skills: z.array(z.string()),
   mcps: z.array(z.string()),
   agents: z.array(z.string()),
 });
 
-const PlanNodeSchema = z.object({
-  kind: KindSchema,
+const resolvePlanNode = z.object({
+  kind: CatalogKindSchema,
   origin: z.string(),
   fqn: z.string(),
   disposition: z.enum(["new", "will-sync", "up-to-date", "identity-changed"]),
@@ -50,31 +48,31 @@ const PlanNodeSchema = z.object({
   /** Dep origins (flattened skills+mcps+agents) — drives apply poisoning. */
   deps: z.array(z.string()),
   /** Dep origins by kind; apply resolves these to installed fqns before persisting. */
-  dependencyRefs: DependencyRefsSchema,
+  dependencyRefs: resolvePlanDependencyRefs,
   /** Manifest version (skill/agent semver; "" for mcp). Carried from resolve so apply skips re-fetch. */
   version: z.string(),
   /** Manifest content (mcp spec; "" for skill/agent). Carried from resolve so apply skips re-fetch. */
   content: z.string(),
 });
-export type PlanNode = z.infer<typeof PlanNodeSchema>;
+export type PlanNode = z.infer<typeof resolvePlanNode>;
 
-const OrphanSchema = z.object({
+const resolvePlanOrphan = z.object({
   kind: z.enum(["skill", "mcp"]),
   fqn: z.string(),
   origin: z.string(),
 });
-export type Orphan = z.infer<typeof OrphanSchema>;
+export type Orphan = z.infer<typeof resolvePlanOrphan>;
 
-const IdentityChangeSchema = z.object({
-  kind: KindSchema,
+const resolvePlanIdentityChange = z.object({
+  kind: CatalogKindSchema,
   oldFqn: z.string(),
   newFqn: z.string(),
 });
-export type IdentityChange = z.infer<typeof IdentityChangeSchema>;
+export type IdentityChange = z.infer<typeof resolvePlanIdentityChange>;
 
 export const ResolvePlanRequestSchema = z
   .object({
-    kind: KindSchema,
+    kind: CatalogKindSchema,
     origin: z.string().optional(),
     fqn: z.string().optional(),
   })
@@ -85,12 +83,12 @@ export type ResolvePlanRequest = z.infer<typeof ResolvePlanRequestSchema>;
 
 export const ResolvePlanResponseSchema = z.object({
   rootOrigin: z.string(),
-  rootKind: KindSchema,
-  toInstall: z.array(PlanNodeSchema),
-  alreadyInstalled: z.array(PlanNodeSchema),
+  rootKind: CatalogKindSchema,
+  toInstall: z.array(resolvePlanNode),
+  alreadyInstalled: z.array(resolvePlanNode),
   conflicts: z.array(ConflictSchema),
-  orphans: z.array(OrphanSchema),
-  identityChange: IdentityChangeSchema.optional(),
+  orphans: z.array(resolvePlanOrphan),
+  identityChange: resolvePlanIdentityChange.optional(),
   upToDate: z.boolean(),
   /** True when the root origin is already installed (install path only). The
    *  caller should direct the user to sync instead of install. When set, the

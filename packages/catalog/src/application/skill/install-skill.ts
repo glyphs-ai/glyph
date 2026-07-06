@@ -16,14 +16,12 @@ export type SkillOriginConflict = {
   readonly attemptedOrigin: string;
 };
 
-const SkillDependencyRefsSchema = z.object({
-  skills: z.array(z.string()),
-  mcps: z.array(z.string()),
-});
-
 export const InstallSkillRequestSchema = z.object({
   origin: z.string(),
-  dependencyRefs: SkillDependencyRefsSchema,
+  dependencyRefs: z.object({
+    skills: z.array(z.string()),
+    mcps: z.array(z.string()),
+  }),
 });
 export type InstallSkillRequest = z.infer<typeof InstallSkillRequestSchema>;
 

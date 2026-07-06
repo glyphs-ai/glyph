@@ -10,48 +10,19 @@ import {
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { type AgentView, selectAllAgents } from "./agent-reads.js";
 
-const DependencyRefSchema = z.object({ fqn: z.string() });
-
-const AgentDependenciesSchema = z
-  .object({
-    skills: z.array(DependencyRefSchema).optional(),
-    mcps: z.array(DependencyRefSchema).optional(),
-    agents: z.array(DependencyRefSchema).optional(),
-  })
-  .optional();
-
-const AgentSchema = z.object({
-  fqn: z.string(),
-  origin: z.string(),
-  description: z.string(),
-  version: z.string(),
-  prereqs: z.string().optional(),
-  prereqsAck: z.boolean(),
-  disabledByUser: z.boolean(),
-  installedAt: z.string(),
-  updatedAt: z.string(),
-  dependencies: AgentDependenciesSchema,
-});
-const MissingDepSchema = z.object({
+const listAgentEntriesMissingDep = z.object({
   kind: z.enum(["skill", "mcp"]),
   name: z.string(),
 });
-type MissingDep = z.infer<typeof MissingDepSchema>;
+type MissingDep = z.infer<typeof listAgentEntriesMissingDep>;
 
-const BlockedDepSchema = z.object({
+const listAgentEntriesBlockedDep = z.object({
   kind: z.enum(["skill", "mcp"]),
   fqn: z.string(),
 });
-type BlockedDep = z.infer<typeof BlockedDepSchema>;
+type BlockedDep = z.infer<typeof listAgentEntriesBlockedDep>;
 
-const BlockedReasonSchema = z.object({
-  needsPrereqsAck: z.literal(true).optional(),
-  disabledByUser: z.literal(true).optional(),
-  orphaned: z.literal(true).optional(),
-  missingDeps: z.array(MissingDepSchema).optional(),
-  blockedDeps: z.array(BlockedDepSchema).optional(),
-});
-type BlockedReason = z.infer<typeof BlockedReasonSchema>;
+type BlockedReason = z.infer<typeof ListAgentEntriesResponseSchema>[number]["blockedReason"];
 
 interface ComputedStatus {
   readonly status: "ready" | "blocked";
@@ -59,14 +30,40 @@ interface ComputedStatus {
 }
 export const ListAgentEntriesRequestSchema = z.object({});
 export type ListAgentEntriesRequest = z.infer<typeof ListAgentEntriesRequestSchema>;
-const ListAgentEntriesSchema = z.object({
-  agent: AgentSchema,
-  status: z.enum(["ready", "blocked"]),
-  blockedReason: BlockedReasonSchema.optional(),
-  missingDeps: z.array(MissingDepSchema).optional(),
-  coordEligible: z.boolean(),
-});
-export const ListAgentEntriesResponseSchema = z.array(ListAgentEntriesSchema);
+export const ListAgentEntriesResponseSchema = z.array(
+  z.object({
+    agent: z.object({
+      fqn: z.string(),
+      origin: z.string(),
+      description: z.string(),
+      version: z.string(),
+      prereqs: z.string().optional(),
+      prereqsAck: z.boolean(),
+      disabledByUser: z.boolean(),
+      installedAt: z.string(),
+      updatedAt: z.string(),
+      dependencies: z
+        .object({
+          skills: z.array(z.object({ fqn: z.string() })).optional(),
+          mcps: z.array(z.object({ fqn: z.string() })).optional(),
+          agents: z.array(z.object({ fqn: z.string() })).optional(),
+        })
+        .optional(),
+    }),
+    status: z.enum(["ready", "blocked"]),
+    blockedReason: z
+      .object({
+        needsPrereqsAck: z.literal(true).optional(),
+        disabledByUser: z.literal(true).optional(),
+        orphaned: z.literal(true).optional(),
+        missingDeps: z.array(listAgentEntriesMissingDep).optional(),
+        blockedDeps: z.array(listAgentEntriesBlockedDep).optional(),
+      })
+      .optional(),
+    missingDeps: z.array(listAgentEntriesMissingDep).optional(),
+    coordEligible: z.boolean(),
+  }),
+);
 export type ListAgentEntriesResponse = z.infer<typeof ListAgentEntriesResponseSchema>;
 export type ListAgentEntriesError = DatabaseUnavailable;
 export interface ListAgentEntriesDeps {
