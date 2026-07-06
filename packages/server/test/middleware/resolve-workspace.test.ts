@@ -20,9 +20,9 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import {
   COLD_LOAD_RACE_MS,
+  resolveWorkspaceMiddleware,
   type WorkspaceVars,
-  workspaceContextMiddleware,
-} from "../../src/middleware/workspace-context.js";
+} from "../../src/middleware/resolve-workspace.js";
 import { captureLogger } from "../_capture-logger.js";
 
 const fakeCtx = {
@@ -44,7 +44,7 @@ const fakeCtx = {
 function makeApp(application: Application) {
   const cap = captureLogger();
   const app = new Hono<{ Variables: WorkspaceVars }>();
-  app.use("/:id/*", workspaceContextMiddleware(application, cap.logger));
+  app.use("/:id/*", resolveWorkspaceMiddleware(application, cap.logger));
   app.get("/:id/probe", (c) => {
     const ctx = c.get("workspaceContext");
     return c.json({ ok: true, workspaceId: ctx.workspace.id });
@@ -52,7 +52,7 @@ function makeApp(application: Application) {
   return { app, cap };
 }
 
-describe("workspaceContextMiddleware", () => {
+describe("resolveWorkspaceMiddleware", () => {
   it("returns 404 when the workspace is not registered", async () => {
     const application = {
       peekContextState: vi.fn(async () => "not-registered" as const),
