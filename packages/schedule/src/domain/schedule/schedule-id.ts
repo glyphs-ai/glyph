@@ -3,11 +3,10 @@ import { err, ok, type Result } from "neverthrow";
 import { z } from "zod";
 
 /**
- * Canonical schedule id: UUID v4. Unlike task/session/workflow's
- * `YYYYMMDD-xxxxxxxx` form, schedule has no on-disk workdir whose `ls`
- * grouping benefits from a date prefix, so a plain UUID v4 is enough.
- * Generation stays in the application layer; the domain owns the format
- * and the brand used at boundaries.
+ * Canonical schedule id: UUID v4. A schedule has no on-disk workdir whose
+ * `ls` grouping would benefit from a date prefix, so a plain UUID v4 is
+ * enough. Generation stays in the application layer; the domain owns the
+ * format and the brand used at boundaries.
  */
 export const ScheduleIdSchema = z
   .string()

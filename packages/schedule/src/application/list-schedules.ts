@@ -63,7 +63,8 @@ export interface ListSchedulesDeps {
  *   - `dataEquals`: generic equality on a JSON path inside `target_json`; the
  *     `path` is grammar-guarded (SQL-injection defence), the `value` is
  *     parameter-bound.
- * Ordered `next_fire_at ASC NULLS LAST` (newest-armed first, never-armed last).
+ * Ordered `next_fire_at ASC NULLS LAST` (soonest upcoming fire first,
+ * never-armed last).
  */
 export class ListSchedulesUseCase
   implements UseCase<ListSchedulesRequest | undefined, ListSchedulesResponse, ListSchedulesError>

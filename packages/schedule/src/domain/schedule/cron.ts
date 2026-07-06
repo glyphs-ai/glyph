@@ -14,9 +14,9 @@ import { err, ok, type Result } from "neverthrow";
  * computation (no IO), so they qualify as a domain calculation rather than
  * an infrastructure adapter; cron IS this domain's core concept.
  *
- * Human-readable description (`describe`, via cronstrue) is presentation,
- * not a domain rule, and lives outside the domain (see
- * `infrastructure/cron/describe.ts`).
+ * Human-readable description (`describeCron`, via cronstrue) is presentation,
+ * not a domain rule, and lives outside the domain, in the infrastructure
+ * cron adapter.
  */
 
 const FIVE_FIELD_RE = /^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s*$/;

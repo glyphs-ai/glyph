@@ -33,19 +33,17 @@ export type RegisterKindError =
   | ScheduleKindRegistryFrozen;
 
 /**
- * Open registry of per-kind handlers (à la BullMQ / Sidekiq / Temporal). The
- * substrate has no built-in knowledge of any concrete kind; callers register
- * handlers at compose time, then `recover()` freezes the registry.
+ * Open registry of per-kind handlers. The substrate has no built-in knowledge
+ * of any concrete kind; callers register handlers at compose time, then
+ * `recover()` freezes the registry.
  *
- * Result-native (like the rest of application/domain): `register` /
- * `handlerFor` return `Result` rather than throwing — the composition root
- * (`WorkspaceContextRegistry.load`) converts an `isErr()` into a throw to
- * trigger teardown, exactly as it does for `recoverOrphanedTasks`.
+ * Result-native: `register` / `handlerFor` return `Result` rather than
+ * throwing; the composition root converts an `isErr()` into a throw to trigger
+ * teardown.
  *
  * The registry is a shared concern: the command use-cases read it
  * (`handlerFor`) and the engine both reads it (fire/recover) and freezes it
- * (recover). It is injected into both — the dynamic-registry analog of
- * workflow's static `runners` record.
+ * (recover). It is injected into both.
  */
 export interface ScheduleKindRegistry {
   /** Compose-time only. Errs on invalid name / duplicate / frozen. */

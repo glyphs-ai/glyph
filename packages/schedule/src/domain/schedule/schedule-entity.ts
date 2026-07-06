@@ -162,7 +162,7 @@ export class ScheduleEntity {
 
   /**
    * Replace the target envelope wholesale (+`updatedAt`), in place. The
-   * use-case composes the RFC 7396 patch (via the handler's `mergePatch` +
+   * use-case composes the merged patch (via the handler's `mergePatch` +
    * `validate`) BEFORE calling this — the entity does no merging. The new
    * envelope's `kind` MUST match the existing kind.
    */

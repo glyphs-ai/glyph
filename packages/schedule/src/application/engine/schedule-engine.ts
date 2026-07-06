@@ -30,15 +30,16 @@ export interface ScheduleEngineOpts {
 /**
  * The stateful scheduler. Owns the croner-driven arm→fire→re-arm timer chain,
  * the in-flight fire set, boot-time `recover()`, and `shutdown()`. The
- * command use-cases NUDGE it post-commit via {@link arm} / {@link cancel}
- * (analogous to workflow use-cases nudging the coordinator); the host drives
- * {@link registerKind} / {@link recover} at compose time and {@link shutdown}
- * on close.
+ * command use-cases nudge it post-commit via {@link arm} / {@link cancel}; the
+ * host drives {@link registerKind} / {@link recover} at compose time and
+ * {@link shutdown} on close.
  *
  * READS go through {@link ScheduleQueries} (recover's preflight + enabled
  * scan — projection reads); the per-fire ENTITY load + WRITES go through
  * {@link ScheduleRepository}. `registerKind` / `recover` / `shutdown` are
- * lifecycle (not per-request) and stay throw-based.
+ * lifecycle operations (compose-time / boot / close), distinct from the
+ * per-request use-cases: `registerKind` and `recover` return `Result`s;
+ * `shutdown` returns a plain `Promise`.
  *
  * ## Behaviour locks (not user-configurable)
  *   - concurrency = 1 (skip-and-warn on overlap; no `last_fired_at` write on a skip)
@@ -90,9 +91,8 @@ export class ScheduleEngine {
    * registry is frozen, repeated calls return `ok` immediately.
    *
    * **On preflight failure the registry stays frozen.** The only correct
-   * recovery is to dispose via `composeScheduleModule().close()` and rebuild —
-   * `WorkspaceContextRegistry.load` does this by converting the `isErr()` into
-   * a throw and tearing down.
+   * recovery is to dispose the module via `composeScheduleModule(...).close()`
+   * and rebuild.
    */
   recover(): ResultAsync<void, ScheduleKindNotRegistered | DatabaseUnavailable> {
     if (this.recovered) return okAsync(undefined);
