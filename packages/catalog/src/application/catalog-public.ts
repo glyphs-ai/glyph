@@ -18,6 +18,7 @@ export type { AgentNotFound, DatabaseUnavailable } from "../domain/agent-reposit
 export type { CatalogKind } from "../domain/catalog-kind.js";
 export { type McpFqn, McpFqnSchema } from "../domain/mcp-fqn.js";
 export type { McpNotFound } from "../domain/mcp-repository.js";
+export { type RegistryOrigin, RegistryOriginSchema } from "../domain/registry-origin.js";
 export type { SkillDependencyRefs } from "../domain/skill-deps.js";
 export { type SkillFqn, SkillFqnSchema } from "../domain/skill-fqn.js";
 export type { SkillNotFound } from "../domain/skill-repository.js";

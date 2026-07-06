@@ -9,12 +9,13 @@ import { eq } from "drizzle-orm";
 import { errAsync, okAsync } from "neverthrow";
 import { z } from "zod";
 import type { DatabaseUnavailable, McpNotFound } from "../../domain/mcp-repository.js";
+import { RegistryOriginSchema } from "../../domain/registry-origin.js";
 import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
 import { mcps } from "../../infrastructure/drizzle/mcp-schema.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 
 export const GetMcpByOriginRequestSchema = z.object({
-  origin: z.string(),
+  origin: RegistryOriginSchema,
 });
 export type GetMcpByOriginRequest = z.infer<typeof GetMcpByOriginRequestSchema>;
 

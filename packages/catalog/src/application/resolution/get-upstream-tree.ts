@@ -12,6 +12,7 @@ import { z } from "zod";
 import type { AgentManifest } from "../../domain/agent-manifest.js";
 import { type CatalogKind, CatalogKindSchema } from "../../domain/catalog-kind.js";
 import type { McpManifest } from "../../domain/mcp-manifest.js";
+import { RegistryOriginSchema } from "../../domain/registry-origin.js";
 import type { SkillManifest } from "../../domain/skill-manifest.js";
 import type { Source, SourceError } from "../../domain/source.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
@@ -25,10 +26,13 @@ import {
 
 export const GetUpstreamTreeRequestSchema = z.object({
   kind: CatalogKindSchema,
-  origin: z.string(),
+  origin: RegistryOriginSchema,
 });
 export type GetUpstreamTreeRequest = z.infer<typeof GetUpstreamTreeRequestSchema>;
 
+// Deliberate alias: the upstream-tree response is structurally the shared
+// resolved-graph shape; re-exporting it keeps one source of truth rather than
+// restating every node/edge field here.
 export const GetUpstreamTreeResponseSchema = ResolvedGraphSchema;
 export type GetUpstreamTreeResponse = z.infer<typeof GetUpstreamTreeResponseSchema>;
 

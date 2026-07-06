@@ -9,13 +9,14 @@ import { eq } from "drizzle-orm";
 import { errAsync, okAsync } from "neverthrow";
 import { z } from "zod";
 import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
+import { RegistryOriginSchema } from "../../domain/registry-origin.js";
 import type { SkillNotFound } from "../../domain/skill-repository.js";
 import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
 import { skills } from "../../infrastructure/drizzle/skill-schema.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 
 export const GetSkillByOriginRequestSchema = z.object({
-  origin: z.string(),
+  origin: RegistryOriginSchema,
 });
 export type GetSkillByOriginRequest = z.infer<typeof GetSkillByOriginRequestSchema>;
 
