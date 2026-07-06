@@ -102,7 +102,6 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
     runners: opts.runners,
     logger,
     now,
-    randomUUID,
   });
 
   return {

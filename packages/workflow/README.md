@@ -1,11 +1,11 @@
 # @glyphs-ai/workflow
 
-> **Tier:** T1 (Modes). See the [tier model](../../docs/architecture.md#tier-model).
+> **Tier:** T1 (Modes).
 
 Closed-kind T1 substrate for workflow DAGs in glyph. It owns three
 tables — `workflows` / `workflow_nodes` / `workflow_edges` — plus the
-entity layer that round-trips them, the error catalog, and the
-`WorkflowNodeRunner` interface that callers implement once per
+entity layer that round-trips them, the Result-native error atoms, and
+the `WorkflowNodeRunner` port that callers implement once per
 `WorkflowNodeKind` and inject at compose time.
 
 ## Substrate model
@@ -38,41 +38,41 @@ the coord's prerogative.
 
 ## API surface
 
-`WorkflowService` exposes four method groups. The coordinator-callback
+`composeWorkflowModule` returns a `WorkflowModule` — a DI container of
+use-case instances plus the stateful engine. There is no service facade;
+consumers call `module.<useCase>.execute(request)`. The coordinator-callback
 mutations and structural reads are surfaced over HTTP (see
-[Coord-callback API](#coord-callback-api)); the lifecycle and
-engine-facing methods are driven by the host (`@glyphs-ai/api` wiring +
-`@glyphs-ai/server` routes), never by the coordinator.
+[Coord-callback API](#coord-callback-api)); the lifecycle and engine-facing
+members are driven by the host, never by the coordinator.
 
 - **Mutation primitives** (coord-callback): `addSubgraph`, `cancelNode`,
   `finishWorkflow`, `respondHumanNode`. Each is independently atomic;
-  structural DAG mutation goes through `addSubgraph`.
-- **Structural reads**: `getWorkflow`, `getDag`, `getNode`,
-  `getNodeDir`, plus the list / aggregate reads `list`,
-  `countAwaitingHumanByWorkflow`, and `aggregateByOrigin`
-  that back the dashboard's workflow list and badges.
-- **Lifecycle / operator**: `createWorkflow` (bootstrap a workflow and
-  its initial coordinator node), `cancelWorkflow` (operator cancel,
-  cascades to in-flight nodes), `deleteWorkflow` (teardown, optionally
-  purging the workflow directory).
-  These are host entry points, not coord-reachable.
-- **Engine-facing**: `setEngine`, `listEligibleNodeIdsForDispatch`,
-  `dispatchAtomic`, and `markNodeTerminal` — the dispatch /
-  terminal-write seam the in-memory `WorkflowEngine` drives each tick.
-  `runnerFor`, the eligibility scan, and `dispatchAtomic` live in
-  `_dispatch.ts`; the service keeps thin delegators.
+  structural DAG growth goes through `addSubgraph`.
+- **Structural reads**: `getWorkflow`, `getDag`, `getNode`, plus the list /
+  aggregate reads `listWorkflows`, `countAwaitingHuman`, and
+  `aggregateByOrigin` that back the dashboard's workflow list and badges, and
+  the per-node artifact reads `listWorkflowArtifacts` /
+  `resolveWorkflowArtifactPath`.
+- **Lifecycle / operator**: `createWorkflow` (bootstrap a workflow and its
+  initial coordinator node), `cancelWorkflow` (operator cancel, cascades to
+  in-flight nodes), `deleteWorkflow` (teardown, optionally purging the workflow
+  directory). These are host entry points, not coord-reachable.
+- **Engine seam**: `module.engine` is the stateful `WorkflowEngine`. Every
+  mutation use-case nudges it post-commit so newly eligible nodes dispatch, and
+  hosts `drain()` it on shutdown. `module.close()` drains the engine and closes
+  the module-owned SQLite connection.
 
 ## Origin + origin_id
 
 Every workflow row carries two first-class routing columns: an `origin`
 recording who launched it, and an optional typed `origin_id` naming the
 specific external entity within that origin. `origin` is an open string
-discriminator (`WorkflowOrigin = string`): `"standalone"` is reserved
-for direct dashboard / CLI / MCP creation and is the default for `GET
-/workflows`; `"schedule"` is stamped by the schedule integration handler
-and pairs with the launching schedule's id in `origin_id`. The default
-listing filters to `standalone` by construction so integration-owned
-workflows don't leak into the user's main list.
+discriminator (`WorkflowOrigin = string`): `"standalone"` is the
+conventional value for direct dashboard / CLI / MCP creation, while
+`"schedule"` is stamped by the schedule integration handler and pairs
+with the launching schedule's id in `origin_id`. `listWorkflows` takes an
+optional `origin` filter so a host can scope a listing to a single origin
+and keep integration-owned workflows out of the user's main list.
 
 The `(origin, origin_id)` pair is backed by the partial index
 `workflows_origin_pair_idx` on `(origin, origin_id) WHERE origin_id IS
@@ -88,29 +88,28 @@ key lives in its own typed column.
 
 ## Layout
 
-Standard `packages/_template` shape:
+Four-layer DDD tree (domain / application / infrastructure / composition):
 
 ```
 src/
-  _dag.ts               Pure DAG helpers — topology, parent-readiness, cycle check, NodeRef serialization
-  _dispatch.ts          Free dispatch helpers — runnerFor / eligibility scan / dispatchAtomic (service delegates)
-  _engine.ts            In-memory WorkflowEngine tick loop (private)
-  _helpers.ts           Misc pkg-internal helpers (safeRmDir)
-  _stuck-recovery.ts    Stuck-coord retry cap consts (STUCK_RETRY_*) + outcome type
-  schema.ts             Drizzle table definitions (private)
-  workflow-entity.ts    Row ↔ entity round-trip (header / node / edge)
-  workflow-repository.ts Drizzle-backed CRUD (private)
-  workflow-service.ts   Mutation primitives, reads, lifecycle + engine seam
-  compose.ts            composeWorkflowModule({ dbFile, runners, ... })
-  migrations.ts         Inlined migration SQL (applied at compose time)
-  testing.ts            openTestWorkflowDb() in-memory test helper
-  errors.ts             WorkflowError + concrete subclasses
-  validate.ts           Id-grammar / enum-membership guards + coordinator-spec check (pure)
-  paths.ts              workflowDir / workflowNodeDir helpers
-  types.ts              FSM enums, runner interface, NodeRef + service request/response DTOs
-  index.ts              public barrel
-drizzle/                generated SQL migrations (committed)
-README.md               this file
+  domain/                Framework-free entities, value objects, and FSM enums
+    workflow/            WorkflowEntity + value objects (status, origin, brief,
+                         cancellation, success, failure, id, dag, dispatch
+                         readiness, stuck recovery) + the WorkflowRepository port
+    node/                Node entity, node id, kind, status, retry, human-node
+    edge/                Edge entity
+  application/           One use-case per operation (each returns a Result)
+    engine/              WorkflowEngine — the in-process dispatch / terminal tick loop
+    ports/               WorkflowNodeRunner port + WorkflowRunners (one per kind)
+    workflow-public.ts   Shared cross-use-case surface re-exported from domain
+    use-case.ts          UseCase interface
+  infrastructure/
+    drizzle/             Table definitions, mapper, repository, queries, migrations, db open
+    file/                WorkflowSandbox — per-workflow directory paths + atomic IO
+  workflow-module.ts     composeWorkflowModule(...) composition root → WorkflowModule
+  index.ts               public barrel
+drizzle/                 generated + hand-written SQL migrations (committed)
+README.md                this file
 ```
 
 ## Wiring
@@ -124,7 +123,7 @@ const workflowModule = await composeWorkflowModule({
   dbFile,
   workspaceDir,
   runners: {
-    coordinator: makeCoordinatorNodeRunner({ ... }),
+    coordinator: makeCoordNodeRunner({ ... }),
     worker:      makeWorkerNodeRunner({ ... }),
     human:       makeHumanNodeRunner({ ... }),
   },
@@ -137,19 +136,18 @@ bridge `@glyphs-ai/workflow`, `@glyphs-ai/task`, and
 
 ## Coord-callback API
 
-The coord-callback mutation primitives on `WorkflowService`, plus the per-node
-`getNode` structural read, are exposed over HTTP on
+The coord-callback mutation use-cases, plus the per-node `getNode`
+structural read, are exposed over HTTP on
 `/api/workspaces/:id/workflows/:workflowId/*` so a coordinator agent's task
-can grow / shrink / inspect the DAG from its own process. HTTP routes
-forward `workflowId` from the URL path and nothing else; the
-substrate's only lifecycle gate is the workflow's own status — a
-mutation against a terminal workflow surfaces
-`WorkflowAlreadyTerminalError` → HTTP 409. Structural invariants
-(coord-chain orphan / single-successor, parent-state rules,
-sealing-rule rejection on non-`not_started` targets) still apply
-and surface as their own typed errors.
+can grow / inspect the DAG from its own process. HTTP routes forward
+`workflowId` from the URL path and nothing else; the substrate's only
+lifecycle gate is the workflow's own status — a mutation against a terminal
+workflow surfaces the `WorkflowAlreadyTerminal` atom → HTTP 409. Structural
+invariants (coord-chain orphan / single-successor, parent-state rules,
+sealing-rule rejection on non-`not_started` targets) still apply and surface
+as their own typed error atoms.
 
-| Verb     | Path                                       | Service method   | Body                                                                                                           | Response                                      |
+| Verb     | Path                                       | Use-case         | Body                                                                                                           | Response                                      |
 | -------- | ------------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `GET`    | `/:workflowId/nodes/:nodeId`               | `getNode`        | _none_                                                                                                         | `WorkflowNode`                            |
 | `POST`   | `/:workflowId/subgraph`                    | `addSubgraph`    | `{ nodes:[{tempId,kind,spec,existingParents?}], edges:[{from,to}] }` — `from`/`to` are tagged `NodeRef`s        | `{ insertedNodes:[{tempId,nodeId,phase}] }`   |
@@ -157,35 +155,35 @@ and surface as their own typed errors.
 | `POST`   | `/:workflowId/finish`                      | `finishWorkflow` | `{ outcome: "succeeded" \| "failed" }`                                                                         | `WorkflowHeader` (post-finish projection) |
 | `POST`   | `/:workflowId/nodes/:nodeId/respond`       | `respondHumanNode` | `{ choiceId?, input? }`                                                                                      | `WorkflowNode` (post-respond projection)  |
 
-`WorkflowNodeRef` is a tagged union:
+`NodeRef` is a tagged union:
 `{kind:"existing",id}` (resolve to an existing node) or
 `{kind:"temp",tempId}` (resolve to a temp node declared in the same
 `addSubgraph` batch).
 
 ### Error policy
 
-| Substrate class                          | HTTP | Why                                                            |
-| ---------------------------------------- | ---- | -------------------------------------------------------------- |
-| `WorkflowNotFoundError`                  | 404  | addressing miss                                                |
-| `WorkflowNodeNotFoundError`              | 404  | addressing miss                                                |
-| `WorkflowEdgeNotFoundError`              | 404  | addressing miss                                                |
-| `InvalidWorkflowIdError` / id grammar    | 400  | caller-fixable structural validation                           |
-| `WorkflowNodeSpecError` (per-kind)       | 400  | caller-fixable spec validation                                 |
-| `EmptyParentsError`                      | 400  | mutation body empty                                            |
-| `WorkflowSubgraph*Error`                 | 400/409 | structural batch rules                                      |
-| `WorkflowNodeKindShapeError`             | 400  | caller `kind` not a non-empty string                           |
-| `WorkflowNodeKindCorruptionError`        | 500  | persisted `kind` value outside the closed enum (corruption)    |
-| `WorkflowEnumValueCorruptionError`       | 500  | persisted enum value outside the known vocabulary (corruption) |
-| `WorkflowAlreadyTerminalError`           | 409  | CAS conflict — workflow is already terminal                    |
-| `WorkflowNodeNotMutableError`            | 409  | sealing rule — status disallows the verb                       |
-| `WorkflowEdgeCycleError`                 | 409  | DAG cycle would close                                          |
-| `WorkflowRemoveNodeOrphansChildError`    | 409  | delete would orphan a child                                    |
-| `WorkflowRemoveEdgeOrphansChildError`    | 409  | delete would orphan the to-node                                |
+Use-cases return discriminated-union error atoms (keyed on `type`); the host's
+route layer maps each atom to an HTTP status:
 
-The CLI surface mirrors the HTTP surface 1:1 — every route has a
-matching `glyph workflow <verb>` subcommand: `add-node`, `add-edge`,
-`add-subgraph`, `remove-node`, `remove-edge`, `replace-spec`,
-`cancel-node`, `finish`, `respond` (the nine mutations), plus `node-show` for the
-`getNode` read. Spec payloads are read from `--spec-file <path>` so
-multi-line JSON survives shell quoting. See
-`packages/cli/src/commands/workflow.ts` for the per-flag rationale.
+| Error atom                       | HTTP | Why                                                     |
+| -------------------------------- | ---- | ------------------------------------------------------- |
+| `WorkflowNotFound`               | 404  | addressing miss                                         |
+| `WorkflowNodeNotFound`           | 404  | addressing miss                                         |
+| `NodeSpecError`                  | 422  | per-kind spec validation (wraps a typed `cause`)        |
+| `EmptyParents`                   | 422  | node declared with no parent                            |
+| `WorkflowSubgraphInvalid`        | 422  | structural batch rule (empty / cyclic / unresolved ref) |
+| `HumanNodeResponseInvalid`       | 422  | human-node response failed validation                   |
+| `WorkflowAlreadyTerminal`        | 409  | mutation against an already-terminal workflow           |
+| `WorkflowNodeNotMutable`         | 409  | sealing rule — status disallows the verb                |
+| `WorkflowDeleteRequiresTerminal` | 409  | delete attempted on a non-terminal workflow             |
+| `WorkflowDagConflict`            | 409  | DAG rule (successor-coord / orphan-coord / parent-state) |
+| `WorkflowInvariantViolation`     | 500  | persisted state violates a substrate invariant          |
+| `DatabaseUnavailable`            | 503  | SQLite driver fault                                     |
+| `WorkflowDirReservationFailed`   | 503  | workflow-directory reservation IO fault                 |
+
+The CLI mirrors the read + mutation surface as `glyph workflow <verb>`
+subcommands. Reads: `list`, `show`, `node-show`, `dag`. Operator lifecycle:
+`create`, `cancel`, `rm`. Coord-callback mutations: `add-node`, `add-subgraph`,
+`add-edge`, `cancel-node`, `finish`, `respond`. The DAG is append-only — there
+is no remove or replace verb. Spec payloads are read from `--spec-file <path>`
+so multi-line JSON survives shell quoting.

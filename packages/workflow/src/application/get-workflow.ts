@@ -24,7 +24,7 @@ import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries
 import type { WorkflowRow } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-export const WorkflowViewSchema = z.object({
+const WorkflowViewSchema = z.object({
   id: WorkflowIdSchema,
   brief: z.string(),
   details: z.string().optional(),

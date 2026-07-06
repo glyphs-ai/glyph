@@ -70,7 +70,6 @@ export class CancelWorkflowNodeUseCase
         const terminal = workflow.value.markNodeTerminal(
           parsed.nodeId,
           "cancelled",
-          "cancelNode",
           this.deps.now().toISOString(),
         );
         if (terminal.isErr())

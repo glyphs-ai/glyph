@@ -59,17 +59,17 @@ export const workflows = sqliteTable(
     index("workflows_status_idx").on(t.status),
     index("workflows_coordinator_agent_idx").on(t.coordinatorAgent),
     index("workflows_origin_idx").on(t.origin),
-    // workflows_origin_pair_idx is a composite partial index defined
-    // in drizzle/0004_workflows_origin_id.sql ((origin, origin_id)
-    // WHERE origin_id IS NOT NULL); drizzle-kit can't express partial
-    // indexes in the TS schema.
+    // workflows_origin_pair_idx is a composite partial index on
+    // (origin, origin_id) WHERE origin_id IS NOT NULL. It is created by
+    // a hand-written migration, not declared here: drizzle-kit can't
+    // express partial indexes in the TS schema.
   ],
 );
 
 /**
  * Persisted row for one workflow node.
  *
- * Polymorphic on `kind`. Two kinds ship: `'worker'` and `'coordinator'`.
+ * Polymorphic on `kind`. Three kinds ship: `'coordinator'`, `'worker'`, and `'human'`.
  * The substrate is kind-agnostic — each row is routed through a compose-time
  * `WorkflowNodeRunner` for kind-specific concerns (spec
  * validation, dispatch, cancel).

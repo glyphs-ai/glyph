@@ -131,7 +131,6 @@ export class RespondToHumanNodeUseCase
         const terminal = workflow.value.markNodeTerminal(
           parsed.nodeId,
           "succeeded",
-          undefined,
           this.deps.now().toISOString(),
         );
         if (terminal.isErr())

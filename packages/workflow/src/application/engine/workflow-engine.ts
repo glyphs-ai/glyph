@@ -46,7 +46,6 @@ export interface WorkflowEngineOpts {
   readonly runners: WorkflowRunners;
   readonly logger?: Logger;
   readonly now?: () => Date;
-  readonly randomUUID?: () => string;
 }
 
 interface DispatchPayload {
@@ -71,7 +70,6 @@ export class WorkflowEngine implements WorkflowDispatchCoordinator {
     this.runners = opts.runners;
     this.logger = opts.logger ?? silentLogger;
     this.now = opts.now ?? (() => new Date());
-    void opts.randomUUID;
   }
 
   async drain(): Promise<void> {
@@ -157,7 +155,6 @@ export class WorkflowEngine implements WorkflowDispatchCoordinator {
       const terminal = workflow.value.markNodeTerminal(
         parsedNodeId.data,
         "cancelled",
-        "workflow cancelled",
         this.now().toISOString(),
       );
       if (terminal.isErr()) {
@@ -300,7 +297,6 @@ export class WorkflowEngine implements WorkflowDispatchCoordinator {
     const terminal = workflow.value.markNodeTerminal(
       nodeId,
       result.status,
-      "reason" in result ? result.reason : undefined,
       this.now().toISOString(),
     );
     if (terminal.isErr()) {

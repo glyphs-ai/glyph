@@ -22,7 +22,7 @@ async function waitUntil(
   throw new Error(`waitUntil timed out (${timeoutMs}ms): ${label}`);
 }
 
-describe("WorkflowService.dispatchAtomic", () => {
+describe("WorkflowEngine.dispatch", () => {
   let f: WorkflowFixture;
 
   beforeEach(async () => {

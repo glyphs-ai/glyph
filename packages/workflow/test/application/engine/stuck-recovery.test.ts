@@ -59,7 +59,7 @@ async function quietEngine(f: WorkflowFixture): Promise<void> {
   await f.module.engine.drain();
 }
 
-describe("WorkflowService — stuck-coord recovery", () => {
+describe("WorkflowEngine — stuck-coord recovery", () => {
   let f: WorkflowFixture;
 
   beforeEach(async () => {
