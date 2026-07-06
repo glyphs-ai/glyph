@@ -55,9 +55,10 @@ export class RenameWorkspaceUseCase
           this.logger.debug({ useCase: "renameWorkspace", err }, "rejected");
           return err;
         }
-        // Every other repo failure is a tech fault. The id/path save
-        // conflicts an UPDATE of a loaded aggregate can never actually
-        // raise fold into DatabaseUnavailable so the contract stays narrow.
+        // Anything past WorkspaceNotFound is an infrastructure fault: the
+        // remaining get/save errors are all DatabaseUnavailable, so log it
+        // and return it (the fallback coercion keeps the error union at
+        // WorkspaceNotFound | DatabaseUnavailable).
         this.logger.warn({ useCase: "renameWorkspace", err }, "tech failure");
         return err.type === "DatabaseUnavailable"
           ? err

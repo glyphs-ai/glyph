@@ -5,9 +5,9 @@
 A *workspace* is a user-chosen directory that holds glyph's
 per-project state. This package manages the global registry: a single
 `$GLYPH_HOME/global.db` SQLite table mapping opaque UUIDs to absolute
-paths, plus allocation/cleanup of the per-workspace `sessions/`,
-`tasks/`, and `workflows/` parent directories. Sibling packages own
-the contents beneath those directories and the per-workspace
+paths, plus provisioning each workspace's root directory at
+registration. Sibling packages create and own the per-domain subdirs
+(`sessions/`, `tasks/`, `workflows/`) and the per-workspace
 `workspace.db`. The directory is normally user-chosen but can also be
 auto-allocated under `$GLYPH_HOME/workspaces/<uuid>/` when the caller
 doesn't specify one. The global registry stores each workspace's
@@ -19,7 +19,7 @@ metadata sidecar file.
 ```
 packages/workspace/src/
   domain/
-    workspace.entity.ts        WorkspaceEntity (pkg-owned domain shape)
+    workspace-entity.ts        WorkspaceEntity (pkg-owned domain shape)
     workspace-id.ts            WorkspaceId schema + branded type
     workspace-name.ts          WorkspaceName schema + branded type
     workspace-repository.ts    repository port (write-side: get/save/delete) + error atoms
@@ -33,9 +33,10 @@ packages/workspace/src/
     workspace-migrations.ts    applyWorkspaceMigrations
     workspace-repository.ts    Drizzle write-side adapter (get/save/delete)
     workspace-queries.ts       Drizzle read-side adapter (query() + workspaces table)
+    workspace-mapper.ts        row ↔ entity mapping (WorkspaceRow / WorkspaceMapper)
   infrastructure/file/
     local-workspace-provisioner.ts  ensures the workspace root dir exists
-  workspace-module.ts          composeWorkspaceModule({ dbFile, defaultWorkspaceParent, logger? })
+  workspace-module.ts          composeWorkspaceModule({ db, defaultWorkspaceParent, logger? })
   index.ts                     public barrel (compose + use-case contracts + curated domain types)
 drizzle/                       generated SQL migrations (committed)
 drizzle.config.ts              drizzle-kit config
@@ -44,8 +45,7 @@ drizzle.config.ts              drizzle-kit config
 ## Public API
 
 The `.` entrypoint exports the composition surface, per-use-case wire
-contracts, the curated cross-use-case domain/error surface, and
-`UseCase` / `UseCaseResult`:
+contracts, and the curated cross-use-case domain/error surface:
 
 ```ts
 import { composeWorkspaceModule, openWorkspaceDb } from "@glyphs-ai/workspace";
@@ -62,7 +62,7 @@ const workspace = await composeWorkspaceModule({
 await workspace.listWorkspaces.execute({});                  // Result<Workspace[], E>
 await workspace.getWorkspace.execute({ id });                // Result<Workspace | null, E>
 await workspace.getLastOpenedWorkspace.execute({});          // Result<Workspace | null, E>
-await workspace.getLastOpenedWorkspaceId.execute({});        // Result<string | null, E>
+await workspace.getLastOpenedWorkspaceId.execute({});        // Result<{ id: string | null }, E>
 
 // Writes
 await workspace.registerWorkspace.execute({ name, workspaceDir }); // workspaceDir optional
@@ -139,9 +139,10 @@ malformed id / name / workspaceDir raises a `ZodError`, which the api
 layer maps to a 400 `ValidationError` envelope.
 
 The write-side repository's `get(id)` returns the entity directly and
-signals a missing row with `WorkspaceNotFound`. Use-cases interpret it
-at their boundary: `rename` / `open` surface it as their caller-facing
-error, while `unregister` treats it as idempotent success.
+signals a missing row with `WorkspaceNotFound`. `rename` / `open` call
+`get` and surface that as their caller-facing error; `unregister`
+deletes by id without a prior `get`, and the delete is a no-op for an
+unknown id (idempotent success).
 
 Change-tracking lives in the repository, not the entity. `WorkspaceEntity`
 is a pure rich-domain object (`create` / `rehydrate` + mutators, no
@@ -161,8 +162,8 @@ and returns `Ok(null)` only for a valid-but-unknown id.
 Concurrency: `registerWorkspace`'s pre-flight conflict checks are
 best-effort UX. Two concurrent registers can race past them; the
 UNIQUE / PRIMARY KEY constraints on the `workspaces` table are the
-deterministic backstop, and the save's INSERT path is wrapped to
-translate SQLite constraint errors back into typed domain errors.
+deterministic backstop. A racing INSERT that trips a constraint
+surfaces as `DatabaseUnavailable`, not `WorkspacePathConflict`.
 
 ## Workspace root directory
 
