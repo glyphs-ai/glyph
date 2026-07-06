@@ -303,8 +303,8 @@ export interface BuildInteractiveLaunchOpts {
    *
    * The dashboard only surfaces a "Spawn remote" button when the
    * active runtime advertises `capabilities.remoteSession === true`;
-   * the runtime MUST still defend itself by throwing
-   * {@link RuntimeDoesNotSupportRemoteError} when called with
+   * the runtime MUST still defend itself by returning a
+   * {@link RuntimeLaunchFailed} error when called with
    * `{ remote: true }` on a runtime that doesn't support it.
    */
   readonly remote?: boolean;
@@ -457,7 +457,7 @@ export interface ReadActivityOpts {
    * SSE polling and by callers walking the timeline head-to-tail.
    *
    * Mutually exclusive with {@link before}; supplying both is a
-   * `RuntimeReadActivityInvalidArgs` from the runtime layer (the route
+   * `RuntimeActivityReadFailed` from the runtime layer (the route
    * layer should reject as 400 before reaching the runtime).
    */
   readonly after?: number;

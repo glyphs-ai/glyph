@@ -288,6 +288,8 @@ export class CopilotActivityStreamParser {
     return { items };
   }
 
+  // Test-only accessor: exposes the internal `seq` counter for
+  // sequencing assertions in specs; no production caller.
   get nextSeq(): number {
     return this.seq;
   }
