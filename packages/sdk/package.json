@@ -2,7 +2,7 @@
   "name": "@glyphs-ai/sdk",
   "private": true,
   "version": "0.0.0",
-  "description": "Typed REST client for the glyph HTTP API, codegenned from @glyphs-ai/server's OpenAPI spec via @hey-api/openapi-ts. Node 22+ devtime; runtime-agnostic, browser-safe output. Includes typed SSE/streaming endpoints.",
+  "description": "Typed REST client for the glyph HTTP API, codegenned from @glyphs-ai/server's OpenAPI spec via @hey-api/openapi-ts. Node 22+ devtime; runtime-agnostic, browser-safe output.",
   "license": "MIT",
   "type": "module",
   "engines": {

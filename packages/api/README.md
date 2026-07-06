@@ -181,6 +181,35 @@ const problem: Problem = toProblem({
 });
 ```
 
+## Error sanitization contract
+
+Business errors thrown by the composed T0/T1 use-cases reach the HTTP
+layer as typed `Error` subclasses. Two things happen before they hit the
+wire:
+
+- **Per-domain `ErrorPolicy`** (`src/_error-policies/`) maps each
+  known error class → `{ status, code, title, detail?, extension? }` so
+  a `WorkflowAlreadyTerminal` becomes a stable `409` with a
+  machine-readable `code`, not an ad-hoc string.
+- **`SAFE_ERROR_NAMES` allow-list** (`src/_http-errors.ts`) gates which
+  error `name`s may surface their `.message` in the response body. Names
+  not on the list have their `.message` dropped and collapse to a
+  generic Problem detail, so runtime host paths, `fs` strings, DB URLs,
+  or stack frames that a downstream service happened to include in an
+  error message never leak on the wire.
+
+The three workflow spec-validation errors
+(`WorkflowCoordSpecError`, `WorkflowWorkerSpecError`,
+`WorkflowHumanSpecError`) are on the allow-list because their messages
+are user-facing validation guidance. Anything unmapped is treated as
+an internal fault: `500` with a generic detail, no leak.
+
+This contract is distinct from the request-validation 400 path (a zod
+parse failure → `application/problem+json` envelope with
+`code: "ValidationError"` + `issues`) documented on the server
+README's "OpenAPI surface" section: request validation runs before any
+use-case executes, so no business error is involved.
+
 ## Tier
 
 `@glyphs-ai/api` is the **T2 Application layer (orchestration)** in
