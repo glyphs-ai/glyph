@@ -18,6 +18,10 @@ export const ListSessionsRequestSchema = z
   .strict();
 export type ListSessionsRequest = z.infer<typeof ListSessionsRequestSchema>;
 
+// Deliberate duplication: this 9-field session projection is intentionally NOT
+// shared with the sibling create-session / get-session use cases that expose the
+// same shape. Each owns its V1 response so a later evolution of one caller never
+// drags the others along in lockstep. Redundancy > coupling.
 export const ListSessionsResponseSchema = z.array(
   z.object({
     id: SessionIdSchema,

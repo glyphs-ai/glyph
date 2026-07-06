@@ -10,6 +10,11 @@ import type { UseCase, UseCaseResult } from "./use-case.js";
 export const GetWorkspaceRequestSchema = z.object({ id: WorkspaceIdSchema }).strict();
 export type GetWorkspaceRequest = z.infer<typeof GetWorkspaceRequestSchema>;
 
+// Deliberate duplication: this 5-field workspace projection is intentionally NOT
+// shared with the sibling get-last-opened-workspace / list-workspaces /
+// register-workspace use cases that expose the same shape. Each owns its V1
+// response so a later evolution of one caller never drags the others along in
+// lockstep. Redundancy > coupling.
 export const GetWorkspaceResponseSchema = z
   .object({
     id: WorkspaceIdSchema,
