@@ -17,7 +17,7 @@ export type WorkspaceVars = {
   workspaceContext: WorkspaceContext;
 };
 
-/** `workspace "<id>" not found` as an RFC 9457 Problem 404. */
+/** `workspace "<id>" not found` as an `application/problem+json` 404. */
 function workspaceNotFound(c: Context, id: string): Response {
   return c.json(
     toProblem({
@@ -55,7 +55,7 @@ export const COLD_LOAD_RACE_MS = 500;
  *     fresh load is still pending after the grace window
  *   - 503 + `Retry-After: 5` if the per-workspace `load()` throws —
  *     surfaces the failure as `WorkspaceLoadError` through the
- *     standard RFC 9457 Problem envelope (no host paths leak)
+ *     standard `application/problem+json` envelope (no host paths leak)
  *
  * The grace window lets fast cold loads bypass the warming round-trip
  * entirely; slow loads hand the client a typed 202 to back off on

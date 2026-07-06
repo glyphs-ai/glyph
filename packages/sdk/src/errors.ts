@@ -1,7 +1,7 @@
 /**
  * `GlyphError` — the single error type every SDK call funnels through.
  *
- * `unwrap()` (see `./unwrap.ts`) builds it from the RFC 9457 Problem
+ * `unwrap()` builds it from the `application/problem+json` Problem
  * envelope so callers get one uniform, typed failure regardless of which
  * route failed. It carries the decoded `Problem` body plus the raw
  * `Response` for callers that still need headers / status text / the body.
@@ -23,7 +23,7 @@ export interface GlyphErrorOptions {
   readonly message: string;
   readonly issues?: ReadonlyArray<GlyphIssue> | undefined;
   readonly response: Response;
-  /** The decoded RFC 9457 Problem body, when the error carried one. */
+  /** The decoded `application/problem+json` Problem body, when the error carried one. */
   readonly body?: Problem | undefined;
 }
 
@@ -63,7 +63,7 @@ export function isGlyphError(err: unknown): err is GlyphError {
 }
 
 /**
- * Structural guard for a decoded RFC 9457 Problem body. Checks the five
+ * Structural guard for a decoded `application/problem+json` Problem body. Checks the five
  * required core members (`type` / `title` / `status` / `detail` / `code`)
  * so a parsed `application/problem+json` response body narrows to
  * {@link Problem} before its extension members are read.
@@ -81,7 +81,7 @@ export function isProblem(value: unknown): value is Problem {
 }
 
 /**
- * Decode an RFC 9457 Problem body from a raw {@link Response}, for callers
+ * Decode an `application/problem+json` Problem body from a raw {@link Response}, for callers
  * holding a `Response` rather than the SDK's pre-parsed `error` slot (e.g.
  * the dashboard's hand-rolled `fetch` helpers). Returns the typed
  * {@link Problem} only when the response is labelled

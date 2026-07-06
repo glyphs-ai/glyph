@@ -9,11 +9,9 @@ export const DEFAULT_GLYPH_HOME = path.join(homedir(), ".glyph");
  * access. Empty-string overrides (`GLYPH_HOME=""`) are treated as
  * unset.
  *
- * Callers MUST pass `process.env` explicitly. The previous shape
- * defaulted to `{}` which silently returned `DEFAULT_GLYPH_HOME`
- * even when the caller meant "use the running process's env" — a
- * footgun that bit when a refactor accidentally dropped the
- * `process.env` argument and the function became a no-op constant.
+ * Callers MUST pass `process.env` explicitly — the `env` parameter is
+ * required, with no default, so a dropped argument is a compile error
+ * rather than a silent fall-back to `DEFAULT_GLYPH_HOME`.
  */
 export function resolveGlyphHome(env: NodeJS.ProcessEnv): string {
   const homeOverride = env.GLYPH_HOME;

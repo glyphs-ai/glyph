@@ -48,23 +48,22 @@ import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-
 // Route manifest and wire types live in `@glyphs-ai/api` (its `wire/`
 // surface); the server imports them via the api barrel, while CLI and
 // dashboard consume the same shapes through `@glyphs-ai/sdk`. Server's
-// public surface is strictly its transport (`runServer`,
-// `RunServerOpts`) + the auth helpers below + the CLI lifecycle
-// breadcrumb helpers (`resolveGlyphHome`, `logsDir`, `runtimeFilePath`,
-// the `RuntimeFile` shape) re-exported here for the CLI
-// process-management commands (`glyph start`, `status`, `stop`, `logs`,
-// `connect`). Those helpers cannot live in the wire surface because
-// they value-import `node:os` / `node:path`, and the wire surface is
-// the SPA-safe layer.
-export * from "./glyph-home.js";
-
-/**
- * Per-request variables stashed on the Hono context by `resolveWorkspaceMiddleware`.
- * Both managers point at the same workspace; routes pull whichever they need.
- *
- * The type itself is re-exported via the middleware module so route
- * factories can import it from a single source.
- */
+// public surface is strictly its transport (`runServer`, `RunServerOpts`)
+// plus the CLI lifecycle breadcrumb helpers (`resolveGlyphHome`,
+// `logsDir`, `runtimeFilePath`, the `RuntimeFile` shape) re-exported below
+// for the CLI process-management commands (`glyph start`, `status`,
+// `stop`, `logs`, `connect`). Those helpers cannot live in the wire
+// surface because they value-import `node:os` / `node:path`, and the wire
+// surface is the SPA-safe layer.
+export {
+  DEFAULT_GLYPH_HOME,
+  LOGS_SUBDIR,
+  logsDir,
+  RUNTIME_FILE_NAME,
+  type RuntimeFile,
+  resolveGlyphHome,
+  runtimeFilePath,
+} from "./glyph-home.js";
 
 /**
  * Options accepted by {@link runServer}. Every field is optional; unset
@@ -340,9 +339,9 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/workspaces", schedulesApp);
 
   // Workflow read + lifecycle surface. The substrate is kind-agnostic
-  // and stores nodes as `{ kind, spec: unknown }`; the wire-layer
-  // projection in `routes/_workflow-projection.ts` flattens the
-  // per-kind shapes for the dashboard / CLI.
+  // and stores nodes as `{ kind, spec: unknown }`; the mounted api routes
+  // flatten those per-kind shapes into the wire projection the dashboard
+  // and CLI consume.
   const workflowsApp = createApiApp<{ Variables: WorkspaceVars }>();
   workflowsApp.use("/:id/workflows/*", resolveWorkspaceMiddleware(application, logger));
   workflowsApp.route(

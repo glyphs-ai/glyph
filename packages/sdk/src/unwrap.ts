@@ -39,7 +39,7 @@ function toIssues(raw: unknown): ReadonlyArray<GlyphIssue> | undefined {
 
 /**
  * Normalise a non-2xx response into a `GlyphError`:
- *   - an RFC 9457 Problem body → message from `detail`, plus `code`,
+ *   - an `application/problem+json` Problem body → message from `detail`, plus `code`,
  *     `issues` (for a `ValidationError`), and the decoded `body`,
  *   - anything else (non-JSON / unrecognised body) → falls back to the
  *     response's status text.
