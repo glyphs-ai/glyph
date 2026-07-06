@@ -5,6 +5,7 @@ import { TaskBriefSchema } from "../domain/task-brief.js";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { type TaskId, TaskIdSchema } from "../domain/task-id.js";
+import { TaskOriginSchema } from "../domain/task-origin.js";
 import type { DatabaseUnavailable } from "../domain/task-repository.js";
 import type { WorkdirFailed } from "../domain/task-sandbox.js";
 import { TaskStatusSchema } from "../domain/task-status.js";
@@ -71,7 +72,7 @@ export const DispatchTaskRequestSchema = z
     brief: TaskBriefSchema,
     details: z.string().optional(),
     runtime: z.string().optional(),
-    origin: z.string().optional(),
+    origin: TaskOriginSchema.optional(),
     originId: z.string().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
     subprocessEnv: z.record(z.string(), z.string()).optional(),
@@ -80,22 +81,24 @@ export const DispatchTaskRequestSchema = z
   .strict();
 export type DispatchTaskRequest = z.infer<typeof DispatchTaskRequestSchema>;
 
-export const DispatchTaskResponseSchema = z.object({
-  id: TaskIdSchema,
-  agent: z.string(),
-  brief: z.string(),
-  details: z.string().optional(),
-  origin: z.string(),
-  originId: z.string().optional(),
-  status: TaskStatusSchema,
-  metadata: z.record(z.string(), z.unknown()),
-  createdAt: z.string(),
-  startedAt: z.string(),
-  endedAt: z.string().optional(),
-  success: TaskSuccessSchema.optional(),
-  failure: TaskFailureSchema.optional(),
-  cancellation: TaskCancellationSchema.optional(),
-});
+export const DispatchTaskResponseSchema = z
+  .object({
+    id: TaskIdSchema,
+    agent: z.string(),
+    brief: z.string(),
+    details: z.string().optional(),
+    origin: z.string(),
+    originId: z.string().optional(),
+    status: TaskStatusSchema,
+    metadata: z.record(z.string(), z.unknown()),
+    createdAt: z.string(),
+    startedAt: z.string(),
+    endedAt: z.string().optional(),
+    success: TaskSuccessSchema.optional(),
+    failure: TaskFailureSchema.optional(),
+    cancellation: TaskCancellationSchema.optional(),
+  })
+  .strict();
 export type DispatchTaskResponse = z.infer<typeof DispatchTaskResponseSchema>;
 
 /** `dispatch`: the chosen runtime is registered but cannot launch headless tasks. */

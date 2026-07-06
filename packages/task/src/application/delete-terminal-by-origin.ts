@@ -2,18 +2,18 @@ import { ResultAsync } from "neverthrow";
 import type { Logger } from "pino";
 import { z } from "zod";
 import type { TaskEntity } from "../domain/task-entity.js";
+import { TaskOriginSchema } from "../domain/task-origin.js";
 import type { DatabaseUnavailable, TaskRepository } from "../domain/task-repository.js";
 import type { TaskSupervisor } from "./supervision/task-supervisor.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const DeleteTerminalByOriginRequestSchema = z
-  .object({ origin: z.string(), originId: z.string() })
+  .object({ origin: TaskOriginSchema, originId: z.string() })
   .strict();
 export type DeleteTerminalByOriginRequest = z.infer<typeof DeleteTerminalByOriginRequestSchema>;
 
-export interface DeleteTerminalByOriginResponse {
-  readonly deletedCount: number;
-}
+export const DeleteTerminalByOriginResponseSchema = z.object({ deletedCount: z.number() }).strict();
+export type DeleteTerminalByOriginResponse = z.infer<typeof DeleteTerminalByOriginResponseSchema>;
 
 export type DeleteTerminalByOriginError = DatabaseUnavailable;
 

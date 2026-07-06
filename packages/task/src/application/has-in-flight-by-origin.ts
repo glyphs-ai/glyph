@@ -1,12 +1,13 @@
 import { and, eq, notInArray } from "drizzle-orm";
 import { z } from "zod";
+import { TaskOriginSchema } from "../domain/task-origin.js";
 import type { DatabaseUnavailable } from "../domain/task-repository.js";
 import { TERMINAL_TASK_STATUSES } from "../domain/task-status.js";
 import type { TaskQueries } from "../infrastructure/drizzle/task-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const HasInFlightByOriginRequestSchema = z
-  .object({ origin: z.string(), originId: z.string() })
+  .object({ origin: TaskOriginSchema, originId: z.string() })
   .strict();
 export type HasInFlightByOriginRequest = z.infer<typeof HasInFlightByOriginRequestSchema>;
 

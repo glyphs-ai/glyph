@@ -3,6 +3,7 @@ import { z } from "zod";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { TaskIdSchema } from "../domain/task-id.js";
+import { TaskOriginSchema } from "../domain/task-origin.js";
 import type { DatabaseUnavailable } from "../domain/task-repository.js";
 import { TaskStatusSchema, TERMINAL_TASK_STATUSES } from "../domain/task-status.js";
 import { TaskSuccessSchema } from "../domain/task-success.js";
@@ -10,27 +11,29 @@ import { projectTaskRow, type TaskQueries } from "../infrastructure/drizzle/task
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const ListInFlightByOriginRequestSchema = z
-  .object({ origin: z.string(), originId: z.string() })
+  .object({ origin: TaskOriginSchema, originId: z.string() })
   .strict();
 export type ListInFlightByOriginRequest = z.infer<typeof ListInFlightByOriginRequestSchema>;
 
 export const ListInFlightByOriginResponseSchema = z.array(
-  z.object({
-    id: TaskIdSchema,
-    agent: z.string(),
-    brief: z.string(),
-    details: z.string().optional(),
-    origin: z.string(),
-    originId: z.string().optional(),
-    status: TaskStatusSchema,
-    metadata: z.record(z.string(), z.unknown()),
-    createdAt: z.string(),
-    startedAt: z.string(),
-    endedAt: z.string().optional(),
-    success: TaskSuccessSchema.optional(),
-    failure: TaskFailureSchema.optional(),
-    cancellation: TaskCancellationSchema.optional(),
-  }),
+  z
+    .object({
+      id: TaskIdSchema,
+      agent: z.string(),
+      brief: z.string(),
+      details: z.string().optional(),
+      origin: z.string(),
+      originId: z.string().optional(),
+      status: TaskStatusSchema,
+      metadata: z.record(z.string(), z.unknown()),
+      createdAt: z.string(),
+      startedAt: z.string(),
+      endedAt: z.string().optional(),
+      success: TaskSuccessSchema.optional(),
+      failure: TaskFailureSchema.optional(),
+      cancellation: TaskCancellationSchema.optional(),
+    })
+    .strict(),
 );
 export type ListInFlightByOriginResponse = z.infer<typeof ListInFlightByOriginResponseSchema>;
 
