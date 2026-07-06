@@ -111,7 +111,7 @@ async function projectAndRefresh(
   };
 }
 
-/** Most-recent activity first; never-active rows (null) sort to the bottom. */
+/** Never-active rows (null) sort first; the rest by most-recent activity. */
 function compareByActivity(
   a: ListSessionsResponse[number],
   b: ListSessionsResponse[number],

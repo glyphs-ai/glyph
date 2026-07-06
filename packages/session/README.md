@@ -14,8 +14,8 @@ use-case that hands a session's launch command to an injected
 
 ## Why
 
-For interactive use, the [GitHub Copilot CLI](https://github.com/github/copilot-cli)
-is the chat UI. glyph's job is to:
+For interactive use, the GitHub Copilot CLI is the chat UI. glyph's
+job is to:
 
 - prepare a workdir with an agent baked in (the runtime adapter's
   `provision` step pulls bytes from the catalog)
@@ -57,9 +57,9 @@ packages/session/src/
     delete-session.ts        archive (row only) / purge (state + sandbox)
     build-interactive-launch.ts  assemble LaunchCommand + work-context env
     spawn-interactive.ts     build + spawn, folded into one result
-    index.ts                 curated domain surface (SessionId + error atoms)
+    session-public.ts        curated domain surface (SessionId + error atoms)
   infrastructure/
-    drizzle/                 session-db / schema / migrations / mapper / repository
+    drizzle/                 session-db / schema / migrations / mapper / repository / queries
     file/local-session-sandbox.ts  LocalSessionSandbox (node:fs)
   session-module.ts          composeSessionModule → SessionModule (DI container)
   index.ts                   public barrel
@@ -99,8 +99,7 @@ session id**.
 
 > Why SQLite for session metadata (and FS for the workdir)? The
 > project-wide rule: queryable structured data → SQLite; opaque
-> blobs / agent product → FS. (Full rationale in
-> [docs/architecture.md](../../docs/architecture.md#backend-selection-when-sqlite).)
+> blobs / agent product → FS.
 
 ## Public API
 
@@ -134,17 +133,18 @@ const result = (await session.spawnInteractive.execute({ id: created.id }))._uns
 if (result.ok) console.log("launched in", result.launcher);
 else console.error(result.code, result.error, result.display);
 
-await session.listSessions.execute({});                 // SessionView[]
-await session.getSession.execute({ id: created.id });   // SessionView | null
+await session.listSessions.execute({});                 // ListSessionsResponse
+await session.getSession.execute({ id: created.id });   // GetSessionResponse (null when absent)
 await session.deleteSession.execute({ id: created.id, purge: false });
 
 await session.close();
 ```
 
-Resume is the same call as launch — once a `runtimeSessionId` exists,
-`buildInteractiveLaunch` emits `--session-id=<id>`; for a fresh session
-it emits `--yolo` with no id. `{ remote: true }` produces a
-remote-friendly variant when the runtime supports it.
+Resume is the same call as launch: the `runtimeSessionId` pre-allocated
+at create time is threaded through `--session-id=<id>` on every launch,
+so the first launch creates the runtime session and later launches
+resume it. `{ remote: true }` produces a remote-friendly variant when
+the runtime supports it.
 
 ## Env layering
 
