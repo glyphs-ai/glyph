@@ -1,5 +1,5 @@
 /**
- * End-to-end acceptance test for thecoord-callback HTTP surface.
+ * End-to-end acceptance test for the coord-callback HTTP surface.
  *
  * Scope: spin up a real `WorkflowModule` (in-memory SQLite, mock per-
  * kind runners), mount `workflowsRoutes` against it, then drive a
