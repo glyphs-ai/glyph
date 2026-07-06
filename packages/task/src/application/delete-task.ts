@@ -48,7 +48,7 @@ export class DeleteTaskUseCase
     return deps.repository
       .get(id)
       .andThen((existing) => {
-        if (!isTerminal(existing.status)) {
+        if (!deleteTaskIsTerminal(existing.status)) {
           return errAsync<void, DeleteTaskError>({
             type: "InvalidTransition",
             from: existing.status,
@@ -65,6 +65,6 @@ export class DeleteTaskUseCase
   }
 }
 
-function isTerminal(status: string): boolean {
+function deleteTaskIsTerminal(status: string): boolean {
   return (TERMINAL_TASK_STATUSES as readonly string[]).includes(status);
 }

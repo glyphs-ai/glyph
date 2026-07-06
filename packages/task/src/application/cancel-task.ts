@@ -12,22 +12,24 @@ import type { UseCase, UseCaseResult } from "./use-case.js";
 export const CancelTaskRequestSchema = z.object({ id: TaskIdSchema }).strict();
 export type CancelTaskRequest = z.infer<typeof CancelTaskRequestSchema>;
 
-export const CancelTaskResponseSchema = z.object({
-  id: TaskIdSchema,
-  agent: z.string(),
-  brief: z.string(),
-  details: z.string().optional(),
-  origin: z.string(),
-  originId: z.string().optional(),
-  status: TaskStatusSchema,
-  metadata: z.record(z.string(), z.unknown()),
-  createdAt: z.string(),
-  startedAt: z.string(),
-  endedAt: z.string().optional(),
-  success: TaskSuccessSchema.optional(),
-  failure: TaskFailureSchema.optional(),
-  cancellation: TaskCancellationSchema.optional(),
-});
+export const CancelTaskResponseSchema = z
+  .object({
+    id: TaskIdSchema,
+    agent: z.string(),
+    brief: z.string(),
+    details: z.string().optional(),
+    origin: z.string(),
+    originId: z.string().optional(),
+    status: TaskStatusSchema,
+    metadata: z.record(z.string(), z.unknown()),
+    createdAt: z.string(),
+    startedAt: z.string(),
+    endedAt: z.string().optional(),
+    success: TaskSuccessSchema.optional(),
+    failure: TaskFailureSchema.optional(),
+    cancellation: TaskCancellationSchema.optional(),
+  })
+  .strict();
 export type CancelTaskResponse = z.infer<typeof CancelTaskResponseSchema>;
 
 export type CancelTaskError =
