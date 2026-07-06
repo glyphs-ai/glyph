@@ -44,11 +44,7 @@ import type {
   TaskNotFound,
   TaskRepository,
 } from "../../domain/task-repository.js";
-import type {
-  TaskSandbox,
-  WorkdirMaterializationFailed,
-  WorkdirReservationFailed,
-} from "../../domain/task-sandbox.js";
+import type { TaskSandbox, WorkdirFailed } from "../../domain/task-sandbox.js";
 import type { ExitOutcome, LiveProcessRegistry } from "../ports/live-process-registry.js";
 import {
   decideTerminal,
@@ -117,8 +113,7 @@ export type PurgeFailed = {
 
 /** Faults surfaced by {@link TaskSupervisor.runDispatch} (the stateful spawn pipeline). */
 type RunDispatchError =
-  | WorkdirReservationFailed
-  | WorkdirMaterializationFailed
+  | WorkdirFailed
   | DatabaseUnavailable
   | RuntimeHeadlessLaunchFailed
   | ManagerShuttingDown;

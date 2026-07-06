@@ -4,7 +4,7 @@ import { WorkflowNodeKindSchema } from "../../../src/domain/node/workflow-node-k
 // NOTE: the old `assertValidWorkflowNodeKind` distinguished a "shape" error
 // (empty / non-string) from a "corruption" error (unknown string). That
 // distinction now lives in the drizzle mapper's node rehydration
-// (WorkflowNodeKindShape vs WorkflowNodeKindCorruption atoms); the closed-enum
+// (WorkflowInvariantViolation subtypes "nodeKindShape" vs "nodeKindValue"); the closed-enum
 // schema here only answers membership, so both cases surface as a failed parse.
 const accepts = (x: unknown): boolean => WorkflowNodeKindSchema.safeParse(x).success;
 

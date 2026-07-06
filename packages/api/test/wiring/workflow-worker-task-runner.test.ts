@@ -5,7 +5,7 @@
  * the kind-specific concerns the runner owns:
  *
  *   - validate: shape checks + agent-existence lookup
- *     (`AgentNotFound` / `AgentResolutionFailed` task unions)
+ *     (`AgentNotFound` / `AgentUnresolvable` task unions)
  *   - dispatch: synthesises `origin: 'workflow'` + the node id in the
  *     typed `origin_id` column (reverse-lookup); installs the
  *     per-node poll interval and returns `void` (the runner logs the
@@ -259,7 +259,7 @@ describe("makeWorkerNodeRunner — validate", () => {
     await r.dispose();
   });
 
-  it("throws AgentResolutionFailed DU when catalog throws", async () => {
+  it("throws AgentUnresolvable DU when catalog throws", async () => {
     const deps = stubDeps({ getAgentThrows: new Error("catalog down") });
     const r = makeWorkerNodeRunner({
       catalog: deps.catalog,
@@ -267,7 +267,7 @@ describe("makeWorkerNodeRunner — validate", () => {
     });
     expect(await errCause(r.validate({ agent: "w", brief: "b" }, NODE_VALIDATE_CTX))).toMatchObject(
       {
-        type: "AgentResolutionFailed",
+        type: "AgentUnresolvable",
         agent: "w",
       },
     );

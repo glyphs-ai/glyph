@@ -8,8 +8,8 @@ export type AgentNotFound = {
 };
 
 /** `dispatch`: the catalog faulted while resolving the agent (not "absent"). */
-export type AgentResolutionFailed = {
-  readonly type: "AgentResolutionFailed";
+export type AgentUnresolvable = {
+  readonly type: "AgentUnresolvable";
   readonly agent: string;
   readonly cause: unknown;
 };
@@ -37,10 +37,10 @@ export interface BlockedReason {
  * Resolves a catalog agent at dispatch time. Satisfied at the composition
  * root by an adapter over `@glyphs-ai/catalog` (task never imports
  * catalog). `resolve` yields `AgentNotFound` when the name is absent and
- * `AgentResolutionFailed` when the catalog itself faults; `getEntry`
+ * `AgentUnresolvable` when the catalog itself faults; `getEntry`
  * returns the readiness entry (`null` when absent).
  */
 export interface AgentResolver {
-  resolve(agent: string): ResultAsync<ResolvedAgent, AgentNotFound | AgentResolutionFailed>;
-  getEntry(agent: string): ResultAsync<AgentEntry | null, AgentResolutionFailed>;
+  resolve(agent: string): ResultAsync<ResolvedAgent, AgentNotFound | AgentUnresolvable>;
+  getEntry(agent: string): ResultAsync<AgentEntry | null, AgentUnresolvable>;
 }

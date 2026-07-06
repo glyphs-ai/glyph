@@ -232,7 +232,7 @@ describe("workflowsRoutes — E2E mock-coord acceptance", () => {
     //    pulling retry off the leaf set, the final leaves = {cend}
     //    satisfies the §3 commit-time {1 coord leaf} invariant; cend
     //    also has a coord-kind parent (the retry) so the
-    //    OrphanCoordInsertError check passes.
+    //    orphanCoordInsert check passes.
     const dagBeforeRes = await h.app.request(`/${wfid}/dag`);
     const dagBefore = (await dagBeforeRes.json()) as {
       nodes: Array<{ id: string; kind: string; status: string }>;

@@ -245,7 +245,10 @@ describe("WorkflowService.addSubgraph", () => {
     const { workflowId } = await bootstrap(f);
     const r = await f.module.addSubgraph.execute({ workflowId, nodes: [], edges: [] });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphEmpty");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "empty" },
+    });
   });
 
   it("REJECTS duplicate tempIds", async () => {
@@ -269,7 +272,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphTempIdInvalid");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "tempIdInvalid" },
+    });
   });
 
   it("REJECTS empty-string tempId", async () => {
@@ -287,7 +293,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphTempIdInvalid");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "tempIdInvalid" },
+    });
   });
 
   it("REJECTS a parentless temp", async () => {
@@ -305,7 +314,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphTempParentless");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "tempParentless" },
+    });
   });
 
   it("REJECTS an edge that references an undeclared temp", async () => {
@@ -323,7 +335,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [{ from: { kind: "temp", tempId: "a" }, to: { kind: "temp", tempId: "ghost" } }],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphNodeRefUnresolved");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "nodeRefUnresolved" },
+    });
   });
 
   it("REJECTS more than one coord temp", async () => {
@@ -347,7 +362,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphMultipleCoordTemps");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "multipleCoordTemps" },
+    });
   });
 
   it("REJECTS an intra-batch cycle", async () => {
@@ -374,7 +392,10 @@ describe("WorkflowService.addSubgraph", () => {
       ],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphCyclic");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "cyclic" },
+    });
   });
 
   it("REJECTS a joined-DAG cycle via an existing edge", async () => {
@@ -426,7 +447,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [{ from: { kind: "temp", tempId: "t" }, to: { kind: "existing", id: a } }],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphCyclic");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "cyclic" },
+    });
   });
 
   // ─── Sad paths: existing-ref resolution ──────────────────
@@ -446,7 +470,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphNodeRefUnresolved");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "nodeRefUnresolved" },
+    });
   });
 
   it("rejects an unresolved existingParents ref before calling runner.validate", async () => {
@@ -468,7 +495,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphNodeRefUnresolved");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "nodeRefUnresolved" },
+    });
     // The unresolved existingParents ref is caught structurally, before the
     // per-temp runner.validate loop — so the worker runner is never invoked.
     expect(f.workerRunner.validateCalls.length).toBe(0);
@@ -502,7 +532,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("WorkflowSubgraphNodeRefUnresolved");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowSubgraphInvalid",
+      reason: { kind: "nodeRefUnresolved" },
+    });
   });
 
   it("REJECTS when an existing to-node is not not_started", async () => {
@@ -646,7 +679,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("ParentState");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowDagConflict",
+      reason: { kind: "parentState" },
+    });
   });
 
   it("REJECTS a coord temp without a coord parent", async () => {
@@ -671,7 +707,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("OrphanCoordInsert");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowDagConflict",
+      reason: { kind: "orphanCoordInsert" },
+    });
   });
 
   it("REJECTS a coord temp when its coord parent already has a coord-kind child", async () => {
@@ -704,7 +743,10 @@ describe("WorkflowService.addSubgraph", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("MultipleSuccessorCoords");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowDagConflict",
+      reason: { kind: "successorCoordExists" },
+    });
   });
 
   it("REJECTS when runner.validate throws", async () => {

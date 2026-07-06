@@ -82,7 +82,7 @@ import {
 } from "@glyphs-ai/workflow";
 import { err, ok, okAsync, type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
-import { taskAgentNotFound, taskAgentResolutionFailed } from "./_task-operation-error.js";
+import { taskAgentNotFound, taskAgentUnresolvable } from "./_task-operation-error.js";
 import type { WorkflowCoordinatorNodeSpec } from "./workflow-node-specs.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
@@ -307,7 +307,7 @@ export function makeCoordNodeRunner(
           try {
             found = await catalog.getAgent(obj.agent);
           } catch (cause) {
-            return err({ cause: taskAgentResolutionFailed(obj.agent, cause) });
+            return err({ cause: taskAgentUnresolvable(obj.agent, cause) });
           }
           if (found === null) return err({ cause: taskAgentNotFound(obj.agent) });
 

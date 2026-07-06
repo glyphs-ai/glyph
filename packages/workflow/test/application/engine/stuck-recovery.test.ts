@@ -9,7 +9,7 @@
  *     detector inserts a retry coord node and the wrapping write
  *     post-commit dispatches it.
  *  2. `addSubgraph` rejects batches whose final leaf frontier is not
- *     exactly `{1 coordinator}` with `WorkflowDagInvariantError` so
+ *     exactly `{1 coordinator}` with `WorkflowDagConflict` (`reason.kind: "invariant"`) so
  *     callers can never push a workflow into a structurally-stuck
  *     shape in a single primitive.
  *
@@ -87,7 +87,10 @@ describe("WorkflowService — stuck-coord recovery", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("DagInvariant");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowDagConflict",
+      reason: { kind: "invariant" },
+    });
   });
 
   it("§15.1 addSubgraph rejects a batch that yields two leaves", async () => {
@@ -111,7 +114,10 @@ describe("WorkflowService — stuck-coord recovery", () => {
       edges: [],
     });
     expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr().type).toBe("DagInvariant");
+    expect(r._unsafeUnwrapErr()).toMatchObject({
+      type: "WorkflowDagConflict",
+      reason: { kind: "invariant" },
+    });
   });
 
   it("§15.1 addSubgraph accepts a batch whose final leaves are {1 coord}", async () => {
@@ -169,7 +175,7 @@ describe("WorkflowService — stuck-coord recovery", () => {
       attempt: 1,
     });
     // Retry coord is a child of the prev coord (so the
-    // OrphanCoordInsertError invariant is satisfied).
+    // orphanCoordInsert invariant is satisfied).
     expect(dag.edges.some((e) => e.from === initialCoordNodeId && e.to === retry?.id)).toBe(true);
   });
 

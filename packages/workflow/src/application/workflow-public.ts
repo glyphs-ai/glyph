@@ -83,20 +83,12 @@ export {
   WorkflowEntity,
 } from "../domain/workflow/workflow-entity.js";
 export type {
-  DagInvariant,
   EmptyParents,
-  MultipleSuccessorCoords,
-  OrphanCoordInsert,
-  ParentState,
   SubgraphError,
+  WorkflowDagConflict,
   WorkflowNodeNotFound,
   WorkflowNodeNotMutable,
-  WorkflowSubgraphCyclic,
-  WorkflowSubgraphEmpty,
-  WorkflowSubgraphMultipleCoordTemps,
-  WorkflowSubgraphNodeRefUnresolved,
-  WorkflowSubgraphTempIdInvalid,
-  WorkflowSubgraphTempParentless,
+  WorkflowSubgraphInvalid,
 } from "../domain/workflow/workflow-entity-errors.js";
 export { workflowNodeNotMutable } from "../domain/workflow/workflow-entity-errors.js";
 export type {
@@ -113,11 +105,8 @@ export type { WorkflowOrigin } from "../domain/workflow/workflow-origin.js";
 export { WorkflowOriginSchema } from "../domain/workflow/workflow-origin.js";
 export type {
   DatabaseUnavailable,
-  WorkflowCorruption,
   WorkflowEntityCorruption,
-  WorkflowEnumValueCorruption,
-  WorkflowNodeKindCorruption,
-  WorkflowNodeKindShape,
+  WorkflowInvariantViolation,
   WorkflowNotFound,
   WorkflowRepository,
 } from "../domain/workflow/workflow-repository.js";

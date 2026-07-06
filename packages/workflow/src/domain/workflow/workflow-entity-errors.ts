@@ -7,72 +7,64 @@ export type WorkflowNodeNotFound = {
   readonly nodeId: string;
 };
 
-export type MultipleSuccessorCoords = {
-  readonly type: "MultipleSuccessorCoords";
-  readonly workflowId: string;
-  readonly coordParentNodeId: string;
-};
-
-export type OrphanCoordInsert = {
-  readonly type: "OrphanCoordInsert";
-  readonly workflowId: string;
-};
-
-export type ParentState = {
-  readonly type: "ParentState";
-  readonly workflowId: string;
-  readonly nodeKind: string;
-  readonly parentNodeId: string;
-  readonly parentStatus: string;
-};
-
 export type EmptyParents = { readonly type: "EmptyParents" };
 
-export type DagInvariant = {
-  readonly type: "DagInvariant";
-  readonly workflowId: string;
-  readonly actualLeafIds: readonly string[];
-  readonly actualLeafKinds: readonly WorkflowNodeKind[];
+/**
+ * A DAG mutation conflicts with the workflow's structural invariants
+ * (coordinator chaining, frontier ownership, parent readiness, or the
+ * single-coordinator-leaf rule). `reason.kind` names the specific conflict.
+ */
+export type WorkflowDagConflict = {
+  readonly type: "WorkflowDagConflict";
+  readonly reason:
+    | {
+        readonly kind: "successorCoordExists";
+        readonly workflowId: string;
+        readonly coordParentNodeId: string;
+      }
+    | { readonly kind: "orphanCoordInsert"; readonly workflowId: string }
+    | {
+        readonly kind: "parentState";
+        readonly workflowId: string;
+        readonly nodeKind: string;
+        readonly parentNodeId: string;
+        readonly parentStatus: string;
+      }
+    | {
+        readonly kind: "invariant";
+        readonly workflowId: string;
+        readonly actualLeafIds: readonly string[];
+        readonly actualLeafKinds: readonly WorkflowNodeKind[];
+      };
 };
 
-export type WorkflowSubgraphEmpty = { readonly type: "WorkflowSubgraphEmpty" };
-
-export type WorkflowSubgraphTempIdInvalid = {
-  readonly type: "WorkflowSubgraphTempIdInvalid";
-  readonly reason: string;
+/**
+ * A submitted subgraph is structurally invalid (empty, malformed temp ids,
+ * unresolved refs, cycles, parentless temps, or multiple coordinator temps).
+ * `reason.kind` names the specific defect.
+ */
+export type WorkflowSubgraphInvalid = {
+  readonly type: "WorkflowSubgraphInvalid";
+  readonly reason:
+    | { readonly kind: "empty" }
+    | { readonly kind: "tempIdInvalid"; readonly message: string }
+    | { readonly kind: "tempParentless"; readonly tempId: string }
+    | {
+        readonly kind: "nodeRefUnresolved";
+        readonly workflowId: string;
+        readonly refKind: "existing" | "temp";
+        readonly refValue: string;
+      }
+    | {
+        readonly kind: "cyclic";
+        readonly workflowId: string;
+        readonly from: string;
+        readonly to: string;
+      }
+    | { readonly kind: "multipleCoordTemps"; readonly workflowId: string };
 };
 
-export type WorkflowSubgraphTempParentless = {
-  readonly type: "WorkflowSubgraphTempParentless";
-  readonly tempId: string;
-};
-
-export type WorkflowSubgraphNodeRefUnresolved = {
-  readonly type: "WorkflowSubgraphNodeRefUnresolved";
-  readonly workflowId: string;
-  readonly refKind: "existing" | "temp";
-  readonly refValue: string;
-};
-
-export type WorkflowSubgraphCyclic = {
-  readonly type: "WorkflowSubgraphCyclic";
-  readonly workflowId: string;
-  readonly from: string;
-  readonly to: string;
-};
-
-export type WorkflowSubgraphMultipleCoordTemps = {
-  readonly type: "WorkflowSubgraphMultipleCoordTemps";
-  readonly workflowId: string;
-};
-
-export type SubgraphError =
-  | WorkflowSubgraphEmpty
-  | WorkflowSubgraphTempIdInvalid
-  | WorkflowSubgraphTempParentless
-  | WorkflowSubgraphNodeRefUnresolved
-  | WorkflowSubgraphCyclic
-  | WorkflowSubgraphMultipleCoordTemps;
+export type SubgraphError = WorkflowSubgraphInvalid;
 
 export type WorkflowNodeNotMutable = {
   readonly type: "WorkflowNodeNotMutable";

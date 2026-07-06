@@ -7,9 +7,8 @@ import type {
   ArtifactListingFailed,
   MaterializeWorkdirArgs,
   TaskSandbox,
-  WorkdirMaterializationFailed,
+  WorkdirFailed,
   WorkdirRemovalFailed,
-  WorkdirReservationFailed,
 } from "../../domain/task-sandbox.js";
 
 /**
@@ -75,7 +74,7 @@ export class LocalTaskSandbox implements TaskSandbox {
     return path.join(this.root, id);
   }
 
-  reserve(id: TaskId): ResultAsync<string, WorkdirReservationFailed> {
+  reserve(id: TaskId): ResultAsync<string, WorkdirFailed> {
     const dir = this.resolve(id);
     return ResultAsync.fromPromise(
       (async () => {
@@ -83,11 +82,11 @@ export class LocalTaskSandbox implements TaskSandbox {
         await mkdir(dir, { recursive: false });
         return dir;
       })(),
-      (cause): WorkdirReservationFailed => ({ type: "WorkdirReservationFailed", cause }),
+      (cause): WorkdirFailed => ({ type: "WorkdirFailed", phase: "reserve", cause }),
     );
   }
 
-  materialize(args: MaterializeWorkdirArgs): ResultAsync<void, WorkdirMaterializationFailed> {
+  materialize(args: MaterializeWorkdirArgs): ResultAsync<void, WorkdirFailed> {
     const { workdir, brief, details } = args;
     return ResultAsync.fromPromise(
       (async () => {
@@ -97,7 +96,7 @@ export class LocalTaskSandbox implements TaskSandbox {
         await mkdir(path.join(workdir, TASK_TEMP_SUBDIR), { recursive: true });
         await mkdir(path.join(workdir, TASK_ARTIFACT_SUBDIR), { recursive: true });
       })(),
-      (cause): WorkdirMaterializationFailed => ({ type: "WorkdirMaterializationFailed", cause }),
+      (cause): WorkdirFailed => ({ type: "WorkdirFailed", phase: "materialize", cause }),
     );
   }
 

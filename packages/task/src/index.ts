@@ -129,8 +129,8 @@ export {
 export type {
   AgentEntry,
   AgentNotFound,
-  AgentResolutionFailed,
   AgentResolver,
+  AgentUnresolvable,
   BlockedReason,
 } from "./application/ports/agent-resolver.js";
 export {

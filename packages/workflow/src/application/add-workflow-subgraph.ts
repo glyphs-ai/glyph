@@ -22,11 +22,8 @@ import {
   validateSubgraphShape,
 } from "../domain/workflow/workflow-entity.js";
 import type {
-  DagInvariant,
-  MultipleSuccessorCoords,
-  OrphanCoordInsert,
-  ParentState,
   SubgraphError,
+  WorkflowDagConflict,
   WorkflowNodeNotFound,
   WorkflowNodeNotMutable,
 } from "../domain/workflow/workflow-entity-errors.js";
@@ -81,10 +78,7 @@ export type AddWorkflowSubgraphError =
   | WorkflowEntityCorruption
   | WorkflowNodeNotFound
   | WorkflowNodeNotMutable
-  | ParentState
-  | OrphanCoordInsert
-  | MultipleSuccessorCoords
-  | DagInvariant
+  | WorkflowDagConflict
   | DatabaseUnavailable;
 export interface AddWorkflowSubgraphDeps {
   readonly repo: WorkflowRepository;
@@ -127,10 +121,13 @@ export class AddWorkflowSubgraphUseCase
           for (const parent of node.existingParents ?? []) {
             if (!existingNodeIds.has(parent))
               return err({
-                type: "WorkflowSubgraphNodeRefUnresolved",
-                workflowId: parsed.workflowId,
-                refKind: "existing",
-                refValue: parent,
+                type: "WorkflowSubgraphInvalid",
+                reason: {
+                  kind: "nodeRefUnresolved",
+                  workflowId: parsed.workflowId,
+                  refKind: "existing",
+                  refValue: parent,
+                },
               });
           }
         }
@@ -140,10 +137,13 @@ export class AddWorkflowSubgraphUseCase
           const full = fullByTemp.get(node.tempId);
           if (full === undefined)
             return err({
-              type: "WorkflowSubgraphNodeRefUnresolved",
-              workflowId: parsed.workflowId,
-              refKind: "temp",
-              refValue: node.tempId,
+              type: "WorkflowSubgraphInvalid",
+              reason: {
+                kind: "nodeRefUnresolved",
+                workflowId: parsed.workflowId,
+                refKind: "temp",
+                refValue: node.tempId,
+              },
             });
           const specResult = await validateNodeSpec({
             runners: this.deps.runners,

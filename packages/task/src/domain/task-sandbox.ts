@@ -2,15 +2,16 @@ import type { ResultAsync } from "neverthrow";
 import type { TaskArtifactFile } from "./task-artifact.js";
 import type { TaskId } from "./task-id.js";
 
-/** `reserve`: the exclusive `mkdir` for a task workdir faulted (EEXIST id collision, missing parent, …). */
-export type WorkdirReservationFailed = {
-  readonly type: "WorkdirReservationFailed";
-  readonly cause: unknown;
-};
-
-/** `materialize`: writing `TASK.md` or creating the `temp/` / `artifact/` subdirs faulted. */
-export type WorkdirMaterializationFailed = {
-  readonly type: "WorkdirMaterializationFailed";
+/**
+ * A task workdir lifecycle step faulted. `phase` names which:
+ *  - `reserve`: the exclusive `mkdir` for the workdir faulted (EEXIST id
+ *    collision, missing parent, …).
+ *  - `materialize`: writing `TASK.md` or creating the `temp/` / `artifact/`
+ *    subdirs faulted.
+ */
+export type WorkdirFailed = {
+  readonly type: "WorkdirFailed";
+  readonly phase: "reserve" | "materialize";
   readonly cause: unknown;
 };
 
@@ -50,10 +51,10 @@ export interface TaskSandbox {
   resolve(id: TaskId): string;
 
   /** Exclusively create the workdir (fails if it already exists); returns its path. */
-  reserve(id: TaskId): ResultAsync<string, WorkdirReservationFailed>;
+  reserve(id: TaskId): ResultAsync<string, WorkdirFailed>;
 
   /** Write `TASK.md` from `brief` + `details` and create the `temp/` / `artifact/` subdirs. */
-  materialize(args: MaterializeWorkdirArgs): ResultAsync<void, WorkdirMaterializationFailed>;
+  materialize(args: MaterializeWorkdirArgs): ResultAsync<void, WorkdirFailed>;
 
   /**
    * Every regular file under `<workdir>/artifact/` (recursively, at any

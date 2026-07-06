@@ -26,10 +26,10 @@ describe("LocalTaskSandbox.reserve", () => {
     expect(existsSync(dir)).toBe(true);
   });
 
-  it("fails with WorkdirReservationFailed when the workdir already exists", async () => {
+  it("fails with WorkdirFailed (phase: reserve) when the workdir already exists", async () => {
     await sandbox.reserve(ID);
     const again = await sandbox.reserve(ID);
-    expect(again._unsafeUnwrapErr().type).toBe("WorkdirReservationFailed");
+    expect(again._unsafeUnwrapErr()).toMatchObject({ type: "WorkdirFailed", phase: "reserve" });
   });
 
   it("creates the sandbox root lazily when it does not exist", async () => {

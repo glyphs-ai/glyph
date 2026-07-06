@@ -8,8 +8,8 @@ export type AgentNotFound = {
 };
 
 /** `create`: the catalog faulted while resolving the agent (not "absent"). */
-export type AgentResolutionFailed = {
-  readonly type: "AgentResolutionFailed";
+export type AgentUnresolvable = {
+  readonly type: "AgentUnresolvable";
   readonly agent: string;
   readonly cause: unknown;
 };
@@ -18,9 +18,9 @@ export type AgentResolutionFailed = {
  * Resolves a catalog agent at session-create time. Satisfied at the
  * composition root by an adapter over `@glyphs-ai/catalog` (session
  * never imports catalog). `resolve` yields `AgentNotFound` when the
- * name is absent and `AgentResolutionFailed` when the catalog itself
+ * name is absent and `AgentUnresolvable` when the catalog itself
  * faults.
  */
 export interface AgentResolver {
-  resolve(agent: string): ResultAsync<ResolvedAgent, AgentNotFound | AgentResolutionFailed>;
+  resolve(agent: string): ResultAsync<ResolvedAgent, AgentNotFound | AgentUnresolvable>;
 }

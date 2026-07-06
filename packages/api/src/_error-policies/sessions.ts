@@ -46,7 +46,7 @@ export const SESSION_TABLE = {
     title: "Sandbox removal failed",
     detail: () => "sandbox removal failed",
   },
-  AgentResolutionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
+  AgentUnresolvable: { status: 500, title: "Internal error", detail: () => INTERNAL },
   SandboxProvisionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
   RuntimeProvisionFailed: { status: 500, title: "Internal error", detail: () => INTERNAL },
   DatabaseUnavailable: { status: 503, title: "Internal error", detail: () => INTERNAL },

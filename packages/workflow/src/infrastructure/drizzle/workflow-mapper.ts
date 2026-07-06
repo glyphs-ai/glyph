@@ -94,7 +94,8 @@ function toWorkflowHeader(
   const id = WorkflowIdSchema.safeParse(row.id);
   if (!id.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: "id",
       value: String(row.id),
       allowed: ["valid workflow id"],
@@ -102,7 +103,8 @@ function toWorkflowHeader(
   const status = WorkflowStatusSchema.safeParse(row.status);
   if (!status.success)
     return err({
-      type: "WorkflowEnumValueCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "enumValue",
       field: "status",
       value: String(row.status),
       allowed: WorkflowStatusSchema.options,
@@ -110,7 +112,8 @@ function toWorkflowHeader(
   const origin = WorkflowOriginSchema.safeParse(row.origin);
   if (!origin.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: "origin",
       value: String(row.origin),
       allowed: ["non-empty string"],
@@ -118,7 +121,8 @@ function toWorkflowHeader(
   const brief = WorkflowBriefSchema.safeParse(row.brief);
   if (!brief.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: "brief",
       value: String(row.brief),
       allowed: ["non-empty single-line string (≤ 200 characters)"],
@@ -164,7 +168,8 @@ function toNodeEntity(row: WorkflowNodeRow): Result<WorkflowNodeEntity, Workflow
   const id = WorkflowNodeIdSchema.safeParse(row.id);
   if (!id.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: "id",
       value: String(row.id),
       allowed: ["valid workflow node id"],
@@ -172,7 +177,8 @@ function toNodeEntity(row: WorkflowNodeRow): Result<WorkflowNodeEntity, Workflow
   const workflowId = WorkflowIdSchema.safeParse(row.workflowId);
   if (!workflowId.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: "workflowId",
       value: String(row.workflowId),
       allowed: ["valid workflow id"],
@@ -181,13 +187,19 @@ function toNodeEntity(row: WorkflowNodeRow): Result<WorkflowNodeEntity, Workflow
   if (!kind.success)
     return err(
       typeof row.kind === "string" && row.kind.length > 0
-        ? { type: "WorkflowNodeKindCorruption", kind: row.kind, allowed: WORKFLOW_NODE_KINDS }
-        : { type: "WorkflowNodeKindShape", value: row.kind },
+        ? {
+            type: "WorkflowInvariantViolation",
+            subtype: "nodeKindValue",
+            value: row.kind,
+            allowed: WORKFLOW_NODE_KINDS,
+          }
+        : { type: "WorkflowInvariantViolation", subtype: "nodeKindShape", value: row.kind },
     );
   const status = WorkflowNodeStatusSchema.safeParse(row.status);
   if (!status.success)
     return err({
-      type: "WorkflowEnumValueCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "enumValue",
       field: "status",
       value: String(row.status),
       allowed: WorkflowNodeStatusSchema.options,
@@ -217,7 +229,8 @@ function toEdgeEntity(row: WorkflowEdgeRow): Result<WorkflowEdgeEntity, Workflow
   const workflowId = WorkflowIdSchema.safeParse(row.workflowId);
   if (!workflowId.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: "workflowId",
       value: String(row.workflowId),
       allowed: ["valid workflow id"],
@@ -225,7 +238,8 @@ function toEdgeEntity(row: WorkflowEdgeRow): Result<WorkflowEdgeEntity, Workflow
   const from = WorkflowNodeIdSchema.safeParse(row.fromNodeId);
   if (!from.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: "fromNodeId",
       value: String(row.fromNodeId),
       allowed: ["valid workflow node id"],
@@ -233,7 +247,8 @@ function toEdgeEntity(row: WorkflowEdgeRow): Result<WorkflowEdgeEntity, Workflow
   const to = WorkflowNodeIdSchema.safeParse(row.toNodeId);
   if (!to.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: "toNodeId",
       value: String(row.toNodeId),
       allowed: ["valid workflow node id"],
@@ -278,7 +293,8 @@ function validateTerminalInvariant(
   )
     return undefined;
   return {
-    type: "WorkflowCorruption",
+    type: "WorkflowInvariantViolation",
+    subtype: "corruption",
     field: "terminalPayload",
     value: String(status),
     allowed: ["exactly the matching terminal payload"],
@@ -292,7 +308,8 @@ function parseJsonObject(
   if (parsed.isErr()) return err(parsed.error);
   if (parsed.value === null || typeof parsed.value !== "object" || Array.isArray(parsed.value))
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: name,
       value: String(raw),
       allowed: ["JSON object"],
@@ -308,7 +325,8 @@ function parseJsonColumn<T>(
     return ok(JSON.parse(raw) as T);
   } catch {
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: name,
       value: String(raw),
       allowed: ["valid JSON"],
@@ -327,7 +345,8 @@ function parseJsonSchemaColumn<T>(
     parsed = JSON.parse(raw);
   } catch {
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: name,
       value: String(raw),
       allowed: ["valid JSON"],
@@ -336,7 +355,8 @@ function parseJsonSchemaColumn<T>(
   const result = schema.safeParse(parsed);
   if (!result.success)
     return err({
-      type: "WorkflowCorruption",
+      type: "WorkflowInvariantViolation",
+      subtype: "corruption",
       field: name,
       value: String(raw),
       allowed: [`valid ${name} payload`],
