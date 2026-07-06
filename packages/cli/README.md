@@ -1,6 +1,6 @@
 # @glyphs-ai/cli
 
-> **Tier:** T_top (Surfaces). See the [tier model](../../docs/architecture.md#tier-model).
+> **Tier:** T_top (Surfaces).
 
 Command-line interface for glyph (lifecycle commands + HTTP API
 client).
@@ -34,9 +34,9 @@ packages/cli/src/
                     one file per top-level command or group. The three
                     largest groups are split facade + sibling subdir
                     (`catalog.ts` + `catalog/`, `schedule.ts` +
-                    `schedule/`, `workflow.ts` + `workflow/`) per
-                    docs/pkg-template.md; the facade re-exports its
-                    concern modules and is the only import surface.
+                    `schedule/`, `workflow.ts` + `workflow/`); the
+                    facade re-exports its concern modules and is the
+                    only import surface.
   registrars/       Commander subtree builders — one per top-level
                     command or group: `lifecycle` (serve / start / stop /
                     restart / status / logs), `config`, `health`,
@@ -234,5 +234,3 @@ Top-level surface tier alongside `@glyphs-ai/dashboard`. Depends on
 `runtime.json` shape). It does NOT import any other package; the
 tier-invisibility fence is enforced by
 `packages/e2e/test/architecture/tier-invisibility.test.ts`.
-
-See [`docs/architecture.md` — Tier model](../../docs/architecture.md#tier-model).
