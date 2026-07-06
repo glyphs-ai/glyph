@@ -10,8 +10,6 @@ export const OriginAggregateSchema = z.object({
   runningCount: z.number(),
   awaitingCount: z.number(),
 });
-export type OriginAggregate = z.infer<typeof OriginAggregateSchema>;
-export type OriginAggregateView = OriginAggregate;
 
 export const AggregateWorkflowsByOriginRequestSchema = z
   .object({

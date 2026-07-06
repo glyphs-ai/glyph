@@ -12,7 +12,7 @@ import {
   type WorkflowFixture,
 } from "./workflow-fixture.js";
 
-describe("WorkflowService.deleteWorkflow", () => {
+describe("WorkflowModule.deleteWorkflow", () => {
   let f: WorkflowFixture;
 
   beforeEach(async () => {

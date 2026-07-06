@@ -9,7 +9,7 @@ import {
   type WorkflowFixture,
 } from "./workflow-fixture.js";
 
-describe("WorkflowService.addSubgraph", () => {
+describe("WorkflowModule.addSubgraph", () => {
   let f: WorkflowFixture;
 
   beforeEach(async () => {

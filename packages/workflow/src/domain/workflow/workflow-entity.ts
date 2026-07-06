@@ -496,13 +496,11 @@ export class WorkflowEntity {
   markNodeTerminal(
     nodeId: WorkflowNodeId,
     status: TerminalWorkflowNodeStatus,
-    reason: string | undefined,
     nowIso: string,
   ): Result<
     { readonly retryCoordInserted: WorkflowNodeId | null; readonly workflowFailed: boolean },
     WorkflowNodeNotFound | IllegalNodeTransition
   > {
-    void reason;
     const node = this.nodeById(nodeId);
     if (node === undefined || node.workflowId !== this.id)
       return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId });
@@ -945,7 +943,7 @@ export function validateSubgraphShape(
   return ok(undefined);
 }
 
-export function resolveSubgraphTopology(
+function resolveSubgraphTopology(
   workflowId: string,
   nodes: readonly SubgraphTempNodeShape[],
   edges: readonly SubgraphEdgeShape[],

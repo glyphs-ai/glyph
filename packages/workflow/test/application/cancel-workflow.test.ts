@@ -10,7 +10,7 @@ import {
   type WorkflowFixture,
 } from "./workflow-fixture.js";
 
-describe("WorkflowService.cancelWorkflow", () => {
+describe("WorkflowModule.cancelWorkflow", () => {
   let f: WorkflowFixture;
 
   beforeEach(async () => {

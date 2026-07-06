@@ -80,7 +80,7 @@ export interface WorkflowNodeArtifactListing {
 /**
  * Per-kind runner injected at compose time via the `runners`
  * parameter to `composeWorkflowModule`. The substrate has built-in
- * knowledge of the closed kind enum (`'coordinator' | 'worker'`) and
+ * knowledge of the closed kind enum (`'coordinator' | 'worker' | 'human'`) and
  * of kind-aware semantic rules (e.g. per-kind parent-readiness, the
  * single-coord-successor rule, the orphan-coord rule, the
  * `workflows.coordinator_agent` denorm sync), but does NOT know HOW
@@ -92,8 +92,9 @@ export interface WorkflowNodeArtifactListing {
  * `workflows.coordinator_agent` denorm sync) are encoded in the
  * engine itself, not routed through a polymorphic interface method.
  * That keeps the runner interface intentionally minimal — validate
- * / dispatch / hasInFlightForNode / cancel — and means a new kind
- * only has to answer those four questions.
+ * / dispatch / hasInFlightForNode / cancel / listArtifacts /
+ * resolveArtifactPath — and means a new kind only has to answer
+ * those six questions.
  *
  * Concrete runners live wherever they bridge the substrate to its
  * mechanism (e.g. `packages/api/src/wiring/` for the shipping

@@ -155,7 +155,7 @@ describe("DrizzleWorkflowRepository — save (snapshot diff)", () => {
     addIteration(wf);
     (await repo.save(wf))._unsafeUnwrap();
     const loaded = (await repo.get(wfId(1)))._unsafeUnwrap();
-    loaded.markNodeTerminal(nodeId(0), "succeeded", undefined, NOW)._unsafeUnwrap();
+    loaded.markNodeTerminal(nodeId(0), "succeeded", NOW)._unsafeUnwrap();
     loaded.markNodeRunning(nodeId(1), "2026-06-07T01:00:00.000Z")._unsafeUnwrap();
     (await repo.save(loaded))._unsafeUnwrap();
     const got = (await repo.get(wfId(1)))._unsafeUnwrap();

@@ -9,7 +9,7 @@ import {
   type WorkflowFixture,
 } from "./workflow-fixture.js";
 
-describe("WorkflowService — read APIs", () => {
+describe("WorkflowModule — read APIs", () => {
   let f: WorkflowFixture;
 
   beforeEach(async () => {
