@@ -6,7 +6,7 @@
  * three pieces the CLI layers on top of that:
  *
  *  - {@link ApiError} — the CLI's HTTP error type. `output.ts` pattern-matches
- *    on `err.status` / `err.body` (the decoded RFC 9457 Problem envelope:
+ *    on `err.status` / `err.body` (the decoded `application/problem+json` Problem envelope:
  *    `code`, `transition`, the `EntryNotReady` reason tree, …), so the throw
  *    path must carry the decoded body.
  *  - {@link unwrap} — turns a result tuple into the success payload or throws,
@@ -24,7 +24,7 @@ import { client, isProblem, type Problem } from "@glyphs-ai/sdk";
 
 /**
  * Thrown when the server responds with a non-2xx / non-204 status.
- * `body` is the decoded RFC 9457 Problem envelope
+ * `body` is the decoded Problem envelope
  * (`application/problem+json`) when the response carried one, so callers
  * can pattern-match on `body.code` / `body.detail` / `body.reason`
  * without re-narrowing an untyped value. `undefined` for a non-Problem
@@ -63,7 +63,7 @@ export interface SdkResult<T> {
  *  - `response.ok` → return `data` (the parsed JSON body; `{}` for a 204);
  *  - otherwise → throw {@link ApiError} carrying the status and the decoded
  *    Problem body, with the same message derivation the CLI shows today
- *    (`body.detail` when the envelope is an RFC 9457 Problem, else
+ *    (`body.detail` when the envelope is an `application/problem+json` Problem, else
  *    `HTTP <status>`).
  */
 export function unwrap<T>(result: SdkResult<T>): NonNullable<T> {

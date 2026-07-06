@@ -170,7 +170,7 @@ export interface SchedulePatchOpts extends WorkspaceFlagOpts {
   readonly details?: string;
   /**
    * Remove `details` from the patched target entirely (sends
-   * `target.details: null` on the wire -- RFC 7396 delete semantics).
+   * `target.details: null` on the wire -- deep-merge delete semantics).
    * Distinct from `--details ""`, which SETS details to the empty
    * string. Mutually exclusive with --details.
    */
@@ -178,7 +178,7 @@ export interface SchedulePatchOpts extends WorkspaceFlagOpts {
   readonly runtime?: string;
   /**
    * Remove `runtime` from the patched target entirely (sends
-   * `target.runtime: null` on the wire -- RFC 7396 delete semantics).
+   * `target.runtime: null` on the wire -- deep-merge delete semantics).
    * Mutually exclusive with --runtime.
    */
   readonly clearRuntime?: boolean;
@@ -246,10 +246,9 @@ export async function schedulePatch(
   try {
     const workspaceId = await resolveWorkspace(opts);
 
-    // `target` is RFC 7396 deep-merged server-side (see
-    // packages/server/src/routes/schedules.ts `PATCH /task/:sid`),
-    // so the CLI no longer needs to GET-merge target leaves before
-    // sending the patch. `trigger`, however, is still wholesale-
+    // `target` is deep-merged server-side, so the CLI no longer needs
+    // to GET-merge target leaves before sending the patch. `trigger`,
+    // however, is still wholesale-
     // replace (small atomic shape), so a partial trigger update
     // (--cron OR --tz, but not both) still requires one GET to fill
     // the other field. This is the only remaining GET-merge case.
