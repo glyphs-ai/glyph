@@ -5,26 +5,23 @@ import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
  * column (single-table envelope storage): target payloads are small,
  * stable, and isolated by `target_kind`.
  *
- * **Indexes.** `schedules_target_agent_idx` is a **functional partial
- * index** on `json_extract(target_json, '$.agent')` filtered
- * `WHERE target_kind = 'task'`. Declared via hand-written
- * `drizzle/0001_drop_target_agent_add_json_index.sql` because
- * drizzle-kit cannot express functional partial indexes in schema; the
- * runtime query in `schedule-repository.ts` MUST use
- * `sql\`json_extract(${schedules.targetJson}, '$.agent')\`` against
- * `target_json` to engage it.
+ * **Indexes.** `schedules_target_agent_idx` is a functional partial
+ * index on `json_extract(target_json, '$.agent')` filtered to
+ * `target_kind = 'task'`. drizzle-kit cannot express a functional
+ * partial index in the TS schema, so it is declared in a hand-written
+ * migration; a query engages it only when it filters on both
+ * `target_kind = 'task'` and the same `json_extract(target_json, '$.agent')`
+ * expression (the list use-case does this for its list-by-agent filter).
  *
  * `next_fire_at` is persisted (despite being derivable from
- * trigger + last_fired_at) so the list endpoint can ORDER BY
- * next_fire_at without N×cron-compute per request. Must be
- * recomputed on `recover()` and on `patch(trigger.*)`.
+ * trigger + last_fired_at) so the list query can ORDER BY
+ * next_fire_at without an N×cron-compute per request. It is recomputed
+ * whenever a schedule's next fire changes (create, patch, fire, run,
+ * recover).
  *
- * No DB-level FK to `agents` — codebase convention is
- * application-level validation. The registered `ScheduleKindHandler`
- * (see `compose.ts`) owns the existence lookup for whatever entity
- * its kind references (for the `task` kind, that's
- * `packages/api/src/wiring/schedule-task-handler.ts` calling
- * `CatalogModule.getAgent` during `validate`).
+ * No DB-level FK to `agents` — validation is application-level: the
+ * registered `ScheduleKindHandler` owns the existence lookup for
+ * whatever entity its kind references, run during its `validate`.
  */
 export const schedules = sqliteTable(
   "schedules",
@@ -45,9 +42,10 @@ export const schedules = sqliteTable(
   (t) => [
     index("schedules_enabled_idx").on(t.enabled),
     index("schedules_next_fire_idx").on(t.nextFireAt),
-    // schedules_target_agent_idx is a functional partial index defined
-    // in drizzle/0001_*.sql (json_extract on target_json, filtered to
-    // target_kind='task'); drizzle-kit can't express it in TS schema.
+    // schedules_target_agent_idx (a functional partial index over
+    // json_extract(target_json, '$.agent') filtered to target_kind='task')
+    // is declared in a hand-written migration; drizzle-kit can't express a
+    // functional partial index in the TS schema.
   ],
 );
 

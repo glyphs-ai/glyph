@@ -2,37 +2,30 @@
 
 > **Tier:** T0 (Foundations). See the [tier model](../../docs/architecture.md#tier-model).
 
-Cron-triggered substrate. Owns one table — `schedules` — plus the
-`ScheduleService` surface (reads + writes + `recover()` +
-`shutdown()` + `preview()` + `run()`) and an open registry of
-per-kind handlers.
+Cron-triggered substrate. Owns one table — `schedules` — a set of
+use-cases (create / patch / delete / run / get / list / preview), the
+stateful `ScheduleEngine` (`recover()` + `shutdown()` + timer arming),
+and an open registry of per-kind handlers.
 
 The pkg has **no built-in knowledge of any concrete kind**. Callers
-register handlers at compose time, BullMQ / Sidekiq / Temporal-style:
+register handlers on the engine at compose time, then `recover()`:
 
 ```ts
 const scheduleModule = await composeScheduleModule({ dbFile });
-scheduleModule.service.registerKind(
-  "task",
-  makeTaskKindHandler({ tasks, catalog }),
-);
-scheduleModule.service.registerKind(
-  "workflow",
-  makeWorkflowKindHandler({ workflows }),
-);
-await scheduleModule.service.recover(); // freezes the registry; MUST come AFTER all registerKind
+scheduleModule.engine.registerKind("task", makeTaskKindHandler({ tasks, catalog }));
+scheduleModule.engine.registerKind("workflow", makeWorkflowKindHandler({ workflows }));
+await scheduleModule.engine.recover(); // freezes the registry; MUST come AFTER every registerKind
 ```
 
-Adding another kind requires **zero edits** to `packages/schedule/src/`.
-Only:
+Adding another kind requires **zero edits** to this package. Only:
 
-1. Define a `ScheduleKindHandler` somewhere the kind's deps live
-   (typically `packages/api/src/wiring/`).
-2. Call `service.registerKind("<kind>", handler)` before
-   `service.recover()`.
-3. (For server-exposed kinds) add per-kind URL routes + wire DTOs in
-   `@glyphs-ai/api` + (optionally) a partial JSON index migration
-   in this pkg.
+1. Define a `ScheduleKindHandler` where the kind's dependencies live
+   (the host's wiring layer).
+2. Call `engine.registerKind("<kind>", handler)` before
+   `engine.recover()`.
+3. (For server-exposed kinds) add per-kind routes + wire DTOs in the
+   host, and — optionally — a partial JSON-index migration in this
+   package.
 
 ## Substrate ⇄ handler split
 
@@ -48,82 +41,84 @@ The schedule pkg owns the substrate concerns:
 The registered `ScheduleKindHandler` owns the per-kind concerns:
 
 - payload shape validation (`validate(data, { changedKeys? })`)
-- RFC 7396 deep-merge (`mergePatch(existing, patch) → { data, changedKeys }`)
+- JSON merge-patch — a deep merge in which a `null` field deletes that
+  key (`mergePatch(existing, patch) → { data, changedKeys }`)
 - fire dispatch (`dispatch({ scheduleId, firedAt, data })`)
 - in-flight check + cascade delete (`hasInFlightForSchedule` /
   `deleteForSchedule`)
 
 The handler interface is intentionally non-generic — `data: unknown`
 all the way through. Per-kind type safety lives at the EDGES (route
-handlers narrow before calling `service.create`; handlers cast after
-their own `validate` produces a value). A `ScheduleKindHandler<TData>`
-generic would force every consumer to track the kind→T mapping at
-compile time, which would turn the substrate into a closed registry.
+handlers narrow before calling `createSchedule.execute`; handlers cast
+after their own `validate` produces a value). A
+`ScheduleKindHandler<TData>` generic would force every consumer to track
+the kind→T mapping at compile time, which would turn the substrate into
+a closed registry.
 
 ## Layout
 
 ```
 packages/schedule/
+├── drizzle/                  SQL migrations (source of truth; inlined into the bundle)
+│   ├── 0000_*.sql            drizzle-kit generated baseline
+│   └── 0001_*.sql            hand-written functional partial JSON-extract index
 ├── drizzle.config.ts
-├── package.json
-├── README.md
-├── tsconfig.json
-├── tsconfig.typecheck.json  Test-scope typecheck (includes test/**/*, noEmit)
-├── vitest.config.ts
-├── drizzle/0000_*.sql       Drizzle-kit generated migration (committed)
-├── drizzle/0001_*.sql       Hand-written functional partial JSON-extract index
 └── src/
-    ├── _helpers.ts           kind-name / JSON-path / name / trigger validators
-    ├── compose.ts            composeScheduleModule({ dbFile, logger })
-    ├── cron.ts               croner + cronstrue wrapper (validate / nextRuns / describe)
-    ├── cronstrue-i18n.d.ts   Ambient decl for `cronstrue/i18n.js` (no `exports` field upstream)
-    ├── errors.ts             ScheduleError + 11 named subclasses
     ├── index.ts              public barrel
-    ├── migrations.ts         AUTO-GENERATED inlined SQL
-    ├── schedule-entity.ts    ScheduleEntity (kind-agnostic envelope container)
-    ├── schedule-repository.ts Drizzle CRUD + preflight (private)
-    ├── schedule-service.ts   ScheduleService + open kind registry
-    ├── schema.ts             Drizzle table definition (private)
-    ├── types.ts              Schedule, ScheduleKindHandler, envelope, service opts
-    └── validate.ts           generateScheduleId + assertValidScheduleId
+    ├── schedule-module.ts    composeScheduleModule + the ScheduleModule container
+    ├── application/          use-cases, the engine, and ports
+    │   ├── {create,patch,delete,run,get,list,preview}-schedule.ts
+    │   ├── use-case.ts         shared use-case contract
+    │   ├── schedule-public.ts  application-layer barrel
+    │   ├── engine/schedule-engine.ts   stateful scheduler (timers + registry freeze)
+    │   └── ports/            schedule-kind-handler.ts, schedule-kind-registry.ts
+    ├── domain/schedule/      entity, value objects, cron service, error atoms
+    │   ├── schedule-entity.ts, schedule-target.ts, schedule-trigger.ts
+    │   ├── schedule-id.ts, cron.ts, schedule-errors.ts
+    │   └── schedule-repository.ts       write-side port (get / save / delete)
+    └── infrastructure/
+        ├── cron/describe.ts             cronstrue human-readable description
+        └── drizzle/                     schema, migrations, mapper, queries, repository, db
 ```
 
 ## Invariants
 
 1. **Cron dialect** — 5-field POSIX only. 6-field expressions are
-   rejected with `InvalidCronExprError` carrying the literal phrase
-   `"6-field cron not supported in v1"`.
+   rejected with the `InvalidCronExpr` error atom, whose `reason` reads
+   `"6-field cron not supported in v1; use 5-field POSIX form"`.
 2. **Concurrency = 1** — if `handler.hasInFlightForSchedule(id)`
    returns `true` at fire time, the tick is skipped (warn-logged) and
    re-armed without writing `last_fired_at`.
 3. **Catchup-once** — `recover()` collapses every missed fire into a
    single catchup dispatch with `firedAt` set to the planned (past)
    time, not `now`.
-4. **Cascade delete with guards** — `delete()` throws
-   `ScheduleEnabledError` if `enabled === true`, and
-   `ScheduleHasInFlightError` if the handler reports in-flight work.
-   Otherwise it cancels the timer, calls `handler.deleteForSchedule`
-   (the handler MUST filter to terminal status only), re-checks
-   in-flight, then drops the schedule row. Returns
-   `{ deletedDispatchCount }` so callers can surface the cascade
-   count.
-5. **Manual `run()` bypasses `enabled`** — manual fires are
-   user-initiated and ignore the concurrency check. Returns
-   `{ dispatchId }`.
+4. **Cascade delete with guards** — `deleteSchedule.execute` errs with
+   `ScheduleEnabled` if `enabled === true`, and `ScheduleHasInFlight`
+   if the handler reports in-flight work. Otherwise it cancels the
+   timer, calls `handler.deleteForSchedule` (which MUST filter to
+   terminal status only), re-checks in-flight, then drops the schedule
+   row. The response is `{ deletedDispatchCount }` so callers can
+   surface the cascade count.
+5. **Manual `runSchedule` bypasses `enabled`** — manual fires are
+   user-initiated and ignore the concurrency check. Records
+   `last_fired_at`, recomputes `next_fire_at`, does NOT re-arm, and
+   returns `{ dispatchId }`.
 6. **Patch never affects in-flight dispatches** — only the trigger /
    arm state is recomputed when `trigger` or `enabled` changed;
    already-dispatched units continue under their handler's
    lifecycle.
 7. **Registry freezes on first `recover()`** — `registerKind` after
-   freeze throws `ScheduleKindRegistryFrozenError`. `recover()`
-   itself preflights every row (enabled AND disabled) and throws
-   `ScheduleKindNotRegisteredError` for any row whose `target_kind`
-   has no handler.
-8. **Persisted data is trusted on read** — `repo.findById` / `repo.findAll`
-   produce envelopes with `data: unknown` from
+   freeze returns the `ScheduleKindRegistryFrozen` atom. `recover()`
+   itself preflights every row (enabled AND disabled) and returns
+   `ScheduleKindNotRegistered` for any row whose `target_kind` has no
+   handler. Both are `Result`s; the composition root converts a
+   failure into a throw to abort the workspace load.
+8. **Persisted data is trusted on read** — the read side
+   (`ScheduleQueries`, behind the `getSchedule` / `listSchedules`
+   use-cases) produces envelopes with `data: unknown` from
    `JSON.parse(target_json)`. The pkg does NOT invoke
    `handler.validate` on every read (it would require a catalog
-   round-trip per row in the list endpoint, and the row was already
+   round-trip per row in the list path, and the row was already
    validated at create / patch time). Handlers that want
    belt-and-braces re-checks on dispatch can do so inside
    `handler.dispatch`.
@@ -143,8 +138,8 @@ index** on `json_extract(target_json, '$.agent')` filtered
 `WHERE target_kind = 'task'`. It's task-kind-specific (the task
 handler stores `agent` in `data.agent`) and stays in the schema for
 the list-by-agent query. Other kinds add their own partial-index
-migrations when they need them. The repository's generic
-`findAll({ kind, dataEquals })` engages this index automatically when
+migrations when they need them. The `listSchedules` use-case's generic
+`{ kind, dataEquals }` filter engages this index automatically when
 called with `{ kind: "task", dataEquals: { path: "$.agent", value }}`;
 without BOTH predicates SQLite's planner can't prove the partial
 predicate and falls back to a scan.
@@ -156,105 +151,13 @@ const scheduleModule = await composeScheduleModule({
   dbFile: path.join(workspaceDir, "workspace.db"),
   logger,
 });
-scheduleModule.service.registerKind(
-  "task",
-  makeTaskKindHandler({ tasks: taskModule.service, catalog: catalogModule.service }),
-);
-await taskModule.service.recoverOrphaned();
-await scheduleModule.service.recover();
+scheduleModule.engine.registerKind("task", makeTaskKindHandler({ tasks, catalog }));
+await scheduleModule.engine.recover();
+// ... application runs ...
+await scheduleModule.close(); // shuts the engine down, then closes the SQLite handle
 ```
 
 Order matters: every kind must be registered BEFORE `recover()` runs,
-otherwise the preflight throws. Tests can call `recover()` with no
-rows in the DB — preflight returns immediately and freezes the
-registry.
-
-## HTTP mutation contract
-
-Mutations stay URL-discriminated by `target.kind` so each route has an
-honest, kind-specific contract. Reads / delete / run / preview are
-polymorphic (one resource view across kinds).
-
-| Operation                  | Route                                                   | Body                       |
-| -------------------------- | ------------------------------------------------------- | -------------------------- |
-| Create task schedule       | `POST   /api/workspaces/:id/schedules/task`             | `CreateTaskScheduleRequest` |
-| Patch task schedule        | `PATCH  /api/workspaces/:id/schedules/task/:sid`        | `PatchTaskScheduleRequest`  |
-| List / get / delete / run / preview | `GET / DELETE / POST /api/workspaces/:id/schedules[/:sid][/run|/preview]` | polymorphic |
-
-The wire shape for `target` on responses is **flat** for the task
-kind (`{ kind: "task", agent, brief, details?, runtime? }`) — the
-server route's `projectScheduleHeader` helper converts the internal
-envelope `{ kind: "task", data: { agent, ... } }` to flat wire on
-the way out. Dashboard / CLI consumers continue to read
-`schedule.target.agent` etc.
-
-### `POST /schedules/task` body
-
-```ts
-interface CreateTaskScheduleRequest {
-  name: string;
-  enabled?: boolean; // default true
-  trigger: { kind: "cron"; expr: string; tz: string };
-  target: {
-    // no `kind` — URL implies it
-    agent: string;
-    brief: string;
-    details?: string;
-    runtime?: string;
-  };
-}
-```
-
-The route validates the wire shape via `validateTaskTargetData`,
-then calls `service.create({ name, trigger, target: { kind: "task", data: validated }, enabled })`.
-The task handler's `validate` re-runs the shape check + the async
-catalog existence lookup.
-
-### `PATCH /schedules/task/:sid` body
-
-```ts
-interface PatchTaskScheduleRequest {
-  name?: string;
-  enabled?: boolean;
-  trigger?: { kind: "cron"; expr: string; tz: string }; // wholesale replace
-  target?: {
-    agent?: string;
-    brief?: string;
-    details?: string | null; // null deletes
-    runtime?: string | null; // null deletes
-  };
-}
-```
-
-The route validates the wire patch shape, then calls
-`service.patch(sid, { ..., expectedKind: "task", target: { patch: validated }})`.
-The service:
-
-1. Loads the entity, throws `ScheduleKindMismatchError` if its
-   `target.kind` differs from `expectedKind` (route projects to 404).
-2. Calls `handler.mergePatch(existing.data, patch)` → `{ data, changedKeys }`.
-3. Calls `handler.validate(data, { changedKeys })` — the handler may
-   skip catalog lookup when `agent` wasn't in `changedKeys`.
-
-### Cascade-delete response
-
-```ts
-interface ScheduleDeleteResponse {
-  ok: true;
-  deletedDispatchCount: number;
-}
-```
-
-`deletedDispatchCount` is the number of historical units-of-work
-(typically tasks) removed by the handler's cascade.
-
-### Manual run response
-
-```ts
-interface ScheduleRunResponse {
-  dispatchId: string;
-}
-```
-
-`dispatchId` is the handler's substrate-side id (task id, workflow
-run id, …).
+otherwise the preflight errs with `ScheduleKindNotRegistered`. Tests can
+call `recover()` with no rows in the DB — preflight returns immediately
+and freezes the registry.

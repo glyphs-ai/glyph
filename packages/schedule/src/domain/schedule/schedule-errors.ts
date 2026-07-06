@@ -4,9 +4,9 @@
  * from these; consumers `switch (err.type)` for exhaustive narrowing.
  *
  * Repository IO atoms (`DatabaseUnavailable`, `ScheduleNotFound`) live with
- * the repository port in `schedule-repository.ts`; cron atoms
- * (`InvalidCronExpr`, `InvalidTimezone`) live with the cron service in
- * `cron.ts`; the id atom (`InvalidScheduleId`) lives in `schedule-id.ts`.
+ * the repository port; cron atoms (`InvalidCronExpr`, `InvalidTimezone`) live
+ * with the cron service; the id atom (`InvalidScheduleId`) lives with the id
+ * value object.
  */
 
 /** A schedule name is not a non-empty trimmed string. */

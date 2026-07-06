@@ -1,8 +1,7 @@
 /**
  * Application-layer use-case contract. `execute` returns the `ResultAsync`
- * chain directly (uniform with workflow / session / catalog / workspace). Each
- * use-case file owns its Zod `Request` / `Response` schemas and its `Error`
- * discriminated union.
+ * chain directly. Each use-case file owns its Zod `Request` / `Response`
+ * schemas and its `Error` discriminated union.
  */
 
 import type { ResultAsync } from "neverthrow";

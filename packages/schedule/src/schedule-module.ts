@@ -12,7 +12,6 @@ import { RunScheduleUseCase } from "./application/run-schedule.js";
 import { type Db, openDb } from "./infrastructure/drizzle/schedule-db.js";
 import { DrizzleScheduleQueries } from "./infrastructure/drizzle/schedule-queries.js";
 import { DrizzleScheduleRepository } from "./infrastructure/drizzle/schedule-repository.js";
-import * as schema from "./infrastructure/drizzle/schedule-schema.js";
 
 /**
  * Public surface of `@glyphs-ai/schedule`: a DI container of use-case instances
@@ -92,6 +91,3 @@ export async function composeScheduleModule(opts: ScheduleModuleOptions): Promis
     },
   };
 }
-
-export type { Db };
-export { schema };

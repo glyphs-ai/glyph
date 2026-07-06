@@ -11,13 +11,10 @@
  * `recover()` (which freezes the registry):
  *
  * ```ts
- * const scheduleModule = composeScheduleModule({ dbFile });
+ * const scheduleModule = await composeScheduleModule({ dbFile });
  * scheduleModule.engine.registerKind("task", makeTaskKindHandler({ tasks, catalog }));
  * await scheduleModule.engine.recover();
  * ```
- *
- * See `packages/api/src/wiring/schedule-task-handler.ts` for the production
- * task-kind handler.
  */
 
 // ─── Application: use-cases, engine, ports ──────────────────────────

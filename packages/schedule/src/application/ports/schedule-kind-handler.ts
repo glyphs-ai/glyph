@@ -3,11 +3,10 @@ import type { ResultAsync } from "neverthrow";
 /**
  * Per-kind handler port + the atoms use-cases raise when routing through it.
  *
- * The handler is a Result-native adapter: implementations live in
- * `packages/api/src/wiring/*` and bridge to `@glyphs-ai/task` /
- * `@glyphs-ai/workflow` / `@glyphs-ai/catalog`. Each fallible call returns a
- * {@link HandlerFault} carrying the underlying cause; the calling use-case
- * unwraps it and translates into its own atom at the boundary (e.g.
+ * The handler is a Result-native adapter: implementations live in the host's
+ * wiring and bridge to the concrete kind's own services. Each fallible call
+ * returns a {@link HandlerFault} carrying the underlying cause; the calling
+ * use-case unwraps it and translates into its own atom at the boundary (e.g.
  * {@link TargetValidationFailed} for `validate`, `DatabaseUnavailable` for the
  * dispatch / lifecycle calls). The substrate stays kind-agnostic — the fault is
  * an opaque `cause`, never a kind-specific error type.
@@ -32,10 +31,11 @@ export interface ScheduleKindHandler {
   ): ResultAsync<unknown, HandlerFault>;
 
   /**
-   * Apply an RFC 7396-style patch to an existing `data` payload, returning
-   * the merged result + the top-level keys that actually changed. Pure,
-   * sync, no IO. Pre-condition: `existing` is the latest persisted `data`
-   * for a row of this kind (a value this handler's own `validate` produced).
+   * Apply a JSON merge-patch to an existing `data` payload — a deep merge in
+   * which a field set to `null` deletes that key — returning the merged
+   * result + the top-level keys that actually changed. Pure, sync, no IO.
+   * Pre-condition: `existing` is the latest persisted `data` for a row of
+   * this kind (a value this handler's own `validate` produced).
    */
   mergePatch(
     existing: unknown,
