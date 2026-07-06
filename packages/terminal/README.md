@@ -1,6 +1,6 @@
 # @glyphs-ai/terminal
 
-> **Tier:** T0 (Foundations / provider). See the [tier model](../../docs/architecture.md#tier-model).
+> **Tier:** T0 (Foundations / provider).
 
 Hosts a shell-runnable `LaunchCommand` inside a per-platform terminal
 emulator. Glyph uses this for one-click interactive launch: instead of
