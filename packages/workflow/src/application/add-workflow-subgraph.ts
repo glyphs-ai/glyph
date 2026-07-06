@@ -43,11 +43,11 @@ import {
 } from "./ports/workflow-node-runner.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-const NodeRefSchema: z.ZodType<NodeRef> = z.discriminatedUnion("kind", [
+const addSubgraphNodeRef: z.ZodType<NodeRef> = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("existing"), id: WorkflowNodeIdSchema }),
   z.object({ kind: z.literal("temp"), tempId: z.string() }),
 ]);
-const SubgraphNodeSchema = z
+const addSubgraphNode = z
   .object({
     tempId: z.string(),
     kind: WorkflowNodeKindSchema,
@@ -55,12 +55,13 @@ const SubgraphNodeSchema = z
     existingParents: z.array(WorkflowNodeIdSchema).readonly().optional(),
   })
   .strict();
-const SubgraphEdgeSchema = z.object({ from: NodeRefSchema, to: NodeRefSchema }).strict();
 export const AddWorkflowSubgraphRequestSchema = z
   .object({
     workflowId: WorkflowIdSchema,
-    nodes: z.array(SubgraphNodeSchema).readonly(),
-    edges: z.array(SubgraphEdgeSchema).readonly(),
+    nodes: z.array(addSubgraphNode).readonly(),
+    edges: z
+      .array(z.object({ from: addSubgraphNodeRef, to: addSubgraphNodeRef }).strict())
+      .readonly(),
   })
   .strict();
 export type AddWorkflowSubgraphRequest = z.infer<typeof AddWorkflowSubgraphRequestSchema>;

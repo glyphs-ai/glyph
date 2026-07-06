@@ -12,7 +12,6 @@ import { WorkflowSuccessSchema } from "../domain/workflow/workflow-success.js";
 import type { WorkflowDispatchCoordinator } from "./engine/workflow-engine.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-const CoordinatorFailureSchema = z.object({ kind: z.literal("coordinator"), message: z.string() });
 export const FinishWorkflowRequestSchema = z.discriminatedUnion("outcome", [
   z
     .object({
@@ -25,7 +24,7 @@ export const FinishWorkflowRequestSchema = z.discriminatedUnion("outcome", [
     .object({
       workflowId: WorkflowIdSchema,
       outcome: z.literal("failed"),
-      failure: CoordinatorFailureSchema,
+      failure: z.object({ kind: z.literal("coordinator"), message: z.string() }),
     })
     .strict(),
 ]);
