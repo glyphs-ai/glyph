@@ -21,14 +21,21 @@ When you see a `fix:` line, run that command verbatim — it's the canonical rem
 
 `code` values are stable wire contracts. The server has three emission paths and they all land in the same `{error, code}` envelope:
 
-1. **DU-based** — `packages/api/src/_error-policies/*.ts` policy tables project a domain
-   discriminated-union `.type` field directly to the wire `code`. These carry NO `Error`
-   suffix (`WorkspaceNotFound`, `TaskNotFound`, `WorkflowAlreadyTerminal`, …).
-2. **Class-based** — the `SAFE_ERROR_NAMES` allow-list in `packages/api/src/_http-errors.ts`
-   projects thrown-error class `.name` to the wire `code`, KEEPING the `Error` suffix
-   (`WorkflowCoordSpecError`, `SessionNotFoundError`, `WorkflowError`, …).
-3. **Inline route literals** — a handful of handlers emit `problemResponse(c, <status>, {code: "..."})`
-   directly (`BadRequest`, `NotFound`, `NoEventsYet`, `PlanTokenInvalid`, …).
+1. **DU-based** — `packages/api/src/_error-policies/*.ts` policy tables project a
+   domain discriminated-union `.type` field directly to the wire `code`. These
+   carry NO `Error` suffix (`WorkspaceNotFound`, `TaskNotFound`,
+   `WorkflowAlreadyTerminal`, …).
+2. **Class-based** — the `SAFE_ERROR_NAMES` allow-list in
+   `packages/api/src/_http-errors.ts` projects thrown-error class `.name` to
+   the wire `code`, KEEPING the `Error` suffix. Only classes that actually
+   exist and are actually thrown from a route path reach the wire; every
+   entry in this doc has been grep-verified against `class <Name> extends
+   Error` in the source. (The allow-list itself is forward-compat and
+   lists more names than are currently thrown — this doc only covers the
+   reachable subset.)
+3. **Inline route literals** — a handful of handlers emit
+   `problemResponse(c, <status>, {code: "..."})` directly (`BadRequest`,
+   `NotFound`, `NoEventsYet`, `PlanTokenInvalid`, …).
 
 Treat every value in the table below as a contract.
 
@@ -48,11 +55,7 @@ Treat every value in the table below as a contract.
 
 | code | HTTP | meaning | fix |
 |---|---|---|---|
-| `SessionNotFound` | 404 | Session id unknown (route-inline emission) | `glyph session list` to find it |
-| `SessionNotFoundError` | 404 | Session id unknown (class-based emission) | Same as above |
-| `InvalidSessionIdError` | 400 | Malformed session id | Check the format (timestamp-shortuuid) |
-| `SessionIdAllocationFailedError` | 500 | Server couldn't mint a new session id | Retry; if persistent, server bug |
-| `SessionError` | 400 | Session pkg generic error | Read the message |
+| `SessionNotFound` | 404 | Session id unknown | `glyph session list` to find it |
 | `UnknownRuntime` | 400 | Runtime name not registered | Check the runtime literal (`copilot`, `codex`, …) |
 | `RuntimeStateDeletionFailed` | 409 | Runtime state cleanup blocked | Retry; if persistent, server-side |
 | `RuntimeProvisionFailed` | 500 | Couldn't start the runtime process | Check runtime config; usually needs CLI binary on PATH |
@@ -83,56 +86,40 @@ Treat every value in the table below as a contract.
 | code | HTTP | meaning | fix |
 |---|---|---|---|
 | `WorkflowNotFound` | 404 | Workflow id unknown | `glyph workflow list` |
-| `WorkflowNotFoundError` | 404 | Workflow id unknown (class-based emission) | Same |
 | `WorkflowNodeNotFound` | 404 | Workflow node id unknown | `glyph workflow dag <wfid>` to find it |
-| `WorkflowNodeNotFoundError` | 404 | Same (class-based) | Same |
 | `NodeSpecError` | 422 | Node spec failed validation | Read the message; fix the payload |
 | `EmptyParents` | 422 | Node has no parent | Add at least one `parentIds` entry |
-| `EmptyParentsError` | 422 | Same (class-based) | Same |
-| `WorkflowSubgraphInvalidError` | 422 | Subgraph invariant violated (cycle, orphan, ref unresolved, …) | Read the extension `reason` and fix |
+| `WorkflowSubgraphInvalid` | 422 | Subgraph invariant violated (cycle, orphan, ref unresolved, …) | Read the extension `reason` and fix |
 | `HumanNodeResponseInvalid` | 422 | Human-node response failed validation | Fix the response payload |
 | `WorkflowAlreadyTerminal` | 409 | Workflow is already terminal | No mutation on terminal workflows |
-| `WorkflowAlreadyTerminalError` | 409 | Same (class-based) | Same |
 | `WorkflowNodeNotMutable` | 409 | Node isn't mutable from its current status | Check `fromStatus` extension |
-| `WorkflowNodeNotMutableError` | 409 | Same (class-based) | Same |
 | `WorkflowDeleteRequiresTerminal` | 409 | Workflow must be terminal before delete | Cancel/finish it first |
-| `WorkflowDeleteHasInFlightTasks` | 409 | Delete blocked by in-flight tasks | Cancel/wait for the tasks |
-| `WorkflowDagConflictError` | 409 | DAG mutation would violate an invariant | Read `reason` — orphan, cycle, parent state, etc |
-| `WorkflowCoordAgentNotCapableError` | 422 | Coord agent lacks `coordEligible` | Pick a coord-eligible agent |
-| `WorkflowCoordSpecError` | 422 | Coordinator spec invalid | Read the message |
-| `WorkflowWorkerSpecError` | 422 | Worker spec invalid | Read the message |
-| `WorkflowHumanSpecError` | 422 | Human spec invalid | Read the message |
-| `WorkflowNodeSpecError` | 422 | Node spec (kind-agnostic) invalid | Read the message |
-| `WorkflowError` | 400 | Workflow pkg generic error | Read the message |
-| `WorkflowWorkerNotInCoordMenuError` | 500 | Worker fqn not in the coord's declared menu | Server-side invariant; report |
+| `WorkflowDeleteHasInFlightTasks` | 409 | Delete blocked by in-flight tasks (route-inline) | Cancel/wait for the tasks |
+| `WorkflowDagConflict` | 409 | DAG mutation would violate an invariant | Read `reason` — orphan, cycle, parent state, etc |
+| `WorkflowCoordAgentNotCapableError` | 422 | Coord agent lacks `coordEligible` (thrown class, table-mapped) | Pick a coord-eligible agent |
+| `WorkflowCoordSpecError` | 422 | Coordinator spec invalid (thrown class, table-mapped) | Read the message |
+| `WorkflowWorkerSpecError` | 422 | Worker spec invalid (thrown class, table-mapped) | Read the message |
+| `WorkflowHumanSpecError` | 422 | Human spec invalid (thrown class, table-mapped) | Read the message |
+| `WorkflowWorkerNotInCoordMenuError` | 500 | Worker fqn not in the coord's declared menu (thrown class) | Server-side invariant; report |
+| `WorkflowError` | 400 | Workflow pkg generic error (route-inline) | Read the message |
 | `WorkflowInvariantViolation` | 500 | Server-side invariant tripped | Report with request id |
 | `WorkflowDirReservationFailed` | 503 | Workflow dir couldn't be reserved | Check disk; retry |
-| `InvalidWorkflowIdError` | 400 | Malformed workflow id | Check the format |
-| `InvalidWorkflowNodeIdError` | 400 | Malformed workflow node id | Check the format |
 
 ### Schedules
 
 | code | HTTP | meaning | fix |
 |---|---|---|---|
 | `ScheduleNotFound` | 404 | Schedule id unknown | `glyph schedule list` |
-| `ScheduleNotFoundError` | 404 | Same (class-based) | Same |
 | `ScheduleKindMismatch` | 404 | Route kind doesn't match the schedule's `target.kind` | Use the matching route |
 | `InvalidScheduleId` | 400 | Malformed schedule id | Check the format |
-| `InvalidScheduleIdError` | 400 | Same (class-based) | Same |
 | `InvalidScheduleName` | 400 | Empty or non-string name | Provide a non-empty string |
 | `InvalidCronExpr` | 400 | Cron expression didn't parse | Check the 5-field cron syntax |
-| `InvalidCronExprError` | 400 | Same (class-based) | Same |
 | `InvalidTimezone` | 400 | Not a valid IANA timezone | Use e.g. `UTC`, `America/Los_Angeles` |
-| `InvalidTimezoneError` | 400 | Same (class-based) | Same |
-| `InvalidJsonPathError` | 400 | Malformed JSON-path patch | Check the RFC-6901 syntax |
 | `TargetKindImmutable` | 400 | `target.kind` cannot change on update | Delete + recreate the schedule |
 | `TaskTargetInvalid` | 400 | Task target payload validation failed | Read the message |
 | `WorkflowTargetInvalid` | 400 | Workflow target payload validation failed | Read the message |
 | `ScheduleEnabled` | 409 | Cannot delete an enabled schedule | Disable first (`glyph schedule disable <id>`) |
-| `ScheduleEnabledError` | 409 | Same (class-based) | Same |
 | `ScheduleHasInFlight` | 409 | Cannot delete while a fired dispatch is in flight | Wait for the fire to finish |
-| `ScheduleHasInFlightError` | 409 | Same (class-based) | Same |
-| `ScheduleError` | 400 | Schedule pkg generic error | Read the message |
 | `ScheduleKindNotRegistered` | 500 | Target `kind` isn't registered server-side | Report with request id |
 | `ScheduleCorruption` | 500 | Persisted schedule row is corrupted | Report; may need manual DB repair |
 
@@ -141,8 +128,7 @@ Treat every value in the table below as a contract.
 | code | HTTP | meaning | fix |
 |---|---|---|---|
 | `SkillNotFound` | 404 | Skill FQN not installed | `glyph catalog skill install --url <url>` or `--file <path>` |
-| `AgentNotFound` | 404 | Agent FQN not installed | `glyph catalog agent install --url <url>` or `--file <path>` |
-| `AgentNotFoundError` | 404 | Same (class-based; shared session/schedule/task) | Same |
+| `AgentNotFound` | 404 | Agent FQN not installed (shared with session/task) | `glyph catalog agent install --url <url>` or `--file <path>` |
 | `McpNotFound` | 404 | MCP not installed | `glyph catalog mcp install --url <url>` or `--file <path>` |
 | `SkillOriginConflict` | 409 | Two skills with same FQN, different origins | Pick one; remove the other |
 | `AgentOriginConflict` | 409 | Two agents with same FQN, different origins | Pick one; remove the other |
@@ -151,19 +137,17 @@ Treat every value in the table below as a contract.
 | `OriginInvalid` | 400 | Malformed origin URL | Check the URL format |
 | `ManifestInvalid` | 400 | Catalog manifest validation failed | Read message; fix the upstream manifest |
 | `SourceUnavailable` | 502 | Couldn't fetch the origin (404, network error, etc) | Check the URL is reachable; transient — safe to retry |
-| `PlanTokenInvalid` | 410 | `--plan-token` was malformed, expired, or already consumed | Re-run the corresponding `... sync-resolve` to mint a fresh token |
+| `PlanTokenInvalid` | 410 | `--plan-token` was malformed, expired, or already consumed (route-inline) | Re-run the corresponding `... sync-resolve` to mint a fresh token |
 
 ### Terminal (session `/spawn`)
 
-These are allow-listed class errors from `@glyphs-ai/terminal`. They have no dedicated policy row, so when they fall through as unmapped safe-name errors the responder uses the fallback status (400 by default). In practice the `/spawn` route surfaces most launch failures as `200 {ok: false, code, error}` rather than throwing.
+The `/spawn` route wraps most launch failures as `200 {ok: false, code, error}` so the dashboard can fall back to a copy-paste command without a second round-trip. These `*Error` codes appear as wire `code` only in the rare cases where the class actually propagates out as a thrown error; when that happens the session route has no dedicated policy row, so the fallback `defaultStatus` (400) is used.
 
 | code | HTTP | meaning | fix |
 |---|---|---|---|
-| `NoTerminalFoundError` | 400* | Couldn't find a terminal to spawn the session in | Server-side; check OS terminal config |
-| `TerminalSpawnFailedError` | 400* | Terminal spawn failed | Same |
-| `UnsupportedPlatformError` | 400* | Operation not supported on this OS | No remedy; cross-platform gap |
-
-*Fallback status; see the note above.
+| `NoTerminalFoundError` | 400 (fallback) / 200 body | Couldn't find a terminal to spawn the session in | Server-side; check OS terminal config |
+| `TerminalSpawnFailedError` | 400 (fallback) / 200 body | Terminal spawn failed | Same |
+| `UnsupportedPlatformError` | 400 (fallback) / 200 body | Operation not supported on this OS | No remedy; cross-platform gap |
 
 ### Generic / route-inline
 
