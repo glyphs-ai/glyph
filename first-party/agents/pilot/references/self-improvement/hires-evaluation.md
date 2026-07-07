@@ -12,6 +12,22 @@ One section per agent (FQN as the heading). Per task completion, append one line
 
 Keep it terse. The signal is the pattern across many entries, not the prose of any one.
 
+Under each agent's section, keep a `### Assessment (<date>)` block updated periodically — this makes `hires.md` a usable reasoning artifact, not just an audit log:
+
+```markdown
+## local/report-writer
+- 2026-05-14 | task ... | success | ...
+- 2026-05-15 | task ... | success | ...
+- 2026-05-16 | task ... | failure | invented data
+- 2026-05-17 | task ... | success | ...
+- 2026-05-17 | task ... | failure | invented data again
+
+### Assessment (2026-05-17)
+Star → Watch list → Fire. Inventing data twice in 3 days. Replacing
+with local/report-writer-v2 with explicit "no-invented-data" reminder
+in the agent body.
+```
+
 ## Reading the log for evaluation
 
 Periodic question (asked during reflection): **how is this agent doing?**
@@ -59,29 +75,9 @@ Document promotions in `decisions.log`:
 YYYY-MM-DDTHH:MM:SSZ | PROMOTE | <fqn> | <reasoning>
 ```
 
-## Don't
+## Rules
 
-- **Don't fire on a single failure** (unless it's a binary trust violation like inventing data). Variance is natural.
-- **Don't promote on a single success.** Pattern matters more than instance.
-- **Don't keep an agent around for sentimental reasons** ("we built this together"). The company is built to deliver, not to preserve.
-- **Don't keep > 3 agents in the same role.** If you have 3 candidates for "writer", one of them is dead weight. Pick the best 1-2 and fire the rest.
-
-## Pro tip
-
-Add a `## <fqn> — assessment` block under each agent's section, updated periodically:
-
-```markdown
-## local/report-writer
-- 2026-05-14 | task ... | success | ...
-- 2026-05-15 | task ... | success | ...
-- 2026-05-16 | task ... | failure | invented data
-- 2026-05-17 | task ... | success | ...
-- 2026-05-17 | task ... | failure | invented data again
-
-### Assessment (2026-05-17)
-Star → Watch list → Fire. Inventing data twice in 3 days. Replacing
-with local/report-writer-v2 with explicit "no-invented-data" reminder
-in the agent body.
-```
-
-This makes `hires.md` not just an audit log but a usable reasoning artifact.
+- **Fire on pattern, not instance.** One failure is variance; a pattern is signal. (Exception: binary trust violations like invented data — single instance is enough.)
+- **Promote on pattern, not instance.** One success is luck; a pattern is a strength.
+- **Cap same-role agents at 3.** If you have 3 candidates for "writer", one is dead weight. Pick the best 1-2 and retire the rest.
+- **Retire agents that no longer serve the mission.** Sentimentality ("we built this together") is a signal to fire, not to keep. The company is built to deliver.

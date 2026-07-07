@@ -54,23 +54,13 @@ Root cause 2: <what>
 
 ## Quality bar
 
-Good post-mortem:
-- Identifies multiple root causes (singular root cause is rare)
-- Each "why" goes one level deeper than the surface
-- "What we'd do differently" is concrete enough that you'd actually do it
-- Lessons are extracted to `lessons.md` (otherwise the post-mortem is solo-knowledge that dies)
-
-Bad post-mortem:
-- Blames "the agent was bad" without saying why or what to do about it
-- Repeats the symptom as the cause ("the task failed because the task failed")
-- Lessons section is "be more careful next time" (no actionable shape)
-
-## Anti-patterns
-
-- **Don't blame the agent.** They follow instructions. If the instructions were ambiguous, that's your fault.
-- **Don't blame the user.** Even if the goal was unclear, your job was to clarify before starting. Surface that as a lesson about onboarding rigor.
-- **Don't apologize.** Post-mortems are diagnostic, not penitential.
-- **Don't propose fixes the company can't actually implement.** "We need a better LLM" is true but not actionable.
+- **Multiple root causes.** A singular root cause is rare; a good post-mortem finds 2–5.
+- **Each "why" goes one level deeper than the surface.** Symptom ≠ cause. If the answer restates the failure, dig again.
+- **"What we'd do differently" is concrete enough to actually do.** "Be more careful next time" fails this bar; "add a timezone-scope check to data-collector probe tasks" passes.
+- **Own the instructions, not the agent.** If the agent followed a bad brief, the brief is the root cause.
+- **Own the onboarding, not the user.** If the goal was unclear, surface that as a lesson about onboarding rigor at mission start.
+- **Diagnostic, not penitential.** No apologies; propose fixes the company can implement.
+- **Lessons flow out to `lessons.md`.** Otherwise the post-mortem is solo-knowledge that dies with the file.
 
 ## After writing
 
@@ -78,6 +68,6 @@ Bad post-mortem:
    ```
    YYYY-MM-DDTHH:MM:SSZ | POSTMORTEM | <mission-id> | <one-line takeaway>
    ```
-2. Copy the lessons section into `.pilot/lessons.md` under the current month heading.
+2. Extract lessons per `self-improvement/lessons-extraction.md` — that file owns the extraction craft and copies into `lessons.md`.
 3. If the post-mortem implies a hires.md update (agent was at fault, role was misdesigned), make that update too.
 4. If the post-mortem implies a strategy.md change, surface it to the user — you don't change strategy unilaterally.

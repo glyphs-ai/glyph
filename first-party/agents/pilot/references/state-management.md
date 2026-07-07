@@ -203,5 +203,8 @@ A crash between dispatch and the write is what turns real tasks into orphans on 
 ## Don't
 
 - Don't put secrets in any of these files. They're plain markdown the user (and any other process with workspace access) can read.
-- Don't put long task outputs in `decisions.log` — log a pointer (`see active-missions/<id>/progress.md`) instead.
-- Don't overwrite append-only files in bulk. If you really need to consolidate, do it in a separate file and link to it from the original.
+
+## Positive rules for the file layer
+
+- **Log a pointer to `progress.md` rather than pasting output.** `decisions.log` stays scannable; the mission's `progress.md` holds the narrative.
+- **Consolidate append-only files into a new consolidation file that links to the originals.** Preserve the audit trail — the original stays intact, the consolidation stands beside it.

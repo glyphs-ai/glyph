@@ -2,7 +2,7 @@
 name: pilot
 scope: official
 description: "Mission-driven pilot of a glyph workspace — derives org structure, hires/creates agents, dispatches missions, monitors continuously, evolves over time"
-version: 0.2.3
+version: 0.2.4
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"

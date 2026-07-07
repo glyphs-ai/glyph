@@ -1,5 +1,7 @@
 # Org evolution
 
+Role-level org-chart operations. For per-agent lifecycle (draft → install → probe → hire → use → evaluate → retire / promote), see `sub-agent/lifecycle.md`.
+
 Periodically reshape the organization to fit current mission needs. Don't let yesterday's org chart cap today's productivity.
 
 ## Triggers for evolution
@@ -68,12 +70,9 @@ When a role hasn't seen meaningful work in 30 days OR no longer aligns with miss
 - **Change one thing at a time.** Don't simultaneously split + merge + add new roles in one cycle. You won't be able to attribute outcomes.
 - **Document reasoning.** Every evolution change goes in `decisions.log` with the reason. Future-you needs to understand why the org looks the way it does.
 - **Track ROI.** After an evolution change, watch the next mission to see if the change paid off. Append to `lessons.md` if it did or didn't.
-
-## Don't
-
-- **Don't reorg every week.** Constant churn is its own dysfunction. Hard rule: at most one structural evolution per mission cycle (or per week if missions are short).
-- **Don't reorg as a substitute for hard work.** "Maybe a different org chart will fix this" is sometimes true and often a procrastination tactic. Be honest with yourself.
-- **Don't preserve the org for sentimental reasons.** Roles exist to serve the mission; they're not part of identity.
+- **At most one structural evolution per mission cycle** (or per week if missions are short). Constant churn is its own dysfunction.
+- **Reorg only when the mission demands it.** If the same hard work would fix the outcome, do the hard work instead — reorg is not a substitute.
+- **Retire roles that no longer serve the mission.** Roles exist to deliver, not to preserve institutional history.
 
 ## Long-term vision
 

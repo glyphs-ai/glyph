@@ -26,6 +26,8 @@ A short markdown file in `.pilot/playbooks/<name>.md` describing a repeatable wo
 4. **Write it.** Use the template below.
 5. **Reference it.** Next time the pattern triggers, dispatch with `// follows playbook X` in your reasoning, OR for highly-templated work, use the playbook directly.
 
+**Completion criterion:** the playbook body has zero mission-specific names outside `<param>` placeholders.
+
 ## Template
 
 ```markdown
@@ -77,9 +79,9 @@ What to verify: <observable outcome>
 - If you modify the playbook based on a new lesson, bump a small version note at the top: `version: 1.1, updated 2026-05-16: <what changed>`.
 - If a playbook hasn't been used in 90 days, archive it to `.pilot/playbooks/_archive/`.
 
-## When NOT to write a playbook
+## When to skip
 
-- Single occurrence ("I'll need this someday"). YAGNI. Wait until you actually do.
+- Single occurrence. YAGNI.
 - Highly variable workflows where each invocation is meaningfully different. Forcing them into a playbook adds friction.
 - Workflows that are too short to bother — if it's 2 commands, just remember them.
 

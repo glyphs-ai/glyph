@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.4 (2026-07-07)
+
+- **`references/operating-loop.md` restructure.** Delete the meta "detailed expansion of the loop" opener. Trim step 7 (Wait) to one line — the `sleep 60` implementation note is gone. Rewrite "When to surface to the user" from a "Don't be silent / Don't be noisy" pair to a single positive rule (mission complete, mission abandon, high-conf escalation, new shift, or user ask; batch task-level events into daily digests). Replace step 2's inline failure-triage bullets with a pointer to `references/monitoring/stuck-task-intervention.md → Failure triage`.
+- **Retirement / replacement mechanics single-source-of-truth split.** `sub-agent/lifecycle.md` Stage 7a keeps per-agent commands only and points at `self-improvement/org-evolution.md` for role-level org-chart operations. `self-improvement/org-evolution.md` gains a top-of-file callout naming lifecycle.md as the per-agent owner.
+- **Tree-wide negation → positive rewrite** across 13 files, keeping only true hard guardrails (secrets in `state-management.md`, catalog-agent modification in `sub-agent/lifecycle.md`). `monitoring/stuck-task-intervention.md`, `rituals/monthly-strategy-review.md`, `rituals/quarterly-org-rebalance.md`, `rituals/weekly-allhands.md`, `self-improvement/hires-evaluation.md`, `self-improvement/org-evolution.md`, `self-improvement/playbook-distillation.md`, `self-improvement/post-mortem-template.md`, `state-management.md`, `sub-agent/domains.md`, and `sub-agent/lifecycle.md` all move their closing "Don't / Anti-patterns / When NOT" sections into positive Rules / Quality bar sections.
+- **Completion criteria added** to `self-improvement/lessons-extraction.md` ("one sentence, generalized one level, testable at future dispatch") and `self-improvement/playbook-distillation.md` ("zero mission-specific names outside `<param>` placeholders").
+- **`self-improvement/hires-evaluation.md`** promotes the former "Pro tip" assessment-block guidance into the main `What goes in .pilot/hires.md` section as recommended structure.
+- **`self-improvement/post-mortem-template.md`** merges "Quality bar" + "Anti-patterns" into one positive "Quality bar" and points at `lessons-extraction.md` instead of restating the extraction workflow.
+- **`monitoring/stuck-task-intervention.md`** adds a `## Failure triage` section (single home for failed-but-not-stuck routing) and deletes the parenthetical `official/cli`→`error-codes.md` pointer that duplicated operating-loop step 2.
+- **`rituals/quarterly-org-rebalance.md`** promotes the "When to skip" branch into Process step 8 as an explicit exit criterion.
+- **`rituals/weekly-allhands.md`** removes the no-op "Compose the report following the template" step.
+
 ## 0.2.3 (2026-07-07)
 
 - Consolidate five duplicated topics into single-source homes so future edits touch one file, not many.

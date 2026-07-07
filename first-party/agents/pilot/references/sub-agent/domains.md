@@ -112,19 +112,15 @@ Q4 DOMAINS:
 
 5 domains, different specialization.
 
-## Anti-patterns
-
-- **Don't force a 4-domain decomposition.** If the mission only needs 2 domains, design 2. If it needs 7, design 7.
-- **Don't conflate domains.** "Engineering" and "DevOps" might be the same domain (one engineer-ops agent) for a small mission, or two domains for a larger one. Decide based on whether the work meaningfully diverges.
-- **Don't pre-create domains "just in case".** YAGNI applies. Add a domain when a real piece of work needs it.
-- **Don't pick domains by analogy to a real company.** A real company has a fixed C-suite (chief financial / marketing / technology officers). Your "company" might not need a CFO at all (if there's no money). Pick from the work, not from the org chart of a Fortune 500.
-- **Don't conflate role and agent.** A role is a function in the org chart. An agent is the thing that fills the role. You can swap agents within a role without changing the org chart.
-
 ## Rules of thumb
 
-- **Start with 2-4 domains.** Easier to grow than to consolidate.
+- **Match domain count to actual work.** 2 or 7, whatever the mission needs — the number falls out of Q4, not out of a Fortune-500 org chart.
+- **One line of work per domain.** If work spills across (e.g. "engineering" and "DevOps" bleed together on a small mission, or a data-collection task keeps needing news-synthesis judgment), re-cluster.
+- **Derive domains from the work list.** Real companies have a fixed C-suite because they have to; your company doesn't. Build the org from Q1–Q3 outputs, not from analogy.
+- **Distinguish role from agent.** A role is a function on the org chart. An agent is the thing that fills it. Swap agents inside a role without touching the org chart.
+- **Add a domain only when a real piece of work needs it.** YAGNI — pre-created domains rot.
+- **Start with 2–4 domains.** Easier to grow than to consolidate.
 - **A domain that hasn't dispatched a task in 30 days is probably not real.** Consider folding it into another or retiring it.
-- **A domain whose tasks regularly overflow into another domain is a sign the line is wrong.** Re-cluster.
 - **Two roles in the same domain doing similar work** = one role with two agents (specialization), not two domains.
 - **Exploratory work** (open-ended R&D, "figure out how to integrate X") often deserves its own domain even if the workload is bursty. The mindset is different from execution work.
 

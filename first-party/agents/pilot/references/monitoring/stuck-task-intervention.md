@@ -2,11 +2,21 @@
 
 Detection lives in `references/operating-loop.md` step 3. This page
 covers what to do once a task has already been flagged stuck (no active
-watchdog, no progress past the threshold).
+watchdog, silent past the threshold).
+
+## Failure triage
+
+For task **failure** (distinct from stuck — the task terminated), route by error shape:
+
+- Error type `EntryNotReadyError` → run the fix command, retry once.
+- Other typed code → look up `references/error-codes.md` in the `official/cli` skill; decide retry / replace agent / escalate.
+- Generic stderr only → likely instruction-quality issue; re-dispatch with a clearer brief.
+
+The rest of this file covers **stuck** (task still running, silent).
 
 ## Triage
 
-When you detect a stuck task, don't immediately kill it. Triage:
+When you detect a stuck task, triage before killing:
 
 1. **Read the last activity entries**:
    ```sh
@@ -67,14 +77,14 @@ If the second agent also stuck, OR you can't tell what's going wrong, OR the stu
 
 ```
 Send to session terminal:
-  Mission <id> step "<step>" is stuck on task <tid> (agent <agent>, idle for <N> minutes).
+  Mission <id> step "<step>" is stuck on task <tid> (agent <agent>, silent for <N> minutes).
   Last activity: <one-line summary>
   My triage: <classification>
   Tried: <what you tried>
   I need your input on: <specific question>
 ```
 
-DO NOT silently wait forever. Stuck tasks are the leading cause of zombie missions.
+Escalation is the default when triage runs out — silent waits are the leading cause of zombie missions.
 
 ## Post-intervention
 
@@ -84,10 +94,11 @@ After ANY intervention (extension or otherwise):
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] STUCK_INTERVENTION | task $tid | <action> | <reason>" >> .pilot/decisions.log
 ```
 
-If the intervention pattern repeats for the same agent (multiple stuck-then-redispatch cycles), the agent has a quality problem. Add to `hires.md` with a strong negative note; consider retiring.
+If the same agent thrashes across multiple stuck-then-redispatch cycles, the agent has a quality problem. Add to `hires.md` with a strong negative note; consider retiring.
 
-## Don't
+## Rules
 
-- Don't auto-kill long-running tasks. Some legitimate work is slow.
-- Don't extend more than once. Two extensions = "I don't know what to do" = escalate instead.
-- Don't redispatch the same task to the same agent more than twice. Definition of insanity.
+- One extension max per stuck task. Two extensions = escalate to user instead.
+- Same agent, two redispatches on the same work: pick a different agent.
+- Cancelled tasks stay cancelled unless the user asks to re-run — don't auto-redispatch.
+- Long-running is not stuck. A task with recent activity keeps running.
