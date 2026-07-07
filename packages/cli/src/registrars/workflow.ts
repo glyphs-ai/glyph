@@ -119,7 +119,7 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
     });
 
   withWorkspaceFlags(workflowCmd.command("node-show"))
-    .description("Print one workflow node's projected wire shape (with taskId enrichment)")
+    .description("Print one workflow node's projected wire shape")
     .argument("<workflow-id>", "Workflow id")
     .argument("<node-id>", "Node id within the workflow")
     .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {

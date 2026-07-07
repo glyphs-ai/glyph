@@ -179,18 +179,18 @@ describe("tasksRoutes", () => {
     expect(body[0].id).toBe(sampleTask.id);
     expect(body[0].agent).toBe("writer");
     expect(m.list).toHaveBeenCalledTimes(1);
-    // Standalone-only by construction: origin is hardcoded server-side
-    // and `?origin=` is gone from the route's
-    // surface. Schedule-launched runs live at `/scheduled-tasks`.
+    // Standalone by default: with no origin pair on the query the route pins
+    // `origin: "standalone"`. Schedule-launched runs live at `/scheduled-tasks`;
+    // an explicit `?origin=&originId=` pair opts into origin-scoped listing.
     expect(m.list).toHaveBeenCalledWith({ origin: "standalone" });
   });
 
   it("GET / stays standalone-only when unrelated query params are present", async () => {
-    // Hono passes unknown query params through; this route only reads
-    // its manifest-declared filters and keeps origin pinned.
+    // Hono passes unknown query params through; this route strips those it
+    // doesn't declare and keeps origin pinned to standalone.
     const list = vi.fn(async () => [sampleTask]);
     const m = stubManager({ list });
-    const res = await tasksRoutes(() => m).request("/?origin=schedule&scheduleId=sched-abc");
+    const res = await tasksRoutes(() => m).request("/?foo=bar&limit=5");
     expect(res.status).toBe(200);
     expect(list).toHaveBeenCalledWith({ origin: "standalone" });
   });
@@ -264,6 +264,64 @@ describe("tasksRoutes", () => {
       createdSince: "2026-05-08T01:00:00.000Z",
       status: "running",
     });
+  });
+
+  it("GET /?origin=workflow&originId=<nid> scopes to the origin pair (drops standalone)", async () => {
+    const workflowTask = { ...sampleTask, origin: "workflow", originId: "node-7" } as Task;
+    const list = vi.fn(async () => [workflowTask]);
+    const m = stubManager({ list });
+    const res = await tasksRoutes(() => m).request("/?origin=workflow&originId=node-7");
+    expect(res.status).toBe(200);
+    const body = await jsonBody(res);
+    expect(body[0].origin).toBe("workflow");
+    // Standalone pin is replaced by the origin pair; no `status` narrowing.
+    expect(list).toHaveBeenCalledWith({ origin: "workflow", originId: "node-7" });
+  });
+
+  it("GET /?origin=workflow&originId=<nid> returns [] on no matches (not 404)", async () => {
+    const list = vi.fn(async () => []);
+    const m = stubManager({ list });
+    const res = await tasksRoutes(() => m).request("/?origin=workflow&originId=never-dispatched");
+    expect(res.status).toBe(200);
+    expect(await jsonBody(res)).toEqual([]);
+  });
+
+  it("GET /?origin=workflow&originId=<nid>&status=running composes status with the origin filter", async () => {
+    const list = vi.fn(async () => [sampleTask]);
+    const m = stubManager({ list });
+    const res = await tasksRoutes(() => m).request(
+      "/?origin=workflow&originId=node-7&status=running",
+    );
+    expect(res.status).toBe(200);
+    expect(list).toHaveBeenCalledWith({
+      origin: "workflow",
+      originId: "node-7",
+      status: "running",
+    });
+  });
+
+  it("GET /?origin=workflow (no originId) → 400 OriginQueryMalformed", async () => {
+    const m = stubManager({});
+    const res = await tasksRoutes(() => m).request("/?origin=workflow");
+    expect(res.status).toBe(400);
+    expect((await jsonBody(res)).code).toBe("OriginQueryMalformed");
+    expect(m.list).not.toHaveBeenCalled();
+  });
+
+  it("GET /?originId=node-7 (no origin) → 400 OriginQueryMalformed", async () => {
+    const m = stubManager({});
+    const res = await tasksRoutes(() => m).request("/?originId=node-7");
+    expect(res.status).toBe(400);
+    expect((await jsonBody(res)).code).toBe("OriginQueryMalformed");
+    expect(m.list).not.toHaveBeenCalled();
+  });
+
+  it("GET /?origin=bogus&originId=x → 400 UnknownOriginKind", async () => {
+    const m = stubManager({});
+    const res = await tasksRoutes(() => m).request("/?origin=workflowNode&originId=node-7");
+    expect(res.status).toBe(400);
+    expect((await jsonBody(res)).code).toBe("UnknownOriginKind");
+    expect(m.list).not.toHaveBeenCalled();
   });
 
   it("POST / requires JSON body", async () => {

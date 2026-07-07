@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 (2026-07-07)
+
+Document origin-scoped task listing and correct the workflow-node task-linkage shape.
+
+- `references/commands.md#task` — document `task list --origin <kind> --origin-id <id>`: both-or-neither flags (partial pair exits `2`), valid kinds `standalone | schedule | workflow`, newest-first `Task[]` across all statuses, and the `origin: <kind>:<id>` table scope header. Note that a bare `task list` still defaults to `standalone` origin.
+- `references/error-codes.md` — add `OriginQueryMalformed` (400, partial origin pair) and `UnknownOriginKind` (400, unknown `--origin` value) under Tasks.
+- Correct the `Task` wire shape in `references/json-shapes.md`: `origin` is the kind alone (`standalone | schedule | workflow`) paired with a top-level `originId`, not a compound `schedule:<sid>` string, and the routing id is **not** nested under `metadata`.
+- Kill the `WorkflowNode.taskId` fiction: a DAG node carries **no** `taskId`. `references/commands.md#workflow` (`dag`, `node-show`, `cancel-node`) and `references/json-shapes.md#workflownode` now resolve a node's task run(s) by origin (`task list --origin workflow --origin-id <nodeId>`), and the node's human-response fields are documented under `metadata.response`, not as top-level `responseInput` / `responseChoiceId`.
+- `schedule list-tasks` output note now states `origin: "schedule"`, `originId: <sid>` (equivalent to `task list --origin schedule --origin-id <sid>`).
+
 ## 0.3.0 (2026-07-07)
 
 Generalize the skill to cover every CLI command group as a first-class citizen.

@@ -34,18 +34,42 @@ export function registerTaskCommands(program: Command, slot: Slot): void {
   const taskCmd = program.command("task").description("Task operations (workspace-scoped)");
 
   withWorkspaceFlags(taskCmd.command("list"))
-    .description("List standalone tasks in the current workspace")
+    .description(
+      "List standalone tasks in the current workspace (or an origin's tasks with --origin/--origin-id)",
+    )
     .option("--agent <name>", "Filter by agent name")
     .option("--runtime <kind>", "Filter by runtime kind")
     .option("--created-since <iso>", "Drop tasks created before this ISO 8601 timestamp")
     .option("--status <status>", "Filter by status (running, succeeded, failed, or cancelled)")
+    .option(
+      "--origin <kind>",
+      "Scope to an origin kind (workflow, schedule) instead of standalone; requires --origin-id",
+    )
+    .option(
+      "--origin-id <id>",
+      "Origin id within --origin (nodeId for workflow, scheduleId for schedule); requires --origin",
+    )
     .action(async (opts: Record<string, unknown>) => {
+      // Both-or-neither: an origin kind is meaningless without its id and
+      // vice versa. Reject a partial pair loudly rather than silently
+      // ignoring one half.
+      const hasOrigin = pickString(opts, "origin") !== undefined;
+      const hasOriginId = pickString(opts, "originId") !== undefined;
+      if (hasOrigin !== hasOriginId) {
+        slot.result = {
+          exitCode: 2,
+          stderr: "--origin and --origin-id must be used together\n",
+        };
+        return;
+      }
       slot.result = await taskList({
         ...parseWorkspaceFlags(opts),
         ...optionalString(opts, "agent"),
         ...optionalString(opts, "runtime"),
         ...optionalString(opts, "createdSince"),
         ...optionalString(opts, "status"),
+        ...optionalString(opts, "origin"),
+        ...optionalString(opts, "originId"),
       });
     });
   withWorkspaceFlags(taskCmd.command("dispatch"))

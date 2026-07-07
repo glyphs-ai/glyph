@@ -109,14 +109,16 @@ Per-group subcommand reference for `glyph workspace / session / task / schedule 
 
 ## task
 
-`glyph task <sub>` — one-shot task dispatches. Every task is owned by exactly one origin (`standalone`, `schedule:<sid>`, or `workflow:<wfid>`) and has a linear terminal state.
+`glyph task <sub>` — one-shot task dispatches. Every task is owned by exactly one origin — a `kind` (`standalone`, `schedule`, or `workflow`) plus, for non-standalone kinds, an `originId` (a `scheduleId`, or a workflow `nodeId`). Each task has a linear terminal state.
 
 ### `task list`
 
 - Optional filters: `--agent <name>`, `--runtime <kind>`, `--created-since <iso>`, `--status <csv>` (subset of `running,succeeded,failed,cancelled`)
-- Route: `GET /workspaces/:id/tasks`
-- Output: `Task[]` (see [json-shapes.md#task](./json-shapes.md#task))
-- Note: list is standalone-origin only. Schedule-origin tasks are under `schedule list-tasks`; workflow-origin tasks are surfaced through `workflow dag` / `workflow node-show`.
+- Origin scope: `--origin <kind>` + `--origin-id <id>` narrows to one origin's tasks (e.g. a workflow node's runs: `--origin workflow --origin-id <nodeId>`). The two flags are **both-or-neither** — passing one without the other exits `2` before any request. Valid kinds: `standalone`, `schedule`, `workflow`.
+- Route: `GET /workspaces/:id/tasks` (query: `origin`, `originId`, plus the filters above)
+- Output: `Task[]`, newest first — all statuses unless `--status` narrows them (see [json-shapes.md#task](./json-shapes.md#task))
+- Table mode prints an `origin: <kind>:<id>` scope header when `--origin` is active; `--json` emits the array unchanged
+- Note: without `--origin`, results default to `standalone` origin only. Schedule-origin tasks also have the dedicated `schedule list-tasks`; workflow-node runs additionally surface through `workflow dag` / `workflow node-show` context.
 
 ### `task dispatch`
 
@@ -215,7 +217,7 @@ Per-group subcommand reference for `glyph workspace / session / task / schedule 
 
 - Optional filters: `--schedule-id <id>`, `--agent <fqn>`, `--runtime <kind>`, `--created-since <iso>`, `--status <csv>`
 - Route: `GET /workspaces/:id/schedules/list-tasks`
-- Output: `Task[]` — same shape as `task list`, but scoped to schedule-origin tasks (`origin` is `schedule:<sid>`)
+- Output: `Task[]` — same shape as `task list`, but scoped to schedule-origin tasks (`origin: "schedule"`, `originId: <sid>`). Equivalent to `task list --origin schedule --origin-id <sid>`.
 
 ---
 
@@ -276,7 +278,7 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 | [`workflow create`](#workflow-create) | Seed a workflow + initial coord node |
 | [`workflow show`](#workflow-show-workflow-id) | Print one workflow's header |
 | [`workflow dag`](#workflow-dag-workflow-id) | Print the full DAG snapshot |
-| [`workflow node-show`](#workflow-node-show-workflow-id-node-id) | Print one node's projection (with `taskId`) |
+| [`workflow node-show`](#workflow-node-show-workflow-id-node-id) | Print one node's projected wire shape |
 | [`workflow add-node`](#workflow-add-node-workflow-id) | Insert one node attached to existing parents |
 | [`workflow add-subgraph`](#workflow-add-subgraph-workflow-id) | Insert N nodes + intra-batch edges atomically |
 | [`workflow add-edge`](#workflow-add-edge-workflow-id) | Add a single edge between two existing nodes |
@@ -314,14 +316,14 @@ Use over `list` whenever you need iteration count or want a single-row fetch by 
 - Route: `GET /workspaces/:id/workflows/:wfid/dag`
 - Output: `WorkflowDag` — `{ header: WorkflowHeader, nodes: WorkflowNode[], edges: WorkflowEdge[] }` (see [json-shapes.md#workflowdag](./json-shapes.md#workflowdag))
 
-`WorkflowNode.taskId` is filled for worker/coord nodes after dispatch. Human nodes carry no `taskId` (they have no runtime).
+A `WorkflowNode` carries **no** `taskId` field. A worker/coordinator node's task run(s) are looked up by origin — `task list --origin workflow --origin-id <nodeId>` (newest first) — never read off the node. Human nodes have no runtime and no task at all.
 
 ### `workflow node-show <workflow-id> <node-id>`
 
 - Route: `GET /workspaces/:id/workflows/:wfid/nodes/:nid`
 - Output: `WorkflowNode`
 
-Use when you already know a node id (e.g. parent id from `dag`) and want to skip re-fetching the whole snapshot. Common in coord wake-up when reading a parent's `taskId` to look up its task and verdict.
+Use when you already know a node id (e.g. parent id from `dag`) and want to skip re-fetching the whole snapshot. Common in coord wake-up when resolving a parent worker's task run via `task list --origin workflow --origin-id <parent-node-id>` to read its verdict.
 
 ### `workflow add-node <workflow-id>`
 
@@ -392,7 +394,7 @@ Destination node must be `not_started`. Adding an edge feeding a running / termi
 - Body: empty (mirrors `task cancel`)
 - Output: `WorkflowNode`
 
-Runner-level defaults supply the reason: worker nodes get `"cancelled by coordinator"`; coord nodes get `"cancelled by operator (workflow cancel)"`. The reason lands on the underlying task entity's `cancellation.message` — read via `glyph task show <taskId>`.
+Runner-level defaults supply the reason: worker nodes get `"cancelled by coordinator"`; coord nodes get `"cancelled by operator (workflow cancel)"`. The reason lands on the underlying task entity's `cancellation.message` — read via `glyph task show <task-id>` (resolve the id with `task list --origin workflow --origin-id <nodeId>`).
 
 ### `workflow cancel <workflow-id>`
 

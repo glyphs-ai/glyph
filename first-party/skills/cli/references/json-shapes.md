@@ -71,14 +71,13 @@ Returned by `task list`, `task dispatch`, `task show`, `schedule list-tasks`.
   "agent": "langsensei/gusu-scribe",
   "brief": "Article draft",
   "details": "Multi-line context...",          // optional — omitted if null
-  "origin": "standalone",                       // "standalone" | "schedule:<sid>" | "workflow:<wfid>"
+  "origin": "standalone",                       // origin KIND: "standalone" | "schedule" | "workflow"
+  "originId": "af12...",                        // optional routing id within the origin (scheduleId, or workflow nodeId); omitted for standalone
   "status": "succeeded",                        // "running" | "succeeded" | "failed" | "cancelled"
   "metadata": {
     "workdir": "/.../tasks/20260617-5ab73e2d",
     "runtimeSessionId": "6e53532e-...",
-    "runtime": "copilot",
-    "workflowNodeId": "af12...",                // present iff origin starts with "workflow:"
-    "scheduleId": "..."                          // present iff origin starts with "schedule:"
+    "runtime": "copilot"
   },
   "createdAt": "2026-06-17T06:52:56.184Z",
   "startedAt": "2026-06-17T06:52:56.184Z",     // absent while pending
@@ -88,6 +87,8 @@ Returned by `task list`, `task dispatch`, `task show`, `schedule list-tasks`.
   "cancellation": { ... }                       // present iff status === "cancelled"
 }
 ```
+
+`origin` is the kind alone; the paired routing id is the top-level `originId` (not nested in `metadata`). A schedule's runs are `origin: "schedule"`, `originId: <scheduleId>`; a workflow node's runs are `origin: "workflow"`, `originId: <nodeId>`. Filter either set with `task list --origin <kind> --origin-id <id>`.
 
 Exactly one of `success` / `failure` / `cancellation` is present when the task is terminal; none are present while `status === "running"`. See [TerminalResult](#terminalresult).
 
@@ -344,11 +345,11 @@ Returned by `workflow node-show`, and one element of `WorkflowDag.nodes`.
   "readyAt":   "2026-07-06T14:05:05.000Z",              // when all parents terminated in a "runnable" state
   "runningAt": "2026-07-06T14:05:06.000Z",              // when the runtime picked it up
   "endedAt":   "2026-07-06T14:20:00.000Z",              // absent while running
-  "taskId":    "20260706-abcd1234",                     // present after dispatch for coordinator/worker nodes; look up via `task show`
-  "responseInput":   "freeform text",                   // human node — set on respond
-  "responseChoiceId": "approve"                          // human node — set on respond
+  "metadata":  { }                                      // human nodes store the operator's answer here as `response: { input?, choiceId? }` after `workflow respond`
 }
 ```
+
+A node carries **no** `taskId`. Worker/coordinator runs are looked up by origin, never stored on the node; to find a node's task run(s) use `glyph task list --origin workflow --origin-id <nodeId> --json` (newest first, so `.[0]` is the latest run). Human-node answers live under `metadata.response`, not as top-level fields.
 
 Node kinds have distinct terminal semantics: a `coordinator` node's terminal is set by its own `workflow finish` call, `worker` inherits from its underlying task, and `human` transitions to `succeeded` on the first valid `workflow respond`.
 
