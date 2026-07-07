@@ -28,6 +28,7 @@
  *   - `GET    /:wfid/artifacts`           — list workflow-summary + per-node artifacts
  *   - `GET    /:wfid/artifacts/:encoded`  — static bytes for one artifact
  *   - `POST   /:wfid/subgraph`            — batch insert N nodes + M edges
+ *   - `POST   /:wfid/prune`               — batch retract N not-started nodes + adjacent edges
  *   - `POST   /:wfid/nodes/:nid/cancel`   — cancel a worker-kind node
  *   - `POST   /:wfid/nodes/:nid/respond`  - answer a waiting human-kind node
  *   - `POST   /:wfid/finish`              — flip workflow terminal
@@ -77,6 +78,8 @@ import {
   GetWorkflowResponseSchema,
   ListWorkflowArtifactsResponseSchema,
   ListWorkflowsResponseSchema,
+  PruneWorkflowSubgraphRequestSchema,
+  PruneWorkflowSubgraphResponseSchema,
   CancelWorkflowRequestSchema as WorkflowCancelWorkflowRequestSchema,
   CreateWorkflowRequestSchema as WorkflowCreateWorkflowRequestSchema,
   FinishWorkflowRequestSchema as WorkflowFinishWorkflowRequestSchema,
@@ -573,6 +576,52 @@ export function workflowsRoutes(
       } catch (err) {
         return respondWorkflowError(c, err, {
           route: "workflows.addSubgraph",
+          policy: workflowsErrorPolicy,
+          meta: { workflowId: wfid as WorkflowId },
+        });
+      }
+    },
+  );
+
+  // ── POST /:wfid/prune — pruneSubgraph ────────────────────────────
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/{wfid}/prune",
+      tags: ["workflows"],
+      summary: "Prune a batch of not-started nodes",
+      request: {
+        params: z.object({ wfid: z.string() }),
+        body: jsonRequest(PruneWorkflowSubgraphRequestSchema.omit({ workflowId: true })),
+      },
+      responses: {
+        200: jsonResponse(PruneWorkflowSubgraphResponseSchema, "Pruned nodes and edges"),
+        400: errorResponse("Malformed request body"),
+        404: errorResponse("Workflow not found"),
+        409: errorResponse("Workflow already terminal"),
+        422: errorResponse("Unprocessable entity"),
+        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
+      },
+    }),
+    async (c) => {
+      const wfid = c.req.param("wfid");
+      const body = c.req.valid("json");
+      try {
+        const result = unwrapWorkflow(
+          await resolve(c).pruneSubgraph.execute({
+            workflowId: wfid as WorkflowId,
+            nodeIds: body.nodeIds,
+          }),
+        );
+        logEvent(c, "workflow.pruneSubgraph", {
+          workflowId: wfid as WorkflowId,
+          prunedCount: result.prunedNodeIds.length,
+        });
+        return c.json({ prunedNodeIds: result.prunedNodeIds, prunedEdges: result.prunedEdges });
+      } catch (err) {
+        return respondWorkflowError(c, err, {
+          route: "workflows.pruneSubgraph",
           policy: workflowsErrorPolicy,
           meta: { workflowId: wfid as WorkflowId },
         });

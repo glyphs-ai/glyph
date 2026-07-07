@@ -2930,6 +2930,62 @@ export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses = {
 
 export type PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponse = PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidSubgraphResponses];
 
+export type PostApiWorkspacesByIdWorkflowsByWfidPruneData = {
+    body: {
+        nodeIds: Array<string>;
+    };
+    path: {
+        id: string;
+        wfid: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{id}/workflows/{wfid}/prune';
+};
+
+export type PostApiWorkspacesByIdWorkflowsByWfidPruneErrors = {
+    /**
+     * Malformed request body
+     */
+    400: Problem;
+    /**
+     * Workflow not found
+     */
+    404: Problem;
+    /**
+     * Workflow already terminal
+     */
+    409: Problem;
+    /**
+     * Unprocessable entity
+     */
+    422: Problem;
+    /**
+     * Internal error
+     */
+    500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
+};
+
+export type PostApiWorkspacesByIdWorkflowsByWfidPruneError = PostApiWorkspacesByIdWorkflowsByWfidPruneErrors[keyof PostApiWorkspacesByIdWorkflowsByWfidPruneErrors];
+
+export type PostApiWorkspacesByIdWorkflowsByWfidPruneResponses = {
+    /**
+     * Pruned nodes and edges
+     */
+    200: {
+        prunedNodeIds: Array<string>;
+        prunedEdges: Array<{
+            from: string;
+            to: string;
+        }>;
+    };
+};
+
+export type PostApiWorkspacesByIdWorkflowsByWfidPruneResponse = PostApiWorkspacesByIdWorkflowsByWfidPruneResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidPruneResponses];
+
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelData = {
     body?: never;
     path: {

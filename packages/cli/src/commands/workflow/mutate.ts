@@ -1,11 +1,12 @@
 /**
  * `glyph workflow ...` coord-callback mutation primitives that back the
- * coordinator-agent contract: add-node / add-subgraph / add-edge,
- * cancel-node, finish. Also exports the shared `readJsonFileArg`
- * file-arg reader used by the spec-file commands. Render helpers live in
- * `./_shared.ts`; argument parsing + validation helpers live in
- * `./_validate.ts`. The DAG is append-only — there is no
- * remove-node / remove-edge / replace-spec.
+ * coordinator-agent contract: add-node / add-subgraph / add-edge /
+ * prune-subgraph, cancel-node, finish. Also exports the shared
+ * `readJsonFileArg` file-arg reader used by the spec-file commands. Render
+ * helpers live in `./_shared.ts`; argument parsing + validation helpers live
+ * in `./_validate.ts`. Only still-`not_started` nodes can be retracted (via
+ * prune-subgraph); once a node has started it is immutable — there is no
+ * remove-started-node / replace-spec.
  */
 
 import { readFileSync } from "node:fs";
@@ -16,6 +17,7 @@ import type {
 import {
   postApiWorkspacesByIdWorkflowsByWfidFinish,
   postApiWorkspacesByIdWorkflowsByWfidNodesByNidCancel,
+  postApiWorkspacesByIdWorkflowsByWfidPrune,
   postApiWorkspacesByIdWorkflowsByWfidSubgraph,
 } from "@glyphs-ai/sdk";
 import { makeSdkClient, resolveWorkspace } from "../../connect.js";
@@ -31,6 +33,7 @@ import {
   KNOWN_NODE_KINDS,
   parseParents,
   validateAddSubgraphRequest,
+  validatePruneSubgraphRequest,
 } from "./_validate.js";
 
 /**
@@ -190,7 +193,57 @@ export async function workflowAddSubgraph(
   }
 }
 
-// --- add-edge ----------------------------------------------------------
+// --- prune-subgraph ----------------------------------------------------
+export interface WorkflowPruneSubgraphOpts extends WorkspaceFlagOpts {
+  /**
+   * Path to a JSON file with `{ nodeIds: [id, ...] }` — the still-`not_started`
+   * nodes to retract along with their adjacent edges.
+   */
+  readonly specFile: string;
+}
+
+export async function workflowPruneSubgraph(
+  workflowId: string,
+  opts: WorkflowPruneSubgraphOpts,
+): Promise<CommandResult> {
+  if (typeof workflowId !== "string" || workflowId.trim() === "") {
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
+  }
+  if (typeof opts.specFile !== "string" || opts.specFile.trim() === "") {
+    return { exitCode: 2, stderr: "missing required --spec-file <path>\n" };
+  }
+  const payloadResult = readJsonFileArg("--spec-file", opts.specFile);
+  if (!payloadResult.ok) {
+    return { exitCode: 2, stderr: `${payloadResult.error}\n` };
+  }
+  const bodyResult = validatePruneSubgraphRequest(payloadResult.value);
+  if (!bodyResult.ok) {
+    return { exitCode: 2, stderr: `${bodyResult.error}\n` };
+  }
+  const { body } = bodyResult;
+  await makeSdkClient(opts);
+  try {
+    const workspaceId = await resolveWorkspace(opts);
+    const result = unwrap(
+      await postApiWorkspacesByIdWorkflowsByWfidPrune({
+        path: { id: workspaceId, wfid: workflowId },
+        body,
+      }),
+    );
+    const fmt = pickFormat(opts, "table");
+    if (fmt === "json") return { exitCode: 0, stdout: formatJson(result) };
+    return {
+      exitCode: 0,
+      stdout: formatTable(
+        ["prunedNodeId"],
+        result.prunedNodeIds.map((id) => [id]),
+      ),
+    };
+  } catch (err) {
+    return formatError(err);
+  }
+}
+
 export type WorkflowAddEdgeOpts = WorkspaceFlagOpts;
 
 export async function workflowAddEdge(

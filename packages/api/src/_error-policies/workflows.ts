@@ -37,6 +37,7 @@ import type {
   GetWorkflowNodeError,
   ListWorkflowsError,
   NodeSpecError,
+  PruneWorkflowSubgraphError,
   RespondToHumanNodeError,
 } from "@glyphs-ai/workflow";
 import type { Context } from "hono";
@@ -64,6 +65,7 @@ export type WorkflowRouteError =
   | GetWorkflowError
   | GetWorkflowNodeError
   | ListWorkflowsError
+  | PruneWorkflowSubgraphError
   | RespondToHumanNodeError;
 
 const INTERNAL = "internal error";
@@ -149,6 +151,25 @@ const WORKFLOW_ATOM_TABLE = {
           return `parent ${err.reason.parentNodeId} is ${err.reason.parentStatus}; cannot attach ${err.reason.nodeKind}`;
         case "invariant":
           return "workflow DAG invariant violation";
+      }
+    },
+    extension: (err) => ({ reason: err.reason }),
+  },
+  WorkflowPruneRejected: {
+    status: 422,
+    title: "Prune rejected",
+    detail: (err) => {
+      switch (err.reason.kind) {
+        case "nodeNotFound":
+          return `prune target not found: ${err.reason.nodeId}`;
+        case "nodeNotStarted":
+          return `prune target ${err.reason.nodeId} is ${err.reason.status}; only not_started nodes are prunable`;
+        case "rootCoordProtected":
+          return `prune target ${err.reason.nodeId} is the root coordinator and cannot be pruned`;
+        case "orphan":
+          return `pruning would orphan surviving node ${err.reason.nodeId}`;
+        case "coordChainBroken":
+          return `pruning would break the coordinator chain at surviving node ${err.reason.nodeId}`;
       }
     },
     extension: (err) => ({ reason: err.reason }),

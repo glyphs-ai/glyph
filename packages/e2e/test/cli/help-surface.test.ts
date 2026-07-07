@@ -260,6 +260,7 @@ describe.skipIf(!BIN_AVAILABLE)("CLI help surface", () => {
         rm [options] <workflow-id>                     Remove a terminal workflow
         add-node [options] <workflow-id>               Coord-only: insert one node attached to one or more existing parents
         add-subgraph [options] <workflow-id>           Coord-only: insert N nodes + intra-batch edges atomically
+        prune-subgraph [options] <workflow-id>         Coord-only: retract N not-started nodes + their adjacent edges atomically
         add-edge [options] <workflow-id>               Coord-only: add a single edge between two existing nodes
         cancel-node [options] <workflow-id> <node-id>  Coord-only: cancel a single worker node (coord-kind targets are rejected with 409)
         finish [options] <workflow-id>                 Coord-only: flip the workflow terminal (outcome: succeeded | failed)

@@ -74,6 +74,28 @@ export type WorkflowNodeNotMutable = {
   readonly verb: string;
 };
 
+/**
+ * A `pruneSubgraph` request is rejected. `reason.kind` names the specific
+ * violation: the first three are per-target input constraints checked up front
+ * (before any mutation), the last two are remaining-graph invariants checked
+ * against the simulated post-removal graph. All five reject before any write,
+ * so a rejected prune leaves the aggregate untouched.
+ */
+export type WorkflowPruneRejected = {
+  readonly type: "WorkflowPruneRejected";
+  readonly reason:
+    | { readonly kind: "nodeNotFound"; readonly workflowId: string; readonly nodeId: string }
+    | {
+        readonly kind: "nodeNotStarted";
+        readonly workflowId: string;
+        readonly nodeId: string;
+        readonly status: string;
+      }
+    | { readonly kind: "rootCoordProtected"; readonly workflowId: string; readonly nodeId: string }
+    | { readonly kind: "orphan"; readonly workflowId: string; readonly nodeId: string }
+    | { readonly kind: "coordChainBroken"; readonly workflowId: string; readonly nodeId: string };
+};
+
 export function workflowNodeNotMutable(
   workflowId: string,
   nodeId: string,

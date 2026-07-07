@@ -15,6 +15,7 @@ import { GetWorkflowNodeUseCase } from "./application/get-workflow-node.js";
 import { ListWorkflowArtifactsUseCase } from "./application/list-workflow-artifacts.js";
 import { ListWorkflowsUseCase } from "./application/list-workflows.js";
 import type { WorkflowRunners } from "./application/ports/workflow-node-runner.js";
+import { PruneWorkflowSubgraphUseCase } from "./application/prune-workflow-subgraph.js";
 import { ResolveWorkflowArtifactPathUseCase } from "./application/resolve-workflow-artifact-path.js";
 import { RespondToHumanNodeUseCase } from "./application/respond-to-human-node.js";
 import { type Db, openDb } from "./infrastructure/drizzle/workflow-db.js";
@@ -40,6 +41,7 @@ export interface WorkflowModule {
   readonly finishWorkflow: FinishWorkflowUseCase;
   readonly cancelWorkflow: CancelWorkflowUseCase;
   readonly addSubgraph: AddWorkflowSubgraphUseCase;
+  readonly pruneSubgraph: PruneWorkflowSubgraphUseCase;
   readonly respondHumanNode: RespondToHumanNodeUseCase;
   readonly getWorkflow: GetWorkflowUseCase;
   readonly listWorkflows: ListWorkflowsUseCase;
@@ -133,6 +135,7 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
       now,
       randomUUID,
     }),
+    pruneSubgraph: new PruneWorkflowSubgraphUseCase({ repo, coordinator: engine }),
     respondHumanNode: new RespondToHumanNodeUseCase({ repo, coordinator: engine, now }),
     getWorkflow: new GetWorkflowUseCase({ query }),
     listWorkflows: new ListWorkflowsUseCase({ query }),
