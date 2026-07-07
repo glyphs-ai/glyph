@@ -41,6 +41,29 @@ const external = [
   // tiny resolver better-sqlite3 uses; same treatment.
   "better-sqlite3",
   "bindings",
+  // @libsql/client is the SQLite driver used by workspace DBs (via
+  // drizzle-orm/libsql). It re-exports the `libsql` package, whose
+  // JS shim calls `require('@libsql/<platform>')` at runtime through
+  // its own `requireNative()` helper (e.g. `@libsql/win32-x64-msvc`
+  // on Windows). Those platform packages ship prebuilt `.node`
+  // bindings and are declared as `optionalDependencies` of `libsql`
+  // so npm installs only the one matching the host.
+  //
+  // Inlining `@libsql/client` (and transitively `libsql`) into our
+  // single-file bundle severs the `requireNative` lookup: it resolves
+  // relative to `bundle/glyph.js`, not to a real
+  // `node_modules/@libsql/client/` next to a materialised
+  // `node_modules/libsql/`, so the platform package is never found
+  // and `glyph start` crashes with
+  // `Cannot find module '@libsql/<platform>'` at first startup.
+  //
+  // Externalising `@libsql/client` keeps the `require()` call intact.
+  // We declare `@libsql/client` in the root `package.json`
+  // `dependencies`; `npm install -g @glyphs-ai/glyph` then
+  // materialises the client, the `libsql` shim, and the correct
+  // `@libsql/<platform>` prebuilt binary side by side, and the
+  // runtime lookup succeeds.
+  "@libsql/client",
   // @github/copilot-sdk wraps the @github/copilot CLI and resolves it at
   // runtime via `import.meta.resolve('@github/copilot/sdk')` (verified
   // against @github/copilot-sdk@1.0.0-beta.4). That call walks the
