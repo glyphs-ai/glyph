@@ -696,10 +696,19 @@ file and break it, that's a `git restore` away (if you're lucky) or a
   with `exactOptionalPropertyTypes`; if a value is "optional", the
   type is `T | undefined` and the field is conditionally spread, not
   assigned `undefined` directly.
-- **Errors are typed.** Every package defines its own error hierarchy
-  (`WorkspaceError`, `CatalogError`, `RuntimeError`, …); the server
-  maps them to HTTP status codes via `instanceof` checks. Throwing a
-  `new Error(...)` from a manager is a smell.
+- **Errors are typed.** Domain and application errors are
+  discriminated-union atoms (`{ type: "<AtomName>", ... }`) returned
+  through neverthrow `Result` / `ResultAsync` — never thrown for
+  control flow. Consumers (routes, other use-cases) branch on
+  `err.type` via `switch` (see `docs/pkg-template.md#errors`). The
+  api layer's Problem envelope maps each `type` to an HTTP status via
+  a per-domain table (`packages/api/src/_error-policies/*`).
+  Infrastructure-level thrown errors (e.g. `WorkspaceLoadError`,
+  `SessionNotFoundError`) live on an allow-list keyed by class name
+  (`SAFE_ERROR_NAMES` in `packages/api/src/_http-errors.ts`); anything
+  off the list collapses to an opaque `InternalError` to avoid
+  leaking host paths. Throwing a bare `new Error(...)` from a
+  manager is a smell.
 - **Comments explain *why*, not *what*.** A regex is self-explanatory;
   the choice to use `Number.parseInt` over `+` because the input might
   be `"0x10"` is not. Lean toward more comments at decision points,

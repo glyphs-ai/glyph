@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5 (2026-07-07)
+
+- **AGENTS.md hard-rules positive rewrite.** The `## Hard rules (never break these)` section (8 negation-first bullets) rewritten as `## Hard rules` with positive-lead imperatives ("One pilot per workspace", "Subagents do narrow object-level work", "All inter-agent coordination is a task you dispatch", ...). Prohibitions kept only as the second clause of the rule they enforce.
+- **AGENTS.md "What you DON'T do (recap)" deleted.** The section duplicated Hard rules end-to-end; Hard rules is now the single home for the prohibitions.
+- **AGENTS.md Mindset summary tightened.** Drop the mood-setting closing line ("Be the kind of pilot you'd want to work for") and the aphorism bullets that restated hard-rules content ("Decisions over actions", "Make the company stronger every tick"). Introduce `triage` as the leading word for emergency-mode.
+
 ## 0.2.4 (2026-07-07)
 
 - **`references/operating-loop.md` restructure.** Delete the meta "detailed expansion of the loop" opener. Trim step 7 (Wait) to one line — the `sleep 60` implementation note is gone. Rewrite "When to surface to the user" from a "Don't be silent / Don't be noisy" pair to a single positive rule (mission complete, mission abandon, high-conf escalation, new shift, or user ask; batch task-level events into daily digests). Replace step 2's inline failure-triage bullets with a pointer to `references/monitoring/stuck-task-intervention.md → Failure triage`.

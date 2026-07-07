@@ -2,7 +2,7 @@
 name: meta-agent-schema
 scope: official
 description: "Schema for glyph-compatible agents, skills, and MCPs — frontmatter, layout, naming, dependency origins, MCP cross-platform rules, runtime-agnostic file references, CHANGELOG conventions"
-version: 0.1.1
+version: 0.2.0
 ---
 
 # Meta-Agent Schema Skill
@@ -45,6 +45,13 @@ name: my-skill                                  # kebab-case, matches folder
 scope: acme                               # the catalog's scope
 description: "What the skill does, one line."   # 1-1024 chars
 version: 0.1.0                                  # 3-segment semver (bare or quoted)
+type: strategy                                  # OPTIONAL — tags the skill's role in the catalog.
+                                                # Currently recognized: `strategy` (a strategy skill
+                                                # loaded by a coord-shaped agent alongside
+                                                # `official/workflow-coordination`; formally invokes
+                                                # the naming exception that lets the strategy's
+                                                # case-bank + dispatch templates name the loading
+                                                # coord agent + worker agent FQNs).
 prereqs: |                                      # OPTIONAL — keep short
   Requires: <one-line summary>. See `references/SETUP.md` for step-by-step setup.
 dependencies:                                   # OPTIONAL
@@ -58,7 +65,7 @@ dependencies:                                   # OPTIONAL
 
 Required fields: `name`, `scope`, `description`, `version`.
 
-Optional fields: `prereqs`, `dependencies.skills`, `dependencies.mcps`.
+Optional fields: `type`, `prereqs`, `dependencies.skills`, `dependencies.mcps`.
 
 Field rules:
 
@@ -66,6 +73,7 @@ Field rules:
 - `version` is mandatory and must be 3-segment semver; the parser accepts both `1.0.0` (bare) and `"1.0.0"` (quoted).
 - `prereqs` is a YAML literal-block string. Keep it short — link to a sibling `references/SETUP.md` for the long version.
 - `dependencies.skills` and `dependencies.mcps` are **arrays of bare origin URI strings**. Object form (`{origin: ...}`) is parsed but discouraged.
+- `type` is optional; when set, it tags the skill's role in the catalog. The one currently recognized value is `strategy`, which invokes the naming exception for strategy skills. Unknown values are accepted by the parser but carry no semantics.
 - Cross-catalog dependencies are allowed: any public GitHub repo URL of the form `https://github.com/<owner>/<repo>/tree/<ref>/<path>` works.
 
 ## Frontmatter — Agent (`agents/<name>/AGENTS.md`)
