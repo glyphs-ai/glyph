@@ -9,15 +9,15 @@ import { pickDrillTarget } from "../../../src/pages/workflows/drill";
  */
 describe("pickDrillTarget", () => {
   it("routes to the node drill when only nodeId is set", () => {
-    expect(pickDrillTarget("task-1", null)).toEqual({ kind: "node", nodeId: "task-1" });
+    expect(pickDrillTarget("n-1", null)).toEqual({ kind: "node", nodeId: "n-1" });
   });
 
   it("routes to the human drill when only humanNodeId is set", () => {
-    expect(pickDrillTarget(null, "node-1")).toEqual({ kind: "human", humanNodeId: "node-1" });
+    expect(pickDrillTarget(null, "hn-1")).toEqual({ kind: "human", humanNodeId: "hn-1" });
   });
 
   it("prefers the node drill when both slots are populated", () => {
-    expect(pickDrillTarget("task-1", "node-1")).toEqual({ kind: "node", nodeId: "task-1" });
+    expect(pickDrillTarget("n-1", "hn-1")).toEqual({ kind: "node", nodeId: "n-1" });
   });
 
   it("returns null when neither slot is set", () => {

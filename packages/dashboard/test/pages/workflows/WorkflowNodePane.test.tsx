@@ -158,7 +158,7 @@ describe("WorkflowNodePane", () => {
       <WorkflowNodePane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeId="task-unknown"
+        nodeId="n-unknown"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={() => {}}

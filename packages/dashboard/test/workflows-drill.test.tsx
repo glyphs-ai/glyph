@@ -101,7 +101,7 @@ afterEach(() => cleanup());
 
 describe("Workflows page — Layer A drill router", () => {
   it("?nodeId routes the right pane to the node pane", async () => {
-    renderWorkflows(`${PATH}?range=all&workflowId=wf-1&nodeId=task-1`, agents);
+    renderWorkflows(`${PATH}?range=all&workflowId=wf-1&nodeId=n-1`, agents);
     expect(await screen.findByTestId("workflow-node-pane")).toBeTruthy();
     expect(screen.queryByTestId("workflow-human-pane")).toBeNull();
     expect(screen.queryByTestId("workflow-human-not-found")).toBeNull();
@@ -115,7 +115,7 @@ describe("Workflows page — Layer A drill router", () => {
   });
 
   it("prefers the node pane when both drill slots are present", async () => {
-    renderWorkflows(`${PATH}?range=all&workflowId=wf-1&nodeId=task-1&humanNodeId=hn-1`, agents);
+    renderWorkflows(`${PATH}?range=all&workflowId=wf-1&nodeId=n-1&humanNodeId=hn-1`, agents);
     expect(await screen.findByTestId("workflow-node-pane")).toBeTruthy();
     expect(screen.queryByTestId("workflow-human-pane")).toBeNull();
     expect(screen.queryByTestId("workflow-human-not-found")).toBeNull();
