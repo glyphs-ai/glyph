@@ -2,7 +2,7 @@
 name: agency-role-reference
 scope: official
 description: "Pointer index for ~185 abstract role templates (msitarzewski/agency-agents, MIT). Use as starting points when hiring a specialist — never install directly."
-version: 0.1.0
+version: 0.1.1
 ---
 
 # Agency Role Reference Skill

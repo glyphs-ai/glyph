@@ -1,12 +1,7 @@
 <!--
   Adapted from msitarzewski/agency-agents (MIT).
-  This index is the only on-disk artifact - full role bodies are
-  fetched on-demand from the upstream URLs below. See ../SKILL.md.
-
-  Regenerate by hand when upstream evolves: walk the upstream tree
-  (e.g. via GitHub's git/trees?recursive=1 API), pull each *.md
-  file's YAML frontmatter, and rewrite this table grouped by
-  top-level category. Format follows the existing rows below.
+  See sibling `../SKILL.md` for full contract, attribution, and
+  regeneration guidance.
 -->
 
 # Agency role library - index

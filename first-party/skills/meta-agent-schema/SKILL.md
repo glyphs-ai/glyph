@@ -2,12 +2,12 @@
 name: meta-agent-schema
 scope: official
 description: "Schema for glyph-compatible agents, skills, and MCPs — frontmatter, layout, naming, dependency origins, MCP cross-platform rules, runtime-agnostic file references, CHANGELOG conventions"
-version: 0.1.0
+version: 0.1.1
 ---
 
 # Meta-Agent Schema Skill
 
-The format contract for **agents**, **skills**, and **MCPs** in glyph-compatible catalogs. This skill is the agent-facing single source of truth: any agent that creates, validates, or modifies catalog entries should load this skill in full and follow it.
+The format contract for **agents**, **skills**, and **MCPs** in glyph-compatible catalogs. Any agent that creates, validates, or modifies catalog entries should load this skill in full and follow it.
 
 The same shape is also reflected in the open [MetaAgents reference spec](https://github.com/metaagents-ai/metaagents). glyph is the canonical implementation; that document is a related spec. Where the two differ, this skill (and the validators that ship with glyph) are authoritative.
 
@@ -247,7 +247,7 @@ Every agent and skill ships a `CHANGELOG.md` next to its `AGENTS.md` / `SKILL.md
 
 ## References
 
-This skill is the agent-facing contract. Two related surfaces exist:
+Related surfaces:
 
-- **Related open spec:** [`metaagents-ai/metaagents`](https://github.com/metaagents-ai/metaagents) — the open MetaAgents reference document. Useful as background; glyph and this skill are the canonical implementation for glyph-compatible catalogs.
-- **Runtime validators (deepest authority — what installs reject):** [`glyphs-ai/glyph` `packages/catalog/`](https://github.com/glyphs-ai/glyph/tree/main/packages/catalog/src). When this skill's prose and the validators disagree, the validators win and this skill is the bug.
+- **Open reference spec:** [`metaagents-ai/metaagents`](https://github.com/metaagents-ai/metaagents) — the open MetaAgents reference document. Useful as background; glyph and this skill are the canonical implementation for glyph-compatible catalogs.
+- **Runtime validators (deepest authority — what installs reject):** the `@glyphs-ai/catalog` package in [`glyphs-ai/glyph`](https://github.com/glyphs-ai/glyph). Where this skill's prose and the validators disagree, the validators are authoritative.

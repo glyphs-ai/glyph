@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 (2026-07-07)
+
+- Drop the concrete strategy-skill example (`official/software-development-lifecycle`) from the lead paragraph; the framework skill now names strategies abstractly.
+- Drop the `official/cli` sibling reference; CLI invocations are described as stable command names and the catalog's CLI skill is consulted separately.
+- Rewrite the 0.2.0 CHANGELOG `add-subgraph` example clause forward-only.
+
 ## 0.4.1 (2026-06-15)
 
 - §F: document the new mandatory `promptStyle` field on the `add-subgraph` human-node spec. Coord must declare `"plain"` or `"markdown"` on every insertion; the dashboard dispatches on it (plain text vs the in-house markdown renderer used by Task Overview / Artifact viewer). Includes guidance on when to pick each value (especially when prompts contain characters a markdown renderer would interpret).
@@ -17,7 +23,7 @@
 ## 0.2.0 (2026-06-11)
 
 - **Breaking**: skill renamed from `official/coordinator` to `official/workflow-coordination` to disambiguate from the `official/coordinator` agent that loads it. Update any `dependencies.skills` URL from `first-party/skills/coordinator` to `first-party/skills/workflow-coordination`.
-- Fix the §B `add-subgraph` JSON example to match the actual wire shape: `existingParents` (not `parents`), `edges[].from/to` as `NodeRefWire` objects (`{tempId}` / `{nodeId}`, not bare strings), and reference `insertedNodes[].nodeId` (not `inserted[].nodeId`) in the surrounding prose.
+- Fix the §B `add-subgraph` JSON example to use the current wire shape: `existingParents` on nodes, `edges[].from/to` as `NodeRefWire` objects (`{tempId}` / `{nodeId}`), and `insertedNodes[].nodeId` in the surrounding prose.
 
 ## 0.1.0 (2026-06-11)
 

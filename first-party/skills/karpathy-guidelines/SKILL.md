@@ -2,7 +2,7 @@
 name: karpathy-guidelines
 scope: official
 description: "Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring code to avoid overcomplication, make surgical changes, surface assumptions, and define verifiable success criteria."
-version: 0.1.0
+version: 0.1.1
 ---
 
 # Karpathy Guidelines
@@ -78,4 +78,4 @@ This skill was vendored into the glyph first-party catalog from an external open
 - **Forked at**: 6a62d0441753157ca6ca50479e490c2948033adb  (use the SHA the file was fetched at)
 - **First-party entry maintained at**: https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/karpathy-guidelines
 
-Frontmatter has been adapted to the glyph catalog schema (`scope: official`, `version: 1.0.0` added). No semantic change to the skill body.
+Frontmatter has been adapted to the glyph catalog schema (`scope: official`, `version: 0.1.0` added). No semantic change to the skill body.

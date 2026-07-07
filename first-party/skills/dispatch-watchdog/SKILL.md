@@ -2,7 +2,7 @@
 name: dispatch-watchdog
 scope: official
 description: "Spawns a properly-detached cross-platform watchdog over a running glyph task or workflow — polls status, exits on terminal state, and reliably surfaces runtime completion notifications to the orchestrator session"
-version: 0.2.0
+version: 0.2.1
 ---
 
 # Dispatch Watchdog Skill
@@ -40,21 +40,7 @@ patterns achieve this.
 
 ## Why this skill exists
 
-The glyph runtime delivers a notification to the orchestrator's
-session when a watchdog process associated with the session reaches a
-terminal state — **but only if the watchdog was spawned through the
-correct primitive**. Four spawn patterns commonly tried in practice,
-and the empirical outcome of each:
-
-| # | Pattern | Outcome |
-|---|---|---|
-| 1 | `task` tool with a subagent (e.g. Haiku) | Subagent often *describes* the work instead of executing the loop; unreliable. |
-| 2 | `Start-Process pwsh -ArgumentList …` | Process spawns but bypasses runtime wiring; **no completion notification**. |
-| 3 | `powershell mode:async` (no `detach`) | Tied to the session shell; session shutdown kills the watchdog before it can complete. |
-| 4 | `powershell mode:async, detach:true` | ✅ Reliably produces completion notifications and survives session lifecycle. |
-
-This skill canonicalises **pattern 4** and its bash equivalent so no
-orchestrator has to rediscover them.
+The glyph runtime delivers a completion notification to the orchestrator's session only when the watchdog is spawned through the `mode:async + detach:true` primitive shown below. Other spawn shapes silently break the notification path.
 
 ## Primitive
 

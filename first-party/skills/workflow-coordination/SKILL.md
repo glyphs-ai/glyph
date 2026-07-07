@@ -2,14 +2,14 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.4.1
+version: 0.4.2
 ---
 
 # Glyph Workflow Coordination Skill
 
-The framework every workflow coordinator wake-up loads: how to read the DAG, what schema reviewer workers emit in `verdict.json`, how to plumb context into worker briefs, and how to author a sibling strategy skill. The case bank, brief templates, and stop condition for any given workflow live in a sibling **strategy skill** (for v1: `official/software-development-lifecycle`); the scaffolding here is strategy-agnostic.
+The framework every workflow coordinator wake-up loads: how to read the DAG, what schema reviewer workers emit in `verdict.json`, how to plumb context into worker briefs, and how to author a sibling strategy skill. The case bank, brief templates, and stop condition for any given workflow live in a sibling **strategy skill**; the scaffolding here is strategy-agnostic.
 
-CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `finish`, `task show`) are documented in the `official/cli` skill, loaded alongside this one.
+CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `finish`, `task show`) are stable command names — consult your catalog's CLI skill for exact flags.
 
 ---
 
@@ -48,7 +48,7 @@ Past wake-ups' decision files live alongside mine under `$GLYPH_WORKFLOW_DIR/coo
 
 Resolve step 5 in priority order:
 
-1. `workflow.metadata.strategy` — explicit strategy FQN set by the workflow creator (e.g. `"official/software-development-lifecycle"`).
+1. `workflow.metadata.strategy` — explicit strategy FQN set by the workflow creator (e.g. `"<catalog>/<strategy-short-name>"`).
 2. An explicit hint inside `workflow.brief` (e.g. `strategy: acme/research-synth`).
 3. The sole strategy among the coord agent's `dependencies.skills` when exactly one is declared.
 
