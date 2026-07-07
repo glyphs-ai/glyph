@@ -2,6 +2,7 @@ import { err, ok, type Result, safeTry } from "neverthrow";
 import { z } from "zod";
 import { generateWorkflowNodeId, WorkflowNodeIdSchema } from "../domain/node/workflow-node-id.js";
 import { COORDINATOR_KIND } from "../domain/node/workflow-node-kind.js";
+import { CoordinatorAgentSchema } from "../domain/workflow/coordinator-agent.js";
 import { WorkflowBriefSchema } from "../domain/workflow/workflow-brief.js";
 import {
   type WorkflowAlreadyTerminal,
@@ -13,6 +14,7 @@ import type {
   WorkflowNodeNotFound,
 } from "../domain/workflow/workflow-entity-errors.js";
 import { generateWorkflowId, WorkflowIdSchema } from "../domain/workflow/workflow-id.js";
+import { WorkflowOriginSchema } from "../domain/workflow/workflow-origin.js";
 import type {
   DatabaseUnavailable,
   WorkflowEntityCorruption,
@@ -27,8 +29,8 @@ export const CreateWorkflowRequestSchema = z
   .object({
     brief: WorkflowBriefSchema,
     details: z.string().optional(),
-    coordinatorAgent: z.string().min(1),
-    origin: z.string().min(1).optional(),
+    coordinatorAgent: CoordinatorAgentSchema,
+    origin: WorkflowOriginSchema.optional(),
     originId: z.string().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })

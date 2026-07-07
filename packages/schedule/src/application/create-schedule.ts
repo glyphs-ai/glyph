@@ -33,17 +33,19 @@ export const CreateScheduleRequestSchema = z
   .strict();
 export type CreateScheduleRequest = z.infer<typeof CreateScheduleRequestSchema>;
 
-export const CreateScheduleResponseSchema = z.object({
-  id: ScheduleIdSchema,
-  name: z.string(),
-  trigger: ScheduleTriggerSchema,
-  target: ScheduleTargetEnvelopeSchema,
-  enabled: z.boolean(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  lastFiredAt: z.string().optional(),
-  nextFireAt: z.string().optional(),
-});
+export const CreateScheduleResponseSchema = z
+  .object({
+    id: ScheduleIdSchema,
+    name: z.string(),
+    trigger: ScheduleTriggerSchema,
+    target: ScheduleTargetEnvelopeSchema,
+    enabled: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    lastFiredAt: z.string().optional(),
+    nextFireAt: z.string().optional(),
+  })
+  .strict();
 export type CreateScheduleResponse = z.infer<typeof CreateScheduleResponseSchema>;
 
 export type CreateScheduleError =

@@ -34,17 +34,19 @@ export type ListSchedulesRequest = z.infer<typeof ListSchedulesRequestSchema>;
 
 export const ListSchedulesResponseSchema = z
   .array(
-    z.object({
-      id: ScheduleIdSchema,
-      name: z.string(),
-      trigger: ScheduleTriggerSchema,
-      target: ScheduleTargetEnvelopeSchema,
-      enabled: z.boolean(),
-      createdAt: z.string(),
-      updatedAt: z.string(),
-      lastFiredAt: z.string().optional(),
-      nextFireAt: z.string().optional(),
-    }),
+    z
+      .object({
+        id: ScheduleIdSchema,
+        name: z.string(),
+        trigger: ScheduleTriggerSchema,
+        target: ScheduleTargetEnvelopeSchema,
+        enabled: z.boolean(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        lastFiredAt: z.string().optional(),
+        nextFireAt: z.string().optional(),
+      })
+      .strict(),
   )
   .readonly();
 export type ListSchedulesResponse = z.infer<typeof ListSchedulesResponseSchema>;

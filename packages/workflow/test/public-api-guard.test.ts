@@ -14,11 +14,11 @@ import { describe, expectTypeOf, it } from "vitest";
 import {
   composeWorkflowModule,
   extractWorkflowNodeRetryMetadata,
+  type GetWorkflowDagResponse,
   generateWorkflowId,
   generateWorkflowNodeId,
   type NodeRef,
   STUCK_RETRY_MAX_ATTEMPTS,
-  type WorkflowDagSnapshot,
   type WorkflowEdgeEntity,
   type WorkflowEntity,
   type WorkflowModule,
@@ -133,10 +133,10 @@ describe("@glyphs-ai/workflow public API guard", () => {
     expectTypeOf<{ readonly kind: "temp"; readonly tempId: string }>().toExtend<NodeRef>();
   });
 
-  it("WorkflowDagSnapshot pins the header + nodes + edges shape", () => {
-    expectTypeOf<WorkflowDagSnapshot>().toHaveProperty("workflow");
-    expectTypeOf<WorkflowDagSnapshot>().toHaveProperty("nodes");
-    expectTypeOf<WorkflowDagSnapshot>().toHaveProperty("edges");
+  it("GetWorkflowDagResponse pins the header + nodes + edges shape", () => {
+    expectTypeOf<GetWorkflowDagResponse>().toHaveProperty("workflow");
+    expectTypeOf<GetWorkflowDagResponse>().toHaveProperty("nodes");
+    expectTypeOf<GetWorkflowDagResponse>().toHaveProperty("edges");
   });
 
   it("preserves the composition surface (composeWorkflowModule + options)", () => {

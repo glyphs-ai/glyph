@@ -2,9 +2,12 @@ import { errAsync, okAsync, type ResultAsync } from "neverthrow";
 import { z } from "zod";
 import type { AgentDependencyRefs } from "../../domain/agent-deps.js";
 import { AgentEntity } from "../../domain/agent-entity.js";
-import { AgentFqn } from "../../domain/agent-fqn.js";
+import { AgentFqn, AgentFqnSchema } from "../../domain/agent-fqn.js";
 import type { AgentManifest } from "../../domain/agent-manifest.js";
 import type { AgentRepository, DatabaseUnavailable } from "../../domain/agent-repository.js";
+import { McpFqnSchema } from "../../domain/mcp-fqn.js";
+import { RegistryOriginSchema } from "../../domain/registry-origin.js";
+import { SkillFqnSchema } from "../../domain/skill-fqn.js";
 import type { Source, SourceError } from "../../domain/source.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 
@@ -16,14 +19,17 @@ export type AgentOriginConflict = {
 };
 
 export const InstallAgentRequestSchema = z.object({
-  origin: z.string(),
+  origin: RegistryOriginSchema,
   dependencyRefs: z.object({
-    skills: z.array(z.string()),
-    mcps: z.array(z.string()),
-    agents: z.array(z.string()),
+    skills: z.array(SkillFqnSchema),
+    mcps: z.array(McpFqnSchema),
+    agents: z.array(AgentFqnSchema),
   }),
 });
-export type InstallAgentRequest = z.infer<typeof InstallAgentRequestSchema>;
+// `z.input`: `dependencyRefs` entries are branded fqn value objects, so the
+// caller-facing request keeps them as raw `string`s — the resolve pipeline
+// feeds already-mapped sibling fqns in and the use-case forwards them verbatim.
+export type InstallAgentRequest = z.input<typeof InstallAgentRequestSchema>;
 
 export const InstallAgentResponseSchema = z.object({
   id: z.string(),

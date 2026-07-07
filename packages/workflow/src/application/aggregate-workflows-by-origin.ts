@@ -1,19 +1,14 @@
 import { and, count, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
+import { WorkflowOriginSchema } from "../domain/workflow/workflow-origin.js";
 import type { DatabaseUnavailable } from "../domain/workflow/workflow-repository.js";
 import { WorkflowStatusSchema } from "../domain/workflow/workflow-status.js";
 import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
-export const OriginAggregateSchema = z.object({
-  totalCount: z.number(),
-  runningCount: z.number(),
-  awaitingCount: z.number(),
-});
-
 export const AggregateWorkflowsByOriginRequestSchema = z
   .object({
-    origin: z.string().min(1),
+    origin: WorkflowOriginSchema,
     originIds: z.array(z.string()).readonly(),
     statusIn: z.array(WorkflowStatusSchema).readonly().optional(),
   })
@@ -21,7 +16,14 @@ export const AggregateWorkflowsByOriginRequestSchema = z
 export type AggregateWorkflowsByOriginRequest = z.infer<
   typeof AggregateWorkflowsByOriginRequestSchema
 >;
-export const AggregateWorkflowsByOriginResponseSchema = z.record(z.string(), OriginAggregateSchema);
+export const AggregateWorkflowsByOriginResponseSchema = z.record(
+  z.string(),
+  z.object({
+    totalCount: z.number(),
+    runningCount: z.number(),
+    awaitingCount: z.number(),
+  }),
+);
 export type AggregateWorkflowsByOriginResponse = z.infer<
   typeof AggregateWorkflowsByOriginResponseSchema
 >;

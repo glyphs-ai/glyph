@@ -35,6 +35,7 @@ export const GetTaskResponseSchema = z
     failure: TaskFailureSchema.optional(),
     cancellation: TaskCancellationSchema.optional(),
   })
+  .strict()
   .nullable();
 export type GetTaskResponse = z.infer<typeof GetTaskResponseSchema>;
 

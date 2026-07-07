@@ -44,17 +44,19 @@ export const PatchScheduleRequestSchema = z
   .strict();
 export type PatchScheduleRequest = z.infer<typeof PatchScheduleRequestSchema>;
 
-export const PatchScheduleResponseSchema = z.object({
-  id: ScheduleIdSchema,
-  name: z.string(),
-  trigger: ScheduleTriggerSchema,
-  target: ScheduleTargetEnvelopeSchema,
-  enabled: z.boolean(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  lastFiredAt: z.string().optional(),
-  nextFireAt: z.string().optional(),
-});
+export const PatchScheduleResponseSchema = z
+  .object({
+    id: ScheduleIdSchema,
+    name: z.string(),
+    trigger: ScheduleTriggerSchema,
+    target: ScheduleTargetEnvelopeSchema,
+    enabled: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    lastFiredAt: z.string().optional(),
+    nextFireAt: z.string().optional(),
+  })
+  .strict();
 export type PatchScheduleResponse = z.infer<typeof PatchScheduleResponseSchema>;
 
 export type PatchScheduleError =

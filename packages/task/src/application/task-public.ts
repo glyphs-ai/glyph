@@ -20,7 +20,7 @@ export { type TaskFailure, TaskFailureSchema } from "../domain/task-failure.js";
 // into `CorruptedTask` (a stored invalid id IS corruption) and request-id
 // validation surfaces a ZodError, so it never appears in a use-case union.
 export { type TaskId, TaskIdSchema } from "../domain/task-id.js";
-export type { TaskOrigin } from "../domain/task-origin.js";
+export { type TaskOrigin, TaskOriginSchema } from "../domain/task-origin.js";
 // ─── repository atoms ─────────────────────────────────────────────────
 export type { DatabaseUnavailable, TaskNotFound } from "../domain/task-repository.js";
 // ─── sandbox (file port) atoms ────────────────────────────────────────

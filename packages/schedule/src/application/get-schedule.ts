@@ -31,6 +31,7 @@ export const GetScheduleResponseSchema = z
     lastFiredAt: z.string().optional(),
     nextFireAt: z.string().optional(),
   })
+  .strict()
   .nullable();
 export type GetScheduleResponse = z.infer<typeof GetScheduleResponseSchema>;
 

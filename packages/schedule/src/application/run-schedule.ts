@@ -17,7 +17,7 @@ export const RunScheduleRequestSchema = z
   .strict();
 export type RunScheduleRequest = z.infer<typeof RunScheduleRequestSchema>;
 
-export const RunScheduleResponseSchema = z.object({ dispatchId: z.string() });
+export const RunScheduleResponseSchema = z.object({ dispatchId: z.string() }).strict();
 export type RunScheduleResponse = z.infer<typeof RunScheduleResponseSchema>;
 
 export type RunScheduleError =

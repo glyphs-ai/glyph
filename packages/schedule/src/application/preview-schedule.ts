@@ -19,10 +19,12 @@ export const PreviewScheduleRequestSchema = z
   .strict();
 export type PreviewScheduleRequest = z.infer<typeof PreviewScheduleRequestSchema>;
 
-export const PreviewScheduleResponseSchema = z.object({
-  describe: z.string(),
-  nextRuns: z.array(z.string()).readonly(),
-});
+export const PreviewScheduleResponseSchema = z
+  .object({
+    describe: z.string(),
+    nextRuns: z.array(z.string()).readonly(),
+  })
+  .strict();
 export type PreviewScheduleResponse = z.infer<typeof PreviewScheduleResponseSchema>;
 
 export type PreviewScheduleError = InvalidCronExpr | InvalidTimezone;

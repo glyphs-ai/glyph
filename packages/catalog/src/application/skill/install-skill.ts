@@ -1,9 +1,11 @@
 import { errAsync, okAsync, type ResultAsync } from "neverthrow";
 import { z } from "zod";
 import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
+import { McpFqnSchema } from "../../domain/mcp-fqn.js";
+import { RegistryOriginSchema } from "../../domain/registry-origin.js";
 import type { SkillDependencyRefs } from "../../domain/skill-deps.js";
 import { SkillEntity } from "../../domain/skill-entity.js";
-import { SkillFqn } from "../../domain/skill-fqn.js";
+import { SkillFqn, SkillFqnSchema } from "../../domain/skill-fqn.js";
 import type { SkillManifest } from "../../domain/skill-manifest.js";
 import type { SkillRepository } from "../../domain/skill-repository.js";
 import type { Source, SourceError } from "../../domain/source.js";
@@ -17,13 +19,16 @@ export type SkillOriginConflict = {
 };
 
 export const InstallSkillRequestSchema = z.object({
-  origin: z.string(),
+  origin: RegistryOriginSchema,
   dependencyRefs: z.object({
-    skills: z.array(z.string()),
-    mcps: z.array(z.string()),
+    skills: z.array(SkillFqnSchema),
+    mcps: z.array(McpFqnSchema),
   }),
 });
-export type InstallSkillRequest = z.infer<typeof InstallSkillRequestSchema>;
+// `z.input`: `dependencyRefs` entries are branded fqn value objects, so the
+// caller-facing request keeps them as raw `string`s — the resolve pipeline
+// feeds already-mapped sibling fqns in and the use-case forwards them verbatim.
+export type InstallSkillRequest = z.input<typeof InstallSkillRequestSchema>;
 
 export const InstallSkillResponseSchema = z.object({
   id: z.string(),

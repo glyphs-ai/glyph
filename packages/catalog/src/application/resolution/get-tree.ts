@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
+import { RegistryOriginSchema } from "../../domain/registry-origin.js";
 import type { Db } from "../../infrastructure/drizzle/catalog-db.js";
 import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
 import { selectAgentByFqn, selectAgentByOrigin } from "../agent/agent-reads.js";
@@ -18,7 +19,7 @@ import { selectSkillByFqn, selectSkillByOrigin } from "../skill/skill-reads.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 import { EMPTY_DEP_REFS, ResolvedGraphSchema, type ResolvedNode } from "./dependency-graph.js";
 
-export const GetTreeRequestSchema = z.object({ origin: z.string() });
+export const GetTreeRequestSchema = z.object({ origin: RegistryOriginSchema });
 export type GetTreeRequest = z.infer<typeof GetTreeRequestSchema>;
 
 export const GetTreeResponseSchema = ResolvedGraphSchema;

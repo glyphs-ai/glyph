@@ -7065,6 +7065,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "application/json": {
                 "schema": {
                   "items": {
+                    "additionalProperties": false,
                     "properties": {
                       "agent": {
                         "type": "string",
@@ -7504,6 +7505,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "describe": {
                       "type": "string",
@@ -7590,6 +7592,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "application/json": {
                 "schema": {
                   "items": {
+                    "additionalProperties": false,
                     "properties": {
                       "createdAt": {
                         "type": "string",
@@ -7786,6 +7789,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "createdAt": {
                       "type": "string",
@@ -7941,6 +7945,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "deletedDispatchCount": {
                       "type": "number",
@@ -8042,6 +8047,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "createdAt": {
                       "type": "string",
@@ -8255,6 +8261,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "createdAt": {
                       "type": "string",
@@ -8420,6 +8427,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "describe": {
                       "type": "string",
@@ -8503,6 +8511,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "dispatchId": {
                       "type": "string",
@@ -8602,6 +8611,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "application/json": {
                 "schema": {
                   "items": {
+                    "additionalProperties": false,
                     "properties": {
                       "createdAt": {
                         "type": "string",
@@ -8808,6 +8818,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "createdAt": {
                       "type": "string",
@@ -8966,6 +8977,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "deletedDispatchCount": {
                       "type": "number",
@@ -9067,6 +9079,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "createdAt": {
                       "type": "string",
@@ -9287,6 +9300,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "createdAt": {
                       "type": "string",
@@ -9465,6 +9479,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "describe": {
                       "type": "string",
@@ -9548,6 +9563,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "dispatchId": {
                       "type": "string",
@@ -10258,6 +10274,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "application/json": {
                 "schema": {
                   "items": {
+                    "additionalProperties": false,
                     "properties": {
                       "agent": {
                         "type": "string",
@@ -10515,6 +10532,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "agent": {
                       "type": "string",
@@ -10810,6 +10828,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "agent": {
                       "type": "string",
@@ -11125,6 +11144,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "agent": {
                       "type": "string",
@@ -12383,6 +12403,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": false,
                   "properties": {
                     "agent": {
                       "type": "string",

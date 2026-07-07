@@ -17,6 +17,7 @@ import { z } from "zod";
 import type { AgentNotFound, DatabaseUnavailable } from "../../domain/agent-repository.js";
 import { CatalogKindSchema } from "../../domain/catalog-kind.js";
 import type { McpNotFound } from "../../domain/mcp-repository.js";
+import { RegistryOriginSchema } from "../../domain/registry-origin.js";
 import type { SkillNotFound } from "../../domain/skill-repository.js";
 import type { Db } from "../../infrastructure/drizzle/catalog-db.js";
 import type { CatalogQueries } from "../../infrastructure/drizzle/catalog-queries.js";
@@ -73,7 +74,7 @@ export type IdentityChange = z.infer<typeof resolvePlanIdentityChange>;
 export const ResolvePlanRequestSchema = z
   .object({
     kind: CatalogKindSchema,
-    origin: z.string().optional(),
+    origin: RegistryOriginSchema.optional(),
     fqn: z.string().optional(),
   })
   .refine((r) => (r.origin === undefined) !== (r.fqn === undefined), {

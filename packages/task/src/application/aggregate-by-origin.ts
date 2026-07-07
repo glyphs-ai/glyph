@@ -1,13 +1,14 @@
 import { and, eq, inArray, type SQL } from "drizzle-orm";
 import { okAsync } from "neverthrow";
 import { z } from "zod";
+import { TaskOriginSchema } from "../domain/task-origin.js";
 import type { DatabaseUnavailable } from "../domain/task-repository.js";
 import type { TaskQueries } from "../infrastructure/drizzle/task-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const AggregateByOriginRequestSchema = z
   .object({
-    origin: z.string(),
+    origin: TaskOriginSchema,
     originIds: z.array(z.string()).readonly(),
     statusIn: z.array(z.string()).readonly().optional(),
   })

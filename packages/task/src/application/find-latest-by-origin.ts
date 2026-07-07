@@ -3,6 +3,7 @@ import { z } from "zod";
 import { TaskCancellationSchema } from "../domain/task-cancellation.js";
 import { TaskFailureSchema } from "../domain/task-failure.js";
 import { TaskIdSchema } from "../domain/task-id.js";
+import { TaskOriginSchema } from "../domain/task-origin.js";
 import type { DatabaseUnavailable } from "../domain/task-repository.js";
 import { TaskStatusSchema } from "../domain/task-status.js";
 import { TaskSuccessSchema } from "../domain/task-success.js";
@@ -10,7 +11,7 @@ import { projectTaskRow, type TaskQueries } from "../infrastructure/drizzle/task
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const FindLatestByOriginRequestSchema = z
-  .object({ origin: z.string(), originId: z.string() })
+  .object({ origin: TaskOriginSchema, originId: z.string() })
   .strict();
 export type FindLatestByOriginRequest = z.infer<typeof FindLatestByOriginRequestSchema>;
 
@@ -31,6 +32,7 @@ export const FindLatestByOriginResponseSchema = z
     failure: TaskFailureSchema.optional(),
     cancellation: TaskCancellationSchema.optional(),
   })
+  .strict()
   .nullable();
 export type FindLatestByOriginResponse = z.infer<typeof FindLatestByOriginResponseSchema>;
 

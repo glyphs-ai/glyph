@@ -22,22 +22,24 @@ export const ListTasksRequestSchema = z
 export type ListTasksRequest = z.infer<typeof ListTasksRequestSchema>;
 
 export const ListTasksResponseSchema = z.array(
-  z.object({
-    id: TaskIdSchema,
-    agent: z.string(),
-    brief: z.string(),
-    details: z.string().optional(),
-    origin: z.string(),
-    originId: z.string().optional(),
-    status: TaskStatusSchema,
-    metadata: z.record(z.string(), z.unknown()),
-    createdAt: z.string(),
-    startedAt: z.string(),
-    endedAt: z.string().optional(),
-    success: TaskSuccessSchema.optional(),
-    failure: TaskFailureSchema.optional(),
-    cancellation: TaskCancellationSchema.optional(),
-  }),
+  z
+    .object({
+      id: TaskIdSchema,
+      agent: z.string(),
+      brief: z.string(),
+      details: z.string().optional(),
+      origin: z.string(),
+      originId: z.string().optional(),
+      status: TaskStatusSchema,
+      metadata: z.record(z.string(), z.unknown()),
+      createdAt: z.string(),
+      startedAt: z.string(),
+      endedAt: z.string().optional(),
+      success: TaskSuccessSchema.optional(),
+      failure: TaskFailureSchema.optional(),
+      cancellation: TaskCancellationSchema.optional(),
+    })
+    .strict(),
 );
 export type ListTasksResponse = z.infer<typeof ListTasksResponseSchema>;
 

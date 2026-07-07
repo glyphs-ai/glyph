@@ -19,6 +19,7 @@ import { z } from "zod";
 import { McpEntity } from "../../domain/mcp-entity.js";
 import type { McpManifest } from "../../domain/mcp-manifest.js";
 import type { DatabaseUnavailable, McpRepository } from "../../domain/mcp-repository.js";
+import { RegistryOriginSchema } from "../../domain/registry-origin.js";
 import type { Source, SourceError } from "../../domain/source.js";
 import type { UseCase, UseCaseResult } from "../use-case.js";
 
@@ -36,7 +37,7 @@ export type McpOriginConflict = {
 };
 
 export const InstallMcpRequestSchema = z.object({
-  origin: z.string(),
+  origin: RegistryOriginSchema,
 });
 export type InstallMcpRequest = z.infer<typeof InstallMcpRequestSchema>;
 
