@@ -57,7 +57,7 @@ export interface EditScheduleModalProps {
  *     truth conflict).
  *   - Submit builds a sparse {@link PatchTaskScheduleRequest} via field-by-
  *     field diff (trim-before-compare). `target.details` /
- *     `target.runtime` use RFC 7396 `null` when the user clears a
+ *     `target.runtime` use `null` (deep-merge delete) when the user clears a
  *     previously-set value.
  *   - "No diff" disables submit so the button doesn't fire a
  *     meaningless PATCH.

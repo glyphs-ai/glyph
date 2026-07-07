@@ -1,6 +1,6 @@
 # @glyphs-ai/dashboard
 
-> **Tier:** T_top (Surfaces). See the [tier model](../../docs/architecture.md#tier-model).
+> **Tier:** T_top (Surfaces).
 
 The glyph dashboard SPA — React + Vite + react-router. The bundled
 production build is served by `@glyphs-ai/server` on the same port Vite

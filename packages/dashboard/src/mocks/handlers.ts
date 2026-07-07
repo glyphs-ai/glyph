@@ -45,7 +45,7 @@ import { store } from "./store.js";
 const W = ":workspaceId";
 
 /**
- * Assemble an RFC 9457 Problem body for the mock error paths so designer
+ * Assemble a Problem-details body for the mock error paths so designer
  * mode and dashboard tests see the same `application/problem+json` envelope
  * the real server emits: `{ type, title, status, detail, code, ...ext }`.
  * Accepts the legacy `{ error, code?, ... }` shape used at the call sites and
@@ -168,7 +168,7 @@ function cryptoUuid(): string {
     Math.floor(Math.random() * 16 ** n)
       .toString(16)
       .padStart(n, "0");
-  // y in [8,9,a,b], matching the RFC 4122 variant bits
+  // y in [8,9,a,b]: the v4 UUID variant nibble (top two bits fixed to 10)
   const y = "89ab"[Math.floor(Math.random() * 4)];
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${y}${hex(3)}-${hex(12)}`;
 }
@@ -499,7 +499,7 @@ export const handlers = [
     return HttpResponse.json({ describe: row.describe, nextRuns });
   }),
   // PATCH /schedules/task/:scheduleId is URL-discriminated by `target.kind`.
-  // `target` uses RFC 7396 deep-merge semantics: present
+  // `target` uses deep-merge semantics: present
   // string sets, `null` deletes (`details` / `runtime`), absent keeps.
   // `trigger` is wholesale-replace; `name` / `enabled` are scalar-set.
   http.patch(`/api/workspaces/${W}/schedules/task/:scheduleId`, async ({ params, request }) => {
@@ -535,7 +535,7 @@ export const handlers = [
     return HttpResponse.json(entity);
   }),
   // PATCH /schedules/workflow/:scheduleId is the workflow-kind sibling
-  // of the task PATCH. `target` uses the same RFC 7396 deep-merge
+  // of the task PATCH. `target` uses the same deep-merge
   // semantics (string sets, `null` deletes `details`, absent keeps),
   // but over the workflow target shape (`coordinatorAgent` + `brief` +
   // `details`, no `runtime`).

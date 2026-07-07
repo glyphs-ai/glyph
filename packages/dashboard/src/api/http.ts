@@ -56,7 +56,8 @@ export const fetchJson = async <T>(path: string, label: string): Promise<T> => {
  * non-OK response. Extends `Error`
  * so UI surfaces can use `instanceof Error` / `err.message`; the
  * message field carries the server-provided `detail` text from the
- * RFC 9457 Problem envelope (or the bare HTTP status as fallback).
+ * `application/problem+json` Problem envelope (or the bare HTTP status
+ * as fallback).
  *
  * The extra fields let typed UI surfaces (e.g. the create-workflow
  * modal pinning a `coordinatorAgent` rejection inline next to the
@@ -86,7 +87,8 @@ export class ApiError extends Error {
  * them inside a helper named `throwApiError` that returns `never`.
  *
  * The error body is decoded through the SDK's shared {@link parseProblem}
- * so the dashboard and CLI narrow the RFC 9457 envelope one identical way.
+ * so the dashboard and CLI narrow the `application/problem+json` envelope
+ * one identical way.
  * The one non-Problem surface is the 202 warming envelope
  * (`{ state: "warming", workspaceId }`), which rides in `application/json`
  * — `parseProblem` leaves it unread (wrong content-type) so it is handled

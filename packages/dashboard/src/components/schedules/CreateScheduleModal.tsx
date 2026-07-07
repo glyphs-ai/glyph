@@ -42,7 +42,7 @@ export interface CreateScheduleModalProps {
  * "Target type" selector.
  *
  * Error-body preservation: `previewCron` and `createSchedule` both
- * surface the server's RFC 9457 Problem `detail` string verbatim (the
+ * surface the server's `application/problem+json` `detail` string verbatim (the
  * SDK `unwrap` seam maps `detail` → `ApiError.message`), so users see
  * "Invalid cron expression: …" rather than "schedule preview: 400".
  */
