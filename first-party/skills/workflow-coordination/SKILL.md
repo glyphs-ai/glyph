@@ -129,15 +129,31 @@ The substrate resolves the `tempId`s within the transaction and returns the assi
 
 ### Common `add-subgraph` rejections
 
-When `glyph workflow add-subgraph` returns a `WorkflowDagConflict`, the `reason.kind` field names the invariant that was violated. Read it before retrying; guessing burns wake-ups.
+When `glyph workflow add-subgraph` fails, the error `type` names the family and `reason.kind` names the specific invariant. Read both before retrying; guessing burns wake-ups.
+
+**`WorkflowDagConflict` — the DAG shape is legal on its own but violates a coord-chain / parent-state rule:**
 
 | `reason.kind` | What tripped it | Forward fix |
 |---|---|---|
 | `orphanCoordInsert` | New coord node has no coord parent (workers-only in `existingParents` + edges). | Add `existingParents: ["<self-node-id>"]` to the `next-coord` node. |
 | `successorCoordExists` | Self already has a coord-kind child in the DAG. | The wake-up is racing an earlier decision. Re-read the DAG (`glyph workflow dag`) and finish or observe instead of re-inserting. |
 | `parentState` | A referenced existing parent is `failed` or `cancelled`; workers/humans can't attach to non-successful parents. | Route to the strategy's failure/cancellation case (typically `workflow finish --outcome failed`). |
-| `WorkflowNodeNotMutable` on an existing edge target | The `edges[].to` points at an existing node that has already started (only `not_started` nodes accept new incoming edges). | Don't rewrite in-flight nodes; insert a fresh temp node instead. |
-| `cyclic` | An edge would create a cycle. | Rework the subgraph so the new nodes strictly extend the frontier downstream. |
+| `invariant` | Post-insert the DAG would have zero, or non-coord, or multiple leaves. | The subgraph must leave the DAG with exactly one leaf and it must be a coord. Add the missing `next-coord` (or fix its wiring). |
+
+**`WorkflowSubgraphInvalid` — the subgraph payload itself is malformed:**
+
+| `reason.kind` | What tripped it | Forward fix |
+|---|---|---|
+| `empty` | Neither nodes nor edges submitted. | Compose a real subgraph; empty mutations are not valid wake-up actions. |
+| `tempIdInvalid` | A `tempId` is empty, duplicated, or otherwise malformed. | Use unique, non-empty `tempId`s within the payload. |
+| `tempParentless` | A temp node has no incoming edge from any parent (existing or temp). | Give the temp node an `existingParents` entry or an edge from another temp. |
+| `nodeRefUnresolved` | An edge references a `tempId` or existing node id that isn't in the payload / DAG. | Fix the reference; make sure the referenced node is defined in `nodes` or already in the DAG. |
+| `cyclic` | An edge would create a cycle in the resulting DAG. | Rework the subgraph so new nodes strictly extend the frontier downstream. |
+| `multipleCoordTemps` | Payload contains more than one coord-kind temp node. | Exactly one `next-coord` per `add-subgraph`; split additional coords into future wake-ups. |
+
+**`WorkflowNodeNotMutable` — the target of an `edges[].to` pointing at an existing node has already started (only `not_started` nodes accept new incoming edges):**
+
+Don't rewrite in-flight nodes; insert a fresh temp node and connect the new work through it.
 
 ---
 
