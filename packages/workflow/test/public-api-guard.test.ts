@@ -14,11 +14,11 @@ import { describe, expectTypeOf, it } from "vitest";
 import {
   composeWorkflowModule,
   extractWorkflowNodeRetryMetadata,
+  type GetWorkflowDagResponse,
   generateWorkflowId,
   generateWorkflowNodeId,
   type NodeRef,
   STUCK_RETRY_MAX_ATTEMPTS,
-  type GetWorkflowDagResponse,
   type WorkflowEdgeEntity,
   type WorkflowEntity,
   type WorkflowModule,
