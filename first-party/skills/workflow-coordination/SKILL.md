@@ -147,7 +147,7 @@ When `glyph workflow add-subgraph` fails, the error `type` names the family and 
 | `empty` | Neither nodes nor edges submitted. | Compose a real subgraph; empty mutations are not valid wake-up actions. |
 | `tempIdInvalid` | A `tempId` is empty, duplicated, or otherwise malformed. | Use unique, non-empty `tempId`s within the payload. |
 | `tempParentless` | A temp node has no incoming edge from any parent (existing or temp). | Give the temp node an `existingParents` entry or an edge from another temp. |
-| `nodeRefUnresolved` | An edge references a `tempId` or existing node id that isn't in the payload / DAG. | Fix the reference; make sure the referenced node is defined in `nodes` or already in the DAG. |
+| `nodeRefUnresolved` | An edge or `existingParents` entry references a `tempId` or existing node id that isn't in the payload / DAG. Look at `reason.refKind` (`"temp"` or `"existing"`) to see which side. | Fix the reference; make sure the referenced node id is present in `nodes` (for temp refs) or already in the workflow DAG (for existing refs). |
 | `cyclic` | An edge would create a cycle in the resulting DAG. | Rework the subgraph so new nodes strictly extend the frontier downstream. |
 | `multipleCoordTemps` | Payload contains more than one coord-kind temp node. | Exactly one `next-coord` per `add-subgraph`; split additional coords into future wake-ups. |
 
