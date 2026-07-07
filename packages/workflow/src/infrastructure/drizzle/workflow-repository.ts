@@ -132,6 +132,7 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
           await this.db.run(sql.raw("RELEASE SAVEPOINT wf_save"));
         } catch (e) {
           await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT wf_save"));
+          await this.db.run(sql.raw("RELEASE SAVEPOINT wf_save"));
           throw e;
         }
       })(),
@@ -150,6 +151,7 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
           await this.db.run(sql.raw("RELEASE SAVEPOINT wf_delete"));
         } catch (e) {
           await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT wf_delete"));
+          await this.db.run(sql.raw("RELEASE SAVEPOINT wf_delete"));
           throw e;
         }
       })(),

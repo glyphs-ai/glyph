@@ -109,6 +109,7 @@ export class DrizzleSkillRepository implements SkillRepository {
           await this.db.run(sql.raw("RELEASE SAVEPOINT skill_save"));
         } catch (e) {
           await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT skill_save"));
+          await this.db.run(sql.raw("RELEASE SAVEPOINT skill_save"));
           throw e;
         }
       })(),
@@ -128,6 +129,7 @@ export class DrizzleSkillRepository implements SkillRepository {
           await this.db.run(sql.raw("RELEASE SAVEPOINT skill_delete"));
         } catch (e) {
           await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT skill_delete"));
+          await this.db.run(sql.raw("RELEASE SAVEPOINT skill_delete"));
           throw e;
         }
       })(),

@@ -131,6 +131,7 @@ export class DrizzleAgentRepository implements AgentRepository {
           await this.db.run(sql.raw("RELEASE SAVEPOINT agent_save"));
         } catch (e) {
           await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT agent_save"));
+          await this.db.run(sql.raw("RELEASE SAVEPOINT agent_save"));
           throw e;
         }
       })(),
@@ -151,6 +152,7 @@ export class DrizzleAgentRepository implements AgentRepository {
           await this.db.run(sql.raw("RELEASE SAVEPOINT agent_delete"));
         } catch (e) {
           await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT agent_delete"));
+          await this.db.run(sql.raw("RELEASE SAVEPOINT agent_delete"));
           throw e;
         }
       })(),
