@@ -209,10 +209,6 @@ name: <strategy-short-name>          # kebab-case, e.g. <your-strategy-name>
 scope: <your-scope>                  # e.g. official, or your catalog's scope
 description: "<one short sentence describing what the strategy orchestrates>"
 version: 0.1.0                       # 3-segment semver
-type: strategy                       # required — invokes the naming exception in rule 3
-                                     # of the skill authoring rules (case-bank / dispatch
-                                     # templates may name the loading coord agent + worker
-                                     # agent FQNs)
 ---
 ```
 

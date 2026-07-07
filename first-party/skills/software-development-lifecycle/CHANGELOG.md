@@ -1,9 +1,5 @@
 # Changelog
 
-## 0.3.3 (2026-07-07)
-
-- Add `type: strategy` to frontmatter. The tag formally invokes the rule-3 naming exception used by the case bank and dispatch templates to name the loading coord agent + worker agent FQNs.
-
 ## 0.3.2 (2026-07-07)
 
 - Declare `official/workflow-coordination` and `official/cli` under `dependencies.skills` in the frontmatter; the body already names both.

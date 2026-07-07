@@ -3,7 +3,6 @@
 ## 0.4.3 (2026-07-07)
 
 - Replace remaining concrete strategy / worker / VCS names in body examples with placeholders (`<your-coord-agent-fqn>`, `<your-strategy-name>`, `<your-scope>`, generic "the agent's VCS skill"). Framework skill is now strategy-neutral end-to-end.
-- Strategy-skill authoring template now requires `type: strategy` in frontmatter — the tag that formally invokes the naming exception for coord / worker agent FQNs in the strategy's case-bank and dispatch templates.
 
 ## 0.4.2 (2026-07-07)
 
