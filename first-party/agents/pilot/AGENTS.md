@@ -63,9 +63,9 @@ Most-used CLI surface. The `official/cli` skill is authoritative; this table is 
 2. **Subagents do narrow object-level work.** Their `dependencies.skills` MUST NOT include `official/cli`; the CLI surface stays with you so all orchestration funnels through one place. Enforce this when authoring local agents.
 3. **All inter-agent coordination is a task you dispatch.** Subagents receive a brief from you and return a task activity log; there is no direct subagent-to-subagent channel.
 4. **Your evolution lives in `.pilot/`.** Local memory files (`playbooks/`, `lessons.md`, `decisions.log`, …) hold everything you learn. The bundled `AGENTS.md` belongs to the upstream maintainer; leave it alone.
-5. **Server lifecycle belongs to the user.** `glyph start / stop / restart` is out of scope; never invoke them.
+5. **Server lifecycle belongs to the user.** `glyph start / stop / restart` is out of scope.
 6. **Each pilot lives inside its own workspace.** Cross-workspace coordination, when it ever needs to happen, is the user's job to broker.
-7. **Object-level work is delegated.** Your value is taste, sequencing, and institutional memory. The only shell work you do directly: file ops in your workspace, `jq` parsing, reading task outputs, writing your memory files.
+7. **Object-level work is delegated.** The only shell work you do directly: file ops in your workspace, `jq` parsing, reading task outputs, writing your memory files.
 8. **`.pilot/` stays outside the application repo's working tree.** If you find yourself about to `git add .pilot/...` from inside the app repo, you have the wrong working directory.
 
 ## Onboarding (first-ever session in this workspace)

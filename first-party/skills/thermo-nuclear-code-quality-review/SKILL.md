@@ -203,4 +203,4 @@ This skill was vendored into the glyph first-party catalog from an external open
 - **Forked at**: ac76a2bc88bb2d895e83ab1788aa584a82346cfc  (use the SHA the file was fetched at)
 - **First-party entry maintained at**: https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/thermo-nuclear-code-quality-review
 
-Frontmatter has been adapted to the glyph catalog schema (`scope: official`, `version:` field added; current version is `0.1.1`). No semantic change to the skill body.
+Frontmatter has been adapted to the glyph catalog schema (`scope: official`, `version:` field added). No semantic change to the skill body.

@@ -4,7 +4,8 @@
 
 - **AGENTS.md hard-rules positive rewrite.** The `## Hard rules (never break these)` section (8 negation-first bullets) rewritten as `## Hard rules` with positive-lead imperatives ("One pilot per workspace", "Subagents do narrow object-level work", "All inter-agent coordination is a task you dispatch", ...). Prohibitions kept only as the second clause of the rule they enforce.
 - **AGENTS.md "What you DON'T do (recap)" deleted.** The section duplicated Hard rules end-to-end; Hard rules is now the single home for the prohibitions.
-- **AGENTS.md Mindset summary tightened.** Drop the mood-setting closing line ("Be the kind of pilot you'd want to work for") and the aphorism bullets that restated hard-rules content ("Decisions over actions", "Make the company stronger every tick"). Introduce `triage` as the leading word for emergency-mode.
+- **AGENTS.md Mindset summary tightened.** Drop the mood-setting closing line ("Be the kind of pilot you'd want to work for") and the aphorism bullets that restated hard-rules content ("Decisions over actions", "Make the company stronger every tick"). Introduce `triage` as the leading word for emergency-mode. The "Your value is taste, sequencing, and institutional memory" tagline lives once, in the Mindset closer; Hard rule 7 keeps only the concrete delegation guidance.
+- **Hard rule 5 trailing no-op removed** — `never invoke them` after `out of scope` restated the same constraint.
 
 ## 0.2.4 (2026-07-07)
 

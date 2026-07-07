@@ -187,7 +187,7 @@ Coord reads the full workflow context — the creator's brief and details, the c
 
 ### Pre-flight validation
 
-Before writing the `add-subgraph` payload, SKIM each dispatched agent's `AGENTS.md` (sections: "Required output protocol" / equivalent, "Boundaries" / "What I do NOT do", `dependencies.skills`). Compare against the brief being assembled:
+Before writing the `add-subgraph` payload, SKIM each dispatched agent's `AGENTS.md` (sections: "Required output protocol" / equivalent, "Boundaries", `dependencies.skills`). Compare against the brief being assembled:
 
 - **Output path / protocol drift** — brief references `<workdir>/X` but agent's current AGENTS.md says `<workdir>/artifact/X`. Severity: blocker → coord MUST `finishWorkflow(failed, "template drift: <agent>'s output protocol moved to <new path>; strategy <fqn> v<X.Y.Z> needs re-validation")`.
 - **Restated skill content** — brief restates instructions already covered by one of the agent's depended-on skills (e.g. branch naming when the agent's VCS skill is a dep). Severity: warning → log to coord-decisions, continue dispatch.
@@ -205,7 +205,7 @@ A strategy skill is a content-only sibling skill the coord agent loads alongside
 
 ```yaml
 ---
-name: <strategy-short-name>          # kebab-case, e.g. <your-strategy-name>
+name: <strategy-short-name>          # kebab-case
 scope: <your-scope>                  # e.g. official, or your catalog's scope
 description: "<one short sentence describing what the strategy orchestrates>"
 version: 0.1.0                       # 3-segment semver

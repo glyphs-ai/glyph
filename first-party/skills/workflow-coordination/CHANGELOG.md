@@ -3,6 +3,8 @@
 ## 0.4.3 (2026-07-07)
 
 - Replace remaining concrete strategy / worker / VCS names in body examples with placeholders (`<your-coord-agent-fqn>`, `<your-strategy-name>`, `<your-scope>`, generic "the agent's VCS skill"). Framework skill is now strategy-neutral end-to-end.
+- Pre-flight validation § drops the alt-heading suggestion `"What I do NOT do"` — no first-party agent uses that heading; the real name is `Boundaries`.
+- Strategy-skill authoring frontmatter comment simplified to `# kebab-case` (the prior `e.g. <your-strategy-name>` example was tautological).
 
 ## 0.4.2 (2026-07-07)
 
