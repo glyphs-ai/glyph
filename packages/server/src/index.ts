@@ -42,6 +42,7 @@ import { accessLog } from "./middleware/access-log.js";
 import { requestId } from "./middleware/request-id.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { resolveWorkspaceMiddleware, type WorkspaceVars } from "./middleware/resolve-workspace.js";
+import { transactionMiddleware } from "./middleware/transaction.js";
 import { createApiApp, registerOpenApiDoc } from "./routes/_openapi.js";
 import { buildSubprocessEnvBase, SUBPROCESS_ENV_SCRUB_KEYS } from "./subprocess-env.js";
 
@@ -276,6 +277,15 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   // `/:id/reload`, so those endpoints stay outside this middleware.
   const wsApp = createApiApp<{ Variables: WorkspaceVars }>();
   wsApp.use("/:id/*", resolveWorkspaceMiddleware(application, logger));
+  // Open a request-scoped transaction once the workspace is resolved.
+  // Registered on the same `/:id/*` group and AFTER resolveWorkspace, so
+  // `c.get("workspaceContext").dbHandles` is populated. Every workspace
+  // route runs inside one libsql transaction that commits on clean return
+  // and rolls back on throw.
+  wsApp.use(
+    "/:id/*",
+    transactionMiddleware((c) => c.get("workspaceContext").dbHandles),
+  );
 
   wsApp.route(
     "/:id/sessions",
