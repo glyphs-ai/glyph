@@ -712,7 +712,13 @@ export class WorkflowEntity {
     // synthesizes the next coord) and must not consume a retry slot — so it gets
     // a fresh `attempt = 1` every time and never trips the cap.
     const countsTowardCap = stuckReason === "coord_exited_without_action";
-    const attempt = countsTowardCap ? (prevRetry?.attempt ?? 0) + 1 : 1;
+    // Ratchet only off a *previous* coord_exited attempt. A workers_finished
+    // retry coord records `attempt = 1` for provenance; seeding the ratchet from
+    // it would pre-charge a following coord_exited chain by one and trip the cap
+    // a retry early, so a non-coord_exited predecessor resets the count to fresh.
+    const priorCoordExitedAttempt =
+      prevRetry?.reason === "coord_exited_without_action" ? (prevRetry.attempt ?? 0) : 0;
+    const attempt = countsTowardCap ? priorCoordExitedAttempt + 1 : 1;
     if (countsTowardCap && attempt > STUCK_RETRY_MAX_ATTEMPTS) {
       this._status = "failed";
       this._endedAt = nowIso;

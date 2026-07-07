@@ -72,6 +72,50 @@ describe("WorkflowModule.pruneSubgraph", () => {
     expect(dag.nodes.some((n) => n.id === workerIds.w1!)).toBe(false);
   });
 
+  it("prunes a mis-planned batch then re-adds a corrected one (roundtrip)", async () => {
+    const { workflowId, initialCoordNodeId } = await bootstrap(f);
+    const wrong = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "w1", spec: { agent: "w", brief: "wrong" } }],
+      coordSpec: { agent: "coord-wrong" },
+    });
+
+    // Retract the entire mis-planned batch (worker + its trailing coord) in one save.
+    const pruned = (
+      await f.module.pruneSubgraph.execute({
+        workflowId,
+        nodeIds: [wrong.workerIds.w1!, wrong.coordId],
+      })
+    )._unsafeUnwrap();
+    expect(pruned.prunedNodeIds).toEqual([wrong.workerIds.w1!, wrong.coordId]);
+
+    // Re-add a corrected batch from the same still-running root coord — proving
+    // pruneSubgraph is the structural inverse of addSubgraph and that the
+    // save() diff-deletion leaves the graph in a re-addable state.
+    const fixed = await addIteration(f, {
+      workflowId,
+      parentCoordId: initialCoordNodeId,
+      nodes: [{ tempId: "w1", spec: { agent: "w", brief: "corrected" } }],
+      coordSpec: { agent: "coord-fixed" },
+    });
+
+    const dag = (await f.module.getDag.execute({ workflowId }))._unsafeUnwrap();
+    // Only the root coord + corrected batch survive the roundtrip.
+    expect(dag.nodes.map((n) => n.id).sort()).toEqual(
+      [initialCoordNodeId, fixed.workerIds.w1!, fixed.coordId].sort(),
+    );
+    // Nothing from the pruned batch remains — neither as a node nor a dangling edge.
+    const prunedIds = new Set<string>([wrong.workerIds.w1!, wrong.coordId]);
+    expect(dag.nodes.some((n) => prunedIds.has(n.id))).toBe(false);
+    expect(dag.edges.some((e) => prunedIds.has(e.from) || prunedIds.has(e.to))).toBe(false);
+    // The corrected batch is wired to the root coord and to its own trailing coord.
+    const edgeKeys = new Set(dag.edges.map((e) => `${e.from}->${e.to}`));
+    expect(edgeKeys.has(`${initialCoordNodeId}->${fixed.workerIds.w1!}`)).toBe(true);
+    expect(edgeKeys.has(`${fixed.workerIds.w1!}->${fixed.coordId}`)).toBe(true);
+    expect(edgeKeys.has(`${initialCoordNodeId}->${fixed.coordId}`)).toBe(true);
+  });
+
   it("rejects pruning the root coordinator with rootCoordProtected", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
     // The engine dispatches the bootstrap coord immediately; force it back to
