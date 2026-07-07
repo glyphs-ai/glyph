@@ -12,11 +12,6 @@ import * as schema from "./catalog-schema.js";
  */
 export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof schema>;
 
-/** Wrap an existing libsql client into a typed drizzle handle (no PRAGMAs, no migrations). */
-export function wrapClient(client: Client): Db {
-  return drizzle(client, { schema });
-}
-
 /**
  * Open a libsql connection in WAL mode, run pending migrations, and
  * return the drizzle handle plus `close`. Tests pass `":memory:"` (as a

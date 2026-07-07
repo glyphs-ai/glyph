@@ -5,11 +5,11 @@ import {
   applyCatalogMigrations,
   type Db as CatalogDb,
   type CatalogModule,
+  schema as catalogSchema,
   composeCatalog,
   type GetSkillResponse,
   type McpFqn,
   type SkillFqn,
-  wrapClient as wrapCatalogClient,
 } from "@glyphs-ai/catalog";
 import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
 import {
@@ -17,7 +17,7 @@ import {
   composeScheduleModule,
   type Db as ScheduleDb,
   type ScheduleModule,
-  wrapClient as wrapScheduleClient,
+  schema as scheduleSchema,
 } from "@glyphs-ai/schedule";
 import {
   type AgentNotFound,
@@ -28,7 +28,7 @@ import {
   type ResolvedAgent,
   type Db as SessionDb,
   type SessionModule,
-  wrapClient as wrapSessionClient,
+  schema as sessionSchema,
 } from "@glyphs-ai/session";
 import {
   applyTaskMigrations,
@@ -36,7 +36,7 @@ import {
   type AgentResolver as TaskAgentResolver,
   type Db as TaskDb,
   type TaskModule,
-  wrapClient as wrapTaskClient,
+  schema as taskSchema,
 } from "@glyphs-ai/task";
 import type { Spawner } from "@glyphs-ai/terminal";
 import {
@@ -44,10 +44,11 @@ import {
   composeWorkflowModule,
   type Db as WorkflowDb,
   type WorkflowModule,
-  wrapClient as wrapWorkflowClient,
+  schema as workflowSchema,
 } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
 import { type Client, createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import { type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
@@ -498,12 +499,24 @@ export class WorkspaceContextRegistry {
       throw err;
     }
 
-    // Per-package drizzle handles (typed by each pkg's schema).
-    const catalogDb = wrapCatalogClient(client);
-    const sessionDb = wrapSessionClient(client);
-    const taskDb = wrapTaskClient(client);
-    const scheduleDb = wrapScheduleClient(client);
-    const workflowDb = wrapWorkflowClient(client);
+    // One merged-schema drizzle handle over the shared client. Each
+    // package owns and exports its own schema; the consumer merges them so
+    // a single drizzle() call resolves every domain's tables (table names
+    // are disjoint across packages). The per-package Db seams below are
+    // typed views over this one handle.
+    const mergedSchema = {
+      ...catalogSchema,
+      ...sessionSchema,
+      ...taskSchema,
+      ...scheduleSchema,
+      ...workflowSchema,
+    };
+    const db = drizzle(client, { schema: mergedSchema });
+    const catalogDb: CatalogDb = db;
+    const sessionDb: SessionDb = db;
+    const taskDb: TaskDb = db;
+    const scheduleDb: ScheduleDb = db;
+    const workflowDb: WorkflowDb = db;
 
     // Partial-failure safety: if a later compose throws, close
     // the shared client so the WAL lock is released.

@@ -12,11 +12,6 @@ import * as schema from "./schedule-schema.js";
  */
 export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof schema>;
 
-/** Wrap an existing libsql client into a typed drizzle handle (no PRAGMAs, no migrations). */
-export function wrapClient(client: Client): Db {
-  return drizzle(client, { schema });
-}
-
 /**
  * Open the schedule DB (libsql) in WAL mode, apply migrations, and
  * return the drizzle handle plus `close`. The file is the per-workspace

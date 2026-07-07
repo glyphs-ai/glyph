@@ -82,7 +82,7 @@ vi.mock("@glyphs-ai/catalog", () => ({
       }) as unknown as CatalogModule,
   ),
   applyCatalogMigrations: vi.fn(async () => undefined),
-  wrapClient: vi.fn(() => ({})),
+  schema: {},
 }));
 
 vi.mock("@glyphs-ai/session", () => ({
@@ -95,7 +95,7 @@ vi.mock("@glyphs-ai/session", () => ({
     };
   }),
   applySessionMigrations: vi.fn(async () => undefined),
-  wrapClient: vi.fn(() => ({})),
+  schema: {},
 }));
 
 vi.mock("@glyphs-ai/task", () => ({
@@ -114,7 +114,7 @@ vi.mock("@glyphs-ai/task", () => ({
       }) as unknown as TaskModule,
   ),
   applyTaskMigrations: vi.fn(async () => undefined),
-  wrapClient: vi.fn(() => ({})),
+  schema: {},
 }));
 
 vi.mock("@glyphs-ai/schedule", () => ({
@@ -131,7 +131,7 @@ vi.mock("@glyphs-ai/schedule", () => ({
     } as unknown as ScheduleModule;
   }),
   applyScheduleMigrations: vi.fn(async () => undefined),
-  wrapClient: vi.fn(() => ({})),
+  schema: {},
 }));
 
 // `composeWorkflowModule` is mocked so the test never touches the
@@ -150,7 +150,7 @@ vi.mock("@glyphs-ai/workflow", () => ({
     } as unknown as WorkflowModule;
   }),
   applyWorkflowMigrations: vi.fn(async () => undefined),
-  wrapClient: vi.fn(() => ({})),
+  schema: {},
 }));
 
 // The coord-runner factory dereferences `tasks` / `catalog` only on

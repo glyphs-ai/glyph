@@ -165,5 +165,4 @@ export {
   schema,
   type WorkflowModule,
   type WorkflowModuleOptions,
-  wrapClient,
 } from "./workflow-module.js";

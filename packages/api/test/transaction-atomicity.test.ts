@@ -23,9 +23,10 @@ vi.setConfig({ hookTimeout: 60_000 });
 import {
   applyCatalogMigrations,
   type Db as CatalogDb,
-  wrapClient as wrapCatalogClient,
+  schema as catalogSchema,
 } from "@glyphs-ai/catalog";
-import { applyTaskMigrations } from "@glyphs-ai/task";
+import { applyTaskMigrations, schema as taskSchema } from "@glyphs-ai/task";
+import { drizzle } from "drizzle-orm/libsql";
 
 let scratch: string;
 let client: Client;
@@ -39,7 +40,10 @@ beforeEach(async () => {
   await client.execute("PRAGMA busy_timeout = 5000");
   await applyCatalogMigrations(client);
   await applyTaskMigrations(client);
-  catalogDb = wrapCatalogClient(client);
+  // Mirror production: one merged-schema drizzle handle over the shared
+  // client. The cross-package writes below prove atomicity across the
+  // catalog + task tables through this single handle.
+  catalogDb = drizzle(client, { schema: { ...catalogSchema, ...taskSchema } });
 });
 
 afterEach(async () => {
