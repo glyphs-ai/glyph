@@ -18,19 +18,21 @@
 
 import type { Db as CatalogDb, CatalogScope, Tx as CatalogTx } from "@glyphs-ai/catalog";
 import { createCatalogScope } from "@glyphs-ai/catalog";
-import type { Db as ScheduleDb, ScheduleScope } from "@glyphs-ai/schedule";
+import type { Db as ScheduleDb, ScheduleScope, Tx as ScheduleTx } from "@glyphs-ai/schedule";
 import { createScheduleScope } from "@glyphs-ai/schedule";
-import type { Db as SessionDb, SessionScope } from "@glyphs-ai/session";
+import type { Db as SessionDb, SessionScope, Tx as SessionTx } from "@glyphs-ai/session";
 import { createSessionScope } from "@glyphs-ai/session";
-import type { Db as TaskDb, TaskScope } from "@glyphs-ai/task";
+import type { Db as TaskDb, TaskScope, Tx as TaskTx } from "@glyphs-ai/task";
 import { createTaskScope } from "@glyphs-ai/task";
-import type { Db as WorkflowDb, WorkflowScope } from "@glyphs-ai/workflow";
+import type { Db as WorkflowDb, WorkflowScope, Tx as WorkflowTx } from "@glyphs-ai/workflow";
 import { createWorkflowScope } from "@glyphs-ai/workflow";
 import type { Context, MiddlewareHandler } from "hono";
 
 /**
  * The full request-scoped object placed on `c.var.scope`. Each property
  * lazily constructs the package's repos (on the tx) and queries (on db).
+ * Scopes are memoized: repeated access yields the same instance so
+ * repo-level identity tracking (e.g. WeakMap snapshots) is preserved.
  */
 export interface RequestScope {
   readonly catalog: CatalogScope;
@@ -64,21 +66,43 @@ export function transactionMiddleware(
     // underlying libsql client, so any package's db.transaction produces
     // a connection-level transaction covering all tables).
     await (handles.catalogDb as CatalogDb).transaction(async (tx: CatalogTx) => {
+      // All domain pkgs share one libsql connection, so the CatalogTx
+      // handle is structurally identical to each pkg's Tx type (both are
+      // `BaseSQLiteDatabase<"async", ResultSet, typeof pkgSchema>`).
+      // The schema type parameter differs but is unused at runtime when
+      // repos use the builder API. Casts go through `unknown` because
+      // TypeScript's schema generics are nominally incompatible.
+      const sessionTx = tx as unknown as SessionTx;
+      const taskTx = tx as unknown as TaskTx;
+      const scheduleTx = tx as unknown as ScheduleTx;
+      const workflowTx = tx as unknown as WorkflowTx;
+
+      let _catalog: CatalogScope | undefined;
+      let _session: SessionScope | undefined;
+      let _task: TaskScope | undefined;
+      let _schedule: ScheduleScope | undefined;
+      let _workflow: WorkflowScope | undefined;
+
       const scope: RequestScope = {
         get catalog() {
-          return createCatalogScope(tx, handles.catalogDb);
+          if (!_catalog) _catalog = createCatalogScope(tx, handles.catalogDb);
+          return _catalog;
         },
         get session() {
-          return createSessionScope(tx as unknown as SessionDb, handles.sessionDb);
+          if (!_session) _session = createSessionScope(sessionTx, handles.sessionDb);
+          return _session;
         },
         get task() {
-          return createTaskScope(tx as unknown as TaskDb, handles.taskDb);
+          if (!_task) _task = createTaskScope(taskTx, handles.taskDb);
+          return _task;
         },
         get schedule() {
-          return createScheduleScope(tx as unknown as ScheduleDb, handles.scheduleDb);
+          if (!_schedule) _schedule = createScheduleScope(scheduleTx, handles.scheduleDb);
+          return _schedule;
         },
         get workflow() {
-          return createWorkflowScope(tx as unknown as WorkflowDb, handles.workflowDb);
+          if (!_workflow) _workflow = createWorkflowScope(workflowTx, handles.workflowDb);
+          return _workflow;
         },
       };
       c.set("scope", scope);

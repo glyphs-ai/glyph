@@ -45,6 +45,7 @@ import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs
 import { type Client, createClient } from "@libsql/client";
 import { type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
+import type { ScopeDbHandles } from "./transaction-middleware.js";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";
 import { makeCoordNodeRunner } from "./wiring/workflow-coord-task-runner.js";
@@ -142,6 +143,12 @@ export interface WorkspaceContext {
    * a live task module to talk to.
    */
   readonly workflows: WorkflowModule;
+  /**
+   * Per-package drizzle handles for use by the transaction middleware.
+   * The middleware passes these to scope factories so each request gets
+   * write-side repos on the tx and read-side queries on the stable db.
+   */
+  readonly dbHandles: ScopeDbHandles;
   /** Closes all backing connections. Idempotent. */
   close(): Promise<void>;
 }
@@ -661,6 +668,7 @@ export class WorkspaceContextRegistry {
       tasks: taskModule,
       schedules: scheduleModule,
       workflows: workflowModule,
+      dbHandles: { catalogDb, sessionDb, taskDb, scheduleDb, workflowDb },
       async close() {
         // Per-module try/catch: a throw from one module's close()
         // must NOT skip the others. Without per-module catches a
