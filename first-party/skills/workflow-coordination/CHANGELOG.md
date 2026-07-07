@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.4 (2026-07-07)
+
+- Make the `next-coord` coord-parent requirement explicit in §B. The prior `add-subgraph` JSON template omitted `existingParents` on the `next-coord` node, which read as "the intra-batch edges from workers are the only wiring needed." The domain invariant (`enforceCoordChainInvariants`) actually requires the new coord node to have at least one coord-kind parent: workers-only parents are rejected with `WorkflowDagConflict / orphanCoordInsert`. The template now sets `existingParents: ["<self-node-id>"]` on the coord node, the surrounding prose grew from two universal rules to three (rule 3 states the coord-to-coord chain explicitly and calls out that the resulting mixed-parents shape drives the phase computation), and a new `Common add-subgraph rejections` sub-section maps every `WorkflowDagConflict.reason.kind` (`orphanCoordInsert`, `successorCoordExists`, `parentState`, `WorkflowNodeNotMutable`, `cyclic`) to a concrete forward fix so coord can recover from a rejection in one wake-up instead of trial-and-error across many.
+
 ## 0.4.3 (2026-07-07)
 
 - Replace remaining concrete strategy / worker / VCS names in body examples with placeholders (`<your-coord-agent-fqn>`, `<your-strategy-name>`, `<your-scope>`, generic "the agent's VCS skill"). Framework skill is now strategy-neutral end-to-end.

@@ -2,7 +2,7 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.4.3
+version: 0.4.4
 ---
 
 # Glyph Workflow Coordination Skill
@@ -111,6 +111,7 @@ Use `glyph workflow add-subgraph` with `tempId` references so every node + edge 
     { "tempId": "<role-b>", "kind": "worker", "existingParents": ["<self-node-id>"],
       "spec": { "agent": "<agent-fqn>", "brief": "<substituted template>", "details": null } },
     { "tempId": "coord",    "kind": "coordinator",
+      "existingParents": ["<self-node-id>"],           // REQUIRED: chain the new coord onto self (see rule 3 below)
       "spec": { "agent": "<your-coord-agent-fqn>" } }
   ],
   "edges": [
@@ -120,7 +121,23 @@ Use `glyph workflow add-subgraph` with `tempId` references so every node + edge 
 }
 ```
 
-The substrate resolves the `tempId`s within the transaction and returns the assigned node ids in `insertedNodes[].nodeId`. Two universal rules: every fan-out MUST end in a `next-coord` whose parents are the newly-inserted workers (otherwise the branch dead-ends), and exactly one `add-subgraph` per wake-up (splitting a fan-out across two CLI calls leaves a half-formed DAG and may re-wake the wrong coord).
+The substrate resolves the `tempId`s within the transaction and returns the assigned node ids in `insertedNodes[].nodeId`. Three universal rules:
+
+1. Every fan-out MUST end in a `next-coord` whose parents are the newly-inserted workers (otherwise the branch dead-ends).
+2. Exactly one `add-subgraph` per wake-up (splitting a fan-out across two CLI calls leaves a half-formed DAG and may re-wake the wrong coord).
+3. The `next-coord` MUST list the currently-running coord's node-id in its `existingParents`. An intra-batch edge from a worker into `next-coord` is NOT enough on its own — the substrate enforces a coord-to-coord chain (a new coord must have at least one coord parent) to keep the DAG frontier connected. The `next-coord` ends up with mixed parents: `[<self-node-id>, ...worker-tempIds-via-edges]`, and its phase is `max(parent-phases) + 1`.
+
+### Common `add-subgraph` rejections
+
+When `glyph workflow add-subgraph` returns a `WorkflowDagConflict`, the `reason.kind` field names the invariant that was violated. Read it before retrying; guessing burns wake-ups.
+
+| `reason.kind` | What tripped it | Forward fix |
+|---|---|---|
+| `orphanCoordInsert` | New coord node has no coord parent (workers-only in `existingParents` + edges). | Add `existingParents: ["<self-node-id>"]` to the `next-coord` node. |
+| `successorCoordExists` | Self already has a coord-kind child in the DAG. | The wake-up is racing an earlier decision. Re-read the DAG (`glyph workflow dag`) and finish or observe instead of re-inserting. |
+| `parentState` | A referenced existing parent is `failed` or `cancelled`; workers/humans can't attach to non-successful parents. | Route to the strategy's failure/cancellation case (typically `workflow finish --outcome failed`). |
+| `WorkflowNodeNotMutable` on an existing edge target | The `edges[].to` points at an existing node that has already started (only `not_started` nodes accept new incoming edges). | Don't rewrite in-flight nodes; insert a fresh temp node instead. |
+| `cyclic` | An edge would create a cycle. | Rework the subgraph so the new nodes strictly extend the frontier downstream. |
 
 ---
 
