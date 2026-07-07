@@ -264,29 +264,27 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 
 ## workflow
 
-`glyph workflow <sub>` — coordinator-facing surface: it lets a workflow header live in the substrate, exposes the live DAG, and lets a `kind: coordinator` task mutate the DAG (add nodes, add edges, replace specs, cancel, finish) while it runs. Workers don't touch this surface — they just do their job and exit; the substrate joins their result back to the DAG node via `task.metadata.workflowNodeId`.
+`glyph workflow <sub>` covers workflow header + live DAG read + DAG mutation + termination. Mutation subcommands are typically invoked by an orchestrator agent inside a running workflow; this doc documents the surface, not the orchestration recipe.
 
 > All 13 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`).
 
 ### Subcommand map
 
-| Subcommand | Purpose | Coord-only? |
-| --- | --- | --- |
-| [`workflow list`](#workflow-list) | List workflows in the workspace | no |
-| [`workflow create`](#workflow-create) | Seed a workflow + initial coord node | no |
-| [`workflow show`](#workflow-show-workflow-id) | Print one workflow's header | no |
-| [`workflow dag`](#workflow-dag-workflow-id) | Print the full DAG snapshot | no |
-| [`workflow node-show`](#workflow-node-show-workflow-id-node-id) | Print one node's projection (with `taskId`) | no |
-| [`workflow add-node`](#workflow-add-node-workflow-id) | Insert one node attached to existing parents | **yes** |
-| [`workflow add-subgraph`](#workflow-add-subgraph-workflow-id) | Insert N nodes + intra-batch edges atomically | **yes** |
-| [`workflow add-edge`](#workflow-add-edge-workflow-id) | Add a single edge between two existing nodes | **yes** |
-| [`workflow cancel-node`](#workflow-cancel-node-workflow-id-node-id) | Cancel a single worker node | **yes** |
-| [`workflow cancel`](#workflow-cancel-workflow-id) | Cancel a running workflow (operator) | no |
-| [`workflow finish`](#workflow-finish-workflow-id) | Flip the workflow terminal | **yes** |
-| [`workflow rm`](#workflow-rm-workflow-id) | Remove a terminal workflow | no |
-| [`workflow respond`](#workflow-respond-workflow-id-node-id) | Respond to a human-kind node | no |
-
-"Coord-only" is a logical marker — the substrate no longer enforces a caller-coord authorization gate, so any client with workspace access can hit these endpoints. Mark mutation-style commands as coord-only in your own playbook to keep the human-vs-orchestrator boundary explicit.
+| Subcommand | Purpose |
+| --- | --- |
+| [`workflow list`](#workflow-list) | List workflows in the workspace |
+| [`workflow create`](#workflow-create) | Seed a workflow + initial coord node |
+| [`workflow show`](#workflow-show-workflow-id) | Print one workflow's header |
+| [`workflow dag`](#workflow-dag-workflow-id) | Print the full DAG snapshot |
+| [`workflow node-show`](#workflow-node-show-workflow-id-node-id) | Print one node's projection (with `taskId`) |
+| [`workflow add-node`](#workflow-add-node-workflow-id) | Insert one node attached to existing parents |
+| [`workflow add-subgraph`](#workflow-add-subgraph-workflow-id) | Insert N nodes + intra-batch edges atomically |
+| [`workflow add-edge`](#workflow-add-edge-workflow-id) | Add a single edge between two existing nodes |
+| [`workflow cancel-node`](#workflow-cancel-node-workflow-id-node-id) | Cancel a single worker node |
+| [`workflow cancel`](#workflow-cancel-workflow-id) | Cancel a running workflow (operator) |
+| [`workflow finish`](#workflow-finish-workflow-id) | Flip the workflow terminal |
+| [`workflow rm`](#workflow-rm-workflow-id) | Remove a terminal workflow |
+| [`workflow respond`](#workflow-respond-workflow-id-node-id) | Respond to a human-kind node |
 
 ### `workflow list`
 
@@ -437,71 +435,6 @@ Triggers the cascade reconciler: every non-terminal node is cancelled with reaso
 - Output: `WorkflowNode` (transitioned to `succeeded`)
 
 The target node must be `kind === "human"` and `status === "running"`. On success, downstream nodes are evaluated for readiness.
-
-### Common patterns
-
-#### Coord introspection (every wake-up)
-
-```sh
-# 1. Workflow header — brief, status, coord agent fqn.
-WF_HDR=$(glyph workflow show "$WFID" --json)
-
-# 2. Full DAG snapshot — nodes + edges.
-DAG=$(glyph workflow dag "$WFID" --json)
-
-# 3. Direct parents of own node id.
-PARENT_IDS=$(echo "$DAG" | jq -r --arg me "$NODE_ID" \
-               '.edges[] | select(.to == $me) | .from')
-
-# 4. Per parent: kind / status / agent / taskId.
-for P in $PARENT_IDS; do
-  echo "$DAG" | jq --arg p "$P" \
-    '.nodes[] | select(.id == $p) | {kind, status, agent: .spec.agent, taskId}'
-done
-```
-
-#### Reading a finished worker's verdict
-
-```sh
-TID=$(glyph workflow node-show "$WFID" "$PARENT_ID" --json | jq -r '.taskId')
-WD=$(glyph task show "$TID" --json | jq -r '.metadata.workdir')
-jq . "$WD/artifact/verdict.json"
-```
-
-#### Batch DAG mutation (typical coord expansion)
-
-```sh
-cat > /tmp/expand.json <<EOF
-{
-  "nodes": [
-    { "tempId": "dev",   "kind": "worker", "existingParents": ["$ME"],
-      "spec": { "agent": "official/engineer",
-                "brief":   $(printf '%s' "$WORKER_BRIEF" | jq -Rs .),
-                "details": $(printf '%s' "$WORKER_DETAILS" | jq -Rs .) } },
-    { "tempId": "coord", "kind": "coordinator",
-      "spec": { "agent": "official/coordinator" } }
-  ],
-  "edges": [
-    { "from": { "kind": "temp", "tempId": "dev" },
-      "to":   { "kind": "temp", "tempId": "coord" } }
-  ]
-}
-EOF
-
-glyph workflow add-subgraph "$WFID" --spec-file /tmp/expand.json --json
-```
-
-#### Finishing the workflow
-
-```sh
-# Success.
-glyph workflow finish "$WFID" --outcome succeeded \
-  --summary "All reviewers approved with only minor findings remaining."
-
-# Failure (reason required).
-glyph workflow finish "$WFID" --outcome failed \
-  --message "dev iteration ended in failed; cannot make progress."
-```
 
 ---
 
