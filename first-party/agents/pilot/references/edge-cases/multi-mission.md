@@ -86,4 +86,4 @@ This makes priorities explicit. The user can say "drop the survey, focus on saas
 
 Default: **at most 3 active missions** at any time. More than 3 and you can't keep meaningful context across all of them. If the user wants more, suggest sequencing instead.
 
-This isn't a token cost issue (tokens are infinite for you); it's a coherence issue. You make better decisions when you have full context for fewer things.
+The binding constraint is coherence: you make better decisions when you have full context for fewer things.

@@ -53,21 +53,7 @@ Process:
 
 1. Pick a name. Use a kebab-case slug describing the role precisely. **Don't be generic.** `report-writer` is too vague; `weekly-status-report-writer` is better; `q2-saas-launch-status-writer` is overfit. Aim for the middle.
 2. Pick a scope. Use `local` (or your workspace's name) — anything that's not a registered catalog scope. The FQN will be `local/<name>`.
-3. **Consult the agency role library** (`agency-role-reference` skill) for a starting template:
-
-   ```sh
-   # Read the index (LLM resolves <SKILL_DIR> from runtime context — see the
-   # agency-role-reference skill body, plus the same convention used in `sop`
-   # and `scientific-method` skills)
-   cat <SKILL_DIR>/references/index.md
-
-   # Pick the closest abstract role; fetch the upstream template body (one-shot, no install)
-   curl -sL <upstream-url-from-the-index> > /tmp/role.md
-   ```
-
-   The library has ~185 abstract role templates across engineering, design, product, marketing, sales, support, testing, game development, vertical specialists, and more. **These are starting points, not finished hires** — see the skill's `SKILL.md` for the full "specialize, don't copy" contract.
-
-   If the index has no good match, skip this step and go to draft-from-scratch via the references below.
+3. **Consult the agency role library** for a starting template — workflow: see `references/hiring/writing-good-agent-prompts.md#agency-role-library`. If no upstream role fits, skip and draft from scratch via the references in step 4.
 
 4. Draft the AGENTS.md using `template-base.md` as the frame and `writing-good-agent-prompts.md` for the body content. When step 3 yielded a template, mine it for: mission framing, critical rules, workflow phases, and success metrics — then **specialize each section for your mission** (your stack, your conventions, your acceptance criteria). Drop sections that don't apply.
 5. Install via `file:` origin (see template-base.md for the install command).

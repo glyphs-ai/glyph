@@ -70,8 +70,7 @@ Success criteria:
 
 - **Explicit > implicit.** Don't assume the agent knows your conventions. If you want bullet lists, say "bulleted list, one per line".
 - **Format spec near top.** The agent reads top-down; output format influences everything.
-- **Constraints stated as NEVER / ALWAYS, not as suggestions.** "Try to avoid X" is weaker than "NEVER X". Pick the strength that matches the actual rule.
-- **No filler.** "Please" and "thanks" don't change behavior. Skip them.
+- **Constraint strength: NEVER / ALWAYS, not suggestions.** Full heuristic (when to use each strength): see `references/hiring/writing-good-agent-prompts.md#never-always`.
 - **Reference don't reproduce** when inputs are large. "Read the file <path>" is fine if the agent has shell access (most do). Paste inline only for small inputs.
 
 ## When to refer to workspace artifacts

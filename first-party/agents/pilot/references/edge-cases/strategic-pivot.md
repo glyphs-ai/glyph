@@ -54,19 +54,14 @@ For each active mission:
 
 - **Aligned with new direction** → continue (note in progress.md: "[date] Pivot: this mission remains relevant.")
 - **Partially aligned** → re-scope and continue (update goal.md + plan.md to reflect what to keep)
-- **Not aligned** → archive
-  ```sh
-  # Move to archived-missions/ with a special outcome.md
-  echo "Outcome: archived due to strategic pivot on $DATE. Pre-pivot state preserved in strategy-history/$DATE." > .pilot/active-missions/<id>/outcome.md
-  mv .pilot/active-missions/<id> .pilot/archived-missions/
-  ```
+- **Not aligned** → abandon per `references/monitoring/mission-progress-tracking.md#abandon-a-mission` (the abandon procedure writes outcome.md + moves to archived-missions/ + logs to decisions.log). Note in the outcome.md reason line that this is a pivot-triggered abandonment and cross-reference `strategy-history/<date>/`.
 
-For each in-flight task in archived missions:
+For each in-flight task in abandoned missions:
 - Decide: cancel (`glyph task rm`) or let it complete (output may be reusable for new direction).
 
 ### 4. Rewrite strategy.md
 
-This is the only file you fully replace (rather than append to). Use the bootstrap template (`bootstrap.md`) as the structure. Make sure to:
+This is the only file you fully replace (rather than append to). Use the strategy.md template in `references/state-management.md#strategymd` as the structure. Make sure to:
 
 - Date the new strategy at the top (so it's clear this is the new mission, not the old)
 - Cross-reference the snapshot: "Previous strategy archived in strategy-history/<date>/."

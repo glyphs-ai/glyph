@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.3 (2026-07-07)
+
+- Consolidate five duplicated topics into single-source homes so future edits touch one file, not many.
+  - **State layout** — `.pilot/` top-level + per-mission directory listing lives only in `references/state-management.md`. `AGENTS.md`, `references/bootstrap.md`, `references/monitoring/mission-progress-tracking.md`, and `references/edge-cases/session-restart-recovery.md` now point at it instead of duplicating.
+  - **Abandon-a-mission procedure** — the outcome.md + move-to-archived-missions/ + decisions.log recipe lives only in `references/monitoring/mission-progress-tracking.md` under a new `Abandon a mission` section. `references/edge-cases/emergency-mode.md` and `references/edge-cases/strategic-pivot.md` reach it by pointer.
+  - **Agency-role-library workflow** — the `cat <SKILL_DIR>/references/index.md` + `curl` + specialize flow lives only in `references/hiring/writing-good-agent-prompts.md`. `references/hiring/decision-tree.md` reaches it by pointer.
+  - **`official/cli` frontmatter rule for local agents** — the "never declare `official/cli` in a local agent's `dependencies.skills`" rule lives only in `references/hiring/template-base.md`. `references/communication/no-direct-subagent-talk.md` no longer duplicates it.
+  - **NEVER / ALWAYS constraint-strength heuristic** — promoted to a first-class subsection in `references/hiring/writing-good-agent-prompts.md` (anchor `#never-always`). `references/communication/to-subagent.md` reaches it by pointer.
+- Prune rationale no-ops and rewrite negation-form guidance in positive form:
+  - `AGENTS.md`: dropped the highlighted subset of `.pilot/` (whole layout now in state-management.md).
+  - `references/bootstrap.md`: dropped inline strategy.md template and org-chart.md template bodies; dropped `Capture it` soft no-op.
+  - `references/communication/no-direct-subagent-talk.md`: dropped the `Why` 4-bullet rationale and the `What goes wrong if you violate this` section.
+  - `references/communication/to-subagent.md`: dropped `No filler` bullet.
+  - `references/communication/to-user.md`: trimmed redundant `Don't keep poking` clause.
+  - `references/edge-cases/emergency-mode.md`: rewrote three `What NOT to do` bullets in positive form with pointers to the correct tracks (hires-evaluation, strategic-pivot).
+  - `references/edge-cases/multi-mission.md`: trimmed `tokens are infinite for you` aside from Hard cap.
+  - `references/edge-cases/session-restart-recovery.md`: dropped `Pre-emptive resilience` section (now under `Hygiene / Persist immediately` in state-management.md).
+  - `references/hiring/writing-good-agent-prompts.md`: rewrote `Be helpful and accurate is filler` anti-pattern in positive form.
+  - `references/monitoring/mission-progress-tracking.md`: dropped `Reading mission state on resume` bash block (belongs in session-restart-recovery.md); tightened `Don't be noisy` pair to one positive sentence.
+
 ## 0.2.2 (2026-06-12)
 
 - Realign the **Commands quick reference** table to the new CLI id-flag convention (`packages/cli/README.md` → "Naming conventions"): `glyph task show <tid>` / `task activity <tid>` → `<task-id>` (positional); `glyph workflow cancel <wfid>` → `glyph workflow cancel <workflow-id>` (positional). Documentation-only change.

@@ -107,7 +107,7 @@ If you find yourself sending a terminal message saying "task X completed", you'r
 
 Don't pester. If they haven't said anything in 24 hours, that's fine — keep working. Surface only when there's something they need to know.
 
-If they've been silent for a week AND you have an unresolved escalation, send a single reminder. Don't keep poking.
+If they've been silent for a week AND you have an unresolved escalation, send a single reminder.
 
 ## When the user gives feedback
 

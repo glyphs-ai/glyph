@@ -92,7 +92,33 @@ I never invent data — uncertain claims are labeled with "(estimate)" or
 
 ### `strategy.md`
 
-(See `bootstrap.md` for the full template.)
+```markdown
+# Strategy
+
+## Mission
+<one-paragraph statement of what we're trying to achieve>
+
+## Success criteria
+- <observable outcome 1>
+- <observable outcome 2>
+- ...
+
+## Time horizon
+<short-term / quarter / open-ended>
+
+## Constraints
+- <technical / human / regulatory / budget>
+
+## Assumptions (you'll revise these as you learn)
+- <assumption 1, with confidence note>
+- ...
+
+## Interpretation
+<your one-paragraph reading of the mission and how you'll approach it>
+
+## Out of scope (for now)
+- <things you've decided NOT to pursue, and why>
+```
 
 ### `org-chart.md`
 
@@ -103,12 +129,14 @@ I never invent data — uncertain claims are labeled with "(estimate)" or
 <one line, copied from strategy.md>
 
 ## Domains and roles
-| Domain | Role | Agent FQN | Hired | Notes |
-|---|---|---|---|---|
-| research | market-analyst | acme/eastmoney-data | 2026-05-13 | installed from acme catalog |
-| writing  | report-writer  | local/report-writer       | 2026-05-13 | created locally, see local-agents/ |
-| ops      | task-monitor   | local/task-monitor        | 2026-05-13 | created locally |
+| Domain | Role | Agent FQN | Status | Hired | Notes |
+|---|---|---|---|---|---|
+| research | market-analyst | acme/eastmoney-data | hired | 2026-05-13 | installed from acme catalog |
+| writing  | report-writer  | local/report-writer       | hired | 2026-05-13 | created locally, see local-agents/ |
+| ops      | task-monitor   | local/task-monitor        | proposed | — | drafting |
 ```
+
+Status values: `proposed` (drafted, not yet probed), `probed` (probe task passed, ready to hire), `hired` (in active use), `retired` (formerly hired, kept for audit).
 
 ### `hires.md`
 
@@ -154,6 +182,18 @@ One line per decision. Keep terse but with rationale:
 ```
 
 ## Hygiene
+
+### Persist immediately
+
+Anything a future tick needs to know goes to disk before the current tick ends:
+
+- **Write `tasks.json` IMMEDIATELY after every dispatch** (before doing anything else with the returned task id).
+- **Update `state.json` after every meaningful tick**, not just the last one of the session.
+- **Write letters generously** — every notable session ends with a letter for future-you.
+
+A crash between dispatch and the write is what turns real tasks into orphans on next resume.
+
+### Long-term hygiene
 
 - Periodically (e.g. monthly) compact `decisions.log` if it grows large — keep the last N months in main log, archive older to `decisions.log.YYYY-MM`.
 - Keep `lessons.md` short and high-signal. If you've added 50 lessons, time to consolidate.

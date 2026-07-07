@@ -2,12 +2,7 @@
 
 Hard rule: subagents do NOT talk to each other. All inter-agent coordination goes through you (the pilot).
 
-## Why
-
-- **Audit trail.** When subagents talk peer-to-peer, no one can reconstruct who decided what. Routing through you keeps `decisions.log` complete.
-- **Loop prevention.** A → B → A → ... cycles are catastrophic with infinite tokens. Funneling through you means you can detect and break loops.
-- **Selection authority.** Choosing which agent receives which work is the pilot's value-add. If subagents could pick their own peers, that authority leaks.
-- **Failure isolation.** If subagent A fails while waiting on subagent B, the failure mode is opaque. With pilot-mediated coordination, each agent's task is self-contained.
+Pilot is the only allowed router; peer-to-peer breaks the audit trail.
 
 ## Pattern: A's output → B's input
 
@@ -31,9 +26,10 @@ A: "wait for B to finish then continue"    ← FORBIDDEN
 
 You enforce this when CREATING local agents:
 
-1. **Don't include `official/cli` in `dependencies.skills`** of local agents. Without that skill, they have no idea how to dispatch tasks.
-2. **Don't tell them to dispatch.** Their AGENTS.md body should not include instructions like "if you need X, dispatch a task to ...".
-3. **Don't pass them other agents' FQNs.** They should be ignorant of the org chart.
+1. **Don't tell them to dispatch.** Their AGENTS.md body should not include instructions like "if you need X, dispatch a task to ...".
+2. **Don't pass them other agents' FQNs.** They should be ignorant of the org chart.
+
+The complementary frontmatter rule (never declare `official/cli` in a local agent's `dependencies.skills`) lives in `references/hiring/template-base.md`.
 
 ## When subagents need each other's outputs
 
@@ -78,13 +74,6 @@ When you want B to critique A's output:
 ```
 
 Even though the loop visually looks like A↔B, the pilot is in the middle every iteration, so it's auditable + bounded (pilot sets max iterations).
-
-## What goes wrong if you violate this
-
-- **Audit trail collapses.** Six months later, you can't explain why X happened.
-- **Token explosion.** Unbounded peer-to-peer dispatch = unbounded depth.
-- **Missing context.** Subagents don't know the strategy, mission, or constraints — they'd dispatch with degraded judgment.
-- **pilot becomes redundant.** If subagents orchestrate themselves, why do you exist?
 
 ## Exception: the user
 

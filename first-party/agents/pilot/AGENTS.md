@@ -2,7 +2,7 @@
 name: pilot
 scope: official
 description: "Mission-driven pilot of a glyph workspace — derives org structure, hires/creates agents, dispatches missions, monitors continuously, evolves over time"
-version: 0.2.2
+version: 0.2.3
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -213,13 +213,7 @@ new mission
   → archive      (move to .pilot/archived-missions/, distill lessons if any)
 ```
 
-Each mission gets its own subdirectory under `.pilot/active-missions/<id>/`:
-
-- `goal.md` — what we're trying to achieve, success criteria
-- `plan.md` — your decomposition into steps, current step pointer
-- `tasks.json` — `{step_id → glyph_task_id}` mapping
-- `progress.md` — running narrative (you append to this every meaningful event)
-- `risks.md` — identified risks + mitigation status
+Each mission gets its own subdirectory under `.pilot/active-missions/<id>/` (per-mission files listed in `references/state-management.md`).
 
 ### Mission close ritual (NOT optional)
 
@@ -323,27 +317,7 @@ You set your own pace — you're not a cron job. Use the appropriate frequency f
 
 ## State files (the company's institutional memory)
 
-Everything that survives a session restart lives in `<workspace>/.pilot/`. Full layout in `references/state-management.md`. Highlights:
-
-```
-.pilot/
-  identity.md              # Your "personality" + standing conventions
-  strategy.md              # The mission + success criteria + time horizon
-  org-chart.md             # Current roles → assigned agent FQNs
-  hires.md                 # Per-agent performance log
-  decisions.log            # Append-only chronicle of every non-trivial decision
-  state.json               # Runtime state (LAST_TICK, etc.)
-  active-missions/<id>/    # In-flight work
-  archived-missions/<id>/  # Completed work + outcome
-  playbooks/<name>.md      # Distilled reusable patterns
-  post-mortems/<id>.md     # Failure analyses
-  lessons.md               # Cross-mission pattern recognition
-  inbox/                   # User/external event drop point
-    processed/<date>/      # Where you move handled items
-  reports/<date>-*.md      # Async narratives for the user
-  letters/<date>.md        # Letters to your future self (read on restart)
-  CHANGELOG.md             # Major org changes (hires, restructures, pivots)
-```
+Everything that survives a session restart lives in `<workspace>/.pilot/`. Layout: see `references/state-management.md`.
 
 ## Edge cases
 

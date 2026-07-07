@@ -29,7 +29,7 @@ mkdir -p local-agents
 touch .pilot/decisions.log .pilot/lessons.md .pilot/CHANGELOG.md .pilot/hires.md .pilot/org-chart.md
 ```
 
-`.pilot/` is your institutional memory (state-management.md). `local-agents/` lives at the workspace root (sibling of `.pilot/`) so it can be `catalog agent install --file /abs/path`-ed; it's NOT under `.pilot/`.
+Layout + read/write conventions: see `state-management.md`. Note: `local-agents/` lives at the workspace root (sibling of `.pilot/`) so it can be `catalog agent install --file /abs/path`-ed; it's NOT under `.pilot/`.
 
 ## Identity (one-time)
 
@@ -43,7 +43,7 @@ This file rarely changes. It's what makes you "the same pilot" across restarts.
 
 ## Mission intake
 
-The mission was passed as the session's initial instructions, OR the user states it now in the first message. Capture it.
+The mission was passed as the session's initial instructions, OR the user states it now in the first message.
 
 ```
 EXAMPLE
@@ -62,55 +62,11 @@ Ask narrow clarifying questions. If the user says "figure it out yourself", DO s
 
 ## Strategy
 
-Write `.pilot/strategy.md`:
-
-```markdown
-# Strategy
-
-## Mission
-<one-paragraph statement of what we're trying to achieve>
-
-## Success criteria
-- <observable outcome 1>
-- <observable outcome 2>
-- ...
-
-## Time horizon
-<short-term / quarter / open-ended>
-
-## Constraints
-- <technical / human / regulatory / budget>
-
-## Assumptions (you'll revise these as you learn)
-- <assumption 1, with confidence note>
-- ...
-
-## Interpretation
-<your one-paragraph reading of the mission and how you'll approach it>
-
-## Out of scope (for now)
-- <things you've decided NOT to pursue, and why>
-```
+Write `.pilot/strategy.md`. Template + section semantics: see `state-management.md#strategymd`. Fill in every section — the `Interpretation` and `Assumptions` sections are the ones you'll re-read on every strategy review, so make them narrative rather than bullet lists.
 
 ## Domain derivation
 
-Apply the 4-question framework from `sub-agent/domains.md`. Write your reasoning to `decisions.log` AND output the resulting domain list to `org-chart.md`:
-
-```markdown
-# Org chart
-
-## Mission
-<one line, copied from strategy.md>
-
-## Domains and roles
-| Domain | Role | Agent FQN | Status |
-|---|---|---|---|
-| <domain-1> | <role-name> | <fqn or "TBD"> | proposed / probed / hired |
-| ... | ... | ... | ... |
-
-## Notes
-<why these domains, why not others>
-```
+Apply the 4-question framework from `sub-agent/domains.md`. Write your reasoning to `decisions.log` AND populate `.pilot/org-chart.md` per the template in `state-management.md#org-chartmd`.
 
 ## Initial hiring plan
 
