@@ -13,8 +13,9 @@ export default defineConfig({
     globals: false,
     pool: "forks",
     testTimeout: 15000,
-    // Windows CI: libsql WAL file locks are released asynchronously on
-    // NTFS; afterEach retries need headroom beyond the default 10s.
-    hookTimeout: 30_000,
+    // Windows CI: libsql WAL-mode checkpoint + NTFS deferred lock
+    // release make teardown (module drain → client.close → rm) slower
+    // than on Unix; 60s gives ample headroom for the heaviest tests.
+    hookTimeout: 60_000,
   },
 });

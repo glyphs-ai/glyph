@@ -34,7 +34,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await teardownTestSubsystem(sys);
-  await rm(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
 });
 
 async function ensureWorkspace(name: string): Promise<{ id: string; workspaceDir: string }> {

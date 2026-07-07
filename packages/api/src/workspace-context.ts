@@ -719,6 +719,17 @@ export class WorkspaceContextRegistry {
         // Close the shared libsql client LAST — modules drain their
         // engines first, so all in-flight SQL completes before the
         // connection is torn down.
+        //
+        // WAL checkpoint before close: on Windows (NTFS) the WAL/SHM
+        // file locks linger after close() unless the WAL has been
+        // checkpointed. TRUNCATE mode merges the WAL back into the
+        // main DB and removes the auxiliary files, allowing the caller
+        // to delete the workspace directory without EPERM retries.
+        try {
+          await client.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+        } catch {
+          // best-effort — the close below still releases the connection
+        }
         try {
           client.close();
         } catch (err) {
