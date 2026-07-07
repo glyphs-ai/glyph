@@ -16,6 +16,7 @@
  *   });
  */
 
+import type { ScopeDbHandles } from "@glyphs-ai/api";
 import type { Db as CatalogDb, CatalogScope } from "@glyphs-ai/catalog";
 import { createCatalogScope } from "@glyphs-ai/catalog";
 import type { Db as ScheduleDb, ScheduleScope } from "@glyphs-ai/schedule";
@@ -40,15 +41,6 @@ export interface RequestScope {
   readonly task: TaskScope;
   readonly schedule: ScheduleScope;
   readonly workflow: WorkflowScope;
-}
-
-/** Per-package db handles needed to build the scope. */
-export interface ScopeDbHandles {
-  readonly catalogDb: CatalogDb;
-  readonly sessionDb: SessionDb;
-  readonly taskDb: TaskDb;
-  readonly scheduleDb: ScheduleDb;
-  readonly workflowDb: WorkflowDb;
 }
 
 /**

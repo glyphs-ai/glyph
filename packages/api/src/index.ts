@@ -103,11 +103,6 @@ export {
   validationProblem,
 } from "./schemas/problem.js";
 export {
-  type RequestScope,
-  type ScopeDbHandles,
-  transactionMiddleware,
-} from "./transaction-middleware.js";
-export {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "./wiring/workflow-coord-task-runner.js";
@@ -117,6 +112,7 @@ export {
   WorkflowWorkerSpecError,
 } from "./wiring/workflow-worker-task-runner.js";
 export {
+  type ScopeDbHandles,
   type WorkspaceContext,
   type WorkspaceContextState,
   WorkspaceHasLiveTasksError,

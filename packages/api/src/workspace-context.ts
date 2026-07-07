@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   type AgentFqn,
   applyCatalogMigrations,
+  type Db as CatalogDb,
   type CatalogModule,
   composeCatalog,
   type GetSkillResponse,
@@ -14,6 +15,7 @@ import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
 import {
   applyScheduleMigrations,
   composeScheduleModule,
+  type Db as ScheduleDb,
   type ScheduleModule,
   wrapClient as wrapScheduleClient,
 } from "@glyphs-ai/schedule";
@@ -24,6 +26,7 @@ import {
   applySessionMigrations,
   composeSessionModule,
   type ResolvedAgent,
+  type Db as SessionDb,
   type SessionModule,
   wrapClient as wrapSessionClient,
 } from "@glyphs-ai/session";
@@ -31,6 +34,7 @@ import {
   applyTaskMigrations,
   composeTaskModule,
   type AgentResolver as TaskAgentResolver,
+  type Db as TaskDb,
   type TaskModule,
   wrapClient as wrapTaskClient,
 } from "@glyphs-ai/task";
@@ -38,6 +42,7 @@ import type { Spawner } from "@glyphs-ai/terminal";
 import {
   applyWorkflowMigrations,
   composeWorkflowModule,
+  type Db as WorkflowDb,
   type WorkflowModule,
   wrapClient as wrapWorkflowClient,
 } from "@glyphs-ai/workflow";
@@ -45,7 +50,6 @@ import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs
 import { type Client, createClient } from "@libsql/client";
 import { type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
-import type { ScopeDbHandles } from "./transaction-middleware.js";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
 import { makeWorkflowKindHandler } from "./wiring/schedule-workflow-handler.js";
 import { makeCoordNodeRunner } from "./wiring/workflow-coord-task-runner.js";
@@ -109,6 +113,21 @@ export class WorkspaceLoadError extends Error {
  *   - `not-registered` — workspace id is unknown to the global DB
  */
 export type WorkspaceContextState = "cached" | "loading" | "unloaded" | "not-registered";
+
+/**
+ * Per-package drizzle handles built over the one shared libsql client.
+ * The transaction middleware passes these to the scope factories so each
+ * request gets write-side repos on the tx and read-side queries on the
+ * stable db. Owned by this package (not the server middleware) because
+ * `WorkspaceContext` embeds it and api must not import from server.
+ */
+export interface ScopeDbHandles {
+  readonly catalogDb: CatalogDb;
+  readonly sessionDb: SessionDb;
+  readonly taskDb: TaskDb;
+  readonly scheduleDb: ScheduleDb;
+  readonly workflowDb: WorkflowDb;
+}
 
 /**
  * Per-workspace bundle of long-lived state. Holds the SQLite-backed
