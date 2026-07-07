@@ -15,6 +15,9 @@ importers:
       '@github/copilot-sdk':
         specifier: 1.0.4
         version: 1.0.4
+      '@libsql/client':
+        specifier: ^0.17.4
+        version: 0.17.4
       better-sqlite3:
         specifier: ^12.10.0
         version: 12.10.0

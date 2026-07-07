@@ -155,8 +155,27 @@ scoped to one workflow run, and managed entirely by npm + GitHub — no
 
 `pnpm bundle` produces `bundle/glyph.js` plus `bundle/static/` (the
 dashboard SPA). The bundle inlines the server + every workspace package +
-`hono` / `js-yaml` / etc. The pino logger family (`pino`, `pino-pretty`,
-`pino-roll`) is intentionally **not** inlined — pino loads transports
-through `worker_threads` with runtime-resolved paths, which can't survive
-bundling. Those three packages are declared as runtime `dependencies` in
-the root `package.json` and pulled by `npm install -g`.
+`hono` / `js-yaml` / etc.
+
+A few packages are intentionally **not** inlined — they resolve paths
+or native bindings at runtime in ways that don't survive bundling.
+Each is externalised in [`esbuild.config.js`](../esbuild.config.js) and
+declared as a runtime `dependency` in the root [`package.json`](../package.json)
+so `npm install -g` materialises them into the user's tree:
+
+- `pino`, `pino-pretty`, `pino-roll`, `thread-stream` — pino loads
+  transports through `worker_threads` with runtime-resolved paths.
+- `better-sqlite3`, `bindings` — native `.node` binding loaded via
+  filesystem walk from the module location.
+- `@libsql/client` — re-exports `libsql`, whose JS shim calls
+  `require('@libsql/<platform>')` (e.g. `@libsql/win32-x64-msvc`) at
+  startup. The platform packages are `optionalDependencies` of
+  `libsql`, so npm installs only the one matching the host.
+- `@github/copilot-sdk` — resolves the `@github/copilot` CLI via
+  `import.meta.resolve('@github/copilot/sdk')`, which walks the SDK's
+  own `node_modules`.
+
+The rule of thumb: if a package uses `__dirname`, `bindings`,
+`worker_threads`, or any `import.meta.resolve` / `requireNative`
+trick to find sibling files at runtime, externalise it and add it to
+the root `dependencies`.
