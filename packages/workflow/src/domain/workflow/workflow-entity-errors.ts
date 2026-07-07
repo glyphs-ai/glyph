@@ -104,3 +104,43 @@ export function workflowNodeNotMutable(
 ): WorkflowNodeNotMutable {
   return { type: "WorkflowNodeNotMutable", workflowId, nodeId, status, verb };
 }
+
+/**
+ * A spec-patch body targets a node whose kind doesn't match the body's declared
+ * kind (e.g. a `human` patch aimed at a `worker` node). `expected` is the kind
+ * the caller asked to patch as; `actual` is the node's real kind. Rejected
+ * before any merge/validate so the caller can't accidentally validate a spec
+ * against the wrong runner.
+ */
+export type NodeKindMismatch = {
+  readonly type: "NodeKindMismatch";
+  readonly workflowId: string;
+  readonly nodeId: string;
+  readonly expected: WorkflowNodeKind;
+  readonly actual: WorkflowNodeKind;
+};
+
+/**
+ * A spec patch targets a coordinator node. Coordinator specs are owned by the
+ * engine's chaining/retry machinery, not by ad-hoc patches, so they are never
+ * editable through this path regardless of the body's declared kind.
+ */
+export type CoordSpecNotEditable = {
+  readonly type: "CoordSpecNotEditable";
+  readonly workflowId: string;
+  readonly nodeId: string;
+};
+
+/**
+ * An optimistic-concurrency check failed: the `specVersion` the caller supplied
+ * no longer matches the node's current `specVersion` (a concurrent patch landed
+ * first). `expected` is the caller's stale version; `actual` is the node's
+ * current one. Rejected before any write.
+ */
+export type SpecVersionConflict = {
+  readonly type: "SpecVersionConflict";
+  readonly workflowId: string;
+  readonly nodeId: string;
+  readonly expected: number;
+  readonly actual: number;
+};

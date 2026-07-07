@@ -53,6 +53,7 @@ function makeDag(): WorkflowDag {
         spec: { kind: "worker", agent: "official/engineer", brief: "a" },
         metadata: {},
         createdAt: "2026-05-28T00:00:00.000Z",
+        specVersion: 0,
       },
       {
         id: "n2",
@@ -63,6 +64,7 @@ function makeDag(): WorkflowDag {
         spec: { kind: "worker", agent: "official/engineer", brief: "b" },
         metadata: {},
         createdAt: "2026-05-28T00:01:00.000Z",
+        specVersion: 0,
       },
       {
         id: "n3",
@@ -73,6 +75,7 @@ function makeDag(): WorkflowDag {
         spec: { kind: "worker", agent: "official/engineer", brief: "c" },
         metadata: {},
         createdAt: "2026-05-28T00:02:00.000Z",
+        specVersion: 0,
       },
     ],
     edges: [],
@@ -94,6 +97,20 @@ describe("WorkflowNodePane", () => {
       />,
     );
     expect(screen.getByTestId("workflow-node-position").textContent).toBe("2 / 3");
+  });
+
+  it("surfaces the current node's specVersion readonly in the nav pill", () => {
+    render(
+      <WorkflowNodePane
+        workflow={makeWf()}
+        dag={makeDag()}
+        nodeId="n2"
+        pollIntervalMs={4000}
+        onBack={() => {}}
+        onNavigate={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("workflow-node-spec-version").textContent).toBe("spec v0");
   });
 
   it("fires onBack when the back button is clicked", () => {

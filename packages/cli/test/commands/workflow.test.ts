@@ -32,6 +32,7 @@ import {
   workflowNodeShow,
   workflowRm,
   workflowShow,
+  workflowUpdateSpec,
 } from "../../src/commands/workflow.js";
 import { problemBody } from "../_helpers/problem.js";
 import { runCli } from "../_helpers/run-cli.js";
@@ -899,6 +900,53 @@ describe("`glyph workflow …` commander wiring (argv → action)", () => {
       details: body,
     });
   });
+
+  it("`workflow update-spec <workflow-id> <node-id> --patch --expect-spec-version` GETs then PATCHes /nodes/:nid/spec", async () => {
+    const patchFile = await writeSpec({ brief: "new brief" });
+    const node = {
+      id: NID,
+      workflowId: WFID,
+      kind: "worker" as const,
+      spec: { agent: "writer", brief: "old" },
+      phase: 2,
+      status: "not_started" as const,
+      specVersion: 3,
+      metadata: {},
+      createdAt: "2026-06-01T00:00:00.000Z",
+    };
+    const { calls } = stubFetchMulti([
+      { status: 200, body: JSON.stringify(node) },
+      {
+        status: 200,
+        body: JSON.stringify({ node: { ...node, specVersion: 4 }, newSpecVersion: 4 }),
+      },
+    ]);
+    const r = await runCli(
+      [
+        "workflow",
+        "update-spec",
+        "--workspace-id",
+        WSID,
+        WFID,
+        NID,
+        "--patch",
+        patchFile,
+        "--expect-spec-version",
+        "3",
+      ],
+      env(),
+    );
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.url).toBe(NODE_URL);
+    expect(calls[1]?.method).toBe("PATCH");
+    expect(calls[1]?.url).toBe(SPEC_URL);
+    expect(calls[1]?.body).toEqual({
+      expectedSpecVersion: 3,
+      target: { kind: "worker", patch: { brief: "new brief" } },
+    });
+  });
 });
 
 // ───coord-callback mutation commands ───────────────────────────
@@ -908,6 +956,8 @@ const NID2 = "20260601-cccccccc";
 const SUBGRAPH_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/subgraph`;
 const FINISH_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/finish`;
 const CANCEL_NODE_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/nodes/${NID}/cancel`;
+const NODE_URL = `${SERVER_URL}/api/workspaces/${WSID}/workflows/${WFID}/nodes/${NID}`;
+const SPEC_URL = `${NODE_URL}/spec`;
 
 const sampleNode = {
   id: NID,
@@ -1091,6 +1141,193 @@ describe("workflowCancelNode", () => {
     const r = await workflowCancelNode(WFID, NID, { ...commonOpts() });
     expect(r.exitCode).toBe(4);
     expect(r.stderr).toContain("WorkflowNodeNotMutableError");
+  });
+});
+
+// ─── update-spec ──────────────────────────────────────────────────────
+
+describe("workflowUpdateSpec", () => {
+  const workerNodeResp = {
+    id: NID,
+    workflowId: WFID,
+    kind: "worker" as const,
+    spec: { agent: "writer", brief: "thing" },
+    phase: 2,
+    status: "not_started" as const,
+    specVersion: 0,
+    metadata: {},
+    createdAt: "2026-06-01T00:00:00.000Z",
+  };
+  const coordNodeResp = { ...workerNodeResp, kind: "coordinator" as const, spec: { agent: "co" } };
+  const patchResp = (node: unknown, newSpecVersion: number): string =>
+    JSON.stringify({ node, newSpecVersion });
+
+  it("pre-GETs the node then PATCHes the patch under --expect-spec-version", async () => {
+    const patchFile = await writeSpec({ brief: "revised brief" });
+    const patched = {
+      ...workerNodeResp,
+      spec: { agent: "writer", brief: "revised brief" },
+      specVersion: 1,
+    };
+    const { calls } = stubFetchMulti([
+      { status: 200, body: JSON.stringify(workerNodeResp) },
+      { status: 200, body: patchResp(patched, 1) },
+    ]);
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "0",
+    });
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.url).toBe(NODE_URL);
+    expect(calls[1]?.method).toBe("PATCH");
+    expect(calls[1]?.url).toBe(SPEC_URL);
+    expect(calls[1]?.body).toEqual({
+      expectedSpecVersion: 0,
+      target: { kind: "worker", patch: { brief: "revised brief" } },
+    });
+    expect(r.stdout).toContain("spec updated");
+    expect(r.stdout).toMatch(/NEWSPECVERSION\s+1/);
+    expect(r.stdout).toMatch(/OLDSPECVERSION\s+0/);
+  });
+
+  it("forwards the supplied --expect-spec-version verbatim (not the pre-GET version)", async () => {
+    const patchFile = await writeSpec({ agent: "poet" });
+    const { calls } = stubFetchMulti([
+      { status: 200, body: JSON.stringify(workerNodeResp) },
+      { status: 200, body: patchResp({ ...workerNodeResp, specVersion: 8 }, 8) },
+    ]);
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "7",
+    });
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(calls[1]?.body).toEqual({
+      expectedSpecVersion: 7,
+      target: { kind: "worker", patch: { agent: "poet" } },
+    });
+  });
+
+  it("accepts a { patch: {...} } wrapper file as well as a bare patch object", async () => {
+    const patchFile = await writeSpec({ patch: { brief: "wrapped" } });
+    const { calls } = stubFetchMulti([
+      { status: 200, body: JSON.stringify(workerNodeResp) },
+      { status: 200, body: patchResp({ ...workerNodeResp, specVersion: 1 }, 1) },
+    ]);
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "0",
+    });
+    expect(r.exitCode, r.stderr).toBe(0);
+    expect(calls[1]?.body).toEqual({
+      expectedSpecVersion: 0,
+      target: { kind: "worker", patch: { brief: "wrapped" } },
+    });
+  });
+
+  it("--json emits the response ({ node, newSpecVersion }) verbatim", async () => {
+    const patchFile = await writeSpec({ brief: "j" });
+    const patched = { ...workerNodeResp, spec: { agent: "writer", brief: "j" }, specVersion: 1 };
+    stubFetchMulti([
+      { status: 200, body: JSON.stringify(workerNodeResp) },
+      { status: 200, body: patchResp(patched, 1) },
+    ]);
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "0",
+      json: true,
+    });
+    expect(r.exitCode, r.stderr).toBe(0);
+    const parsed = JSON.parse(r.stdout ?? "") as {
+      node: { specVersion: number };
+      newSpecVersion: number;
+    };
+    expect(parsed.newSpecVersion).toBe(1);
+    expect(parsed.node.specVersion).toBe(1);
+  });
+
+  it("rejects a coordinator node client-side (only the GET, no PATCH)", async () => {
+    const patchFile = await writeSpec({ agent: "x" });
+    const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify(coordNodeResp) }]);
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "0",
+    });
+    expect(r.exitCode).toBe(2);
+    expect(r.stderr).toMatch(/coordinator/);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.method).toBe("GET");
+  });
+
+  it("rejects an empty patch after resolving the kind (no PATCH)", async () => {
+    const patchFile = await writeSpec({});
+    const { calls } = stubFetchMulti([{ status: 200, body: JSON.stringify(workerNodeResp) }]);
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "0",
+    });
+    expect(r.exitCode).toBe(2);
+    expect(r.stderr).toMatch(/at least one field/);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("rejects missing --patch with exit 2, no fetch", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: "",
+      expectSpecVersion: "0",
+    });
+    expect(r.exitCode).toBe(2);
+    expect(r.stderr).toMatch(/--patch/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing --expect-spec-version with exit 2, no fetch", async () => {
+    const patchFile = await writeSpec({ agent: "x" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "",
+    });
+    expect(r.exitCode).toBe(2);
+    expect(r.stderr).toMatch(/--expect-spec-version/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-integer --expect-spec-version with exit 2, no fetch", async () => {
+    const patchFile = await writeSpec({ agent: "x" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "1.5",
+    });
+    expect(r.exitCode).toBe(2);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a server 409 SpecVersionConflict via exit 4", async () => {
+    const patchFile = await writeSpec({ brief: "revised" });
+    stubFetchMulti([
+      { status: 200, body: JSON.stringify(workerNodeResp) },
+      { status: 409, body: problemBody(409, "SpecVersionConflict", "spec version stale") },
+    ]);
+    const r = await workflowUpdateSpec(WFID, NID, {
+      ...commonOpts(),
+      patch: patchFile,
+      expectSpecVersion: "0",
+    });
+    expect(r.exitCode).toBe(4);
+    expect(r.stderr).toContain("SpecVersionConflict");
   });
 });
 

@@ -65,6 +65,14 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     folderMillis: 5,
     hash: "cb8b6a4b630981e32a6d8abfd0cc17e62ff3aa626f91d8887102710f5ae28a1c",
   },
+  {
+    sql: [
+      "ALTER TABLE `workflow_nodes` ADD `spec_version` integer DEFAULT 0 NOT NULL;"
+    ],
+    bps: true,
+    folderMillis: 6,
+    hash: "105b705d2536b97c47a5c9579e338889a82418120a9d6bce8b1f25d314a71598",
+  },
 ];
 
 /**

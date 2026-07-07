@@ -39,6 +39,7 @@ import type {
   NodeSpecError,
   PruneWorkflowSubgraphError,
   RespondToHumanNodeError,
+  UpdateWorkflowNodeSpecError,
 } from "@glyphs-ai/workflow";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -66,7 +67,8 @@ export type WorkflowRouteError =
   | GetWorkflowNodeError
   | ListWorkflowsError
   | PruneWorkflowSubgraphError
-  | RespondToHumanNodeError;
+  | RespondToHumanNodeError
+  | UpdateWorkflowNodeSpecError;
 
 const INTERNAL = "internal error";
 
@@ -127,6 +129,24 @@ const WORKFLOW_ATOM_TABLE = {
     title: "Workflow node not mutable",
     detail: (err) => `workflow node ${err.nodeId} is not mutable from ${err.status}`,
     extension: (err) => ({ fromStatus: err.status, transition: err.verb }),
+  },
+  NodeKindMismatch: {
+    status: 400,
+    title: "Node kind mismatch",
+    detail: (err) => `workflow node ${err.nodeId} is a ${err.actual} node, not a ${err.expected}`,
+    extension: (err) => ({ expected: err.expected, actual: err.actual }),
+  },
+  CoordSpecNotEditable: {
+    status: 400,
+    title: "Coordinator spec not editable",
+    detail: (err) => `workflow node ${err.nodeId} is a coordinator; its spec is not editable`,
+  },
+  SpecVersionConflict: {
+    status: 409,
+    title: "Spec version conflict",
+    detail: (err) =>
+      `workflow node ${err.nodeId} spec version ${err.expected} is stale (current: ${err.actual})`,
+    extension: (err) => ({ expected: err.expected, actual: err.actual }),
   },
   WorkflowDeleteRequiresTerminal: {
     status: 409,

@@ -99,6 +99,7 @@ describe("workflows schema", () => {
         "ready_at",
         "running_at",
         "spec_json",
+        "spec_version",
         "status",
         "workflow_id",
       ].sort(),
@@ -117,6 +118,12 @@ describe("workflows schema", () => {
     const phase = cols.find((c) => c.name === "phase");
     expect(phase?.notnull).toBe(1);
     expect(phase?.type.toUpperCase()).toBe("INTEGER");
+    // `spec_version` is an optimistic-concurrency counter: INTEGER NN DEFAULT 0
+    // so legacy rows backfill to 0 and every spec patch bumps it by one.
+    const specVersion = cols.find((c) => c.name === "spec_version");
+    expect(specVersion?.notnull).toBe(1);
+    expect(specVersion?.type.toUpperCase()).toBe("INTEGER");
+    expect(specVersion?.dflt_value).toBe("0");
   });
 
   it("workflow_edges table has the expected column set + composite PK", () => {

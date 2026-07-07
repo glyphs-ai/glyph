@@ -42,6 +42,7 @@ function makeDag(wf: WorkflowHeader): WorkflowDag {
         spec: { kind: "worker", agent: "official/engineer", brief: "x" },
         metadata: {},
         createdAt: wf.createdAt,
+        specVersion: 0,
       },
     ],
     edges: [],

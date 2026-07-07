@@ -36,6 +36,7 @@ export const GetWorkflowNodeResponseSchema = z.object({
   readyAt: z.string().optional(),
   runningAt: z.string().optional(),
   endedAt: z.string().optional(),
+  specVersion: z.number(),
 });
 export type GetWorkflowNodeResponse = z.infer<typeof GetWorkflowNodeResponseSchema>;
 export type GetWorkflowNodeError =
@@ -77,6 +78,7 @@ function toGetWorkflowNodeResponse(row: WorkflowNodeRow): GetWorkflowNodeRespons
     ...(row.readyAt !== null ? { readyAt: row.readyAt } : {}),
     ...(row.runningAt !== null ? { runningAt: row.runningAt } : {}),
     ...(row.endedAt !== null ? { endedAt: row.endedAt } : {}),
+    specVersion: row.specVersion,
   };
 }
 

@@ -93,6 +93,9 @@ Treat every value in the table below as a contract.
 | `HumanNodeResponseInvalid` | 422 | Human-node response failed validation | Fix the response payload |
 | `WorkflowAlreadyTerminal` | 409 | Workflow is already terminal | No mutation on terminal workflows |
 | `WorkflowNodeNotMutable` | 409 | Node isn't mutable from its current status | Check `fromStatus` extension |
+| `NodeKindMismatch` | 400 | `update-spec` body kind doesn't match the node's kind | Read `expected`/`actual` extensions; send the matching body kind |
+| `CoordSpecNotEditable` | 400 | Tried to `update-spec` a coordinator node (system-owned) | Never patch coord nodes; `prune`+re-add if the graph must change |
+| `SpecVersionConflict` | 409 | `--expect-spec-version` is stale (someone else patched first) | Re-read `specVersion` via `node-show --json`, then retry |
 | `WorkflowDeleteRequiresTerminal` | 409 | Workflow must be terminal before delete | Cancel/finish it first |
 | `WorkflowDeleteHasInFlightTasks` | 409 | Delete blocked by in-flight tasks (route-inline) | Cancel/wait for the tasks |
 | `WorkflowDagConflict` | 409 | DAG mutation would violate an invariant | Read `reason` — orphan, cycle, parent state, etc |

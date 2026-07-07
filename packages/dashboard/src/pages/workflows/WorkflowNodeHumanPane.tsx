@@ -127,6 +127,13 @@ export function WorkflowNodeHumanPane({
           <span className={`dag-node__status dag-node__status--${node.status}`}>
             {WORKFLOW_NODE_STATUS_LABEL[node.status]}
           </span>
+          <span
+            className="workflow-node-spec-version"
+            data-testid="workflow-node-spec-version"
+            title="Spec version (optimistic-concurrency token for updateNodeSpec)"
+          >
+            spec v{node.specVersion}
+          </span>
         </header>
 
         <HumanNodeContent key={node.id} node={node} />

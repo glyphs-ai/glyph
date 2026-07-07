@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 (2026-07-07)
+
+- Document `update-spec`, the in-place partial-patch for a still-`not_started` node's spec, in §B. A new "Correct a not_started node's spec via update-spec" sub-section teaches the decision boundary: patch in place when only the spec changes (same kind, same edges — preserving node id + edges instead of churning them via prune+re-add); prune + re-add for a kind change or edge/parent restructure; `cancel-node` (neither) once a node has dispatched. States the two hard rules — read the current `specVersion` and pass it back as the expected version, re-reading + retrying on a version-conflict; and never patch a coordinator node (system-owned, substrate-rejected) — a wrong coord is a graph-structure problem. Keeps the section neutral of exact CLI flags (defers to `official/cli`). The framework command-name list in the lead-in now cites `update-spec`.
+
 ## 0.5.0 (2026-07-07)
 
 - Document `prune-subgraph`, the structural inverse of `add-subgraph`, in §B. A new "Retract a mis-planned fan-out via prune-subgraph" sub-section teaches when to retract still-`not_started` nodes (a queued batch a wake-up now knows is wrong) rather than letting dead work dispatch, gives the `--spec-file` `{ "nodeIds": [...] }` body shape, and states the three constraints that keep the surviving DAG connected and coord-anchored: only `not_started` nodes are prunable, the phase-0 bootstrap coordinator is protected, and removal may neither orphan a survivor nor strip a surviving coordinator of its last coord parent. A companion `WorkflowPruneRejected` rejection table maps each `reason.kind` (`nodeNotFound`, `nodeNotStarted`, `rootCoordProtected`, `orphan`, `coordChainBroken`) to a concrete forward fix, mirroring the existing `add-subgraph` rejection tables so a coord recovers from a refused prune in one wake-up. The framework command-name list in the lead-in now cites `prune-subgraph` alongside `add-subgraph`.

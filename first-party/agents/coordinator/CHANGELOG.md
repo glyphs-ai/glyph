@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 (2026-07-07)
+
+- Add a **Correcting a not_started node's spec** section: when to use `workflow update-spec` (typo/brief/agent-swap, same kind + edges) vs. `prune`/`remove-node` + re-add (kind change, restructure); always `node-show --json` first to read `specVersion` and pass `--expect-spec-version`; re-read + retry on `SpecVersionConflict` (409); never patch a coordinator node (`CoordSpecNotEditable`). Add a Commands-table row and list `workflow update-spec` under **Write Access**.
+
 ## 0.2.2 (2026-07-07)
 
 - Replace the inline copy of `official/workflow-coordination` §A steps 1–9 in the Wake-up loop with a single pointer ("Run §A of the loaded skill"); fold the standalone **Discipline** bullets into **✅ Always** (adds "re-read the DAG on every wake-up" and "use §B DAG introspection snippets") and delete the standalone list. Drop the §A/§B/§C/§D/§E TOC narration from Setup step 1.

@@ -17,7 +17,7 @@ Per-group subcommand reference for `glyph workspace / session / task / schedule 
 | [`task`](#task) | `list`, `dispatch`, `show`, `activity`, `cancel`, `rm` |
 | [`schedule`](#schedule) | `list`, `create`, `show`, `enable`, `disable`, `patch`, `rm`, `run`, `preview`, `list-tasks` |
 | [`catalog`](#catalog) | `overview`, `agent {…}`, `skill {…}`, `mcp {…}` |
-| [`workflow`](#workflow) | `list`, `create`, `show`, `node-show`, `dag`, `cancel`, `rm`, `add-node`, `add-subgraph`, `add-edge`, `cancel-node`, `finish`, `respond` |
+| [`workflow`](#workflow) | `list`, `create`, `show`, `node-show`, `dag`, `cancel`, `rm`, `add-node`, `add-subgraph`, `add-edge`, `cancel-node`, `finish`, `respond`, `update-spec` |
 | [`runtime`](#runtime) | `list` |
 | [Server inspection](#server-inspection) | `health`, `config`, `status`, `logs` |
 
@@ -266,7 +266,7 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 
 `glyph workflow <sub>` covers workflow header + live DAG read + DAG mutation + termination. Mutation subcommands are typically invoked by an orchestrator agent inside a running workflow; this doc documents the surface, not the orchestration recipe.
 
-> All 13 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`).
+> All 14 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`).
 
 ### Subcommand map
 
@@ -285,6 +285,7 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 | [`workflow finish`](#workflow-finish-workflow-id) | Flip the workflow terminal |
 | [`workflow rm`](#workflow-rm-workflow-id) | Remove a terminal workflow |
 | [`workflow respond`](#workflow-respond-workflow-id-node-id) | Respond to a human-kind node |
+| [`workflow update-spec`](#workflow-update-spec-workflow-id-node-id) | Partial-patch a `not_started` worker/human node's spec |
 
 ### `workflow list`
 
@@ -435,6 +436,20 @@ Triggers the cascade reconciler: every non-terminal node is cancelled with reaso
 - Output: `WorkflowNode` (transitioned to `succeeded`)
 
 The target node must be `kind === "human"` and `status === "running"`. On success, downstream nodes are evaluated for readiness.
+
+### `workflow update-spec <workflow-id> <node-id>`
+
+- Required flags: `--patch <path>` (JSON file with the partial spec fields to overlay) and `--expect-spec-version <n>` (the `specVersion` you read from `node-show`)
+- Route: `PATCH /workspaces/:id/workflows/:wfid/nodes/:nid/spec`
+- Body: `{ expectedSpecVersion, target }` where `target` is a **body-discriminated** union keyed on `target.kind`:
+  - `{ "kind": "worker", "agent"?, "brief"?, "details"?, "runtime"? }` — any subset; at least one field
+  - `{ "kind": "human", "prompt"?, "promptStyle"?, "choices"? }` — any subset; at least one field
+  - The CLI reads the node's kind (via a pre-`node-show`) and builds the discriminant for you; the `--patch` file may be the bare fields (`{ "brief": "…" }`) or wrapped (`{ "patch": { "brief": "…" } }`)
+- Output: `{ node, newSpecVersion }` — the full patched `WorkflowNode` plus the bumped version (always `node.specVersion`)
+- Only `not_started` worker/human nodes are patchable. Coordinator nodes are rejected (`CoordSpecNotEditable`); this is a **partial** overlay — omitted fields keep their prior value
+- Failure modes: **400** `NodeKindMismatch` (body kind ≠ node kind) / `CoordSpecNotEditable` (coord node) / invalid body; **422** `NodeSpecError` (patched spec fails validation); **404** `WorkflowNodeNotFound`; **409** `WorkflowNodeNotMutable` (node already dispatched) / `SpecVersionConflict` (stale `--expect-spec-version`) / `WorkflowAlreadyTerminal`
+
+Read `specVersion` from `workflow node-show <wfid> <nid> --json` first, pass it as `--expect-spec-version`, and on a `SpecVersionConflict` (409) re-read and retry — a concurrent patch won the race.
 
 ---
 

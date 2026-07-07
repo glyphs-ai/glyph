@@ -71,8 +71,10 @@ describe("workflows migrations-inventory", () => {
  * (`$.scheduleId`); workflow-origin tasks live in the task table, not here.
  */
 
-/** The origin_id migration is the last inlined entry. */
-const ORIGIN_ID_MIGRATION_INDEX = MIGRATIONS.length - 1;
+/** The origin_id migration, located by its column-add so later appended migrations don't shift this index. */
+const ORIGIN_ID_MIGRATION_INDEX = MIGRATIONS.findIndex((m) =>
+  m.sql.some((stmt) => stmt.includes("ADD COLUMN `origin_id`")),
+);
 
 /** Exec one inlined migration's statements against a raw connection. */
 function applyMigration(sqlite: BetterSqliteDatabase, index: number): void {

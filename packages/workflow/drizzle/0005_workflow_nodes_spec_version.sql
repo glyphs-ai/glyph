@@ -1,0 +1,1 @@
+ALTER TABLE `workflow_nodes` ADD `spec_version` integer DEFAULT 0 NOT NULL;

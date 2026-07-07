@@ -1,20 +1,24 @@
 /**
  * `glyph workflow ...` coord-callback mutation primitives that back the
  * coordinator-agent contract: add-node / add-subgraph / add-edge /
- * prune-subgraph, cancel-node, finish. Also exports the shared
+ * prune-subgraph, update-spec, cancel-node, finish. Also exports the shared
  * `readJsonFileArg` file-arg reader used by the spec-file commands. Render
  * helpers live in `./_shared.ts`; argument parsing + validation helpers live
- * in `./_validate.ts`. Only still-`not_started` nodes can be retracted (via
- * prune-subgraph); once a node has started it is immutable — there is no
- * remove-started-node / replace-spec.
+ * in `./_validate.ts`. A still-`not_started` node can be retracted (via
+ * prune-subgraph) or have its spec patched (via update-spec); once a node has
+ * started it is immutable — there is no remove-started-node, and update-spec
+ * refuses any node that has left `not_started`.
  */
 
 import { readFileSync } from "node:fs";
 import type {
+  PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData,
   PostApiWorkspacesByIdWorkflowsByWfidFinishData,
   PostApiWorkspacesByIdWorkflowsByWfidSubgraphData,
 } from "@glyphs-ai/sdk";
 import {
+  getApiWorkspacesByIdWorkflowsByWfidNodesByNid,
+  patchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpec,
   postApiWorkspacesByIdWorkflowsByWfidFinish,
   postApiWorkspacesByIdWorkflowsByWfidNodesByNidCancel,
   postApiWorkspacesByIdWorkflowsByWfidPrune,
@@ -33,6 +37,7 @@ import {
   KNOWN_NODE_KINDS,
   parseParents,
   validateAddSubgraphRequest,
+  validateNodeSpecPatch,
   validatePruneSubgraphRequest,
 } from "./_validate.js";
 
@@ -239,6 +244,101 @@ export async function workflowPruneSubgraph(
         result.prunedNodeIds.map((id) => [id]),
       ),
     };
+  } catch (err) {
+    return formatError(err);
+  }
+}
+
+// --- update-spec -------------------------------------------------------
+export interface WorkflowUpdateSpecOpts extends WorkspaceFlagOpts {
+  /**
+   * Path to a JSON file holding the partial spec patch. Accepts either the
+   * patch object directly (only the fields to change — worker: `agent` /
+   * `brief` / `details` / `runtime`; human: `prompt` / `promptStyle` /
+   * `choices`) or a `{ patch: {...} }` wrapper. The node's kind is read via a
+   * pre-GET, so there is no `--kind` flag.
+   */
+  readonly patch: string;
+  /**
+   * Required optimistic-concurrency guard: the node's current `specVersion`
+   * (read it via `workflow node-show <wfid> <nid> --json`). A stale value is
+   * rejected by the server with 409 SpecVersionConflict.
+   */
+  readonly expectSpecVersion: string;
+}
+
+/**
+ * Patch a still-`not_started` worker/human node's spec. The command first
+ * GETs the node to resolve its kind (coordinator nodes are rejected — their
+ * spec is not editable), then PATCHes the partial patch under the supplied
+ * `--expect-spec-version`. The server shallow-merges the patch onto the
+ * current spec, re-validates the merged spec authoritatively, and bumps
+ * `specVersion` by one (returned as `newSpecVersion`).
+ */
+export async function workflowUpdateSpec(
+  workflowId: string,
+  nodeId: string,
+  opts: WorkflowUpdateSpecOpts,
+): Promise<CommandResult> {
+  if (typeof workflowId !== "string" || workflowId.trim() === "") {
+    return { exitCode: 2, stderr: "workflow id is required (positional <workflow-id>)\n" };
+  }
+  if (typeof nodeId !== "string" || nodeId.trim() === "") {
+    return { exitCode: 2, stderr: "node id is required (positional <node-id>)\n" };
+  }
+  if (typeof opts.patch !== "string" || opts.patch.trim() === "") {
+    return { exitCode: 2, stderr: "missing required --patch <path>\n" };
+  }
+  if (typeof opts.expectSpecVersion !== "string" || opts.expectSpecVersion.trim() === "") {
+    return { exitCode: 2, stderr: "missing required --expect-spec-version <n>\n" };
+  }
+  const expectedSpecVersion = Number(opts.expectSpecVersion);
+  if (!Number.isInteger(expectedSpecVersion) || expectedSpecVersion < 0) {
+    return { exitCode: 2, stderr: "--expect-spec-version must be a non-negative integer\n" };
+  }
+  const patchResult = readJsonFileArg("--patch", opts.patch);
+  if (!patchResult.ok) {
+    return { exitCode: 2, stderr: `${patchResult.error}\n` };
+  }
+  await makeSdkClient(opts);
+  try {
+    const workspaceId = await resolveWorkspace(opts);
+    const node = unwrap(
+      await getApiWorkspacesByIdWorkflowsByWfidNodesByNid({
+        path: { id: workspaceId, wfid: workflowId, nid: nodeId },
+      }),
+    );
+    if (node.kind === "coordinator") {
+      return {
+        exitCode: 2,
+        stderr: `node ${nodeId} is a coordinator; its spec is not editable\n`,
+      };
+    }
+    const targetResult = validateNodeSpecPatch(node.kind, patchResult.value);
+    if (!targetResult.ok) {
+      return { exitCode: 2, stderr: `${targetResult.error}\n` };
+    }
+    const body: PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData["body"] = {
+      expectedSpecVersion,
+      target: targetResult.target,
+    };
+    const result = unwrap(
+      await patchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpec({
+        path: { id: workspaceId, wfid: workflowId, nid: nodeId },
+        body,
+      }),
+    );
+    const fmt = pickFormat(opts, "table");
+    if (fmt === "json") return { exitCode: 0, stdout: formatJson(result) };
+    const summary = formatRecord({
+      "workflow-id": workflowId,
+      "node-id": nodeId,
+      kind: node.kind,
+      oldSpecVersion: expectedSpecVersion,
+      newSpecVersion: result.newSpecVersion,
+      message: "spec updated",
+    });
+    return { exitCode: 0, stdout: `${summary}\n${renderNode(result.node, opts)}` };
   } catch (err) {
     return formatError(err);
   }

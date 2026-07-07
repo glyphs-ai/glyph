@@ -16,6 +16,7 @@ export interface WorkflowNodeCreateArgs {
   readonly status: WorkflowNodeStatus;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly createdAt: string;
+  readonly specVersion?: number;
 }
 
 /** Mapper-only trusted assembly from already validated, decoded row values. */
@@ -24,6 +25,7 @@ export interface WorkflowNodeReconstituteArgs extends WorkflowNodeCreateArgs {
   readonly readyAt: string | undefined;
   readonly runningAt: string | undefined;
   readonly endedAt: string | undefined;
+  readonly specVersion: number;
 }
 
 /** Persisted workflow-node child entity. */
@@ -40,6 +42,7 @@ export class WorkflowNodeEntity {
     private readonly _readyAt: string | undefined,
     private readonly _runningAt: string | undefined,
     private readonly _endedAt: string | undefined,
+    private readonly _specVersion: number,
   ) {}
 
   static create(args: WorkflowNodeCreateArgs): WorkflowNodeEntity {
@@ -55,6 +58,7 @@ export class WorkflowNodeEntity {
       undefined,
       undefined,
       undefined,
+      args.specVersion ?? 0,
     );
   }
 
@@ -71,6 +75,7 @@ export class WorkflowNodeEntity {
       args.readyAt,
       args.runningAt,
       args.endedAt,
+      args.specVersion,
     );
   }
 
@@ -83,6 +88,7 @@ export class WorkflowNodeEntity {
       readonly readyAt: string | undefined;
       readonly runningAt: string | undefined;
       readonly endedAt: string | undefined;
+      readonly specVersion: number;
     }>,
   ): WorkflowNodeEntity {
     return new WorkflowNodeEntity(
@@ -97,7 +103,18 @@ export class WorkflowNodeEntity {
       Object.hasOwn(patch, "readyAt") ? patch.readyAt : this.readyAt,
       Object.hasOwn(patch, "runningAt") ? patch.runningAt : this.runningAt,
       Object.hasOwn(patch, "endedAt") ? patch.endedAt : this.endedAt,
+      patch.specVersion ?? this.specVersion,
     );
+  }
+
+  /**
+   * Replace the node's spec with a runner-validated `spec`, bumping
+   * {@link specVersion} by one. The version bump is what a later optimistic-
+   * concurrency check compares against, so spec and version always move
+   * together — callers cannot change one without the other.
+   */
+  withPatchedSpec(spec: unknown): WorkflowNodeEntity {
+    return this.withPatch({ spec, specVersion: this._specVersion + 1 });
   }
 
   get id(): WorkflowNodeId {
@@ -142,5 +159,9 @@ export class WorkflowNodeEntity {
 
   get endedAt(): string | undefined {
     return this._endedAt;
+  }
+
+  get specVersion(): number {
+    return this._specVersion;
   }
 }

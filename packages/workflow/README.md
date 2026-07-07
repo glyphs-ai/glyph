@@ -45,9 +45,9 @@ mutations and structural reads are surfaced over HTTP (see
 [Coord-callback API](#coord-callback-api)); the lifecycle and engine-facing
 members are driven by the host, never by the coordinator.
 
-- **Mutation primitives** (coord-callback): `addSubgraph`, `cancelNode`,
-  `finishWorkflow`, `respondHumanNode`. Each is independently atomic;
-  structural DAG growth goes through `addSubgraph`.
+- **Mutation primitives** (coord-callback): `addSubgraph`, `pruneSubgraph`,
+  `updateNodeSpec`, `cancelNode`, `finishWorkflow`, `respondHumanNode`. Each is
+  independently atomic; structural DAG growth goes through `addSubgraph`.
 - **Structural reads**: `getWorkflow`, `getDag`, `getNode`, plus the list /
   aggregate reads `listWorkflows`, `countAwaitingHuman`, and
   `aggregateByOrigin` that back the dashboard's workflow list and badges, and
@@ -151,6 +151,8 @@ as their own typed error atoms.
 | -------- | ------------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `GET`    | `/:workflowId/nodes/:nodeId`               | `getNode`        | _none_                                                                                                         | `WorkflowNode`                            |
 | `POST`   | `/:workflowId/subgraph`                    | `addSubgraph`    | `{ nodes:[{tempId,kind,spec,existingParents?}], edges:[{from,to}] }` — `from`/`to` are tagged `NodeRef`s        | `{ insertedNodes:[{tempId,nodeId,phase}] }`   |
+| `POST`   | `/:workflowId/prune`                       | `pruneSubgraph`  | `{ nodeIds:[…] }` — retract still-`not_started` nodes + adjacent edges                                          | `{ prunedNodeIds:[…], prunedEdges:[{from,to}] }` |
+| `PATCH`  | `/:workflowId/nodes/:nodeId/spec`          | `updateNodeSpec` | `{ expectedSpecVersion, target:{ kind:"worker"\|"human", …spec fields } }` — partial patch on a `not_started` node | `{ node, newSpecVersion }` |
 | `POST`   | `/:workflowId/nodes/:nodeId/cancel`        | `cancelNode`     | _none_                                                                                                         | `WorkflowNode` (post-cancel projection)   |
 | `POST`   | `/:workflowId/finish`                      | `finishWorkflow` | `{ outcome: "succeeded" \| "failed" }`                                                                         | `WorkflowHeader` (post-finish projection) |
 | `POST`   | `/:workflowId/nodes/:nodeId/respond`       | `respondHumanNode` | `{ choiceId?, input? }`                                                                                      | `WorkflowNode` (post-respond projection)  |

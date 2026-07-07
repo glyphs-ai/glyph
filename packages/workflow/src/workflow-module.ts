@@ -18,6 +18,7 @@ import type { WorkflowRunners } from "./application/ports/workflow-node-runner.j
 import { PruneWorkflowSubgraphUseCase } from "./application/prune-workflow-subgraph.js";
 import { ResolveWorkflowArtifactPathUseCase } from "./application/resolve-workflow-artifact-path.js";
 import { RespondToHumanNodeUseCase } from "./application/respond-to-human-node.js";
+import { UpdateWorkflowNodeSpecUseCase } from "./application/update-workflow-node-spec.js";
 import { type Db, openDb } from "./infrastructure/drizzle/workflow-db.js";
 import { DrizzleWorkflowQueries } from "./infrastructure/drizzle/workflow-queries.js";
 import { DrizzleWorkflowRepository } from "./infrastructure/drizzle/workflow-repository.js";
@@ -42,6 +43,7 @@ export interface WorkflowModule {
   readonly cancelWorkflow: CancelWorkflowUseCase;
   readonly addSubgraph: AddWorkflowSubgraphUseCase;
   readonly pruneSubgraph: PruneWorkflowSubgraphUseCase;
+  readonly updateNodeSpec: UpdateWorkflowNodeSpecUseCase;
   readonly respondHumanNode: RespondToHumanNodeUseCase;
   readonly getWorkflow: GetWorkflowUseCase;
   readonly listWorkflows: ListWorkflowsUseCase;
@@ -136,6 +138,7 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
       randomUUID,
     }),
     pruneSubgraph: new PruneWorkflowSubgraphUseCase({ repo, coordinator: engine }),
+    updateNodeSpec: new UpdateWorkflowNodeSpecUseCase({ repo, runners: opts.runners }),
     respondHumanNode: new RespondToHumanNodeUseCase({ repo, coordinator: engine, now }),
     getWorkflow: new GetWorkflowUseCase({ query }),
     listWorkflows: new ListWorkflowsUseCase({ query }),

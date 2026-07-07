@@ -57,6 +57,7 @@ function makeDag(wf: WorkflowHeader): WorkflowDag {
         kind: "coordinator" as const,
         status: "running",
         phase: 0,
+        specVersion: 0,
         spec: { kind: "coordinator", agent: wf.coordinatorAgent },
         metadata: {},
         createdAt: wf.createdAt,

@@ -28,6 +28,7 @@ function makeHumanNode(
     spec,
     metadata: {},
     createdAt: "2026-05-28T00:00:00.000Z",
+    specVersion: 0,
     ...overrides,
   } as WorkflowNode;
 }
@@ -108,5 +109,25 @@ describe("WorkflowNodeHumanPane — promptStyle dispatch", () => {
     expect(plain.tagName).toBe("P");
     expect(plain.textContent).toBe("Pick version 1.0.*");
     expect(screen.queryByTestId("human-prompt-markdown")).toBeNull();
+  });
+});
+
+describe("WorkflowNodeHumanPane — spec version surfacing", () => {
+  it("renders the node's specVersion readonly in the header", () => {
+    const node = makeHumanNode(
+      { kind: "human", prompt: "Approve?", promptStyle: "plain" },
+      { specVersion: 3 },
+    );
+    render(
+      <WorkflowNodeHumanPane
+        workflow={makeWf()}
+        dag={makeDag(node)}
+        nodeId={node.id}
+        onBack={() => {}}
+        onNavigate={() => {}}
+      />,
+    );
+    const chip = screen.getByTestId("workflow-node-spec-version");
+    expect(chip.textContent).toBe("spec v3");
   });
 });

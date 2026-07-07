@@ -6,6 +6,7 @@
  */
 
 import type {
+  PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData,
   PostApiWorkspacesByIdWorkflowsByWfidPruneData,
   PostApiWorkspacesByIdWorkflowsByWfidSubgraphData,
 } from "@glyphs-ai/sdk";
@@ -16,6 +17,9 @@ type SubgraphEdge = SubgraphBody["edges"][number];
 type SubgraphNodeRef = SubgraphEdge["from"];
 
 type PruneBody = PostApiWorkspacesByIdWorkflowsByWfidPruneData["body"];
+
+type UpdateSpecBody = PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData["body"];
+type UpdateSpecTarget = UpdateSpecBody["target"];
 
 export type WorkflowNodeKind = SubgraphNode["kind"];
 
@@ -157,6 +161,31 @@ export function validatePruneSubgraphRequest(
     nodeIds.push(nodeId);
   }
   return { ok: true, body: { nodeIds } };
+}
+
+/**
+ * Shape-check the `--patch` file for `workflow update-spec` and wrap it in the
+ * discriminated `target` the PATCH route expects. Accepts either the patch
+ * object directly or a `{ patch: {...} }` wrapper. The `kind` is resolved from
+ * a pre-GET of the node (never a client flag), so only the non-coordinator
+ * kinds reach here. The server applies the authoritative per-kind whitelist
+ * (`.strict()` rejects unknown keys) and re-validates the merged spec through
+ * the target runner; the CLI only rejects a non-object / empty patch so an
+ * obvious mistake fails before the round-trip.
+ */
+export function validateNodeSpecPatch(
+  kind: Exclude<WorkflowNodeKind, "coordinator">,
+  raw: unknown,
+): { ok: true; target: UpdateSpecTarget } | { ok: false; error: string } {
+  if (!isPlainObject(raw)) {
+    return { ok: false, error: "--patch must be a JSON object of patch fields" };
+  }
+  // Accept both the patch object directly and a `{ patch: {...} }` wrapper.
+  const patch = "patch" in raw && isPlainObject(raw.patch) ? raw.patch : raw;
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "spec patch must set at least one field" };
+  }
+  return { ok: true, target: { kind, patch } as UpdateSpecTarget };
 }
 
 function validateNodeRefInput(
