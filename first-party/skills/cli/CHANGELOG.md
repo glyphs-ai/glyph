@@ -1,28 +1,23 @@
 # Changelog
 
-## 0.3.2 (2026-07-07)
+## 0.3.0 (2026-07-07)
 
-- Remove inter-skill references throughout the doc. `SKILL.md`, `references/playbooks.md`, and `references/commands.md#workflow` no longer point at `official/workflow-coordination` or other sibling skills for "where the playbook continues." The playbooks in this skill are strategy-agnostic CLI plumbing that stands on its own; each skill owns its full narrative and the CLI skill stays a pure command / shape / plumbing reference.
+Generalize the skill beyond workflow: every command group is a first-class citizen, docs match the current wire, and the skill stays a pure self-contained CLI reference (no inter-skill cross-links).
 
-## 0.3.1 (2026-07-07)
-
-- Consolidate the workflow subcommand reference into `references/commands.md#workflow` and delete `references/workflow-commands.md`. All 7 non-workflow groups + workflow now share one file, one shape, one anchor scheme.
-- Rename `references/workflows.md` → `references/playbooks.md`. The doc was never about `glyph workflow …`; it's goal-oriented CLI plumbing (install-and-verify agent, dispatch-and-wait, monitor, sync, clean up, onboard). Workflow-substrate playbooks live in `official/workflow-coordination`, not here.
-- Purge outdated workflow subcommands. The following endpoints no longer exist on the server and their CLI equivalents were dropped from `packages/cli/src/registrars/workflow.ts`; the reference now reflects reality:
+- Rewrite `SKILL.md` as a generalized CLI map (all command groups, not just workflow). New top-level "Command surface at a glance" table indexes every group with a one-line purpose and the reference doc that covers it. Workflow content moved out of `SKILL.md`'s body; the skill body now devotes equal weight to `workspace` / `session` / `task` / `schedule` / `catalog` / `workflow` / `runtime` / server-inspection.
+- Add `references/commands.md` — full per-subcommand reference covering **all 8** command groups (workspace, session, task, schedule, catalog {agent,skill,mcp}, workflow, runtime, server-inspection) in one file, one anchor scheme. Documents flags, HTTP route, body shape, response shape, exit-code notes, and per-command anti-patterns (e.g. `schedule patch --details ""` does NOT clear; use `--clear-details`).
+- Add `references/json-shapes.md` — payload shapes returned by `--json`. Covers `Workspace`, `Session`, `Task`, `ActivityItem`, `TerminalResult` (task and workflow arms), `Schedule`, `AgentEntry` + `BlockedReason`, `ResolveManifest` (with `planToken` semantics), `WorkflowHeader`, `WorkflowDag` (`WorkflowNode` + `WorkflowEdge`), `Runtime`, `ServerStatus`. Flags optional-vs-null-vs-absent semantics per field. Cross-links to `error-codes.md` for `BlockedReason` remediation.
+- Rename `references/workflows.md` → `references/playbooks.md`. The doc was never about `glyph workflow …`; it's goal-oriented CLI plumbing (install-and-verify agent, dispatch-and-wait, monitor, sync, clean up, onboard). Every playbook is self-contained — `glyph` invocations + `jq` post-processing + control flow, no external references.
+- Delete `references/workflow-commands.md`; fold its content into `references/commands.md#workflow` so the workflow subcommand reference lives in the same file / same shape as every other command group.
+- Purge outdated workflow subcommands. The following server endpoints no longer exist and their CLI equivalents were dropped from `packages/cli/src/registrars/workflow.ts`; the reference now reflects reality:
   - `remove-node` → gone (was `DELETE /workflows/:wfid/nodes/:nid`)
   - `remove-edge` → gone (was `DELETE /workflows/:wfid/edges/:from/:to`)
   - `replace-spec` → gone (was `PATCH /workflows/:wfid/nodes/:nid/spec`)
-- Re-anchor `add-node` and `add-edge` documentation as **convenience wrappers over `POST /subgraph`** (the CLI builds a one-node or one-edge subgraph payload internally). The old `POST /nodes` / `POST /edges` routes in the previous reference never actually existed on the current server; the doc claimed HTTP endpoints that the wire had already lost.
+- Re-anchor `add-node` and `add-edge` as **convenience wrappers over `POST /subgraph`** (the CLI builds a one-node or one-edge subgraph payload internally). The old `POST /nodes` / `POST /edges` routes in the previous reference never actually existed on the current server; the doc claimed HTTP endpoints that the wire had already lost.
 - Correct the subgraph edge shape example: `edges[].from/to` are `{ kind: "existing", id }` OR `{ kind: "temp", tempId }` — not bare `{ tempId }` / `{ nodeId }` objects. Match the actual `NodeRefWire` schema.
 - Add `human`-kind node spec example to `add-node` (choices optional; omit for freeform text input). The kind was already supported by the wire and CLI validator; the doc omitted it.
-- Update cross-references: `AGENTS.md` for `first-party/agents/coordinator` now points at `references/commands.md#workflow` instead of the deleted `workflow-commands.md`.
-
-## 0.3.0 (2026-07-07)
-
-- Rewrite `SKILL.md` as a generalized CLI map (all command groups, not just workflow). New top-level "Command surface at a glance" table indexes every group with a one-line purpose and the reference doc that covers it. Workflow content moved out of `SKILL.md`'s body and into `references/workflow-commands.md` (already existed); the skill body now devotes equal weight to `workspace` / `session` / `task` / `schedule` / `catalog` / `runtime` / server-inspection.
-- Add `references/commands.md` — full per-subcommand reference for the non-workflow surface (workspace, session, task, schedule, catalog {agent,skill,mcp}, runtime, server-inspection). Documents flags, HTTP route, body shape, response shape, exit-code notes, and per-command anti-patterns (e.g. `schedule patch --details ""` does NOT clear; use `--clear-details`).
-- Add `references/json-shapes.md` — payload shapes returned by `--json`. Covers `Workspace`, `Session`, `Task`, `ActivityItem`, `TerminalResult` (task and workflow arms), `Schedule`, `AgentEntry` + `BlockedReason`, `ResolveManifest` (with `planToken` semantics), `WorkflowHeader`, `WorkflowDag` (`WorkflowNode` + `WorkflowEdge`), `Runtime`, `ServerStatus`. Flags optional-vs-null-vs-absent semantics per field. Cross-links to `error-codes.md` for `BlockedReason` remediation.
-- Cross-link every reference doc from `SKILL.md`'s new "References" block; annotate anti-patterns section with a schedule-patch clarification (`--details ""` is treated as omitted, use `--clear-details`).
+- No inter-skill references. `SKILL.md` and every reference doc stand on their own; the CLI skill is a pure command / shape / plumbing reference and each other skill owns its own narrative.
+- Update cross-references: `first-party/agents/coordinator/AGENTS.md` now points at `references/commands.md#workflow` instead of the deleted `workflow-commands.md`.
 - No behaviour changes; documentation-only.
 
 ## 0.2.2 (2026-06-24)
