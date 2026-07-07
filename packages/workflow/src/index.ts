@@ -96,8 +96,6 @@ export {
   GetWorkflowDagRequestSchema,
   type GetWorkflowDagResponse,
   GetWorkflowDagResponseSchema,
-  type WorkflowDagSnapshot,
-  type WorkflowEdgeView,
 } from "./application/get-workflow-dag.js";
 export {
   type GetWorkflowNodeError,

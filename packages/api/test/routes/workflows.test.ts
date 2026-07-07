@@ -19,9 +19,9 @@
 
 import type { TaskModule } from "@glyphs-ai/task";
 import type {
+  GetWorkflowDagResponse,
   GetWorkflowNodeResponse,
   GetWorkflowResponse,
-  WorkflowDagSnapshot,
   WorkflowId,
   WorkflowModule,
   WorkflowNodeId,
@@ -92,7 +92,7 @@ function makeWorkerView(): GetWorkflowNodeResponse {
   };
 }
 
-function makeDagView(): WorkflowDagSnapshot {
+function makeDagView(): GetWorkflowDagResponse {
   return {
     workflow: makeHeaderView(),
     nodes: [makeCoordView(), makeWorkerView()],

@@ -84,11 +84,6 @@ export const GetWorkflowDagResponseSchema = z.object({
     .readonly(),
 });
 export type GetWorkflowDagResponse = z.infer<typeof GetWorkflowDagResponseSchema>;
-// Retained as the public identity of the workflow package (consumed by
-// `@glyphs-ai/api` tests); a plain type alias keeps the wire contract stable
-// without introducing a schema-level alias to `GetWorkflowDagResponseSchema`.
-export type WorkflowDagSnapshot = GetWorkflowDagResponse;
-export type WorkflowEdgeView = GetWorkflowDagResponse["edges"][number];
 export type GetWorkflowDagError = WorkflowNotFound | WorkflowEntityCorruption | DatabaseUnavailable;
 export interface GetWorkflowDagDeps {
   readonly query: WorkflowQueries;
