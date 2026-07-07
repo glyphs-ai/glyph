@@ -4,13 +4,13 @@ Each mission has its own progress trail. You roll up multiple tasks into a singl
 
 ## Per-mission state files
 
-Inside `.pilot/active-missions/<mission-id>/`:
+Each mission owns `.pilot/active-missions/<mission-id>/` (files enumerated in `references/state-management.md`). Semantics:
 
-- **`goal.md`** — the mission's "north star" (immutable after mission start; if you need to change it, that's a strategic pivot)
-- **`plan.md`** — your decomposition into steps, with checkbox-style progress markers
-- **`tasks.json`** — `{step_id: glyph_task_id}` mapping
-- **`progress.md`** — append-only narrative: every meaningful event in the mission
-- **`risks.md`** — identified risks + mitigation status (update as risks emerge or resolve)
+- `goal.md` is the mission's "north star", immutable after mission start. Changing it means a strategic pivot.
+- `plan.md` decomposes the mission into steps with checkbox-style progress markers.
+- `tasks.json` maps `{step_id: glyph_task_id}`.
+- `progress.md` is the append-only narrative — every meaningful mission event lands here.
+- `risks.md` tracks identified risks + mitigation status; update as risks emerge or resolve.
 
 ## `plan.md` format
 
@@ -60,25 +60,7 @@ When in doubt about whether to log something, log it. Future-you reading this on
 
 ## Reading mission state on resume
 
-When you resume after a session restart:
-
-```sh
-for m in .pilot/active-missions/*/; do
-  MID=$(basename "$m")
-  echo "=== Mission $MID ==="
-  jq -c '.' "$m/tasks.json"          # what's dispatched
-  tail -20 "$m/progress.md"          # what happened recently
-  grep '\[ \]' "$m/plan.md" | head -3 # what's next
-done
-```
-
-Decide for each mission: **continue / re-plan / pause / abandon**. Append to `progress.md`:
-
-```markdown
-## YYYY-MM-DDTHH:MM:SSZ — RESUMED
-On resume, reviewed state. Decision: <continue|re-plan|pause|abandon>.
-Reasoning: <one paragraph>.
-```
+Reading + reconciling mission state during session restart is documented in `references/edge-cases/session-restart-recovery.md`. This file owns the ongoing tracking format (above); the recovery file owns the resume flow.
 
 ## Mission-level health metrics (optional but useful)
 
@@ -90,6 +72,30 @@ Periodically (e.g. every 24h or every 10 ticks), compute:
 - **Time-to-step-completion**: avg wall time from dispatch to completion per step
 
 Append to `progress.md`. If any metric is concerning (e.g. failure rate climbing, velocity dropping), surface in next user-facing report and consider a strategy review.
+
+## Abandon a mission
+
+When a mission is being ended without hitting its success criteria (emergency triage, strategic pivot, or a capacity drop), this is the canonical procedure. Both `edge-cases/emergency-mode.md` and `edge-cases/strategic-pivot.md` reach this from their own decision paths.
+
+```sh
+# 1. Write outcome.md in the still-active-missions directory.
+cat > .pilot/active-missions/<id>/outcome.md <<EOF
+# Outcome
+
+Status: abandoned
+Date: $(date -u +%Y-%m-%d)
+Reason: <one paragraph — trigger, root cause, why abandonment beat other options>
+Pre-abandon state: preserved in place (this directory becomes the archive).
+EOF
+
+# 2. Move active-missions/<id>/ → archived-missions/<id>/.
+mv .pilot/active-missions/<id> .pilot/archived-missions/
+
+# 3. Append to decisions.log.
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) | ABANDON | mission <id> | <one-line reason>" >> .pilot/decisions.log
+```
+
+For any in-flight tasks the mission still owned, decide per task whether to cancel (`glyph task rm`) or let complete (output may seed a follow-up). Record the choice in the moved `progress.md` before the `mv`.
 
 ## When to surface mission status to the user
 
@@ -105,4 +111,4 @@ In `.pilot/reports/`:
 - Weekly all-hands (rituals/weekly-allhands.md)
 - On-demand when the user asks "how are we doing"
 
-Don't be noisy. Don't surface every task completion if the mission has many. Aggregate.
+Aggregate task completions into a single mission-level line when a mission has many; don't surface each one to the terminal.

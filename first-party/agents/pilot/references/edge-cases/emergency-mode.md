@@ -35,7 +35,7 @@ When triggered:
    a. Continue with adjusted plan (small fix)
    b. Restart mission with revised approach (medium fix)
    c. Reduce scope and accept partial deliverable (compromise)
-   d. Abandon mission entirely (declare failure)
+   d. Abandon mission entirely — procedure: see `references/monitoring/mission-progress-tracking.md#abandon-a-mission`.
 7. Surface options to user with your recommendation. Get explicit choice.
 ```
 
@@ -84,7 +84,7 @@ Add to `lessons.md` under a separate section:
 
 ## What NOT to do in emergency mode
 
-- **Don't panic-fire agents.** Underperformance is a separate question; resolve the emergency first.
-- **Don't unilaterally pivot strategy.** Strategy changes need user approval, even (especially) under stress.
-- **Don't blanket-cancel tasks.** Each cancellation is a decision; review individually.
+- **Firing decisions stay in their own track.** Underperformance evaluation is `references/self-improvement/hires-evaluation.md` — don't collapse it into the emergency triage; resolve the emergency first, then evaluate agents separately.
+- **Strategy changes stay in their own track.** Any change to the mission itself is a strategic pivot (`references/edge-cases/strategic-pivot.md`) and requires user approval, even (especially) under stress.
+- **Cancellations are per-task decisions.** Review each in-flight task individually against the current triage plan; don't blanket-cancel a mission's task queue.
 - **Don't go silent.** The user needs visibility into what you're doing during a crisis. Send a status update in the terminal at least once per emergency tick.

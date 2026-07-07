@@ -2,7 +2,10 @@
 name: dispatch-with-details
 scope: official
 description: "Wrapper over `glyph task dispatch` and `glyph workflow create` that takes a brief-file path, auto-derives a ≤200-char summary for `--brief`, forwards the body via `--details-file`, and returns the parsed task / workflow id"
-version: 0.3.1
+version: 0.3.2
+dependencies:
+  skills:
+    - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/dispatch-watchdog"
 ---
 
 # Dispatch With Details Skill
@@ -48,22 +51,7 @@ across both kinds.
 
 ## Why this skill exists
 
-Empirical pain recurring across dispatcher runs:
-
-- Both `glyph task dispatch --brief "<text>"` and
-  `glyph workflow create --brief "<text>"` reject payloads >200
-  chars with a hard error. The 200-char cap is shared — the server
-  enforces it identically across both verbs.
-- The natural length of a caller's brief is multi-paragraph Markdown.
-- The workaround — write the full brief to a file, pass it via
-  `--details-file`, hand-author a ≤200-char summary for `--brief` —
-  is correct but rediscovered every time, and rediscovered
-  independently for each dispatch verb.
-
-This skill canonicalises the workaround so callers stop rediscovering
-it, and abstracts the dispatch verb away so the same call shape
-works whether the caller is seeding a one-shot task or a full
-workflow.
+Both `glyph task dispatch --brief` and `glyph workflow create --brief` reject payloads > 200 chars with a hard error. Natural briefs are multi-paragraph Markdown, so callers must author the body in a file, pass it via `--details-file`, and derive a short summary for `--brief`. This skill packages that workaround as one primitive that works for either verb.
 
 ## Choosing between task and workflow
 

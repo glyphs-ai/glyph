@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.3 (2026-07-07)
+
+- Restructure the body into two self-contained mode blocks: **`## MODE: code`** (Applying the thermo-nuclear rubric + Review process + Audit mode) and **`## MODE: ci`** (Workflow + What MODE: ci does NOT do); Boundaries / Write access / Reporting stay shared. Update the MODE-selection pointer to "See the MODE: ci section below."
+- Trim **What MODE: ci does NOT do** to 2 items (coord-boundary + no auto-retry); drop "Does NOT read the PR diff" and "Does NOT post inline review comments" (already covered by the MODE: ci workflow itself).
+- Delete the "This split is intentional … accountability moments …" meta paragraph under **Applying the thermo-nuclear rubric**; keep the operational split rule.
+- Refer to the tier-invisibility architecture test by concept in **Project knowledge**; drop the `packages/e2e/test/architecture/tier-invisibility.test.ts` path.
+- Remove the **PowerShell encoding caveat** callout from the Commands section; the caveat now lives in the `git-pr` skill under **Platform notes**.
+- Replace the inline `gh api .../pulls/<n>/reviews` invocation + review-body JSON in **Review process** step 5 with a pointer to the `git-pr` skill's **GitHub PR review submission** section (single source of truth).
+
+## 0.2.2 (2026-07-06)
+
+- Correct the **Wire DTOs** project-knowledge line: there is no `packages/api/src/wire/` surface. HTTP request / response zod schemas are owned by the domain packages (`application/<use-case>.ts`) and composed into `OpenAPIHono` route factories under `packages/api/src/routes/`; `@glyphs-ai/sdk` is generated from the OpenAPI spec and is what `dashboard` / `cli` import.
+
 ## 0.2.1 (2026-06-26)
 
 - Repoint **Project knowledge** and the consistency-review criterion off the deleted `@glyphs-ai/contracts` package: tier layering T2 is now `api` + `sdk`, wire DTOs live in `packages/api/src/wire/`, and the fenced surfaces (`dashboard` / `cli`) import wire types from `@glyphs-ai/sdk`.

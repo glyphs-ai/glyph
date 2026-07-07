@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.3 (2026-07-07)
+
+- Trim the **Layout** section: replace the ASCII `packages/` / `first-party/` / `scripts/` / `docs/` tree with per-directory bullet lists; drop the T0/T1/T2 tier annotations from each package line (they're in the tier diagram directly above) and hoist the canonical `docs/` entries under a dedicated pointer subsection.
+- Refer to the tier-invisibility architecture test by concept only; delete the `packages/e2e/test/architecture/tier-invisibility.test.ts` path from the tier-layering blurb, the wire-schemas blurb, and the 🚫 **Never** bullet on breaking layering.
+- Remove the **PowerShell encoding caveat** subsection from the Git workflow section; the caveat now lives in the `git-pr` skill under **Platform notes**.
+
+## 0.2.2 (2026-07-06)
+
+- Correct the **wire schema** guidance, tier diagram, and package-layout listing: there is no `packages/api/src/wire/` surface. HTTP request / response zod schemas are owned by the domain packages (`application/<use-case>.ts`); `@glyphs-ai/api` composes them into `OpenAPIHono` route factories under `packages/api/src/routes/<domain>.ts`; `@glyphs-ai/server` mounts the factories; `@glyphs-ai/sdk` is generated from the resulting OpenAPI spec and is what `dashboard` / `cli` import.
+
 ## 0.2.1 (2026-06-26)
 
 - Repoint the **Wire DTOs** guidance, tier diagram, and package-layout listing off the deleted `@glyphs-ai/contracts` package: T2 is now `api` (orchestration + wire DTOs under `src/wire/`) + `sdk` (generated client). New HTTP-route request / response types live in `packages/api/src/wire/` (declared via `packages/api/src/wire/routes/<domain>.ts`); `dashboard` / `cli` import wire types from `@glyphs-ai/sdk`.

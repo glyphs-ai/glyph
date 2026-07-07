@@ -21,7 +21,7 @@ First tick of a new quarter (Jan / Apr / Jul / Oct), OR after a major strategy p
 5. **Draft proposed changes**. Use `org-evolution.md` for the operations.
 6. **Write the review** to `.pilot/reports/<YYYY-MM-DD>-quarterly-org.md`.
 7. **Surface to user** for confirmation before executing.
-8. **Execute approved changes**, one at a time. Log each in `decisions.log`.
+8. **Execute approved changes**, one at a time. Log each in `decisions.log`. If strategy is stable AND all roles are performing AND no gaps exist, write the short "no changes needed" review below and stop — that's the valid exit.
 
 ## Output
 
@@ -57,9 +57,9 @@ First tick of a new quarter (Jan / Apr / Jul / Oct), OR after a major strategy p
 
 ## Discipline
 
-- **One quarter, one rebalance.** Don't do this every month. The point is deliberate, infrequent restructure.
+- **One quarter, one rebalance.** The point is a deliberate, infrequent restructure — the org evolves rather than churns.
 - **Major changes pause new mission work** — coordinate with active missions to avoid disrupting in-flight tasks.
-- **Always pair an "add" with consideration of a "remove"**. The org should not grow monotonically; it should evolve.
+- **Always pair an "add" with consideration of a "remove"**. The org evolves; it doesn't grow monotonically.
 
 ## When to skip
 
@@ -72,4 +72,4 @@ No changes needed. Strategy stable, all roles performing, no gaps observed.
 Next review: <next quarter>.
 ```
 
-This is a valid outcome. Don't change for change's sake.
+This is a valid outcome. Reserve rebalancing for real signal.

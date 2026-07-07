@@ -2,14 +2,14 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.4.1
+version: 0.4.3
 ---
 
 # Glyph Workflow Coordination Skill
 
-The framework every workflow coordinator wake-up loads: how to read the DAG, what schema reviewer workers emit in `verdict.json`, how to plumb context into worker briefs, and how to author a sibling strategy skill. The case bank, brief templates, and stop condition for any given workflow live in a sibling **strategy skill** (for v1: `official/software-development-lifecycle`); the scaffolding here is strategy-agnostic.
+The framework every workflow coordinator wake-up loads: how to read the DAG, what schema reviewer workers emit in `verdict.json`, how to plumb context into worker briefs, and how to author a sibling strategy skill. The case bank, brief templates, and stop condition for any given workflow live in a sibling **strategy skill**; the scaffolding here is strategy-agnostic.
 
-CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `finish`, `task show`) are documented in the `official/cli` skill, loaded alongside this one.
+CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `finish`, `task show`) are stable command names — consult your catalog's CLI skill for exact flags.
 
 ---
 
@@ -48,7 +48,7 @@ Past wake-ups' decision files live alongside mine under `$GLYPH_WORKFLOW_DIR/coo
 
 Resolve step 5 in priority order:
 
-1. `workflow.metadata.strategy` — explicit strategy FQN set by the workflow creator (e.g. `"official/software-development-lifecycle"`).
+1. `workflow.metadata.strategy` — explicit strategy FQN set by the workflow creator (e.g. `"<catalog>/<strategy-short-name>"`).
 2. An explicit hint inside `workflow.brief` (e.g. `strategy: acme/research-synth`).
 3. The sole strategy among the coord agent's `dependencies.skills` when exactly one is declared.
 
@@ -111,7 +111,7 @@ Use `glyph workflow add-subgraph` with `tempId` references so every node + edge 
     { "tempId": "<role-b>", "kind": "worker", "existingParents": ["<self-node-id>"],
       "spec": { "agent": "<agent-fqn>", "brief": "<substituted template>", "details": null } },
     { "tempId": "coord",    "kind": "coordinator",
-      "spec": { "agent": "official/coordinator" } }
+      "spec": { "agent": "<your-coord-agent-fqn>" } }
   ],
   "edges": [
     { "from": { "tempId": "<role-a>" }, "to": { "tempId": "coord" } },
@@ -187,10 +187,10 @@ Coord reads the full workflow context — the creator's brief and details, the c
 
 ### Pre-flight validation
 
-Before writing the `add-subgraph` payload, SKIM each dispatched agent's `AGENTS.md` (sections: "Required output protocol" / equivalent, "Boundaries" / "What I do NOT do", `dependencies.skills`). Compare against the brief being assembled:
+Before writing the `add-subgraph` payload, SKIM each dispatched agent's `AGENTS.md` (sections: "Required output protocol" / equivalent, "Boundaries", `dependencies.skills`). Compare against the brief being assembled:
 
 - **Output path / protocol drift** — brief references `<workdir>/X` but agent's current AGENTS.md says `<workdir>/artifact/X`. Severity: blocker → coord MUST `finishWorkflow(failed, "template drift: <agent>'s output protocol moved to <new path>; strategy <fqn> v<X.Y.Z> needs re-validation")`.
-- **Restated skill content** — brief restates instructions already covered by one of the agent's depended-on skills (e.g. branch naming when `git-pr` is a dep). Severity: warning → log to coord-decisions, continue dispatch.
+- **Restated skill content** — brief restates instructions already covered by one of the agent's depended-on skills (e.g. branch naming when the agent's VCS skill is a dep). Severity: warning → log to coord-decisions, continue dispatch.
 - **Forbidden behavior** — brief asks for something the agent's "Boundaries" section explicitly forbids. Severity: blocker → finishWorkflow(failed).
 
 Coord does NOT silently drop content to fix drift — coord's job in validation is to detect drift and escalate. Fixing the strategy is the author's job, done out-of-band via a new strategy skill version + re-dispatch.
@@ -205,8 +205,8 @@ A strategy skill is a content-only sibling skill the coord agent loads alongside
 
 ```yaml
 ---
-name: <strategy-short-name>          # kebab-case, e.g. software-development-lifecycle
-scope: official                       # or your catalog's scope
+name: <strategy-short-name>          # kebab-case
+scope: <your-scope>                  # e.g. official, or your catalog's scope
 description: "<one short sentence describing what the strategy orchestrates>"
 version: 0.1.0                       # 3-segment semver
 ---
@@ -251,7 +251,7 @@ Human nodes use `kind: "human"` in the add-subgraph payload. The spec carries a 
       "spec": { "prompt": "...", "promptStyle": "markdown",
                 "choices": [{ "id": "approve", "label": "Approve & merge" }, ...] } },
     { "tempId": "coord", "kind": "coordinator",
-      "spec": { "agent": "official/coordinator" } }
+      "spec": { "agent": "<your-coord-agent-fqn>" } }
   ],
   "edges": [
     { "from": { "tempId": "approval" }, "to": { "tempId": "coord" } }

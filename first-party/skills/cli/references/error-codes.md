@@ -17,14 +17,9 @@ agent "writer" is not ready: prereqs not acknowledged (HTTP 409, EntryNotReadyEr
 
 When you see a `fix:` line, run that command verbatim — it's the canonical remediation.
 
-## Where `code` values come from (two paths)
+## Where `code` values come from
 
-The server emits `code` from two different code paths, both ending up in the same `{error, code}` envelope:
-
-1. **Typed-error allow-list** (`packages/server/src/routes/_shared.ts:SAFE_ERROR_NAMES`). When a route catches an error whose `name` is on this list, the name passes through to `code`. Most entries below come from this path.
-2. **Inline literals** in handler code (`c.json({error, code: "BadRequest"}, 400)` etc). A small set of generic codes is hand-rolled this way.
-
-Both are stable wire contracts. The distinction matters only if you're maintaining the server: adding a new typed error means adding to `SAFE_ERROR_NAMES`; adding a new inline code is just a string change.
+`code` values are stable wire contracts. Two internal server paths emit them (a typed-error allow-list and a small set of inline literals in handler code), but both land in the same `{error, code}` envelope. Treat every value in the table below as a contract.
 
 ## Full code table
 
@@ -67,7 +62,7 @@ Both are stable wire contracts. The distinction matters only if you're maintaini
 | `BadRequest` | 400 | Generic 400 (malformed body, invalid query) | Read the message; fix the call |
 | `NotFound` | 404 | Generic 404 (resource id not found) | Check the id; usually a typo or stale reference |
 | `PlanTokenInvalid` | 410 | `--plan-token` was malformed, expired, or already consumed | Re-run the corresponding `... sync-resolve` to mint a fresh token |
-| `internal error` (no `code`) | 500 | Server-side fault that escaped the safe-error allow-list | Server-side; surface to user with the request id from logs |
+| `internal error` (no `code`) | 500 | Server-side fault whose underlying error name was suppressed (not on the safe-error allow-list). Message alone won't tell you remediation | Surface to user with the request id from server logs |
 
 ## EntryNotReadyError reasons
 
@@ -84,7 +79,3 @@ Both are stable wire contracts. The distinction matters only if you're maintaini
 A single `EntryNotReadyError` can carry multiple `reason` fields at once (e.g. both `needsPrereqsAck` AND `missingDeps`). The CLI prints one `cause:` line per active field; resolve all of them, then retry the original command.
 
 If the CLI prints `cause: blocked (reason fields not recognized by this CLI version)`, the server has emitted a new `BlockedReason` variant the CLI doesn't know about. Inspect via the dashboard or upgrade the CLI for typed remediation.
-
-## When you see no `code`
-
-If stderr only contains a message like `internal error (HTTP 500)` with no `code`, that means the server intentionally suppressed the underlying error name (it wasn't on the safe-error allow-list — leaks paths, etc). You can't infer remediation from the message alone. Surface it to the user and ask them to check the server logs for the matching request id.

@@ -24,7 +24,7 @@ in a follow-up doc**.
 | --------- | ----------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | **T0**    | Foundations | `catalog`, `runtime`, `schedule`, `terminal`, `workspace` | Who / Where / When / Scope + leaf infrastructure — irreducible primitives                |
 | **T1**    | Modes       | `session`, `task`, `workflow`            | How work runs — Interactive (`session`) / Headless single-shot (`task`) / Multi-task DAG (`workflow`) |
-| **T2**    | Application | `api` (orchestration + wire contracts), `sdk` (generated client) | Two siblings: T0/T1 composed into business capabilities, with the cross-pkg wire contracts living under api's wire/ surface, plus a generated typed HTTP client |
+| **T2**    | Application | `api` (orchestration + HTTP route factories), `sdk` (generated client) | Two siblings — `api` composes T0/T1 into business capabilities, assembling domain-owned zod schemas into OpenAPIHono route factories; `sdk` is the typed client generated from the resulting OpenAPI spec |
 | **T3**    | Host        | `server`                                            | HTTP transport that exposes T2 capabilities over the wire                               |
 | **T_top** | Surfaces    | `dashboard`, `cli`                                  | Platform-specific UI on top of T3                                                       |
 
@@ -66,20 +66,24 @@ wire format is a separate axis (see "Dependency invariants" — TBD).
   - `api` — the *how it's built* AND the *what is on the wire*:
     `composeApplication`, `WorkspaceContext`, per-workspace registries,
     schedule-task wiring (Node-only orchestration that assembles T0/T1
-    services), plus the wire contracts under its `wire/` surface — the
-    route catalog, request / response DTO shapes, and leaf path helpers
-    (`GLYPH_HOME`, `runtime.json`). The api barrel re-exports the wire
-    surface so the in-process server composition root gets both layers
-    from one import site. Consumed by `server`.
+    services), plus the HTTP surface — the per-domain `OpenAPIHono`
+    route factories under `src/routes/` that compose the request /
+    response zod schemas the domain packages own, and the shared
+    Problem-envelope error surface (`src/schemas/problem.ts`). The api
+    barrel re-exports the route factories + error surface so the
+    in-process server composition root gets both layers from one import
+    site. Consumed by `server`.
   - `sdk` — the *typed client for the wire*: a fully-generated fetch
     client (`@hey-api/openapi-ts`) over `server`'s `/api/openapi.json`,
-    plus thin `unwrap` / `GlyphError` helpers we own, and a hand-kept
-    `wire.ts` that re-derives the named wire DTOs from the generated
-    operation envelopes. Self-contained at runtime (zero `@glyphs-ai/*`
-    imports — the generated output inlines its own fetch client), so it
-    ships safely to browser surfaces. Codegen is devtime-only tooling
-    under `scripts/` that reads `server` source to assemble the spec;
-    that devtime edge is not a runtime tier dependency (enforced by
+    whose generated barrel (`src/generated/`) exports one tree-shakeable
+    operation per route (`getApiHealth`, …) plus every request / response
+    type, wrapped by the only hand-written code we own — the `unwrap` /
+    `unwrapOr` result helpers and the normalised `GlyphError` type.
+    Self-contained at runtime (zero `@glyphs-ai/*` imports — the
+    generated output inlines its own fetch client), so it ships safely to
+    browser surfaces. Codegen is devtime-only tooling under `scripts/`
+    that reads `server` source to assemble the spec; that devtime edge is
+    not a runtime tier dependency (enforced by
     `sdk-no-server-runtime-import.test.ts`). The strict-isolation surface
     for `dashboard` and `cli`.
 - T3 — how do remote clients invoke T2? `server` is a thin HTTP
@@ -100,8 +104,8 @@ machine-enforced**:
 - **Convention only** (not machine-enforced): T0/T1 packages SHOULD
   NOT be imported by T3 or T_top (server or other surfaces).
   `server` may import T0/T1 directly today; the dashboard / cli
-  fence above is the strict half. `@glyphs-ai/api` exposes the wire
-  contracts (its `wire/` surface) for server's convenience.
+  fence above is the strict half. `@glyphs-ai/api` exposes the HTTP
+  route factories (its `src/routes/` surface) for server's convenience.
 
 The fenced consumers' allowed edges:
 
@@ -117,7 +121,7 @@ The fenced consumers' allowed edges:
 ```
 
 **`api` is the orchestration composition root.** New cross-cutting
-features land in `api` (wire-only shapes go under its `wire/` surface);
+features land in `api` (HTTP shapes become `createRoute` entries in its `src/routes/` factories, composed from domain-owned zod schemas);
 transport (`server`) and UI (`dashboard` / `cli`)
 stay thin. The leaf infrastructure pkgs (`terminal` and the runtime
 adapters) carry no orchestration of their own — `api` is the only
@@ -167,10 +171,12 @@ gives each box a name.
 
 `@glyphs-ai/sdk` is the strict-isolation surface for the fenced
 consumers: a generated, browser-safe HTTP client plus the wire types
-it exchanges, zero orchestration code. The wire contracts themselves
-live under `@glyphs-ai/api`'s `wire/` surface; the api barrel re-exports
-them, so the in-process server boot path can import "both halves" from a
-single specifier (`@glyphs-ai/api`). Dashboard and CLI MUST go through
+it exchanges, zero orchestration code. The wire contract itself is
+assembled in `@glyphs-ai/api`'s `OpenAPIHono` route factories (under
+`src/routes/`) from the request / response zod schemas the domain
+packages own; the api barrel re-exports those factories, so the
+in-process server boot path can import "both halves" from a single
+specifier (`@glyphs-ai/api`). Dashboard and CLI MUST go through
 `@glyphs-ai/sdk` directly — the structural fence is enforced by
 `packages/e2e/test/architecture/tier-invisibility.test.ts`.
 
@@ -216,10 +222,9 @@ against package-private Drizzle repositories. `task` exposes
 `UseCase<Request, Response, Error>` classes returning `ResultAsync` with
 discriminated-union errors. Repositories return package-owned entities at
 their boundary. The full contract (layer table, projection-helper rules,
-when Entity becomes a class) lives in
-[`docs/pkg-template.md` → Repository contract](./pkg-template.md#repository-contract);
-the rationale for this specific shape is in the same doc under
-[Why this shape](./pkg-template.md#why-this-shape).
+when Entity becomes a class) and the rationale for this specific shape
+live in
+[`docs/pkg-template.md` → Repository contract](./pkg-template.md#repository-contract).
 
 In-tree examples: anemic BCs (`workspace`, `session`) use a plain
 `interface` for Entity; rich BCs (`catalog`, `task`) use a class with
@@ -691,10 +696,19 @@ file and break it, that's a `git restore` away (if you're lucky) or a
   with `exactOptionalPropertyTypes`; if a value is "optional", the
   type is `T | undefined` and the field is conditionally spread, not
   assigned `undefined` directly.
-- **Errors are typed.** Every package defines its own error hierarchy
-  (`WorkspaceError`, `CatalogError`, `RuntimeError`, …); the server
-  maps them to HTTP status codes via `instanceof` checks. Throwing a
-  `new Error(...)` from a manager is a smell.
+- **Errors are typed.** Domain and application errors are
+  discriminated-union atoms (`{ type: "<AtomName>", ... }`) returned
+  through neverthrow `Result` / `ResultAsync` — never thrown for
+  control flow. Consumers (routes, other use-cases) branch on
+  `err.type` via `switch` (see `docs/pkg-template.md#errors`). The
+  api layer's Problem envelope maps each `type` to an HTTP status via
+  a per-domain table (`packages/api/src/_error-policies/*`).
+  Infrastructure-level thrown errors (e.g. `WorkspaceLoadError`,
+  `SessionNotFoundError`) live on an allow-list keyed by class name
+  (`SAFE_ERROR_NAMES` in `packages/api/src/_http-errors.ts`); anything
+  off the list collapses to an opaque `InternalError` to avoid
+  leaking host paths. Throwing a bare `new Error(...)` from a
+  manager is a smell.
 - **Comments explain *why*, not *what*.** A regex is self-explanatory;
   the choice to use `Number.parseInt` over `+` because the input might
   be `"0x10"` is not. Lean toward more comments at decision points,
@@ -737,30 +751,36 @@ them up.
 
 ## Adding a new HTTP route
 
-A route is a **wire manifest + server handler + test** trio. The
-three sides are reconciled by a reflection test, so skipping one fails
-CI rather than drifting silently.
+A route is a **domain zod schema + api route factory + generated
+client** trio, kept in sync by the OpenAPI snapshot test — skip a step
+and CI fails rather than drifting silently.
 
-1. **Declare it in `@glyphs-ai/api`'s wire surface.** Add a `defineRoute<...>(...)`
-   entry to the relevant per-domain slice in
-   `packages/api/src/wire/routes/<domain>.ts` with typed request and
-   response shapes. New DTOs live under `wire/` (never inline in the
-   handler); the `wire/routes.ts` facade aggregates every slice into the
-   `ROUTES` manifest that the server reads and the SDK is generated from.
-2. **Implement the handler in `@glyphs-ai/server`.** In
-   `packages/server/src/routes/<domain>.ts`, parse + validate the request
-   (return a `ValidationResult` on bad input — see § Validation pipeline
-   in [`packages/server/README.md`](../packages/server/README.md)),
-   dispatch to the per-workspace `WorkspaceContext` service (or to `api`),
-   and format the response. Surface typed errors through `respondError`
-   with the domain's `ErrorPolicy`, and add any new user-facing error
+1. **Own the request / response shape in the domain package.** Add (or
+   reuse) the `Request` / `Response` zod schemas in the owning domain
+   pkg's `application/<use-case>.ts` (for example
+   `DispatchTaskRequestSchema` in
+   `packages/task/src/application/dispatch-task.ts`). These schemas are
+   the source of truth for the wire shape.
+2. **Declare the route in `@glyphs-ai/api`.** Add a `createRoute(...)`
+   entry to the domain's `OpenAPIHono` factory in
+   `packages/api/src/routes/<domain>.ts`, wiring the request / response
+   schemas (validation is handled by the zod-openapi route definition)
+   and the typed error responses — the Problem envelope via
+   `respondProblem` plus the domain's table in
+   `packages/api/src/_error-policies/`. Add any new user-facing error
    class `name` to `SAFE_ERROR_NAMES`.
-3. **Register + test.** Mount the handler so it is reachable, then let
-   `packages/server/test/route-manifest.test.ts` (the reflection test)
-   assert the registered Hono routes match the `ROUTES` manifest exactly,
-   and add a per-domain handler test under `packages/server/test/`. The
-   CLI's typed `client.call(...)` picks the route up from the same
-   manifest with no extra wiring.
+3. **Mount it in `@glyphs-ai/server`.** Register the factory in
+   `packages/server/src/index.ts`
+   (`app.route("/api/<domain>", <domain>Routes(...))`). `server` adds no
+   per-route handler of its own — it mounts the api factories and serves
+   the spec at `/api/openapi.json`
+   (`packages/server/src/routes/_openapi.ts`).
+4. **Regenerate the client + snapshot.** Run
+   `pnpm --filter @glyphs-ai/sdk gen` to regenerate `@glyphs-ai/sdk`
+   from the new OpenAPI spec, then refresh the snapshot guarded by
+   `packages/server/test/openapi-snapshot.test.ts`. The dashboard / cli
+   import the newly generated operation from `@glyphs-ai/sdk` — no
+   manual wiring.
 
 ## Adding a new CLI command
 
@@ -770,9 +790,10 @@ hand-rolls a `fetch`.
 
 1. **Register the subcommand.** Add it to the relevant registrar in
    `packages/cli/src/registrars/<domain>.ts` (wrap workspace-scoped
-   commands with `withWorkspaceFlags`). The action calls
-   `client.call(...)` against the typed route and stores the response on
-   the command `slot`.
+   commands with `withWorkspaceFlags`). The action creates a client with
+   `makeSdkClient(opts)`, calls the generated `@glyphs-ai/sdk` operation
+   for the route (through the `unwrap(...)` helper), and stores the
+   response on the command `slot`.
 2. **Render the result.** Route the response through the result / output
    seam (`packages/cli/src/result.ts` + `output.ts`) so both the
    human-readable `table` default and `--json` work. Follow the id and

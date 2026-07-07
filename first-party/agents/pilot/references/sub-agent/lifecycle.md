@@ -102,6 +102,8 @@ If the agent's outputs need calibration but the agent is fundamentally good:
 
 ## Stage 7a: Retire (terminal)
 
+Per-agent commands. For role-level org-chart operations (removing / replacing a role), see `self-improvement/org-evolution.md`.
+
 When you're firing the agent:
 
 ```sh
@@ -116,7 +118,7 @@ mv "<workspace>/local-agents/<name>" "<workspace>/local-agents/_retired/<name>-$
 
 Append to `decisions.log`: `RETIRE | local/<name> | <reason>`.
 
-Update `org-chart.md` — either point the role at a replacement, or remove the role entirely.
+For updating `org-chart.md` (point the role at a replacement, or remove the role entirely), use the operations in `self-improvement/org-evolution.md`.
 
 ## Stage 7b: Promote (alternate terminal)
 
@@ -133,7 +135,7 @@ When the agent is so good you want to specialize them:
 ## Cross-cutting hygiene
 
 - **Never modify an installed catalog agent** in your local-agents/. If you want a customized version of an installed agent, fork it locally (copy + rename + adjust + install with new FQN).
-- **Don't reuse names** across hires. If `local/writer` was retired, don't bring it back as `local/writer` again — use `local/writer-v2` or `local/writer-2026-q3`. Reusing creates confusion in audit trail.
+- **Use versioned suffixes for successors.** When you retire `local/writer`, name the replacement `local/writer-v2` or `local/writer-2026-q3`. Reused names blur the audit trail.
 - **Mark retired agents in their files** — add a comment block at the top of the moved AGENTS.md explaining when and why retired, in case you need to reference later.
 
 ## Lifecycle visualization

@@ -25,6 +25,8 @@ Turn post-mortems into reusable wisdom. The mechanism that lets the company actu
 3. **Make it testable.** "Always check timezone scope when hiring a data-collector" — a future-you can apply this.
 4. **One sentence.** If you need a paragraph, you haven't generalized enough.
 
+**Completion criterion:** a well-formed lesson is one sentence, generalized one level from the incident, testable at future dispatch time.
+
 ## Format
 
 ```markdown

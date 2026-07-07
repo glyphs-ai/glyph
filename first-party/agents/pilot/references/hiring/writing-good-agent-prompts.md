@@ -2,7 +2,7 @@
 
 Use these guidelines whenever you draft a local agent. The frame in `template-base.md` is the structure; this file is what to write inside.
 
-## Before you start: check the role library
+## <a id="agency-role-library"></a>Before you start: check the role library
 
 If the agent you're drafting fits a generic role (frontend developer, code reviewer, incident responder, technical writer, accessibility auditor, ...), the **`agency-role-reference` skill** has a pointer index of ~185 abstract role templates from `msitarzewski/agency-agents` (MIT). Each template has a mission framing, critical rules, workflow phases, and success metrics worth mining as a starting point.
 
@@ -29,10 +29,22 @@ If no upstream role fits, skip the library and draft from scratch using the patt
 4. **Use examples.** One concrete input → output example is worth a paragraph of description.
 5. **Match scope to role.** A role-specialized agent should refuse out-of-scope work explicitly. Don't make a "report-writer" that also debates philosophy.
 
+### <a id="never-always"></a>Constraint strength: NEVER / ALWAYS, not suggestions
+
+Rules in an agent body — and in task briefs — must be phrased at the strength you actually mean. Phrase matches enforcement:
+
+- **NEVER X / ALWAYS Y** — hard rule, no exceptions, agent should refuse rather than break it. Use for data integrity, safety, scope boundaries.
+- **Prefer X over Y** — default with room to deviate when justified. Use for style / conventions.
+- **Try to X / Avoid Y** — suggestion, weakest. Use only when you truly mean "nice to have".
+
+A soft "try to avoid X" gets ignored under any pressure; a hard "NEVER X" holds. Don't over-strength (`NEVER` for a stylistic nit hollows out the marker) and don't under-strength (`prefer` for a data-integrity rule invites violation).
+
+This heuristic is the single source for constraint-phrasing guidance across pilot docs. Task-brief authoring (`communication/to-subagent.md`) refers back to it.
+
 ## Anti-patterns to avoid
 
 - **"You are an expert in X"** is mostly useless. The agent doesn't gain capability from being told it's an expert. Replace with concrete instructions.
-- **"Be helpful and accurate"** is filler. Define what helpful means in this role.
+- **"Be helpful and accurate"** — replace with concrete instructions (what does helpful look like in this role? what does accurate mean?).
 - **Open-ended "answer any question about Y"** invites scope creep. Bound the role.
 - **Letting the agent choose output format.** Always specify.
 - **No examples.** Even one example dramatically improves output consistency.

@@ -2,7 +2,7 @@
 name: thermo-nuclear-code-quality-review
 scope: official
 description: "Run an extremely strict maintainability review for abstraction quality, giant files, and spaghetti-condition growth. Use for a thermo-nuclear code quality review, thermonuclear review, deep code quality audit, or especially harsh maintainability review."
-version: 0.1.0
+version: 0.1.1
 ---
 
 # Thermo-Nuclear Code Quality Review
@@ -202,5 +202,3 @@ This skill was vendored into the glyph first-party catalog from an external open
 - **Upstream license**: MIT
 - **Forked at**: ac76a2bc88bb2d895e83ab1788aa584a82346cfc  (use the SHA the file was fetched at)
 - **First-party entry maintained at**: https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/thermo-nuclear-code-quality-review
-
-Frontmatter has been adapted to the glyph catalog schema (`scope: official`, `version: 1.0.0` added). No semantic change to the skill body.

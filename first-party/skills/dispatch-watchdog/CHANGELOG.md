@@ -1,8 +1,13 @@
 # Changelog
 
+## 0.2.1 (2026-07-07)
+
+- Collapse "Why this skill exists" to a two-sentence pointer at pattern 4. Anti-patterns section already covers the failure modes.
+- Rewrite the 0.2.0 entry's `-match` anti-pattern clause forward-only.
+
 ## 0.2.0 (2026-06-14)
 
-- Replace the duplicated PowerShell and bash watchdog loop bodies with a single cross-platform Node script (`watchdog.mjs`) shipped as a skill artifact. The script uses `JSON.parse` to extract the top-level `status` field, so it is robust against `"status": "..."` substrings embedded in nested JSON fields (e.g. a workflow's `details` brief) and against PowerShell's `ConvertFrom-Json` choking on long string values with backslash escapes. SKILL.md Pattern 4 sections now reduce to a one-line `node <SKILL_DIR>/watchdog.mjs ...` spawn per OS, using the runtime-agnostic `<SKILL_DIR>` placeholder so the body works across every supported provisioner. The `<kind>` argument switches between `task` and `workflow` polling. Drop the PowerShell `-match` array-footgun anti-pattern note (no longer applicable, the body is no longer PowerShell).
+- Replace the duplicated PowerShell and bash watchdog loop bodies with a single cross-platform Node script (`watchdog.mjs`) shipped as a skill artifact. The script uses `JSON.parse` to extract the top-level `status` field, so it is robust against `"status": "..."` substrings embedded in nested JSON fields (e.g. a workflow's `details` brief) and against PowerShell's `ConvertFrom-Json` choking on long string values with backslash escapes. SKILL.md Pattern 4 sections now reduce to a one-line `node <SKILL_DIR>/watchdog.mjs ...` spawn per OS, using the runtime-agnostic `<SKILL_DIR>` placeholder so the body works across every supported provisioner. The `<kind>` argument switches between `task` and `workflow` polling. Remove the `-match` anti-pattern note (no longer applicable to the Node body).
 
 ## 0.1.0 (2026-06-11)
 

@@ -8,10 +8,10 @@ First tick of each month, OR after any major mission completion / abandonment. D
 
 ## Process
 
-1. **Re-read `.pilot/strategy.md`** start to finish, slowly.
+1. **Re-read `.pilot/strategy.md`** start to finish, annotating any drift you notice.
 2. **Re-read `.pilot/lessons.md`** for the past month.
 3. **Skim `.pilot/decisions.log`** — what did we actually do?
-4. **Compare**: do the decisions and outcomes track the strategy, or have we drifted?
+4. **Compare** decisions and outcomes against strategy. Annotate every success criterion with `closer / same / farther`, backed by evidence from the log.
 5. **Write the review** to `.pilot/reports/<YYYY-MM-DD>-strategy-review.md`.
 6. **Surface to user** if any items in the review require user decisions.
 
@@ -83,8 +83,9 @@ First tick of each month, OR after any major mission completion / abandonment. D
 
 If 3 consecutive monthly reviews say "behind on success criteria", consider that the mission scope was wrong. Surface to the user with a proposed pivot. Don't pivot unilaterally — strategy changes always need user agreement.
 
-## Anti-patterns
+## Quality bar
 
-- **Inventing progress.** If we haven't moved on a criterion, say so. Performative optimism rots the company.
-- **Skipping uncomfortable questions.** If org fit is bad, say it. If pace is behind, say it. The user reads these.
-- **Running the review and not acting on it.** Every review must produce at least one concrete change OR an explicit "no changes needed because X". Reports that don't move the needle are wasted compute.
+- **Rate progress honestly.** If we haven't moved on a criterion, say so. Performative optimism rots the company.
+- **Answer the uncomfortable questions.** If org fit is bad, say it. If pace is behind, say it. The user reads these.
+- **Every review produces a concrete change** — or an explicit "no changes needed because X". A review that doesn't move the needle is wasted compute.
+- **Every success criterion carries a `closer / same / farther` verdict** with evidence from the log.

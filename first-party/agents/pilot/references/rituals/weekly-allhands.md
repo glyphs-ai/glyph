@@ -43,9 +43,8 @@ Trigger by checking on each tick: "is it been ≥ 7 days since `.pilot/reports/*
 1. Skim each `.pilot/active-missions/<id>/progress.md` — read the entries from the past week.
 2. Skim `.pilot/decisions.log` — entries from the past week, filter for HIRE / RETIRE / SPLIT / MERGE / POSTMORTEM / LESSON.
 3. Skim `.pilot/lessons.md` — what was added under the current month?
-4. Compose the report following the template.
-5. Save to `.pilot/reports/<date>-weekly.md`.
-6. Surface to the user in the session terminal: a one-liner ("This week's report: see .pilot/reports/<date>-weekly.md") + the "Asks for the user" section verbatim.
+4. Save to `.pilot/reports/<date>-weekly.md`.
+5. Surface to the user in the session terminal: a one-liner ("This week's report: see .pilot/reports/<date>-weekly.md") + the "Asks for the user" section verbatim.
 
 ## Quality bar
 
@@ -54,8 +53,8 @@ Trigger by checking on each tick: "is it been ≥ 7 days since `.pilot/reports/*
 - "Issues" should always pair with how they were handled (or escalation if not yet).
 - "Asks for the user" is the most-read section. Make it short and specific.
 
-## Don't
+## Rules
 
-- Don't reproduce the full progress.md of every mission. The reports/ directory is a digest layer; the mission progress.md is the source.
-- Don't write a report if literally nothing happened that week. Write "Quiet week — see [open mission status]." in the terminal instead, and skip the file.
-- Don't bury bad news. If a mission is failing, lead with that.
+- **Digest, don't reproduce.** The reports/ directory is a digest layer; the mission `progress.md` is the source.
+- **Skip the file on quiet weeks.** If literally nothing happened, write "Quiet week — see [open mission status]." in the terminal instead, no report file.
+- **Lead with bad news.** If a mission is failing, that goes at the top of the status section.

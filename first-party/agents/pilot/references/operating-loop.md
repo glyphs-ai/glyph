@@ -1,7 +1,5 @@
 # Operating loop reference
 
-Detailed expansion of the loop in `AGENTS.md`. Use as a per-tick checklist when you find yourself unsure what to do next.
-
 ## Tick cadence
 
 You don't run on a real timer — you process a tick when:
@@ -64,11 +62,7 @@ case "$STATUS" in
     MISSION_ID=$(basename "$MISSION")
     echo "[$NOW] Task $TID ($AGENT) failed: $(echo "$RESULT" | head -c 300)" >> ".pilot/post-mortems/$MISSION_ID.md"
 
-    # Apply failure handling per AGENTS.md.
-    # Quick triage:
-    #   - error type "EntryNotReadyError" → run the fix command, retry once
-    #   - other typed code → consult references/error-codes.md in the `official/cli` skill, decide retry / replace agent / escalate
-    #   - generic stderr only → likely instruction-quality issue; re-dispatch with clearer instructions
+    # On task failure, see references/monitoring/stuck-task-intervention.md → Failure triage.
     ;;
 
   cancelled)
@@ -160,16 +154,7 @@ Trigger only if steps 2-5 produced no actual work this tick. Cycle through (over
 
 ## Step 7: Wait
 
-```sh
-# Wait for the soonest of:
-#   - tick interval (e.g. 60s)
-#   - user input on stdin
-#   - signal that a task event fired (you can check by polling, see step 1)
-#
-# Implementation: a simple `sleep 60` + checking stdin readiness
-# is sufficient. More sophisticated agents can use a select-style
-# wait, but it's not required.
-```
+Wait for tick interval, stdin, or task event.
 
 ## Mission completion
 
@@ -193,12 +178,4 @@ When a mission can't be completed (irrecoverable failure / user cancels):
 
 ## When to surface to the user
 
-Don't be silent for too long. Send a session-terminal status update when:
-
-- A mission completes successfully (with deliverable)
-- A mission abandons (with reason + post-mortem pointer)
-- A high-confidence escalation is needed
-- It's the start of a new "shift" (e.g. weekly all-hands trigger)
-- The user asks
-
-Don't be noisy. Don't send a status update for every task completion if the mission has 50 tasks — batch them in a daily/mission summary.
+Send a session-terminal status update on: mission complete, mission abandon, high-confidence escalation, new shift (e.g. weekly all-hands), or user ask. Batch task-level events into a daily/mission digest.

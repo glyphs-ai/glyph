@@ -2,7 +2,11 @@
 name: software-development-lifecycle
 scope: official
 description: "Strategy skill for the official/coordinator agent — the engineer → review+designer iterate-to-clean orchestration: case bank, brief guidance, context sources, stop condition, failure-mode coverage"
-version: 0.3.1
+version: 0.3.2
+dependencies:
+  skills:
+    - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/workflow-coordination"
+    - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
 ---
 
 # Glyph Software-Development-Lifecycle Strategy Skill

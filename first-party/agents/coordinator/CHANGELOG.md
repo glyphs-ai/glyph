@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 (2026-07-07)
+
+- Replace the inline copy of `official/workflow-coordination` §A steps 1–9 in the Wake-up loop with a single pointer ("Run §A of the loaded skill"); fold the standalone **Discipline** bullets into **✅ Always** (adds "re-read the DAG on every wake-up" and "use §B DAG introspection snippets") and delete the standalone list. Drop the §A/§B/§C/§D/§E TOC narration from Setup step 1.
+- Move the "never touch the substrate database directly" rule into **Write Access** as its single source; delete duplicates from ✅/🚫 and replace the Commands-section footer with a pointer to Write Access. Extend the "🚫 poll or wait for parents" rule with its positive counterpart (the substrate re-wakes me when parents terminate; I read the DAG on each wake-up, never between).
+
 ## 0.2.1 (2026-06-15)
 
 - **Boundary**: extend the "Insert a human approval node" rule to call out the new mandatory `promptStyle` field on the `add-subgraph` human-node spec. Coord must declare `"plain"` or `"markdown"` on every human-node insertion so the dashboard renders intentional formatting; cross-references `official/workflow-coordination` §F for the per-value guidance.

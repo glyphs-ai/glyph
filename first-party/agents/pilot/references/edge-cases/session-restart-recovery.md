@@ -103,11 +103,4 @@ The key: only mark completions as processed AFTER you've handled them. Update `s
 
 If you crash mid-processing, the next tick re-processes those completions — which is fine because processing is idempotent (you append to progress.md, append to hires.md — duplicates would be visible but not corrupting). The MISSION steps don't get re-dispatched because the next-step decision is based on plan.md state, which only gets updated when you actually advance.
 
-## Pre-emptive resilience
-
-Habits that make recovery easier:
-
-- **Write `tasks.json` IMMEDIATELY after every dispatch**, before doing anything else.
-- **Update `state.json` after every meaningful tick**, not just the last one of a session.
-- **Write letters generously** — every notable session ends with a letter for future-you.
-- **Don't keep important state in memory.** If you need it across ticks, write it to a file.
+Persist all cross-tick state to a file — anything you'll need on the next tick must land on disk before this tick ends. State-file discipline (append-only vs mutating vs read-mostly) lives in `references/state-management.md`.

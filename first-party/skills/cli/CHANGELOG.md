@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 (2026-07-07)
+
+Generalize the skill to cover every CLI command group as a first-class citizen.
+
+- Rewrite `SKILL.md` as a generalized CLI map. New top-level "Command surface at a glance" table indexes every group with a one-line purpose and its reference doc. The skill body devotes equal weight to `workspace` / `session` / `task` / `schedule` / `catalog` / `workflow` / `runtime` / server-inspection.
+- Add `references/commands.md` — full per-subcommand reference covering all 8 command groups (workspace, session, task, schedule, catalog {agent,skill,mcp}, workflow, runtime, server-inspection) in one file with a shared anchor scheme. Documents flags, HTTP route, body shape, response shape, exit-code notes, and per-command gotchas (e.g. `schedule patch --details ""` does NOT clear — use `--clear-details`).
+- Add `references/json-shapes.md` — payload shapes returned by `--json`. Covers `Workspace`, `Session`, `Task`, `ActivityItem`, `TerminalResult` (task and workflow arms), `Schedule`, `AgentEntry` + `BlockedReason`, `ResolveManifest` (with `planToken` semantics), `WorkflowHeader`, `WorkflowDag` (`WorkflowNode` + `WorkflowEdge`), `Runtime`, `ServerStatus`. Flags optional-vs-null-vs-absent semantics per field.
+- Rename `references/workflows.md` → `references/playbooks.md`. Goal-oriented CLI plumbing: install-and-verify agent, dispatch-and-wait, monitor task, sync entry, clean up, onboard fresh workspace, create a local agent on the fly.
+- Fold `references/workflow-commands.md` into `references/commands.md#workflow` so the workflow subcommand reference lives in the same file and shape as every other command group.
+- Workflow surface reflects the current wire:
+  - `add-node` and `add-edge` are documented as convenience wrappers over `POST /subgraph` (CLI builds a one-node or one-edge subgraph payload internally).
+  - `add-subgraph` edge shape: `edges[].from/to` are `{ kind: "existing", id }` or `{ kind: "temp", tempId }` (matches `NodeRefWire`).
+  - `add-node` supports `human` kind (choices optional; omit for freeform text input).
+  - `remove-node`, `remove-edge`, `replace-spec` removed — no longer part of the CLI or server surface.
+- Update `first-party/agents/coordinator/AGENTS.md` reference to point at `references/commands.md#workflow`.
+- Drop coordinator / worker consumer vocabulary from `SKILL.md` and the `workflow` section of `references/commands.md`. The CLI reference now describes the surface neutrally; consumer-role framing (who calls which mutation subcommand) is owned upstream by the strategy skill / orchestrator agent that consumes this CLI.
+- Drop the `Coord-only?` column from the `references/commands.md#workflow` subcommand index and the meta paragraph explaining the marker.
+- Delete the `Common patterns` section (coord introspection, verdict reading, batch DAG expansion, finish) from `references/commands.md#workflow`. That material duplicated the orchestration playbook that lives upstream in `official/workflow-coordination`; the CLI reference is per-subcommand only.
+- Drop the `packages/server/src/routes/_shared.ts:SAFE_ERROR_NAMES` source-path reference from `references/error-codes.md` (rot-prone internal file coupling); collapse the two-paragraph internal-detail explanation of "where `code` values come from" to a single sentence stating `code` is a stable wire contract, and merge the `When you see no code` edge case into the main table row.
+- Add a strict `ready` gate to the "install an agent and make sure it's ready to dispatch" playbook in `references/playbooks.md` (`test "$FINAL" = ready || exit 1`) so the branch cannot silently exit with a still-blocked entry.
+- Flip the `--purge` clean-up comment in `references/playbooks.md` from `Don't --purge casually` prohibition to positive guidance: use plain `task rm` for terminal tasks; `--purge` only when the workdir isn't needed.
+- Prose polish in `SKILL.md`: delete the meta `What this skill is NOT` and `When to use` sections, rewrite the `Don't…` anti-patterns as positive `Pitfalls`, and move the `Common SSE resume pattern` snippets out into `references/playbooks.md#monitor-a-long-running-task` (single source of truth) with only a pointer left in `SKILL.md`.
+- Trim the meta opener in `references/playbooks.md` ("Each playbook is goal-oriented…") to "Copy and adapt."
+- No behaviour changes; documentation-only.
+
 ## 0.2.2 (2026-06-24)
 
 - Drop the removed `--metadata-file` flag and `metadata?` body field from the `glyph workflow create` reference in `references/workflow-commands.md`. The caller-facing workflow `metadata` input no longer exists on the HTTP `CreateWorkflowBody` or the CLI, so the optional flags are now `--details` / `--details-file` only and the body shape is `{ brief, coordinatorAgent, details? }`.

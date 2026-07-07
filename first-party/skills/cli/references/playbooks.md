@@ -1,6 +1,6 @@
-# Common workflows
+# Common playbooks
 
-Each playbook is goal-oriented: name the goal, list the steps with branches. Copy and adapt.
+Copy and adapt.
 
 > All examples assume `GLYPH_WORKSPACE=<id>` is already set. If it isn't, every command would prepend `--workspace-id <id>`.
 
@@ -55,8 +55,10 @@ case "$S" in
       echo "$REASON" | jq '.missingDeps'
       exit 1
     fi
-    # Re-verify after fixes.
-    glyph catalog agent show "$FQN" --json | jq '.status'
+    # Re-verify after fixes. Must land at `ready` — anything else is a hard fail.
+    FINAL=$(glyph catalog agent show "$FQN" --json | jq -r '.status')
+    echo "$FINAL"
+    test "$FINAL" = ready || exit 1
     ;;
 esac
 ```
@@ -199,8 +201,8 @@ glyph task list --status failed --json \
   | jq -r '.[].id' \
   | while read TID; do glyph task rm "$TID"; done
 
-# Hard delete (purge): also rm the workdir and runtime's per-task state.
-# Use only when you're sure you don't want stderr.log etc.
+# Use plain `task rm` for terminal tasks; `--purge` only when you don't need the workdir
+# (stderr.log and runtime per-task state are also removed).
 glyph task rm <tid> --purge
 ```
 

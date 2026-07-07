@@ -2,7 +2,7 @@
 name: engineer
 scope: official
 description: "Engineering agent for glyph — implements features, fixes bugs, and opens PRs on glyphs-ai/glyph"
-version: 0.2.1
+version: 0.2.3
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/git-pr"
@@ -57,49 +57,51 @@ If you only touched one package, narrow the test step with `--filter` to save ti
 ```
 T_top  surfaces       dashboard, cli
 T3     host           server
-T2     application    api (orchestration + wire types), sdk (generated client)
+T2     application    api (orchestration + OpenAPIHono route factories), sdk (generated client)
 T1     modes          session, task, workflow
 T0     foundations    catalog, runtime, schedule, terminal, workspace
 ```
 
-Imports flow **downward only**. The fence is enforced by `packages/e2e/test/architecture/tier-invisibility.test.ts` — if you break the layering, this test fails before CI does.
+Imports flow **downward only**. The fence is enforced by the tier-invisibility architecture test — if you break the layering, this test fails before CI does.
 
 ### Layout
 
-```
-packages/
-  catalog/        T0  agent/skill/MCP definitions, drizzle schema, repository pattern
-  runtime/        T0  copilot + other runtime adapters, placeholder substitution
-  schedule/       T0  cron-like dispatch
-  terminal/       T0  shell wrapping
-  workspace/      T0  workspace registry + entity
-  session/        T1  interactive sessions
-  task/           T1  headless one-shot tasks
-  workflow/       T1  multi-task DAG (workflows + workflow_nodes + workflow_edges, mutated by coordinator nodes)
-  api/            T2  cross-T0/T1 orchestration + wire DTOs under src/wire/ (no HTTP transport)
-  sdk/            T2  generated typed HTTP client + wire types; browser-safe, consumed by dashboard/cli
-  server/         T3  HTTP routes, error sanitization, the binary's entrypoint
-  dashboard/      T_top  React UI + MSW mocks
-  cli/            T_top  command registrars
-  e2e/                 architecture invariants + spawn-smoke
-  _template/           scaffold for `pnpm new-pkg`
+Packages (see the tier diagram above for T0–T_top placement):
 
-first-party/
-  agents/<name>/AGENTS.md + CHANGELOG.md
-  skills/<name>/SKILL.md + CHANGELOG.md (some have references/)
-  mcps/<name>.json
-  # authoritative schema rules live in the `official/meta-agent-schema` skill
+- `packages/catalog/` — agent/skill/MCP definitions, drizzle schema, repository pattern
+- `packages/runtime/` — copilot + other runtime adapters, placeholder substitution
+- `packages/schedule/` — cron-like dispatch
+- `packages/terminal/` — shell wrapping
+- `packages/workspace/` — workspace registry + entity
+- `packages/session/` — interactive sessions
+- `packages/task/` — headless one-shot tasks
+- `packages/workflow/` — multi-task DAG (workflows + workflow_nodes + workflow_edges, mutated by coordinator nodes)
+- `packages/api/` — cross-T0/T1 orchestration + `OpenAPIHono` route factories under `src/routes/` (no HTTP transport)
+- `packages/sdk/` — generated typed HTTP client + wire types; browser-safe, consumed by dashboard/cli
+- `packages/server/` — HTTP routes, error sanitization, the binary's entrypoint
+- `packages/dashboard/` — React UI + MSW mocks
+- `packages/cli/` — command registrars
+- `packages/e2e/` — architecture invariants + spawn-smoke
+- `packages/_template/` — scaffold for `pnpm new-pkg`
 
-scripts/
-  inline-migrations.mjs  inlines drizzle migrations into the CLI bundle
-  copy-dashboard.mjs     inlines dashboard dist into the CLI bundle
-  new-pkg.mjs            scaffolds a new packages/<name>/ from _template
+Catalog (`first-party/`):
 
-docs/
-  architecture.md   tier layering (read first)
-  pkg-template.md   conventions every package follows
-  RELEASING.md      cut a release + npm publish flow
-```
+- `first-party/agents/<name>/AGENTS.md + CHANGELOG.md`
+- `first-party/skills/<name>/SKILL.md + CHANGELOG.md` (some have `references/`)
+- `first-party/mcps/<name>.json`
+- Authoritative schema rules live in the `official/meta-agent-schema` skill.
+
+Scripts (`scripts/`):
+
+- `inline-migrations.mjs` — inlines drizzle migrations into the CLI bundle
+- `copy-dashboard.mjs` — inlines dashboard dist into the CLI bundle
+- `new-pkg.mjs` — scaffolds a new `packages/<name>/` from `_template`
+
+Canonical docs (read these before touching an unfamiliar package):
+
+- `docs/architecture.md` — tier layering (read first)
+- `docs/pkg-template.md` — conventions every package follows
+- `docs/RELEASING.md` — cut a release + npm publish flow
 
 ### Per-package source/test layout
 
@@ -169,9 +171,9 @@ function parseConfig(raw: unknown): Config {
 const cfg = JSON.parse(text) as any;
 ```
 
-### Wire DTOs live in api's `wire/` surface
+### Wire schemas live in the domain packages; routes live in `api`
 
-If you add a new HTTP route, the request and response types belong in `packages/api/src/wire/` (declare the route in `packages/api/src/wire/routes/<domain>.ts`), NOT inline in the route handler. `dashboard` and `cli` import wire types from `@glyphs-ai/sdk` only — they MUST NOT import from `@glyphs-ai/api` or any deeper tier (enforced by the tier-invisibility test).
+If you add a new HTTP route, the request / response **zod schemas** belong in the owning domain package's `application/<use-case>.ts` module (e.g. `DispatchTaskRequestSchema` in `packages/task/src/application/dispatch-task.ts`), and the route itself is a `createRoute(...)` entry in that domain's `OpenAPIHono` factory under `packages/api/src/routes/<domain>.ts` — never inline in a server handler. `server` only mounts the factories; `@glyphs-ai/sdk` is regenerated from the resulting OpenAPI spec. `dashboard` and `cli` import the generated operations + types from `@glyphs-ai/sdk` only — they MUST NOT import from `@glyphs-ai/api` or any deeper tier (enforced by the tier-invisibility architecture test).
 
 ## Testing
 
@@ -191,10 +193,6 @@ Always use the `git-pr` skill — read its body before any `git` command. Summar
 4. PR description structure: **What** / **Why** / **Changes** / **How to test**.
 5. Clean up: `git --git-dir=... worktree remove $WORK_DIR/repo --force` at the end.
 
-### PowerShell encoding caveat for `gh` body flags
-
-On Windows from PowerShell, always use `gh pr edit --body-file <utf8-file>`, never `gh pr edit --body "<text>"`. PowerShell argument encoding mangles em-dashes / arrows / section signs into multi-byte mojibake. The `--body-file` path always reads the file as UTF-8 and round-trips cleanly. The same caveat applies to `gh pr create --body-file`, `gh issue create --body-file`, and any other `gh` command that accepts `--body`.
-
 ## Comment hygiene
 
 - **No transient PM labels in code comments** — no PR numbers, no issue numbers, no "iter-N", no version tags like `v2.3`, no mission IDs. Comments must be self-explanatory and durable.
@@ -207,7 +205,7 @@ On Windows from PowerShell, always use `gh pr edit --body-file <utf8-file>`, nev
 
 - Read `docs/architecture.md` and `docs/pkg-template.md` before editing a package you haven't touched recently.
 - Run `pnpm build && pnpm typecheck && pnpm test && pnpm lint` before opening a PR.
-- Use the existing `repository pattern` / `atomic-write helpers` / api `wire/` surface — don't invent parallel conventions.
+- Use the existing `repository pattern` / `atomic-write helpers` / api route factories — don't invent parallel conventions.
 - Keep PRs surgical: one PR, one problem, one reviewable diff.
 - Write tests for new behavior in the same PR as the source change.
 - Use conventional commits and link the PR to the relevant issue if there is one.
@@ -217,7 +215,7 @@ On Windows from PowerShell, always use `gh pr edit --body-file <utf8-file>`, nev
 - Adding a new `packages/<pkg>` (use `pnpm new-pkg` and confirm it fits the tier model).
 - Adding a new top-level dependency to root or any package (lockfile churn + supply-chain surface).
 - Changing the drizzle schema (`packages/<pkg>/src/schema.ts`) — requires a `db:generate` migration and an inline-migrations refresh.
-- Changing the wire contract (`packages/api/src/wire/`) in a backward-incompatible way.
+- Changing the wire contract (a domain package's request / response zod schema, or a route in `packages/api/src/routes/`) in a backward-incompatible way.
 - Changing CI workflows in `.github/workflows/`.
 
 ### 🚫 Never
@@ -225,7 +223,7 @@ On Windows from PowerShell, always use `gh pr edit --body-file <utf8-file>`, nev
 - Push directly to `main`. Always open a PR.
 - Commit secrets, tokens, or API keys.
 - Add a sibling package manager (no `npm-shrinkwrap.json`, `yarn.lock`, `bun.lockb`).
-- Break the tier layering (the `tier-invisibility.test.ts` test will catch it; do not silence it).
+- Break the tier layering (the tier-invisibility architecture test will catch it; do not silence it).
 - Replace atomic writes with bare `fs.writeFile` in a repository module.
 - Merge your own PR (human-only decision).
 - Cut an npm release or publish `@glyphs-ai/glyph` (human-only decision).
