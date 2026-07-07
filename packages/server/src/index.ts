@@ -267,84 +267,64 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
   app.route("/api/runtimes", runtimesRoutes(runtimeRegistry));
   app.route("/api/workspaces", workspacesRoutes(application));
 
-  // Workspace-scoped sessions / tasks / catalog. Middleware resolves the
-  // `:id` workspace once and stashes the whole `WorkspaceContext` on
-  // c.var; each route family reads the bits it needs. 404 if id is not
-  // registered; 5xx if workspace.db cannot be opened.
-  const sessionsApp = createApiApp<{ Variables: WorkspaceVars }>();
-  sessionsApp.use("/:id/sessions/*", resolveWorkspaceMiddleware(application, logger));
-  sessionsApp.route(
+  // Workspace-scoped families (sessions / tasks / scheduled-* / schedules /
+  // workflows / catalog) share one sub-app. The resolve middleware runs
+  // once for every `/:id/*` path and stashes the whole `WorkspaceContext`
+  // on c.var; each route family reads the bits it needs. 404 if id is not
+  // registered; 5xx if workspace.db cannot be opened. Workspace CRUD
+  // (`workspacesRoutes`, mounted above) is matched first for `/:id` and
+  // `/:id/reload`, so those endpoints stay outside this middleware.
+  const wsApp = createApiApp<{ Variables: WorkspaceVars }>();
+  wsApp.use("/:id/*", resolveWorkspaceMiddleware(application, logger));
+
+  wsApp.route(
     "/:id/sessions",
     sessionsRoutes((c) => c.get("workspaceContext")),
   );
-  app.route("/api/workspaces", sessionsApp);
-
-  const tasksApp = createApiApp<{ Variables: WorkspaceVars }>();
-  tasksApp.use("/:id/tasks/*", resolveWorkspaceMiddleware(application, logger));
-  tasksApp.route(
+  wsApp.route(
     "/:id/tasks",
     tasksRoutes((c) => c.get("workspaceContext").tasks),
   );
-  app.route("/api/workspaces", tasksApp);
-
   // `/scheduled-tasks` is the schedule-origin sibling of `/tasks`. It
   // shares the same workspace-scoped TaskModule (via the same
   // `workspaceContext.tasks` resolver) so storage / cancellation /
   // dispatch all observe one in-memory state — splitting at the route
   // layer, not the service layer, keeps the seam at the URL where it
   // belongs.
-  const scheduledTasksApp = createApiApp<{ Variables: WorkspaceVars }>();
-  scheduledTasksApp.use("/:id/scheduled-tasks/*", resolveWorkspaceMiddleware(application, logger));
-  scheduledTasksApp.route(
+  wsApp.route(
     "/:id/scheduled-tasks",
     scheduledTasksRoutes((c) => c.get("workspaceContext").tasks),
   );
-  app.route("/api/workspaces", scheduledTasksApp);
-
   // `/scheduled-workflows` is the schedule-origin sibling of
   // `/workflows`. Returns workflows launched by cron triggers,
   // filtered to `origin = 'schedule'`.
-  const scheduledWorkflowsApp = createApiApp<{ Variables: WorkspaceVars }>();
-  scheduledWorkflowsApp.use(
-    "/:id/scheduled-workflows/*",
-    resolveWorkspaceMiddleware(application, logger),
-  );
-  scheduledWorkflowsApp.route(
+  wsApp.route(
     "/:id/scheduled-workflows",
     scheduledWorkflowsRoutes((c) => c.get("workspaceContext").workflows),
   );
-  app.route("/api/workspaces", scheduledWorkflowsApp);
-
   // Schedule CRUD + run + preview, split by target kind. Each kind is a
   // sibling collection under `/schedules/<kind>`; `/schedules/preview-cron` is
-  // the one kindless endpoint (a cron calculator, touches no stored row). All
-  // share the same workspace-scoped per-context state via one middleware.
-  const schedulesApp = createApiApp<{ Variables: WorkspaceVars }>();
-  schedulesApp.use("/:id/schedules/*", resolveWorkspaceMiddleware(application, logger));
-  schedulesApp.route(
+  // the one kindless endpoint (a cron calculator, touches no stored row).
+  wsApp.route(
     "/:id/schedules/task",
     schedulesTaskRoutes((c) => c.get("workspaceContext").schedules),
   );
-  schedulesApp.route(
+  wsApp.route(
     "/:id/schedules/workflow",
     schedulesWorkflowRoutes(
       (c) => c.get("workspaceContext").schedules,
       (c) => c.get("workspaceContext").workflows,
     ),
   );
-  schedulesApp.route(
+  wsApp.route(
     "/:id/schedules/preview-cron",
     schedulesPreviewCronRoutes((c) => c.get("workspaceContext").schedules),
   );
-  app.route("/api/workspaces", schedulesApp);
-
   // Workflow read + lifecycle surface. The substrate is kind-agnostic
   // and stores nodes as `{ kind, spec: unknown }`; the mounted api routes
   // flatten those per-kind shapes into the wire projection the dashboard
   // and CLI consume.
-  const workflowsApp = createApiApp<{ Variables: WorkspaceVars }>();
-  workflowsApp.use("/:id/workflows/*", resolveWorkspaceMiddleware(application, logger));
-  workflowsApp.route(
+  wsApp.route(
     "/:id/workflows",
     workflowsRoutes(
       (c) => c.get("workspaceContext").workflows,
@@ -352,15 +332,11 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
       (c) => c.get("workspaceContext").workspace.workspaceDir,
     ),
   );
-  app.route("/api/workspaces", workflowsApp);
-
-  const catalogApp = createApiApp<{ Variables: WorkspaceVars }>();
-  catalogApp.use("/:id/catalog/*", resolveWorkspaceMiddleware(application, logger));
-  catalogApp.route(
+  wsApp.route(
     "/:id/catalog",
     catalogRoutes((c) => c.get("workspaceContext").catalog),
   );
-  app.route("/api/workspaces", catalogApp);
+  app.route("/api/workspaces", wsApp);
 
   // OpenAPI: assemble the 3.1 document from every mounted OpenAPIHono
   // sub-app, inject the mount-level workspace `id` params, and serve it,
