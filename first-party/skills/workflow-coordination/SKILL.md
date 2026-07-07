@@ -2,14 +2,14 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.4.4
+version: 0.5.0
 ---
 
 # Glyph Workflow Coordination Skill
 
 The framework every workflow coordinator wake-up loads: how to read the DAG, what schema reviewer workers emit in `verdict.json`, how to plumb context into worker briefs, and how to author a sibling strategy skill. The case bank, brief templates, and stop condition for any given workflow live in a sibling **strategy skill**; the scaffolding here is strategy-agnostic.
 
-CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `finish`, `task show`) are stable command names — consult your catalog's CLI skill for exact flags.
+CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `prune-subgraph`, `finish`, `task show`) are stable command names — consult your catalog's CLI skill for exact flags.
 
 ---
 
@@ -154,6 +154,30 @@ When `glyph workflow add-subgraph` fails, the error `type` names the family and 
 **`WorkflowNodeNotMutable` — the target of an `edges[].to` pointing at an existing node has already started (only `not_started` nodes accept new incoming edges):**
 
 Don't rewrite in-flight nodes; insert a fresh temp node and connect the new work through it.
+
+### Retract a mis-planned fan-out via prune-subgraph
+
+`add-subgraph`'s structural inverse. When a wake-up realizes a batch it queued is wrong — but the nodes haven't started yet — retract them instead of letting dead work dispatch. Use `glyph workflow prune-subgraph <wf> --spec-file <path>` with a body naming the node ids to remove:
+
+```jsonc
+{ "nodeIds": ["<node-id-a>", "<node-id-b>"] }
+```
+
+The substrate removes those nodes **and every edge touching them** in one transaction and returns `{ prunedNodeIds, prunedEdges }`. It is all-or-nothing: if any check below trips, nothing is removed. Three constraints follow from keeping the surviving DAG connected and coord-anchored:
+
+- Only `not_started` nodes are prunable (a node that already dispatched is real work — cancel it via `cancel-node`, don't prune it).
+- The phase-0 bootstrap coordinator can never be pruned.
+- After removal, every surviving non-root node must still have a parent, and every surviving non-root coordinator must still have a coordinator parent.
+
+**`WorkflowPruneRejected` — the prune batch was refused; `reason.kind` names why:**
+
+| `reason.kind` | What tripped it | Forward fix |
+|---|---|---|
+| `nodeNotFound` | A requested id isn't in this workflow. | Re-read the DAG (`glyph workflow dag`); prune only ids that exist. |
+| `nodeNotStarted` | A target has already started (`ready` / `running` / terminal). `reason.status` shows which. | Leave started nodes alone; `cancel-node` an in-flight worker instead. |
+| `rootCoordProtected` | A target is the phase-0 bootstrap coordinator. | Never prune the root; it anchors the whole DAG. |
+| `orphan` | Removing the batch would strand a surviving node with no parents. `reason.nodeId` is the would-be orphan. | Include the orphan in the same prune batch, or keep the parent it depends on. |
+| `coordChainBroken` | A surviving coordinator would keep only worker parents (its coord parent was pruned). `reason.nodeId` is that coord. | Prune the dependent coord in the same batch, or keep a coord parent for it. |
 
 ---
 

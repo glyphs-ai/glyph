@@ -22,6 +22,7 @@ import type {
   WorkflowDagConflict,
   WorkflowNodeNotFound,
   WorkflowNodeNotMutable,
+  WorkflowPruneRejected,
 } from "./workflow-entity-errors.js";
 import { workflowNodeNotMutable } from "./workflow-entity-errors.js";
 import type { WorkflowFailure } from "./workflow-failure.js";
@@ -414,6 +415,83 @@ export class WorkflowEntity {
     return ok({ insertedNodes: insertedResponse });
   }
 
+  /**
+   * Structural inverse of {@link addSubgraph}: retract a set of still-unstarted
+   * nodes and every edge adjacent to them, in one save. Every target must exist,
+   * be `not_started`, and not be the root coordinator; after simulated removal
+   * every surviving non-root node must still have a parent and every surviving
+   * non-root coord must still have a coord parent. All checks reject before any
+   * mutation, so a rejected prune leaves the aggregate untouched.
+   *
+   * Removing `not_started` downstream nodes cannot violate the
+   * `phase = max(parent.phase) + 1` invariant on survivors, so no phase
+   * recomputation is needed. Reachability / "can the graph still make progress"
+   * is intentionally NOT enforced here — that is the engine's stuck-recovery
+   * concern.
+   */
+  pruneSubgraph(args: { readonly nodeIds: readonly WorkflowNodeId[] }): Result<
+    {
+      readonly prunedNodeIds: readonly WorkflowNodeId[];
+      readonly prunedEdges: readonly {
+        readonly from: WorkflowNodeId;
+        readonly to: WorkflowNodeId;
+      }[];
+    },
+    WorkflowAlreadyTerminal | WorkflowPruneRejected
+  > {
+    const running = this.requireRunning();
+    if (running.isErr()) return err(running.error);
+    const targetIds = uniqueNodeIds(args.nodeIds);
+    const targets = new Set<WorkflowNodeId>();
+    for (const nodeId of targetIds) {
+      const node = this.nodeById(nodeId);
+      if (node === undefined || node.workflowId !== this.id)
+        return err(pruneRejected({ kind: "nodeNotFound", workflowId: this.id, nodeId }));
+      if (node.status !== "not_started")
+        return err(
+          pruneRejected({
+            kind: "nodeNotStarted",
+            workflowId: this.id,
+            nodeId,
+            status: node.status,
+          }),
+        );
+      if (isRootCoord(node))
+        return err(pruneRejected({ kind: "rootCoordProtected", workflowId: this.id, nodeId }));
+      targets.add(nodeId);
+    }
+    const survivors = this.nodes.filter((node) => !targets.has(node.id));
+    const survivingEdges = this.edges.filter(
+      (edge) => !targets.has(edge.from) && !targets.has(edge.to),
+    );
+    const survivingParents = new Map<WorkflowNodeId, WorkflowNodeId[]>();
+    for (const edge of survivingEdges) {
+      const parents = survivingParents.get(edge.to) ?? [];
+      parents.push(edge.from);
+      survivingParents.set(edge.to, parents);
+    }
+    const survivorById = new Map(survivors.map((node) => [node.id, node]));
+    for (const node of survivors) {
+      if (isRootCoord(node)) continue;
+      const parents = survivingParents.get(node.id) ?? [];
+      if (parents.length === 0)
+        return err(pruneRejected({ kind: "orphan", workflowId: this.id, nodeId: node.id }));
+      if (
+        node.kind === COORDINATOR_KIND &&
+        !parents.some((parentId) => survivorById.get(parentId)?.kind === COORDINATOR_KIND)
+      )
+        return err(
+          pruneRejected({ kind: "coordChainBroken", workflowId: this.id, nodeId: node.id }),
+        );
+    }
+    const prunedEdges = this.edges
+      .filter((edge) => targets.has(edge.from) || targets.has(edge.to))
+      .map((edge) => ({ from: edge.from, to: edge.to }));
+    this._nodes = survivors;
+    this._edges = survivingEdges;
+    return ok({ prunedNodeIds: targetIds, prunedEdges });
+  }
+
   replaceNodeMetadata(
     nodeId: WorkflowNodeId,
     metadata: Readonly<Record<string, unknown>>,
@@ -628,14 +706,26 @@ export class WorkflowEntity {
     if (typeof prevAgent !== "string" || prevAgent.length === 0)
       return { retryCoordInserted: null, workflowFailed: false };
     const prevRetry = extractWorkflowNodeRetryMetadata(prevCoord.metadata);
-    const attempt = (prevRetry?.attempt ?? 0) + 1;
-    if (attempt > STUCK_RETRY_MAX_ATTEMPTS) {
+    // Only `coord_exited_without_action` chains accumulate toward the retry cap.
+    // `workers_finished_without_coord` is a legitimate common wake-up pattern (a
+    // coord that queues workers only then finishes; the workers landing terminal
+    // synthesizes the next coord) and must not consume a retry slot — so it gets
+    // a fresh `attempt = 1` every time and never trips the cap.
+    const countsTowardCap = stuckReason === "coord_exited_without_action";
+    // Ratchet only off a *previous* coord_exited attempt. A workers_finished
+    // retry coord records `attempt = 1` for provenance; seeding the ratchet from
+    // it would pre-charge a following coord_exited chain by one and trip the cap
+    // a retry early, so a non-coord_exited predecessor resets the count to fresh.
+    const priorCoordExitedAttempt =
+      prevRetry?.reason === "coord_exited_without_action" ? (prevRetry.attempt ?? 0) : 0;
+    const attempt = countsTowardCap ? priorCoordExitedAttempt + 1 : 1;
+    if (countsTowardCap && attempt > STUCK_RETRY_MAX_ATTEMPTS) {
       this._status = "failed";
       this._endedAt = nowIso;
       this._failure = {
         kind: "substrate",
         reason: STUCK_RETRY_LIMIT,
-        message: `stuck-coord recovery cap (${STUCK_RETRY_LIMIT}): exceeded ${STUCK_RETRY_MAX_ATTEMPTS} consecutive retry attempts without forward progress`,
+        message: `stuck-coord recovery cap (${STUCK_RETRY_LIMIT}): exceeded ${STUCK_RETRY_MAX_ATTEMPTS} consecutive coord_exited_without_action attempts without forward progress`,
       };
       this._success = undefined;
       this._cancellation = undefined;
@@ -1083,6 +1173,14 @@ function coordAgent(spec: unknown): string | undefined {
 
 function isNode(node: WorkflowNodeEntity | undefined): node is WorkflowNodeEntity {
   return node !== undefined;
+}
+
+function isRootCoord(node: WorkflowNodeEntity): boolean {
+  return node.phase === 0 && node.kind === COORDINATOR_KIND;
+}
+
+function pruneRejected(reason: WorkflowPruneRejected["reason"]): WorkflowPruneRejected {
+  return { type: "WorkflowPruneRejected", reason };
 }
 
 function compareDesc(left: string, right: string): number {

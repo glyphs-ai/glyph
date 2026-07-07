@@ -7,9 +7,10 @@
  * canonical surface for the CLI; see `commands/workflow.ts` doc-block
  * for the design rationale behind each flag.
  *
- * Mutation primitives: add-node / add-subgraph / add-edge / cancel-node /
- * finish — the DAG-growth + terminal primitives a coord agent calls via
- * HTTP from its task. The DAG is append-only: there is no remove/replace.
+ * Mutation primitives: add-node / add-subgraph / add-edge / prune-subgraph /
+ * cancel-node / finish — the DAG-growth + terminal primitives a coord agent
+ * calls via HTTP from its task. Only still-`not_started` nodes can be retracted
+ * (prune-subgraph); started / terminal nodes are immutable.
  */
 
 import { readFileSync } from "node:fs";
@@ -25,6 +26,7 @@ import {
   workflowFinish,
   workflowList,
   workflowNodeShow,
+  workflowPruneSubgraph,
   workflowRespond,
   workflowRm,
   workflowShow,
@@ -189,6 +191,17 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
     )
     .action(async (workflowId: string, opts: Record<string, unknown>) => {
       slot.result = await workflowAddSubgraph(workflowId, {
+        ...parseWorkspaceFlags(opts),
+        specFile: pickString(opts, "specFile") ?? "",
+      });
+    });
+
+  withWorkspaceFlags(workflowCmd.command("prune-subgraph"))
+    .description("Coord-only: retract N not-started nodes + their adjacent edges atomically")
+    .argument("<workflow-id>", "Workflow id")
+    .requiredOption("--spec-file <path>", "Path to JSON file matching { nodeIds:[id,...] }")
+    .action(async (workflowId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowPruneSubgraph(workflowId, {
         ...parseWorkspaceFlags(opts),
         specFile: pickString(opts, "specFile") ?? "",
       });
