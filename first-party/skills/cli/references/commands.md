@@ -1,6 +1,6 @@
 # CLI command reference (non-workflow surface)
 
-Per-group subcommand reference for `glyph workspace / session / task / schedule / catalog / runtime` plus server-inspection commands. Workflow lives separately in [`workflow-commands.md`](./workflow-commands.md); JSON payload shapes live in [`json-shapes.md`](./json-shapes.md); error codes in [`error-codes.md`](./error-codes.md).
+Per-group subcommand reference for `glyph workspace / session / task / schedule / catalog / workflow / runtime` plus server-inspection commands. JSON payload shapes live in [`json-shapes.md`](./json-shapes.md); error codes in [`error-codes.md`](./error-codes.md); goal-oriented playbooks in [`playbooks.md`](./playbooks.md).
 
 > All examples assume `GLYPH_WORKSPACE=<id>` is set unless noted. Pass `--workspace-id <id>` to act on a different workspace.
 >
@@ -17,6 +17,7 @@ Per-group subcommand reference for `glyph workspace / session / task / schedule 
 | [`task`](#task) | `list`, `dispatch`, `show`, `activity`, `cancel`, `rm` |
 | [`schedule`](#schedule) | `list`, `create`, `show`, `enable`, `disable`, `patch`, `rm`, `run`, `preview`, `list-tasks` |
 | [`catalog`](#catalog) | `overview`, `agent {…}`, `skill {…}`, `mcp {…}` |
+| [`workflow`](#workflow) | `list`, `create`, `show`, `node-show`, `dag`, `cancel`, `rm`, `add-node`, `add-subgraph`, `add-edge`, `cancel-node`, `finish`, `respond` |
 | [`runtime`](#runtime) | `list` |
 | [Server inspection](#server-inspection) | `health`, `config`, `status`, `logs` |
 
@@ -261,6 +262,249 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 
 ---
 
+## workflow
+
+`glyph workflow <sub>` — coordinator-facing surface: it lets a workflow header live in the substrate, exposes the live DAG, and lets a `kind: coordinator` task mutate the DAG (add nodes, add edges, replace specs, cancel, finish) while it runs. Workers don't touch this surface — they just do their job and exit; the substrate joins their result back to the DAG node via `task.metadata.workflowNodeId`.
+
+> All 13 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`). The strategy skills that drive coord decisions (e.g. `official/workflow-coordination` + `official/software-development-lifecycle`) live in their own package and describe *what* to dispatch — this section documents *how*.
+
+### Subcommand map
+
+| Subcommand | Purpose | Coord-only? |
+| --- | --- | --- |
+| [`workflow list`](#workflow-list) | List workflows in the workspace | no |
+| [`workflow create`](#workflow-create) | Seed a workflow + initial coord node | no |
+| [`workflow show`](#workflow-show-workflow-id) | Print one workflow's header | no |
+| [`workflow dag`](#workflow-dag-workflow-id) | Print the full DAG snapshot | no |
+| [`workflow node-show`](#workflow-node-show-workflow-id-node-id) | Print one node's projection (with `taskId`) | no |
+| [`workflow add-node`](#workflow-add-node-workflow-id) | Insert one node attached to existing parents | **yes** |
+| [`workflow add-subgraph`](#workflow-add-subgraph-workflow-id) | Insert N nodes + intra-batch edges atomically | **yes** |
+| [`workflow add-edge`](#workflow-add-edge-workflow-id) | Add a single edge between two existing nodes | **yes** |
+| [`workflow cancel-node`](#workflow-cancel-node-workflow-id-node-id) | Cancel a single worker node | **yes** |
+| [`workflow cancel`](#workflow-cancel-workflow-id) | Cancel a running workflow (operator) | no |
+| [`workflow finish`](#workflow-finish-workflow-id) | Flip the workflow terminal | **yes** |
+| [`workflow rm`](#workflow-rm-workflow-id) | Remove a terminal workflow | no |
+| [`workflow respond`](#workflow-respond-workflow-id-node-id) | Respond to a human-kind node | no |
+
+"Coord-only" is a logical marker — the substrate no longer enforces a caller-coord authorization gate, so any client with workspace access can hit these endpoints. Mark mutation-style commands as coord-only in your own playbook to keep the human-vs-orchestrator boundary explicit.
+
+### `workflow list`
+
+- Optional filters: `--q <pattern>` (substring match on the workflow id; escapes SQL `LIKE` metacharacters server-side), `--coordinator-agent <fqn>` (exact match), `--created-since <iso>` (inclusive lower bound on `created_at`)
+- Route: `GET /workspaces/:id/workflows`
+- Output: `WorkflowHeader[]` — each element omits `iterationCount` (list path skips the per-row DAG fetch; use `show` when you need it)
+
+### `workflow create`
+
+- Required flags: `--brief <text>`, `--coord-agent <fqn>`
+- Optional flags: `--details <text>` OR `--details-file <path>` (mutually exclusive)
+- Route: `POST /workspaces/:id/workflows`
+- Body: `CreateWorkflowRequest` — `{ brief, coordinatorAgent, details? }`
+- Output: `WorkflowHeader` (status `running`, `iterationCount: 1` — one freshly-created coord node)
+
+The initial coord node is dispatched by the engine as soon as the row lands; the coord's wake-up sees a single `not_started` self-parent-less node and runs the strategy's "no parents" case.
+
+### `workflow show <workflow-id>`
+
+- Route: `GET /workspaces/:id/workflows/:wfid`
+- Output: `WorkflowHeader` with accurate `iterationCount` (count of worker dev nodes in the DAG, irrespective of status)
+
+Use over `list` whenever you need iteration count or want a single-row fetch by id.
+
+### `workflow dag <workflow-id>`
+
+- Route: `GET /workspaces/:id/workflows/:wfid/dag`
+- Output: `WorkflowDag` — `{ header: WorkflowHeader, nodes: WorkflowNode[], edges: WorkflowEdge[] }` (see [json-shapes.md#workflowdag](./json-shapes.md#workflowdag))
+
+`WorkflowNode.taskId` is filled for worker/coord nodes after dispatch. Human nodes carry no `taskId` (they have no runtime).
+
+### `workflow node-show <workflow-id> <node-id>`
+
+- Route: `GET /workspaces/:id/workflows/:wfid/nodes/:nid`
+- Output: `WorkflowNode`
+
+Use when you already know a node id (e.g. parent id from `dag`) and want to skip re-fetching the whole snapshot. Common in coord wake-up when reading a parent's `taskId` to look up its task and verdict.
+
+### `workflow add-node <workflow-id>`
+
+- Required flags: `--kind <coordinator|worker|human>`, `--spec-file <path>`
+- Optional flags: `--parent-node-ids <id1,id2,…>` (comma-separated; empty is rejected — every non-initial node needs ≥ 1 parent)
+- Route: `POST /workspaces/:id/workflows/:wfid/subgraph` — **convenience wrapper** over `add-subgraph`; the CLI builds a one-node payload with tempId `n0` and no intra-batch edges.
+- Output: `AddSubgraphResponse.insertedNodes[0]` — `{ nodeId, phase }` (the CLI unwraps the single row for a nicer default-table format)
+
+Spec shape by kind:
+
+```jsonc
+// coordinator spec
+{ "agent": "official/coordinator" }
+
+// worker spec — brief/details overlay onto the workflow header defaults
+{ "agent": "official/engineer", "brief": "…", "details": "…" }
+
+// human spec — choices are optional; omit for freeform text input
+{ "prompt": "…",
+  "choices": [ { "id": "approve", "label": "Approve" },
+               { "id": "reject",  "label": "Reject"  } ] }
+```
+
+`add-node` is fine for single-parent appends, but cannot reference nodes that don't exist yet. For "add dev + add coord-after-dev", use [`add-subgraph`](#workflow-add-subgraph-workflow-id) to keep the operation atomic.
+
+### `workflow add-subgraph <workflow-id>`
+
+- Required flags: `--spec-file <path>`
+- Route: `POST /workspaces/:id/workflows/:wfid/subgraph`
+- Body: `AddSubgraphRequest`:
+
+  ```jsonc
+  {
+    "nodes": [
+      { "tempId": "dev",   "kind": "worker",
+        "existingParents": ["<existing-node-id>"],
+        "spec": { "agent": "official/engineer", "brief": "…", "details": "…" } },
+      { "tempId": "coord", "kind": "coordinator",
+        "spec": { "agent": "official/coordinator" } }
+    ],
+    "edges": [
+      { "from": { "kind": "temp", "tempId": "dev" },
+        "to":   { "kind": "temp", "tempId": "coord" } }
+    ]
+  }
+  ```
+
+- Output: `AddSubgraphResponse` — `{ insertedNodes: [{ tempId, nodeId, phase }] }`
+
+Substrate rules enforced atomically:
+- Node refs on `edges[].from/to` may be `{ kind: "existing", id }` for a node already in the DAG, or `{ kind: "temp", tempId }` for a sibling in the same batch.
+- `existingParents` on a node lists existing-node ids only (no tempIds; use `edges` to wire intra-batch).
+- No cycles; the substrate rejects the whole batch on any invariant violation and inserts nothing.
+
+The coord strategies build their "dev + next-coord" or "review + designer + next-coord" expansions with this command so the engine sees a self-consistent DAG slice.
+
+### `workflow add-edge <workflow-id>`
+
+- Required flags: `--from-node-id <id>`, `--to-node-id <id>`
+- Route: `POST /workspaces/:id/workflows/:wfid/subgraph` — **convenience wrapper**: the CLI builds a `{ nodes: [], edges: [{ from: {kind:"existing",id}, to: {kind:"existing",id} }] }` payload.
+- Output: `AddSubgraphResponse.insertedNodes` (empty on pure-edge add, so table mode prints `edge … inserted`); use `--json` if you want the raw shape
+
+Destination node must be `not_started`. Adding an edge feeding a running / terminal node is rejected.
+
+### `workflow cancel-node <workflow-id> <node-id>`
+
+- Route: `POST /workspaces/:id/workflows/:wfid/nodes/:nid/cancel`
+- Body: empty (mirrors `task cancel`)
+- Output: `WorkflowNode`
+
+Runner-level defaults supply the reason: worker nodes get `"cancelled by coordinator"`; coord nodes get `"cancelled by operator (workflow cancel)"`. The reason lands on the underlying task entity's `cancellation.message` — read via `glyph task show <taskId>`.
+
+### `workflow cancel <workflow-id>`
+
+- Optional flags: `--message <text>` (defaults to empty), `--kind <user>` (only `"user"` is accepted)
+- Route: `POST /workspaces/:id/workflows/:wfid/cancel`
+- Body: `CancelWorkflowRequest` — `{ cancellation: { kind: "user", message } }`
+- Output: `WorkflowHeader`
+
+Triggers the cascade reconciler: every non-terminal node is cancelled with reason `"workflow cancelled"`. Use sparingly — coord normally finishes itself via `finish` instead of being externally cancelled.
+
+### `workflow finish <workflow-id>`
+
+- Required flags: `--outcome <succeeded|failed>`
+- Mutually exclusive: `--summary <text>` (only with `--outcome succeeded`; sets `success.output`); `--message <text>` (**required** with `--outcome failed`; sets `failure.message`)
+- Route: `POST /workspaces/:id/workflows/:wfid/finish`
+- Body: `FinishWorkflowRequest`:
+
+  ```jsonc
+  // succeeded
+  { "outcome": "succeeded", "success": { "output": <string|null> } }
+  // failed
+  { "outcome": "failed",
+    "failure": { "kind": "coordinator", "message": "<reason>" } }
+  ```
+
+- Output: `WorkflowHeader`
+
+`failure.kind` is always `"coordinator"` (the only currently-valid arm; future arms are reserved). Idempotent on re-call with the same outcome (substrate compares and no-ops); calling with a conflicting outcome returns `WorkflowAlreadyTerminalError` (400).
+
+### `workflow rm <workflow-id>`
+
+- Route: `DELETE /workspaces/:id/workflows/:wfid`
+- Refuses (409) if the workflow is still running. Cancel it first (`workflow cancel`) or wait for coord's `finish`.
+
+### `workflow respond <workflow-id> <node-id>`
+
+- Required (mutually exclusive): `--choice-id <id>` (must match one of `spec.choices[].id`) OR `--input <text>` (non-empty; required when `--choice-id` is omitted)
+- Route: `POST /workspaces/:id/workflows/:wfid/nodes/:nid/respond`
+- Body: `{ choiceId?, input? }`
+- Output: `WorkflowNode` (transitioned to `succeeded`)
+
+The target node must be `kind === "human"` and `status === "running"`. On success, downstream nodes are evaluated for readiness.
+
+### Common patterns
+
+#### Coord introspection (every wake-up)
+
+```sh
+# 1. Workflow header — brief, status, coord agent fqn.
+WF_HDR=$(glyph workflow show "$WFID" --json)
+
+# 2. Full DAG snapshot — nodes + edges.
+DAG=$(glyph workflow dag "$WFID" --json)
+
+# 3. Direct parents of own node id.
+PARENT_IDS=$(echo "$DAG" | jq -r --arg me "$NODE_ID" \
+               '.edges[] | select(.to == $me) | .from')
+
+# 4. Per parent: kind / status / agent / taskId.
+for P in $PARENT_IDS; do
+  echo "$DAG" | jq --arg p "$P" \
+    '.nodes[] | select(.id == $p) | {kind, status, agent: .spec.agent, taskId}'
+done
+```
+
+#### Reading a finished worker's verdict
+
+```sh
+TID=$(glyph workflow node-show "$WFID" "$PARENT_ID" --json | jq -r '.taskId')
+WD=$(glyph task show "$TID" --json | jq -r '.metadata.workdir')
+jq . "$WD/artifact/verdict.json"
+```
+
+#### Batch DAG mutation (typical coord expansion)
+
+```sh
+cat > /tmp/expand.json <<EOF
+{
+  "nodes": [
+    { "tempId": "dev",   "kind": "worker", "existingParents": ["$ME"],
+      "spec": { "agent": "official/engineer",
+                "brief":   $(printf '%s' "$WORKER_BRIEF" | jq -Rs .),
+                "details": $(printf '%s' "$WORKER_DETAILS" | jq -Rs .) } },
+    { "tempId": "coord", "kind": "coordinator",
+      "spec": { "agent": "official/coordinator" } }
+  ],
+  "edges": [
+    { "from": { "kind": "temp", "tempId": "dev" },
+      "to":   { "kind": "temp", "tempId": "coord" } }
+  ]
+}
+EOF
+
+glyph workflow add-subgraph "$WFID" --spec-file /tmp/expand.json --json
+```
+
+#### Finishing the workflow
+
+```sh
+# Success.
+glyph workflow finish "$WFID" --outcome succeeded \
+  --summary "All reviewers approved with only minor findings remaining."
+
+# Failure (reason required).
+glyph workflow finish "$WFID" --outcome failed \
+  --message "dev iteration ended in failed; cannot make progress."
+```
+
+---
+
 ## runtime
 
 `glyph runtime list`
@@ -284,7 +528,6 @@ Not workspace-scoped; useful for scripting and diagnostics.
 ## See also
 
 - [`SKILL.md`](../SKILL.md) — top-level conventions (workspace scoping, output/error discipline, anti-patterns)
-- [`workflow-commands.md`](./workflow-commands.md) — `glyph workflow …` per-subcommand reference
+- [`playbooks.md`](./playbooks.md) — multi-step goal-oriented playbooks (install-and-verify, dispatch-and-wait, monitor, sync, clean up, onboard). Workflow-substrate playbooks live in the `official/workflow-coordination` skill.
 - [`json-shapes.md`](./json-shapes.md) — payload shapes returned by `--json`
 - [`error-codes.md`](./error-codes.md) — every `code` the server emits + the matching `glyph` command to fix it
-- [`workflows.md`](./workflows.md) — multi-step playbooks (install-and-verify, dispatch-and-wait, monitor, sync, clean up, onboard)

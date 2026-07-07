@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1 (2026-07-07)
+
+- Consolidate the workflow subcommand reference into `references/commands.md#workflow` and delete `references/workflow-commands.md`. All 7 non-workflow groups + workflow now share one file, one shape, one anchor scheme.
+- Rename `references/workflows.md` → `references/playbooks.md`. The doc was never about `glyph workflow …`; it's goal-oriented CLI plumbing (install-and-verify agent, dispatch-and-wait, monitor, sync, clean up, onboard). Workflow-substrate playbooks live in `official/workflow-coordination`, not here.
+- Purge outdated workflow subcommands. The following endpoints no longer exist on the server and their CLI equivalents were dropped from `packages/cli/src/registrars/workflow.ts`; the reference now reflects reality:
+  - `remove-node` → gone (was `DELETE /workflows/:wfid/nodes/:nid`)
+  - `remove-edge` → gone (was `DELETE /workflows/:wfid/edges/:from/:to`)
+  - `replace-spec` → gone (was `PATCH /workflows/:wfid/nodes/:nid/spec`)
+- Re-anchor `add-node` and `add-edge` documentation as **convenience wrappers over `POST /subgraph`** (the CLI builds a one-node or one-edge subgraph payload internally). The old `POST /nodes` / `POST /edges` routes in the previous reference never actually existed on the current server; the doc claimed HTTP endpoints that the wire had already lost.
+- Correct the subgraph edge shape example: `edges[].from/to` are `{ kind: "existing", id }` OR `{ kind: "temp", tempId }` — not bare `{ tempId }` / `{ nodeId }` objects. Match the actual `NodeRefWire` schema.
+- Add `human`-kind node spec example to `add-node` (choices optional; omit for freeform text input). The kind was already supported by the wire and CLI validator; the doc omitted it.
+- Update cross-references: `AGENTS.md` for `first-party/agents/coordinator` now points at `references/commands.md#workflow` instead of the deleted `workflow-commands.md`.
+
 ## 0.3.0 (2026-07-07)
 
 - Rewrite `SKILL.md` as a generalized CLI map (all command groups, not just workflow). New top-level "Command surface at a glance" table indexes every group with a one-line purpose and the reference doc that covers it. Workflow content moved out of `SKILL.md`'s body and into `references/workflow-commands.md` (already existed); the skill body now devotes equal weight to `workspace` / `session` / `task` / `schedule` / `catalog` / `runtime` / server-inspection.

@@ -119,7 +119,7 @@ responsible for their own output.
        `coord-decisions/` audit entry. On blocker-severity drift, call
        `workflow finish --outcome failed --message "template drift: …"`
        per §D's severity matrix instead of dispatching.
-3. **Load the `official/cli` skill** (in particular `references/workflow-commands.md`)
+3. **Load the `official/cli` skill** (in particular `references/commands.md#workflow`)
    for the per-subcommand flags, routes, and response shapes I use below.
 4. Confirm `GLYPH_WORKSPACE` and my own `GLYPH_TASK_*` env are set;
    if they aren't, exit with a clear error — I cannot run outside the

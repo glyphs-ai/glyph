@@ -396,6 +396,5 @@ Use `glyph health` (a wire probe) instead when you actually need to know whether
 ## See also
 
 - [`SKILL.md`](../SKILL.md) — output discipline, exit codes, streaming resume pattern
-- [`commands.md`](./commands.md) — per-subcommand reference (flags, routes, which shape maps to which command)
-- [`workflow-commands.md`](./workflow-commands.md) — workflow-specific subcommands
+- [`commands.md`](./commands.md) — per-subcommand reference (flags, routes, which shape maps to which command), including `## workflow`
 - [`error-codes.md`](./error-codes.md) — server error codes and remediation

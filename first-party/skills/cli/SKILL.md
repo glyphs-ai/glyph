@@ -2,7 +2,7 @@
 name: cli
 scope: official
 description: "Control a glyph server from the CLI — workspaces, agents, tasks, sessions, schedules, catalog, workflows, and server lifecycle"
-version: 0.3.0
+version: 0.3.1
 ---
 
 # official/cli skill
@@ -42,7 +42,7 @@ Every workspace-scoped command inherits `--server / --workspace-id / --output / 
 | `task` | Dispatch one-shot tasks, inspect them, tail activity, cancel, remove | `references/commands.md#task` |
 | `schedule` | Cron-triggered task launchers (create / list / patch / enable / disable / run / preview / list-tasks) | `references/commands.md#schedule` |
 | `catalog` | Install / sync / enable / disable agents, skills, MCPs | `references/commands.md#catalog` |
-| `workflow` | Seed a DAG run, walk it, mutate it as coord, respond to human nodes | `references/workflow-commands.md` |
+| `workflow` | Seed a DAG run, walk it, mutate it as coord, respond to human nodes | `references/commands.md#workflow` |
 | `runtime` | List registered runtimes (copilot, etc) | `references/commands.md#runtime` |
 | Server inspection | `health`, `config`, `status`, `logs` — no lifecycle | `references/commands.md#server-inspection` |
 | Server lifecycle | `serve / start / stop / restart` — **out of scope** for this skill | — |
@@ -135,7 +135,6 @@ glyph task activity <tid> --follow --after "$N" | jq -c
 ## References (mandatory reading before non-trivial work)
 
 - `references/commands.md` — per-group subcommand reference (workspace / session / task / schedule / catalog / runtime / server inspection). Skim once, keep as lookup.
-- `references/workflow-commands.md` — full per-subcommand reference for `glyph workflow …` (coord surface, DAG mutation, human-node respond).
-- `references/workflows.md` — multi-step playbooks (install-and-verify agent, dispatch-and-wait, monitor task, sync entry, clean up, onboard fresh workspace, create a local agent on the fly).
+- `references/playbooks.md` — multi-step goal-oriented playbooks (install-and-verify agent, dispatch-and-wait, monitor task, sync entry, clean up, onboard fresh workspace, create a local agent on the fly). Workflow-substrate playbooks live in the `official/workflow-coordination` skill.
 - `references/json-shapes.md` — the common `--json` payload shapes with concrete field lists and optionality notes.
 - `references/error-codes.md` — every `code` value the server emits + the matching `glyph` command to fix it.
