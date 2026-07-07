@@ -60,15 +60,15 @@ const DEFAULT_NODE_TASK_POLL_INTERVAL_MS = 4000;
  *     sentinel = no filter)
  *   - `?range=today|7d|30d|all` — time-preset filter on `createdAt`
  *   - `?workflowId=<wfid>`     — master-detail selection
- *   - `?nodeTaskId=<taskId>`   — Mode B drill-down (right pane swaps
+ *   - `?nodeId=<nodeId>`   — Mode B drill-down (right pane swaps
  *     from the {@link WorkflowDetail} tab host to the full
- *     {@link WorkflowNodeTaskPane})
+ *     {@link WorkflowNodePane})
  *
  * The prior `?status=` slot was retired in favour of client-side
  * Running/Completed grouping in the list; a stale `?status=` slot in
  * old links is ignored gracefully (no read, no redirect).
  *
- * When `nodeTaskId` is present, the right pane is the node-task drill
+ * When `nodeId` is present, the right pane is the node-task drill
  * (with a header pill walking the workflow's nodes in execution
  * order). When it's absent, the right pane is the standard 3-tab
  * `WorkflowDetail`. Tab state is component-local and does NOT
@@ -88,31 +88,27 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   const setTimeFilter = (v: TimePreset) => setRangeUrl(v);
 
   const [selectedIdRaw] = useUrlSearchValue("workflowId", "");
-  const [nodeTaskIdRaw] = useUrlSearchValue("nodeTaskId", "");
+  const [nodeIdRaw] = useUrlSearchValue("nodeId", "");
   const [humanNodeIdRaw] = useUrlSearchValue("humanNodeId", "");
   const selectedId = selectedIdRaw === "" ? null : selectedIdRaw;
-  const nodeTaskId = nodeTaskIdRaw === "" ? null : nodeTaskIdRaw;
+  const nodeId = nodeIdRaw === "" ? null : nodeIdRaw;
   const humanNodeId = humanNodeIdRaw === "" ? null : humanNodeIdRaw;
 
-  // Atomic URL writer: updates `workflowId`, `nodeTaskId`, and
+  // Atomic URL writer: updates `workflowId`, `nodeId`, and
   // `humanNodeId` in a single `navigate()` call so two sequential
   // single-key setters can't race via stale `location.search`
   // snapshots. Pass `undefined` to leave a key untouched, empty
   // string / null to delete it.
   const setMasterDetailUrl = useCallback(
-    (next: {
-      workflowId?: string | null;
-      nodeTaskId?: string | null;
-      humanNodeId?: string | null;
-    }) => {
+    (next: { workflowId?: string | null; nodeId?: string | null; humanNodeId?: string | null }) => {
       const params = new URLSearchParams(location.search);
       if (next.workflowId !== undefined) {
         if (next.workflowId === null || next.workflowId === "") params.delete("workflowId");
         else params.set("workflowId", next.workflowId);
       }
-      if (next.nodeTaskId !== undefined) {
-        if (next.nodeTaskId === null || next.nodeTaskId === "") params.delete("nodeTaskId");
-        else params.set("nodeTaskId", next.nodeTaskId);
+      if (next.nodeId !== undefined) {
+        if (next.nodeId === null || next.nodeId === "") params.delete("nodeId");
+        else params.set("nodeId", next.nodeId);
       }
       if (next.humanNodeId !== undefined) {
         if (next.humanNodeId === null || next.humanNodeId === "") params.delete("humanNodeId");
@@ -134,7 +130,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   });
 
   // Atomic "Clear filters" reset. The selection keys (`workflowId`,
-  // `nodeTaskId`, `humanNodeId`) are intentionally preserved so clearing
+  // `nodeId`, `humanNodeId`) are intentionally preserved so clearing
   // filters is non-destructive to the open detail view. The time range is
   // widened to "all" (not merely deleted, which would fall back to the
   // bounded default) so clearing actually surfaces workflows that predate
@@ -187,45 +183,45 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   const detail = useWorkflowDetail(effectiveSelectedId);
 
   // Compute the selected node id for the Graph tab's highlight. When
-  // Mode B is active (`nodeTaskId` or `humanNodeId` set), map it back
+  // Mode B is active (`nodeId` or `humanNodeId` set), map it back
   // to a node id via the dag. A dag that hasn't loaded yet keeps the
   // selection null so the chip just renders un-styled.
   const selectedNodeId = useMemo(() => {
     if (humanNodeId !== null) return humanNodeId;
-    if (nodeTaskId !== null) return nodeTaskId;
+    if (nodeId !== null) return nodeId;
     return null;
-  }, [humanNodeId, nodeTaskId]);
+  }, [humanNodeId, nodeId]);
 
   // Master selection write: clears any in-flight Mode B at the same
   // time so the right pane never falls into the inconsistent state
-  // "workflow A's header + workflow B's nodeTaskId."
+  // "workflow A's header + workflow B's nodeId."
   const onSelectWorkflow = useCallback(
     (id: string | null) => {
-      setMasterDetailUrl({ workflowId: id, nodeTaskId: null, humanNodeId: null });
+      setMasterDetailUrl({ workflowId: id, nodeId: null, humanNodeId: null });
     },
     [setMasterDetailUrl],
   );
 
   // Mode B entry: parent renders the appropriate pane on the right.
-  // Human nodes use `humanNodeId`; task-backed nodes use `nodeTaskId`.
+  // Human nodes use `humanNodeId`; task-backed nodes use `nodeId`.
   const onSelectNode = useCallback(
     (node: WorkflowNode) => {
       if (node.kind === "human") {
-        setMasterDetailUrl({ nodeTaskId: null, humanNodeId: node.id });
+        setMasterDetailUrl({ nodeId: null, humanNodeId: node.id });
       } else {
-        setMasterDetailUrl({ nodeTaskId: node.id, humanNodeId: null });
+        setMasterDetailUrl({ nodeId: node.id, humanNodeId: null });
       }
     },
     [setMasterDetailUrl],
   );
 
   const onBackToWorkflow = useCallback(() => {
-    setMasterDetailUrl({ nodeTaskId: null, humanNodeId: null });
+    setMasterDetailUrl({ nodeId: null, humanNodeId: null });
   }, [setMasterDetailUrl]);
 
   const onNavigateNode = useCallback(
-    (nextTaskId: string) => {
-      setMasterDetailUrl({ nodeTaskId: nextTaskId, humanNodeId: null });
+    (nextNodeId: string) => {
+      setMasterDetailUrl({ nodeId: nextNodeId, humanNodeId: null });
     },
     [setMasterDetailUrl],
   );
@@ -234,9 +230,9 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
     (nextNodeId: string) => {
       const target = detail.dag?.nodes.find((n) => n.id === nextNodeId);
       if (target?.kind === "human") {
-        setMasterDetailUrl({ humanNodeId: nextNodeId, nodeTaskId: null });
+        setMasterDetailUrl({ humanNodeId: nextNodeId, nodeId: null });
       } else if (target !== undefined) {
-        setMasterDetailUrl({ nodeTaskId: nextNodeId, humanNodeId: null });
+        setMasterDetailUrl({ nodeId: nextNodeId, humanNodeId: null });
       }
     },
     [setMasterDetailUrl, detail.dag],
@@ -278,7 +274,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   const handleCreated = useCallback(
     (created: WorkflowHeader) => {
       setError(null);
-      setMasterDetailUrl({ workflowId: created.id, nodeTaskId: null, humanNodeId: null });
+      setMasterDetailUrl({ workflowId: created.id, nodeId: null, humanNodeId: null });
       // Best-effort: refresh the list so the new row is sourced from
       // the server rather than synthesised on the client. Status
       // grouping puts the freshly-`running` row in the Running
@@ -326,7 +322,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
       // this on the next refresh tick, but clearing inline avoids
       // the transient "workflow not found" alert.
       if (effectiveSelectedId === deleteTarget.id) {
-        setMasterDetailUrl({ workflowId: null, nodeTaskId: null, humanNodeId: null });
+        setMasterDetailUrl({ workflowId: null, nodeId: null, humanNodeId: null });
       }
       setDeleteTarget(null);
       setDeletePurge(false);
@@ -387,7 +383,7 @@ export function WorkflowsPage({ agents, currentWorkspaceId, config }: WorkflowsP
   // a shared state-machine container would over-couple pages whose evolution
   // should stay independent.
   const detailWorkflow = detail.workflow;
-  const drill = pickDrillTarget(nodeTaskId, humanNodeId);
+  const drill = pickDrillTarget(nodeId, humanNodeId);
 
   return (
     <>

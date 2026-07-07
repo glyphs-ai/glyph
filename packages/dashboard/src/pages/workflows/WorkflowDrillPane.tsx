@@ -1,7 +1,7 @@
 import type { WorkflowDag, WorkflowHeader } from "../../api";
 import type { WorkflowDrillTarget } from "./drill";
 import { WorkflowNodeHumanPane } from "./WorkflowNodeHumanPane";
-import { WorkflowNodeTaskPane } from "./WorkflowNodeTaskPane";
+import { WorkflowNodePane } from "./WorkflowNodePane";
 
 export interface WorkflowDrillPaneProps {
   /** Active drill discriminant; the caller has already narrowed it non-null. */
@@ -11,7 +11,7 @@ export interface WorkflowDrillPaneProps {
   effectiveSelectedId: string;
   pollIntervalMs: number;
   onBack: () => void;
-  onNavigateNode: (taskId: string) => void;
+  onNavigateNode: (nodeId: string) => void;
   onNavigateHumanNode: (nodeId: string) => void;
 }
 
@@ -33,13 +33,13 @@ export function WorkflowDrillPane({
   onNavigateHumanNode,
 }: WorkflowDrillPaneProps) {
   switch (target.kind) {
-    case "nodeTask":
+    case "node":
       return (
-        <WorkflowNodeTaskPane
-          key={`${effectiveSelectedId}:${target.nodeTaskId}`}
+        <WorkflowNodePane
+          key={`${effectiveSelectedId}:${target.nodeId}`}
           workflow={workflow}
           dag={dag}
-          nodeTaskId={target.nodeTaskId}
+          nodeId={target.nodeId}
           pollIntervalMs={pollIntervalMs}
           onBack={onBack}
           onNavigate={onNavigateNode}

@@ -30,12 +30,12 @@ export interface WorkflowViewProps {
   selectedNodeId?: string | null;
   /**
    * Fired when a node chip is activated. Parent uses it to enter Mode B
-   * (flips `?nodeTaskId=...` in the URL state machine).
+   * (flips `?nodeId=...` in the URL state machine).
    */
   onSelectNode: (node: WorkflowNode) => void;
   /**
    * Optional slot for a trailing chrome row (e.g. the "Back to workflow"
-   * pill + prev/next walker rendered by `WorkflowNodeTaskPane`). When
+   * pill + prev/next walker rendered by `WorkflowNodePane`). When
    * supplied, the header lays it out flush-right beside the title.
    */
   headerTrailing?: ReactNode;

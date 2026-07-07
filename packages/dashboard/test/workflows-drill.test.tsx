@@ -7,8 +7,8 @@ import type { AgentEntry } from "../src/api/catalog.js";
 /**
  * Layer A (drill router) lock-in for the Workflows page. Verifies that
  * `pickDrillTarget` + `<WorkflowDrillPane>` route the URL drill slots to the
- * matching node pane: `?nodeTaskId=` → `<WorkflowNodeTaskPane>`, `?humanNodeId=`
- * → `<WorkflowNodeHumanPane>`, and `nodeTask` wins when both are populated.
+ * matching node pane: `?nodeId=` → `<WorkflowNodePane>`, `?humanNodeId=`
+ * → `<WorkflowNodeHumanPane>`, and `node` wins when both are populated.
  *
  * Kept in a sibling file (not `workflows-states.test.tsx`) so the Layer A
  * routing concern stays isolated from the Layer B list × detail state matrix —
@@ -100,8 +100,8 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("Workflows page — Layer A drill router", () => {
-  it("?nodeTaskId routes the right pane to the node-task pane", async () => {
-    renderWorkflows(`${PATH}?range=all&workflowId=wf-1&nodeTaskId=task-1`, agents);
+  it("?nodeId routes the right pane to the node pane", async () => {
+    renderWorkflows(`${PATH}?range=all&workflowId=wf-1&nodeId=n-1`, agents);
     expect(await screen.findByTestId("workflow-node-pane")).toBeTruthy();
     expect(screen.queryByTestId("workflow-human-pane")).toBeNull();
     expect(screen.queryByTestId("workflow-human-not-found")).toBeNull();
@@ -114,8 +114,8 @@ describe("Workflows page — Layer A drill router", () => {
     expect(screen.queryByTestId("workflow-node-not-found")).toBeNull();
   });
 
-  it("prefers the node-task pane when both drill slots are present", async () => {
-    renderWorkflows(`${PATH}?range=all&workflowId=wf-1&nodeTaskId=task-1&humanNodeId=hn-1`, agents);
+  it("prefers the node pane when both drill slots are present", async () => {
+    renderWorkflows(`${PATH}?range=all&workflowId=wf-1&nodeId=n-1&humanNodeId=hn-1`, agents);
     expect(await screen.findByTestId("workflow-node-pane")).toBeTruthy();
     expect(screen.queryByTestId("workflow-human-pane")).toBeNull();
     expect(screen.queryByTestId("workflow-human-not-found")).toBeNull();
