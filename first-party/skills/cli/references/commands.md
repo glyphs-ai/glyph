@@ -39,7 +39,7 @@ Per-group subcommand reference for `glyph workspace / session / task / schedule 
 - Route: `POST /workspaces`
 - Body: `{ name?, workspaceDir? }`
 - Output: `Workspace`
-- Failure modes: `WorkspaceAlreadyExistsError` (409, name/workdir clash), `WorkspacePathConflictError` (409, another workspace already on that workdir), `WorkspaceNameInvalidError` (400)
+- Failure modes: `WorkspacePathConflictError` (409, another workspace already registered on the same `workspaceDir`). Malformed `name` / `workspaceDir` payloads fail the request schema and return the standard `application/problem+json` 400 body.
 
 ### `workspace current`
 
@@ -125,7 +125,7 @@ Per-group subcommand reference for `glyph workspace / session / task / schedule 
 - Route: `POST /workspaces/:id/tasks`
 - Body: `{ agent, brief, details?, runtime? }`
 - Output: `Task` (with `status: "running"`)
-- Common failures: `EntryNotReadyError` (409, agent blocked — see [error-codes.md#entrynotreadyerror-reasons](./error-codes.md#entrynotreadyerror-reasons)), `AgentNotFound` (404), `RuntimeDoesNotSupportTasksError` (400)
+- Common failures: `EntryNotReadyError` (409, agent blocked — see [error-codes.md#entrynotreadyerror-reasons](./error-codes.md#entrynotreadyerror-reasons)), `AgentNotFound` (404), `RuntimeDoesNotSupportTasksError` (501)
 
 ### `task show <task-id>`
 
@@ -420,7 +420,7 @@ Triggers the cascade reconciler: every non-terminal node is cancelled with reaso
 
 - Output: `WorkflowHeader`
 
-`failure.kind` is always `"coordinator"` (the only currently-valid arm; future arms are reserved). Idempotent on re-call with the same outcome (substrate compares and no-ops); calling with a conflicting outcome returns `WorkflowAlreadyTerminalError` (400).
+`failure.kind` is always `"coordinator"` (the only currently-valid arm; future arms are reserved). Idempotent on re-call with the same outcome (substrate compares and no-ops); calling with a conflicting outcome returns `WorkflowAlreadyTerminalError` (409).
 
 ### `workflow rm <workflow-id>`
 
