@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { listScheduledWorkflows, type WorkflowHeader, type WorkflowNode } from "../../api";
 import { useWorkflowDetail } from "../../hooks/useWorkflowDetail";
 import { WorkflowNodeHumanPane } from "../../pages/workflows/WorkflowNodeHumanPane";
-import { WorkflowNodeTaskPane } from "../../pages/workflows/WorkflowNodeTaskPane";
+import { WorkflowNodePane } from "../../pages/workflows/WorkflowNodePane";
 import { WorkflowView } from "../../pages/workflows/WorkflowView";
 import { FallbackBackRow, FireNavPill } from "./FireNav";
 
@@ -247,11 +247,11 @@ function FireWorkflowView({
         );
       }
       return (
-        <WorkflowNodeTaskPane
+        <WorkflowNodePane
           key={`${fireWorkflowId}:${fireNodeId}`}
           workflow={workflow}
           dag={dag}
-          nodeTaskId={node.id}
+          nodeId={node.id}
           pollIntervalMs={4000}
           onBack={onBackFromNode}
           onNavigate={(nextNodeId: string) => {

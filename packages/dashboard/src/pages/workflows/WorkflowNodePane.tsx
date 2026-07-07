@@ -4,19 +4,19 @@ import { TaskView } from "../../components/task-view";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
 import { orderNodesForNav } from "./workflow-nav-utils.js";
 
-export interface WorkflowNodeTaskPaneProps {
+export interface WorkflowNodePaneProps {
   /** The parent workflow header (used for the back-label only). */
   workflow: WorkflowHeader;
   /** The current DAG (used for the prev/next walk). */
   dag: WorkflowDag | null;
-  /** The task id requested via `?nodeTaskId=`. May be stale (URL-shareable). */
-  nodeTaskId: string;
+  /** The node id requested via `?nodeId=`. May be stale (URL-shareable). */
+  nodeId: string;
   /** Polling cadence for the task header + activity stream. */
   pollIntervalMs: number;
-  /** Called when the user clicks ← Back; parent clears `?nodeTaskId=`. */
+  /** Called when the user clicks ← Back; parent clears `?nodeId=`. */
   onBack: () => void;
-  /** Called when the user clicks ‹ / ›; parent atomically sets `?nodeTaskId=`. */
-  onNavigate: (nextTaskId: string) => void;
+  /** Called when the user clicks ‹ / ›; parent atomically sets `?nodeId=`. */
+  onNavigate: (nextNodeId: string) => void;
 }
 
 /**
@@ -26,34 +26,34 @@ export interface WorkflowNodeTaskPaneProps {
  *
  *   - The pane owns its own node-list walk (sourced from the parent's
  *     already-fetched `dag.nodes`); navigation never re-fetches.
- *   - When `nodeTaskId` resolves to a node in the current dag, the
+ *   - When `nodeId` resolves to a node in the current dag, the
  *     full `TaskView` is mounted with a header-trailing pill carrying
  *     `← Back to "{brief}"` + `‹ N/M ›`. The N/M counter is keyed off
  *     **node order** (phase ASC, createdAt ASC), so a user walking
  *     `‹` from the start of the workflow sees the next earlier node
  *     in execution order.
- *   - When `nodeTaskId` is not in the current dag (URL shared from
+ *   - When `nodeId` is not in the current dag (URL shared from
  *     another workflow, or a node was pruned), a "Node not found"
  *     fallback with a back-only row is shown.
  *
  * `useTaskDetail` is mounted via the inner `NodeTaskView` so it can be
- * `key`-remounted on `nodeTaskId` swap — defence-in-depth around the
+ * `key`-remounted on `nodeId` swap — defence-in-depth around the
  * hook's monotonic seq guard.
  */
-export function WorkflowNodeTaskPane({
+export function WorkflowNodePane({
   workflow,
   dag,
-  nodeTaskId,
+  nodeId,
   pollIntervalMs,
   onBack,
   onNavigate,
-}: WorkflowNodeTaskPaneProps) {
+}: WorkflowNodePaneProps) {
   const orderedNodes = useMemo(() => {
     return orderNodesForNav(dag).filter((n) => n.kind !== "human");
   }, [dag]);
   const currentIndex = useMemo(
-    () => orderedNodes.findIndex((n) => n.id === nodeTaskId),
-    [orderedNodes, nodeTaskId],
+    () => orderedNodes.findIndex((n) => n.id === nodeId),
+    [orderedNodes, nodeId],
   );
   const found = currentIndex !== -1;
 
@@ -106,8 +106,8 @@ export function WorkflowNodeTaskPane({
   return (
     <aside className="tasks-pane__detail" data-testid="workflow-node-pane">
       <NodeTaskView
-        key={nodeTaskId}
-        nodeId={nodeTaskId}
+        key={nodeId}
+        nodeId={nodeId}
         pollIntervalMs={pollIntervalMs}
         headerTrailing={pill}
       />
@@ -122,7 +122,7 @@ interface FallbackBackRowProps {
 
 /**
  * Minimal back-only row used while the dag is loading or the
- * requested `nodeTaskId` isn't part of the current workflow. The
+ * requested `nodeId` isn't part of the current workflow. The
  * success path uses {@link WorkflowNodeNav} inside the TaskView
  * title row instead, costing zero extra vertical space.
  */

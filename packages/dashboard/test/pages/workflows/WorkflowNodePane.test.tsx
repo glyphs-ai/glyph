@@ -25,7 +25,7 @@ vi.mock("../../../src/api", async () => {
   };
 });
 
-import { WorkflowNodeTaskPane } from "../../../src/pages/workflows/WorkflowNodeTaskPane";
+import { WorkflowNodePane } from "../../../src/pages/workflows/WorkflowNodePane";
 
 function makeWf(overrides: Partial<WorkflowHeader> = {}): WorkflowHeader {
   return {
@@ -81,13 +81,13 @@ function makeDag(): WorkflowDag {
 
 afterEach(() => cleanup());
 
-describe("WorkflowNodeTaskPane", () => {
+describe("WorkflowNodePane", () => {
   it("renders the nav pill with N/M position counter", () => {
     render(
-      <WorkflowNodeTaskPane
+      <WorkflowNodePane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="n2"
+        nodeId="n2"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={() => {}}
@@ -99,10 +99,10 @@ describe("WorkflowNodeTaskPane", () => {
   it("fires onBack when the back button is clicked", () => {
     const onBack = vi.fn();
     render(
-      <WorkflowNodeTaskPane
+      <WorkflowNodePane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="n2"
+        nodeId="n2"
         pollIntervalMs={4000}
         onBack={onBack}
         onNavigate={() => {}}
@@ -112,13 +112,13 @@ describe("WorkflowNodeTaskPane", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it("fires onNavigate with the previous node's taskId on prev click", () => {
+  it("fires onNavigate with the previous node's id on prev click", () => {
     const onNavigate = vi.fn();
     render(
-      <WorkflowNodeTaskPane
+      <WorkflowNodePane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="n2"
+        nodeId="n2"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={onNavigate}
@@ -130,10 +130,10 @@ describe("WorkflowNodeTaskPane", () => {
 
   it("disables prev at the first node and next at the last node", () => {
     const { rerender } = render(
-      <WorkflowNodeTaskPane
+      <WorkflowNodePane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="n1"
+        nodeId="n1"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={() => {}}
@@ -141,10 +141,10 @@ describe("WorkflowNodeTaskPane", () => {
     );
     expect((screen.getByTestId("workflow-node-prev") as HTMLButtonElement).disabled).toBe(true);
     rerender(
-      <WorkflowNodeTaskPane
+      <WorkflowNodePane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="n3"
+        nodeId="n3"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={() => {}}
@@ -153,12 +153,12 @@ describe("WorkflowNodeTaskPane", () => {
     expect((screen.getByTestId("workflow-node-next") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("renders a 'Node not found' fallback when the nodeTaskId is not in the dag", () => {
+  it("renders a 'Node not found' fallback when the nodeId is not in the dag", () => {
     render(
-      <WorkflowNodeTaskPane
+      <WorkflowNodePane
         workflow={makeWf()}
         dag={makeDag()}
-        nodeTaskId="task-unknown"
+        nodeId="task-unknown"
         pollIntervalMs={4000}
         onBack={() => {}}
         onNavigate={() => {}}
