@@ -22,9 +22,6 @@ import { EMPTY_DEP_REFS, ResolvedGraphSchema, type ResolvedNode } from "./depend
 export const GetTreeRequestSchema = z.object({ origin: RegistryOriginSchema });
 export type GetTreeRequest = z.infer<typeof GetTreeRequestSchema>;
 
-// Deliberate alias: the installed-tree response is structurally the shared
-// resolved-graph shape; re-exporting it keeps one source of truth rather than
-// restating every node/edge field here.
 export const GetTreeResponseSchema = ResolvedGraphSchema;
 export type GetTreeResponse = z.infer<typeof GetTreeResponseSchema>;
 

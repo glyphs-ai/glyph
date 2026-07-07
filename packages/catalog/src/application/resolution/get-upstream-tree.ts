@@ -30,9 +30,6 @@ export const GetUpstreamTreeRequestSchema = z.object({
 });
 export type GetUpstreamTreeRequest = z.infer<typeof GetUpstreamTreeRequestSchema>;
 
-// Deliberate alias: the upstream-tree response is structurally the shared
-// resolved-graph shape; re-exporting it keeps one source of truth rather than
-// restating every node/edge field here.
 export const GetUpstreamTreeResponseSchema = ResolvedGraphSchema;
 export type GetUpstreamTreeResponse = z.infer<typeof GetUpstreamTreeResponseSchema>;
 
