@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import matter from "gray-matter";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { provisionCopilotWorkdir } from "../../src/copilot/provision.js";
 import { flattenSkillName } from "../../src/index.js";
@@ -548,5 +549,28 @@ describe("provisionCopilotWorkdir - end-to-end shape", () => {
     expect(await exists(path.join(t, ".github/hooks/dev__lint__post-write.sh"))).toBe(true);
     // No .git/ - see the workdir-prep describe block above.
     expect(await exists(path.join(t, ".git"))).toBe(false);
+  });
+});
+
+describe("provisionCopilotWorkdir - gray-matter cache isolation", () => {
+  it("applyFrontmatterPatch does not pollute gray-matter cache", async () => {
+    const skillBody =
+      "---\nname: cli\nscope: official\ndescription: d\nversion: 0.1.0\n---\n# body";
+    const t = targetDir();
+    const { source, agentName } = await setup({
+      skills: {
+        "official/cli": { body: skillBody },
+      },
+    });
+    await provisionCopilotWorkdir(
+      t,
+      await source.resolveAgent(agentName),
+      source,
+      TEST_PLACEHOLDERS,
+    );
+    // After provision rewrites `name` to "official__cli" internally,
+    // re-parsing the same raw content must still return the original name.
+    const reparsed = matter(skillBody);
+    expect(reparsed.data.name).toBe("cli");
   });
 });
