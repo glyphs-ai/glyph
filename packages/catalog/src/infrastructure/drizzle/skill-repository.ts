@@ -19,14 +19,14 @@ import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
 import type { SkillEntity } from "../../domain/skill-entity.js";
 import type { SkillFqn } from "../../domain/skill-fqn.js";
 import type { SkillNotFound, SkillRepository } from "../../domain/skill-repository.js";
-import type { Tx } from "./catalog-db.js";
+import type { Db } from "./catalog-db.js";
 import { SkillMapper } from "./skill-mapper.js";
 import { skillFiles, skillMcpDeps, skillSkillDeps, skills } from "./skill-schema.js";
 
 export class DrizzleSkillRepository implements SkillRepository {
-  private readonly db: Tx;
+  private readonly db: Db;
 
-  constructor(opts: { db: Tx }) {
+  constructor(opts: { db: Db }) {
     this.db = opts.db;
   }
 

@@ -59,7 +59,7 @@ export {
 } from "./domain/schedule/schedule-trigger.js";
 export { describeCron } from "./infrastructure/cron/describe.js";
 // ─── Infrastructure: db, migrations, schema, queries, describe ──────
-export { type Db, openDb, type Tx, wrapClient } from "./infrastructure/drizzle/schedule-db.js";
+export { type Db, openDb, wrapClient } from "./infrastructure/drizzle/schedule-db.js";
 export { ScheduleMapper } from "./infrastructure/drizzle/schedule-mapper.js";
 export {
   applyScheduleMigrations,

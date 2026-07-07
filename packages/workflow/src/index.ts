@@ -163,7 +163,6 @@ export {
   composeWorkflowModule,
   type Db,
   schema,
-  type Tx,
   type WorkflowModule,
   type WorkflowModuleOptions,
   wrapClient,

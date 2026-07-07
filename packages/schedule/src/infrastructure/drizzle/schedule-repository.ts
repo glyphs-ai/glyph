@@ -8,7 +8,7 @@ import type {
   ScheduleNotFound,
   ScheduleRepository,
 } from "../../domain/schedule/schedule-repository.js";
-import type { Tx } from "./schedule-db.js";
+import type { Db } from "./schedule-db.js";
 import { ScheduleMapper } from "./schedule-mapper.js";
 import { type NewScheduleRow, schedules } from "./schedule-schema.js";
 
@@ -25,10 +25,10 @@ import { type NewScheduleRow, schedules } from "./schedule-schema.js";
  * `ScheduleCorruption` for a row that violates the stored grammar.
  */
 export class DrizzleScheduleRepository implements ScheduleRepository {
-  private readonly db: Tx;
+  private readonly db: Db;
   private readonly snapshots = new WeakMap<ScheduleEntity, NewScheduleRow>();
 
-  constructor(opts: { db: Tx }) {
+  constructor(opts: { db: Db }) {
     this.db = opts.db;
   }
 

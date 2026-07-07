@@ -1,19 +1,16 @@
 import type { ResultSet } from "@libsql/client";
 import { type Client, createClient } from "@libsql/client";
-import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
+import { drizzle } from "drizzle-orm/libsql";
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 import { applyCatalogMigrations } from "./catalog-migrations.js";
 import * as schema from "./catalog-schema.js";
 
-/** The pkg's drizzle DB handle, parameterized by the catalog tables. */
-export type Db = LibSQLDatabase<typeof schema>;
-
 /**
- * Common query-capable handle — both {@link Db} and a drizzle transaction
- * satisfy this interface. Repositories accept `Tx` so they can participate
- * in a request-scoped transaction without owning one.
+ * The pkg's drizzle DB handle, parameterized by the catalog tables. A
+ * request-scoped drizzle transaction also satisfies this type, so
+ * repositories and queries stay unaware of whether they run inside one.
  */
-export type Tx = BaseSQLiteDatabase<"async", ResultSet, typeof schema>;
+export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof schema>;
 
 /** Wrap an existing libsql client into a typed drizzle handle (no PRAGMAs, no migrations). */
 export function wrapClient(client: Client): Db {

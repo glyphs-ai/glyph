@@ -2,7 +2,7 @@
  * Request-scoped accessor for schedule infrastructure.
  */
 
-import type { Db, Tx } from "./schedule-db.js";
+import type { Db } from "./schedule-db.js";
 import { DrizzleScheduleQueries } from "./schedule-queries.js";
 import { DrizzleScheduleRepository } from "./schedule-repository.js";
 
@@ -11,7 +11,7 @@ export interface ScheduleScope {
   readonly queries: DrizzleScheduleQueries;
 }
 
-export function createScheduleScope(tx: Tx, db: Db): ScheduleScope {
+export function createScheduleScope(tx: Db, db: Db): ScheduleScope {
   let _repo: DrizzleScheduleRepository | undefined;
   let _queries: DrizzleScheduleQueries | undefined;
   return {

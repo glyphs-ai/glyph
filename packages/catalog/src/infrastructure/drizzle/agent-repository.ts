@@ -32,12 +32,12 @@ import {
   agentSkillDeps,
   agents,
 } from "./agent-schema.js";
-import type { Tx } from "./catalog-db.js";
+import type { Db } from "./catalog-db.js";
 
 export class DrizzleAgentRepository implements AgentRepository {
-  private readonly db: Tx;
+  private readonly db: Db;
 
-  constructor(opts: { db: Tx }) {
+  constructor(opts: { db: Db }) {
     this.db = opts.db;
   }
 

@@ -7,7 +7,7 @@
  */
 
 import { DrizzleAgentRepository } from "./agent-repository.js";
-import type { Db, Tx } from "./catalog-db.js";
+import type { Db } from "./catalog-db.js";
 import { DrizzleCatalogQueries } from "./catalog-queries.js";
 import { DrizzleMcpRepository } from "./mcp-repository.js";
 import { DrizzleSkillRepository } from "./skill-repository.js";
@@ -19,7 +19,7 @@ export interface CatalogScope {
   readonly queries: DrizzleCatalogQueries;
 }
 
-export function createCatalogScope(tx: Tx, db: Db): CatalogScope {
+export function createCatalogScope(tx: Db, db: Db): CatalogScope {
   let _agentRepo: DrizzleAgentRepository | undefined;
   let _skillRepo: DrizzleSkillRepository | undefined;
   let _mcpRepo: DrizzleMcpRepository | undefined;

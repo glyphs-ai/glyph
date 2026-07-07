@@ -16,15 +16,15 @@
  *   });
  */
 
-import type { Db as CatalogDb, CatalogScope, Tx as CatalogTx } from "@glyphs-ai/catalog";
+import type { Db as CatalogDb, CatalogScope } from "@glyphs-ai/catalog";
 import { createCatalogScope } from "@glyphs-ai/catalog";
-import type { Db as ScheduleDb, ScheduleScope, Tx as ScheduleTx } from "@glyphs-ai/schedule";
+import type { Db as ScheduleDb, ScheduleScope } from "@glyphs-ai/schedule";
 import { createScheduleScope } from "@glyphs-ai/schedule";
-import type { Db as SessionDb, SessionScope, Tx as SessionTx } from "@glyphs-ai/session";
+import type { Db as SessionDb, SessionScope } from "@glyphs-ai/session";
 import { createSessionScope } from "@glyphs-ai/session";
-import type { Db as TaskDb, TaskScope, Tx as TaskTx } from "@glyphs-ai/task";
+import type { Db as TaskDb, TaskScope } from "@glyphs-ai/task";
 import { createTaskScope } from "@glyphs-ai/task";
-import type { Db as WorkflowDb, WorkflowScope, Tx as WorkflowTx } from "@glyphs-ai/workflow";
+import type { Db as WorkflowDb, WorkflowScope } from "@glyphs-ai/workflow";
 import { createWorkflowScope } from "@glyphs-ai/workflow";
 import type { Context, MiddlewareHandler } from "hono";
 
@@ -65,17 +65,17 @@ export function transactionMiddleware(
     // Wrap in a catalog-db transaction (all packages share the same
     // underlying libsql client, so any package's db.transaction produces
     // a connection-level transaction covering all tables).
-    await (handles.catalogDb as CatalogDb).transaction(async (tx: CatalogTx) => {
-      // All domain pkgs share one libsql connection, so the CatalogTx
-      // handle is structurally identical to each pkg's Tx type (both are
+    await (handles.catalogDb as CatalogDb).transaction(async (tx: CatalogDb) => {
+      // All domain pkgs share one libsql connection, so the catalog tx
+      // handle is structurally identical to each pkg's Db type (both are
       // `BaseSQLiteDatabase<"async", ResultSet, typeof pkgSchema>`).
       // The schema type parameter differs but is unused at runtime when
       // repos use the builder API. Casts go through `unknown` because
       // TypeScript's schema generics are nominally incompatible.
-      const sessionTx = tx as unknown as SessionTx;
-      const taskTx = tx as unknown as TaskTx;
-      const scheduleTx = tx as unknown as ScheduleTx;
-      const workflowTx = tx as unknown as WorkflowTx;
+      const sessionTx = tx as unknown as SessionDb;
+      const taskTx = tx as unknown as TaskDb;
+      const scheduleTx = tx as unknown as ScheduleDb;
+      const workflowTx = tx as unknown as WorkflowDb;
 
       let _catalog: CatalogScope | undefined;
       let _session: SessionScope | undefined;

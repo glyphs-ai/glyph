@@ -14,7 +14,7 @@ import type {
   WorkflowNotFound,
   WorkflowRepository,
 } from "../../domain/workflow/workflow-repository.js";
-import type { Tx } from "./workflow-db.js";
+import type { Db } from "./workflow-db.js";
 import { WorkflowMapper } from "./workflow-mapper.js";
 import type { NewWorkflowNodeRow, NewWorkflowRow, WorkflowNodeRow } from "./workflow-schema.js";
 import { workflowEdges, workflowNodes, workflows } from "./workflow-schema.js";
@@ -24,9 +24,9 @@ const silentLogger: Logger = pino({ level: "silent" });
 type EdgeKeyParts = { readonly from: string; readonly to: string };
 
 export class DrizzleWorkflowRepository implements WorkflowRepository {
-  private readonly db: Tx;
+  private readonly db: Db;
   private readonly logger: Logger;
-  constructor(opts: { db: Tx; logger?: Logger }) {
+  constructor(opts: { db: Db; logger?: Logger }) {
     this.db = opts.db;
     this.logger = opts.logger ?? silentLogger;
   }

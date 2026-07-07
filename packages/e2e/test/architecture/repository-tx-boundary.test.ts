@@ -2,7 +2,7 @@
  * Structural enforcement of the request-scoped transaction boundary.
  *
  * Repositories are write-side infrastructure that MUST NOT own or start
- * transactions — they receive a `Tx` handle via constructor injection
+ * transactions — they receive a `Db` handle via constructor injection
  * and the request-scoped middleware owns the transaction lifecycle.
  *
  * Queries are read-side infrastructure that MUST NOT accept a `tx`
@@ -105,7 +105,7 @@ describe("queries read-side boundary", () => {
   for (const { rel, abs } of collectQueriesFiles()) {
     it(`${rel} constructor does not accept a tx parameter`, () => {
       const src = readFileSync(abs, "utf8");
-      // Match constructor signatures that reference Tx or tx — queries
+      // Match constructor signatures that reference tx — queries
       // must only receive `db` (stable handle), never a transaction.
       const txParamPattern = /constructor\s*\([^)]*\btx\b[^)]*\)/;
       const match = txParamPattern.exec(src);
@@ -113,19 +113,6 @@ describe("queries read-side boundary", () => {
         match,
         `${rel} constructor accepts a "tx" parameter at offset ${match?.index}. ` +
           `Queries classes must only accept "db" (the stable read handle), not a transaction.`,
-      ).toBeNull();
-    });
-
-    it(`${rel} does not import Tx type`, () => {
-      const src = readFileSync(abs, "utf8");
-      // Queries files should not need the Tx type at all — they only
-      // use the Db handle for committed-snapshot reads.
-      const txImportPattern = /import\s+(?:type\s+)?{[^}]*\bTx\b[^}]*}\s+from/;
-      const match = txImportPattern.exec(src);
-      expect(
-        match,
-        `${rel} imports "Tx" type at offset ${match?.index}. ` +
-          `Queries classes should only depend on Db, not Tx.`,
       ).toBeNull();
     });
   }
