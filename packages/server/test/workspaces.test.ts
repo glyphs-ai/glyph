@@ -24,7 +24,7 @@ afterEach(async () => {
   for (const sys of openSubsystems.splice(0)) {
     await teardownTestSubsystem(sys);
   }
-  await rm(scratch, { recursive: true, force: true });
+  await rm(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 
 async function makeApp() {

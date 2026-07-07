@@ -13,5 +13,8 @@ export default defineConfig({
     globals: false,
     pool: "forks",
     testTimeout: 15000,
+    // Windows CI: libsql WAL file locks are released asynchronously on
+    // NTFS; afterEach retries need headroom beyond the default 10s.
+    hookTimeout: 30_000,
   },
 });
