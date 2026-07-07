@@ -266,7 +266,7 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 
 `glyph workflow <sub>` — coordinator-facing surface: it lets a workflow header live in the substrate, exposes the live DAG, and lets a `kind: coordinator` task mutate the DAG (add nodes, add edges, replace specs, cancel, finish) while it runs. Workers don't touch this surface — they just do their job and exit; the substrate joins their result back to the DAG node via `task.metadata.workflowNodeId`.
 
-> All 13 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`). The strategy skills that drive coord decisions (e.g. `official/workflow-coordination` + `official/software-development-lifecycle`) live in their own package and describe *what* to dispatch — this section documents *how*.
+> All 13 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`). This section documents *how* to invoke them; *what* to dispatch (coord strategy, brief templates, verdict schema) is a decision layer above the CLI.
 
 ### Subcommand map
 
@@ -528,6 +528,6 @@ Not workspace-scoped; useful for scripting and diagnostics.
 ## See also
 
 - [`SKILL.md`](../SKILL.md) — top-level conventions (workspace scoping, output/error discipline, anti-patterns)
-- [`playbooks.md`](./playbooks.md) — multi-step goal-oriented playbooks (install-and-verify, dispatch-and-wait, monitor, sync, clean up, onboard). Workflow-substrate playbooks live in the `official/workflow-coordination` skill.
+- [`playbooks.md`](./playbooks.md) — multi-step playbooks (install-and-verify, dispatch-and-wait, monitor, sync, clean up, onboard)
 - [`json-shapes.md`](./json-shapes.md) — payload shapes returned by `--json`
 - [`error-codes.md`](./error-codes.md) — every `code` the server emits + the matching `glyph` command to fix it

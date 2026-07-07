@@ -2,7 +2,7 @@
 name: cli
 scope: official
 description: "Control a glyph server from the CLI — workspaces, agents, tasks, sessions, schedules, catalog, workflows, and server lifecycle"
-version: 0.3.1
+version: 0.3.2
 ---
 
 # official/cli skill
@@ -135,6 +135,6 @@ glyph task activity <tid> --follow --after "$N" | jq -c
 ## References (mandatory reading before non-trivial work)
 
 - `references/commands.md` — per-group subcommand reference (workspace / session / task / schedule / catalog / runtime / server inspection). Skim once, keep as lookup.
-- `references/playbooks.md` — multi-step goal-oriented playbooks (install-and-verify agent, dispatch-and-wait, monitor task, sync entry, clean up, onboard fresh workspace, create a local agent on the fly). Workflow-substrate playbooks live in the `official/workflow-coordination` skill.
+- `references/playbooks.md` — multi-step goal-oriented playbooks (install-and-verify agent, dispatch-and-wait, monitor task, sync entry, clean up, onboard fresh workspace, create a local agent on the fly).
 - `references/json-shapes.md` — the common `--json` payload shapes with concrete field lists and optionality notes.
 - `references/error-codes.md` — every `code` value the server emits + the matching `glyph` command to fix it.

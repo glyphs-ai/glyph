@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 (2026-07-07)
+
+- Remove inter-skill references throughout the doc. `SKILL.md`, `references/playbooks.md`, and `references/commands.md#workflow` no longer point at `official/workflow-coordination` or other sibling skills for "where the playbook continues." The playbooks in this skill are strategy-agnostic CLI plumbing that stands on its own; each skill owns its full narrative and the CLI skill stays a pure command / shape / plumbing reference.
+
 ## 0.3.1 (2026-07-07)
 
 - Consolidate the workflow subcommand reference into `references/commands.md#workflow` and delete `references/workflow-commands.md`. All 7 non-workflow groups + workflow now share one file, one shape, one anchor scheme.
