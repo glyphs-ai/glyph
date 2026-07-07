@@ -1,8 +1,13 @@
 # Changelog
 
+## 0.3.2 (2026-07-07)
+
+- Declare `official/workflow-coordination` and `official/cli` under `dependencies.skills` in the frontmatter; the body already names both.
+- Rewrite 0.3.1 CHANGELOG entry forward-only (drop the "Previously ..." framing and the squash-strategy rationale tail).
+
 ## 0.3.1 (2026-06-15)
 
-- **§B approve branch now actually merges the PR.** Previously `choiceId == "approve"` only called `finishWorkflow(succeeded, ...)`, leaving the PR open and forcing the human to manually `gh pr merge` after the workflow ended — contradicting the human-node's "Approve & merge" choice label. The branch now calls `gh pr merge <pr_number> --repo <owner/repo> --squash --delete-branch` before finishing the workflow. Squash strategy is hardcoded (matches the dominant observed user preference across all SDLC ports to date). On merge failure (non-mergeable, push race, branch protection), the workflow finishes `failed` with a clear reason and the PR remains open for manual triage. §Stop-condition prose and §Failure-mode coverage table updated to match.
+- The approve-choice branch runs `gh pr merge <pr_number> --repo <owner/repo> --squash --delete-branch` before `finishWorkflow(succeeded, ...)`. On merge failure (non-mergeable, push race, branch protection), the workflow finishes `failed` with a clear reason; the PR remains open for manual triage. §Stop-condition prose and §Failure-mode coverage table updated to match. Squash is the merge strategy.
 
 ## 0.2.1 (2026-06-12)
 
