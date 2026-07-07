@@ -77,5 +77,3 @@ This skill was vendored into the glyph first-party catalog from an external open
 - **Upstream license**: MIT
 - **Forked at**: 6a62d0441753157ca6ca50479e490c2948033adb  (use the SHA the file was fetched at)
 - **First-party entry maintained at**: https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/karpathy-guidelines
-
-Frontmatter has been adapted to the glyph catalog schema (`scope: official`, `version:` field added). No semantic change to the skill body.
