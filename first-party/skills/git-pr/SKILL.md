@@ -2,7 +2,7 @@
 name: git-pr
 scope: official
 description: "Git branch management and GitHub PR workflow using worktrees"
-version: 0.1.0
+version: 0.1.1
 ---
 
 # Git PR Skill
@@ -130,8 +130,40 @@ git push origin HEAD
 ## Open PR
 
 ```bash
-gh pr create --title "feat: ..." --body "..." --base main
+gh pr create --title "feat: ..." --body-file <utf8-file> --base main
 ```
+
+## GitHub PR review submission
+
+Submit a structured review (verdict + inline comments) via the reviews API. Compose the body in a UTF-8 file and POST it with `--input`.
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<number>/reviews \
+  --method POST \
+  --input <review-body.json>
+```
+
+Review-body JSON shape (universal across agents that submit GitHub reviews):
+
+```json
+{
+  "body": "Overall summary",
+  "event": "APPROVE | REQUEST_CHANGES | COMMENT",
+  "comments": [
+    { "path": "packages/<pkg>/src/Foo.tsx", "line": 42, "body": "..." }
+  ]
+}
+```
+
+- `body` — the summary at the top of the review; may reference paths (`playwright-evidence/login-mobile.png`) or line anchors (`HeaderActions.tsx:42`).
+- `event` — exactly one of `APPROVE`, `REQUEST_CHANGES`, `COMMENT`. `COMMENT` submits inline comments without a verdict.
+- `comments[]` — zero or more inline comments; each must set `path` (repo-relative) and `line` (in the PR diff).
+
+## Platform notes
+
+### PowerShell encoding caveat for `gh` body flags
+
+On Windows from PowerShell, always use `--body-file <utf8-file>` — never `--body "<text>"` — with any `gh` command that accepts a body: `gh pr create`, `gh pr edit`, `gh pr review`, `gh issue create`, `gh issue edit`. PowerShell's argument-string encoding mangles em-dashes, arrows, and section signs into multi-byte mojibake; `--body-file` reads the file as UTF-8 and round-trips cleanly. Compose the body into a UTF-8 file (heredoc on POSIX, `Set-Content -Encoding utf8` on PowerShell) and pass its path.
 
 ## Conventional Commits
 
