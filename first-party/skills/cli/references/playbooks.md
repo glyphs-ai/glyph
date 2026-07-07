@@ -1,6 +1,6 @@
 # Common playbooks
 
-Each playbook is goal-oriented: name the goal, list the steps with branches. Copy and adapt. Every step is self-contained CLI plumbing — `glyph` invocations, `jq` post-processing, and control flow. No external references.
+Each playbook is goal-oriented: name the goal, list the steps with branches. Copy and adapt.
 
 > All examples assume `GLYPH_WORKSPACE=<id>` is already set. If it isn't, every command would prepend `--workspace-id <id>`.
 

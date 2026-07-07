@@ -266,7 +266,7 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 
 `glyph workflow <sub>` — coordinator-facing surface: it lets a workflow header live in the substrate, exposes the live DAG, and lets a `kind: coordinator` task mutate the DAG (add nodes, add edges, replace specs, cancel, finish) while it runs. Workers don't touch this surface — they just do their job and exit; the substrate joins their result back to the DAG node via `task.metadata.workflowNodeId`.
 
-> All 13 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`). This section documents *how* to invoke them; *what* to dispatch (coord strategy, brief templates, verdict schema) is a decision layer above the CLI.
+> All 13 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`).
 
 ### Subcommand map
 
