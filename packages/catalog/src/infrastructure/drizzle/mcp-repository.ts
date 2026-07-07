@@ -19,14 +19,14 @@ import type {
   McpNotFound,
   McpRepository,
 } from "../../domain/mcp-repository.js";
-import type { Db } from "./catalog-db.js";
+import type { Tx } from "./catalog-db.js";
 import { McpMapper } from "./mcp-mapper.js";
 import { mcps } from "./mcp-schema.js";
 
 export class DrizzleMcpRepository implements McpRepository {
-  private readonly db: Db;
+  private readonly db: Tx;
 
-  constructor(opts: { db: Db }) {
+  constructor(opts: { db: Tx }) {
     this.db = opts.db;
   }
 

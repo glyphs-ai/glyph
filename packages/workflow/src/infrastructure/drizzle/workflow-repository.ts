@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import type { WorkflowNodeEntity } from "../../domain/node/workflow-node-entity.js";
@@ -14,7 +14,7 @@ import type {
   WorkflowNotFound,
   WorkflowRepository,
 } from "../../domain/workflow/workflow-repository.js";
-import type { Db } from "./workflow-db.js";
+import type { Tx } from "./workflow-db.js";
 import { WorkflowMapper } from "./workflow-mapper.js";
 import type { NewWorkflowNodeRow, NewWorkflowRow, WorkflowNodeRow } from "./workflow-schema.js";
 import { workflowEdges, workflowNodes, workflows } from "./workflow-schema.js";
@@ -24,9 +24,9 @@ const silentLogger: Logger = pino({ level: "silent" });
 type EdgeKeyParts = { readonly from: string; readonly to: string };
 
 export class DrizzleWorkflowRepository implements WorkflowRepository {
-  private readonly db: Db;
+  private readonly db: Tx;
   private readonly logger: Logger;
-  constructor(opts: { db: Db; logger?: Logger }) {
+  constructor(opts: { db: Tx; logger?: Logger }) {
     this.db = opts.db;
     this.logger = opts.logger ?? silentLogger;
   }
@@ -77,64 +77,55 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
   save(entity: WorkflowEntity): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => {
-        await this.db.run(sql.raw("SAVEPOINT wf_save"));
-        try {
-          const snapshot = entity.__snapshot();
-          if (snapshot.header === null) {
-            await this.db.insert(workflows).values(WorkflowMapper.toWorkflowRow(entity)).run();
-            for (const node of entity.nodes)
-              await this.db.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
-            for (const edge of entity.edges)
-              await this.db.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
-            await this.db.run(sql.raw("RELEASE SAVEPOINT wf_save"));
-            return;
-          }
-          if (headerChanged(snapshot.header, entity))
-            await this.db
-              .update(workflows)
-              .set(workflowPatch(entity))
-              .where(eq(workflows.id, entity.id))
-              .run();
-          const currentNodes = new Map(entity.nodes.map((node) => [node.id, node]));
+        const snapshot = entity.__snapshot();
+        if (snapshot.header === null) {
+          await this.db.insert(workflows).values(WorkflowMapper.toWorkflowRow(entity)).run();
           for (const node of entity.nodes)
-            if (!snapshot.nodes.has(node.id))
-              await this.db.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
-          for (const id of snapshot.nodes.keys())
-            if (!currentNodes.has(id))
-              await this.db.delete(workflowNodes).where(eq(workflowNodes.id, id)).run();
-          for (const [id, snap] of snapshot.nodes) {
-            const node = currentNodes.get(id);
-            if (node !== undefined && nodeChanged(snap, node))
-              await this.db
-                .update(workflowNodes)
-                .set(nodePatch(node))
-                .where(eq(workflowNodes.id, id))
-                .run();
-          }
-          const currentEdgeKeys = new Set(entity.edges.map((edge) => edgeKey(edge.from, edge.to)));
-          for (const key of snapshot.edgeKeys)
-            if (!currentEdgeKeys.has(key)) {
-              const edge = splitEdgeKey(key);
-              await this.db
-                .delete(workflowEdges)
-                .where(
-                  and(
-                    eq(workflowEdges.workflowId, entity.id),
-                    eq(workflowEdges.fromNodeId, edge.from),
-                    eq(workflowEdges.toNodeId, edge.to),
-                  ),
-                )
-                .run();
-            }
+            await this.db.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
           for (const edge of entity.edges)
-            if (!snapshot.edgeKeys.has(edgeKey(edge.from, edge.to)))
-              await this.db.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
-          await this.db.run(sql.raw("RELEASE SAVEPOINT wf_save"));
-        } catch (e) {
-          await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT wf_save"));
-          await this.db.run(sql.raw("RELEASE SAVEPOINT wf_save"));
-          throw e;
+            await this.db.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
+          return;
         }
+        if (headerChanged(snapshot.header, entity))
+          await this.db
+            .update(workflows)
+            .set(workflowPatch(entity))
+            .where(eq(workflows.id, entity.id))
+            .run();
+        const currentNodes = new Map(entity.nodes.map((node) => [node.id, node]));
+        for (const node of entity.nodes)
+          if (!snapshot.nodes.has(node.id))
+            await this.db.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
+        for (const id of snapshot.nodes.keys())
+          if (!currentNodes.has(id))
+            await this.db.delete(workflowNodes).where(eq(workflowNodes.id, id)).run();
+        for (const [id, snap] of snapshot.nodes) {
+          const node = currentNodes.get(id);
+          if (node !== undefined && nodeChanged(snap, node))
+            await this.db
+              .update(workflowNodes)
+              .set(nodePatch(node))
+              .where(eq(workflowNodes.id, id))
+              .run();
+        }
+        const currentEdgeKeys = new Set(entity.edges.map((edge) => edgeKey(edge.from, edge.to)));
+        for (const key of snapshot.edgeKeys)
+          if (!currentEdgeKeys.has(key)) {
+            const edge = splitEdgeKey(key);
+            await this.db
+              .delete(workflowEdges)
+              .where(
+                and(
+                  eq(workflowEdges.workflowId, entity.id),
+                  eq(workflowEdges.fromNodeId, edge.from),
+                  eq(workflowEdges.toNodeId, edge.to),
+                ),
+              )
+              .run();
+          }
+        for (const edge of entity.edges)
+          if (!snapshot.edgeKeys.has(edgeKey(edge.from, edge.to)))
+            await this.db.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
       })(),
       mapToDatabaseUnavailable,
     );
@@ -143,17 +134,9 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
   delete(id: WorkflowId): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => {
-        await this.db.run(sql.raw("SAVEPOINT wf_delete"));
-        try {
-          await this.db.delete(workflowEdges).where(eq(workflowEdges.workflowId, id)).run();
-          await this.db.delete(workflowNodes).where(eq(workflowNodes.workflowId, id)).run();
-          await this.db.delete(workflows).where(eq(workflows.id, id)).run();
-          await this.db.run(sql.raw("RELEASE SAVEPOINT wf_delete"));
-        } catch (e) {
-          await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT wf_delete"));
-          await this.db.run(sql.raw("RELEASE SAVEPOINT wf_delete"));
-          throw e;
-        }
+        await this.db.delete(workflowEdges).where(eq(workflowEdges.workflowId, id)).run();
+        await this.db.delete(workflowNodes).where(eq(workflowNodes.workflowId, id)).run();
+        await this.db.delete(workflows).where(eq(workflows.id, id)).run();
       })(),
       mapToDatabaseUnavailable,
     );

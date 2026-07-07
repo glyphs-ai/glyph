@@ -59,7 +59,7 @@ export {
 } from "./domain/schedule/schedule-trigger.js";
 export { describeCron } from "./infrastructure/cron/describe.js";
 // ─── Infrastructure: db, migrations, schema, queries, describe ──────
-export { type Db, openDb } from "./infrastructure/drizzle/schedule-db.js";
+export { type Db, openDb, type Tx, wrapClient } from "./infrastructure/drizzle/schedule-db.js";
 export { ScheduleMapper } from "./infrastructure/drizzle/schedule-mapper.js";
 export {
   applyScheduleMigrations,
@@ -75,5 +75,9 @@ export {
   type ScheduleRow,
   schedules,
 } from "./infrastructure/drizzle/schedule-schema.js";
+export {
+  createScheduleScope,
+  type ScheduleScope,
+} from "./infrastructure/drizzle/schedule-scope.js";
 // ─── Composition ────────────────────────────────────────────────────
 export * from "./schedule-module.js";

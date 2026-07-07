@@ -91,6 +91,10 @@ export {
 } from "./application/spawn-interactive.js";
 // ─── use-case contract ─────────────────────────────────────────────
 export type { UseCase, UseCaseResult } from "./application/use-case.js";
+// ─── infrastructure seams (shared-db support) ──────────────────────
+export { type Db, type Tx, wrapClient } from "./infrastructure/drizzle/session-db.js";
+export { applySessionMigrations } from "./infrastructure/drizzle/session-migrations.js";
+export { createSessionScope, type SessionScope } from "./infrastructure/drizzle/session-scope.js";
 export {
   composeSessionModule,
   type SessionModule,

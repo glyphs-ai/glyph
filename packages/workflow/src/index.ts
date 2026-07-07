@@ -146,6 +146,11 @@ export {
 } from "./application/respond-to-human-node.js";
 // ─── Shared cross-use-case surface (re-exported from domain) ───────
 export * from "./application/workflow-public.js";
+export { applyWorkflowMigrations } from "./infrastructure/drizzle/workflow-migrations.js";
+export {
+  createWorkflowScope,
+  type WorkflowScope,
+} from "./infrastructure/drizzle/workflow-scope.js";
 // ─── Path helpers ──────────────────────────────────────────────────
 export {
   WORKFLOW_SUBDIR,
@@ -158,6 +163,8 @@ export {
   composeWorkflowModule,
   type Db,
   schema,
+  type Tx,
   type WorkflowModule,
   type WorkflowModuleOptions,
+  wrapClient,
 } from "./workflow-module.js";

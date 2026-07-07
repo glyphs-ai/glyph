@@ -9,7 +9,7 @@ import type {
   TaskRepository,
 } from "../../domain/task-repository.js";
 import { TERMINAL_TASK_STATUSES } from "../../domain/task-status.js";
-import type { Db } from "./task-db.js";
+import type { Tx } from "./task-db.js";
 import { TaskMapper } from "./task-mapper.js";
 import { type NewTaskRow, tasks } from "./task-schema.js";
 
@@ -32,11 +32,11 @@ const silentLogger: Logger = pino({ level: "silent" });
  * project rows via `projectTaskRow`, never reconstruct entities.
  */
 export class DrizzleTaskRepository implements TaskRepository {
-  private readonly db: Db;
+  private readonly db: Tx;
   private readonly logger: Logger;
   private readonly snapshots = new WeakMap<TaskEntity, NewTaskRow>();
 
-  constructor(opts: { db: Db; logger?: Logger }) {
+  constructor(opts: { db: Tx; logger?: Logger }) {
     this.db = opts.db;
     this.logger = opts.logger ?? silentLogger;
   }

@@ -40,7 +40,7 @@ import { ListSkillFilesUseCase } from "./application/skill/list-skill-files.js";
 import { ListSkillsUseCase } from "./application/skill/list-skills.js";
 import { UninstallSkillUseCase } from "./application/skill/uninstall-skill.js";
 import { DrizzleAgentRepository } from "./infrastructure/drizzle/agent-repository.js";
-import { openDb } from "./infrastructure/drizzle/catalog-db.js";
+import { type Db, openDb } from "./infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "./infrastructure/drizzle/catalog-queries.js";
 import { DrizzleMcpRepository } from "./infrastructure/drizzle/mcp-repository.js";
 import { DrizzleSkillRepository } from "./infrastructure/drizzle/skill-repository.js";
@@ -49,10 +49,9 @@ import { JsonMcpSource } from "./infrastructure/source/json-mcp-source.js";
 import { MarkdownAgentSource } from "./infrastructure/source/markdown-agent-source.js";
 import { MarkdownSkillSource } from "./infrastructure/source/markdown-skill-source.js";
 
-export interface CatalogModuleOptions {
-  /** Absolute path to the catalog SQLite file; tests pass ":memory:". */
-  readonly dbFile: string;
-}
+export type CatalogModuleOptions =
+  | { readonly db: Db; readonly dbFile?: never }
+  | { readonly dbFile: string; readonly db?: never };
 
 export interface CatalogModule {
   readonly installAgent: InstallAgentUseCase;
@@ -94,7 +93,16 @@ export interface CatalogModule {
 }
 
 export async function composeCatalog(opts: CatalogModuleOptions): Promise<CatalogModule> {
-  const { db, close } = await openDb(opts.dbFile);
+  let db: Db;
+  let closeDb: () => void;
+  if ("db" in opts && opts.db !== undefined) {
+    db = opts.db;
+    closeDb = () => {};
+  } else {
+    const opened = await openDb(opts.dbFile as string);
+    db = opened.db;
+    closeDb = opened.close;
+  }
   const registry = defaultRegistry();
 
   const agentRepo = new DrizzleAgentRepository({ db });
@@ -154,7 +162,7 @@ export async function composeCatalog(opts: CatalogModuleOptions): Promise<Catalo
     listSkills: new ListSkillsUseCase({ queries }),
     listMcps: new ListMcpsUseCase({ queries }),
     async close() {
-      close();
+      closeDb();
     },
   };
 }

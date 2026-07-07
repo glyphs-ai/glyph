@@ -2,30 +2,47 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import {
   type AgentFqn,
+  applyCatalogMigrations,
   type CatalogModule,
   composeCatalog,
   type GetSkillResponse,
   type McpFqn,
   type SkillFqn,
+  wrapClient as wrapCatalogClient,
 } from "@glyphs-ai/catalog";
 import type { AgentContentSource, RuntimeRegistry } from "@glyphs-ai/runtime";
-import { composeScheduleModule, type ScheduleModule } from "@glyphs-ai/schedule";
+import {
+  applyScheduleMigrations,
+  composeScheduleModule,
+  type ScheduleModule,
+  wrapClient as wrapScheduleClient,
+} from "@glyphs-ai/schedule";
 import {
   type AgentNotFound,
   type AgentResolver,
   type AgentUnresolvable,
+  applySessionMigrations,
   composeSessionModule,
   type ResolvedAgent,
   type SessionModule,
+  wrapClient as wrapSessionClient,
 } from "@glyphs-ai/session";
 import {
+  applyTaskMigrations,
   composeTaskModule,
   type AgentResolver as TaskAgentResolver,
   type TaskModule,
+  wrapClient as wrapTaskClient,
 } from "@glyphs-ai/task";
 import type { Spawner } from "@glyphs-ai/terminal";
-import { composeWorkflowModule, type WorkflowModule } from "@glyphs-ai/workflow";
+import {
+  applyWorkflowMigrations,
+  composeWorkflowModule,
+  type WorkflowModule,
+  wrapClient as wrapWorkflowClient,
+} from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
+import { type Client, createClient } from "@libsql/client";
 import { type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
@@ -430,13 +447,42 @@ export class WorkspaceContextRegistry {
     const dbFile = path.join(workspace.workspaceDir, "workspace.db");
     await mkdir(workspace.workspaceDir, { recursive: true });
 
-    // Partial-failure safety: each successive composeXxxModule opens
-    // its own SQLite handle. If a later one throws, the earlier
-    // handles would leak (file lock held, WAL file pinned, …) unless
-    // we tear them down on the failure path. Track each handle as we
-    // build, and on any throw run them in reverse order so the
-    // entire load is "all-or-nothing" from a resource POV.
+    // Phase 2: single shared libsql client for all domain packages.
+    // PRAGMAs and migrations are applied once; per-package drizzle
+    // handles are lightweight wrappers over this shared connection.
+    const url = `file:${dbFile}`;
+    const client: Client = createClient({ url });
+    await client.execute("PRAGMA journal_mode = WAL");
+    await client.execute("PRAGMA synchronous = NORMAL");
+    await client.execute("PRAGMA busy_timeout = 5000");
+
+    // Migrations run in dependency order. Each pkg's migration table
+    // (`__drizzle_migrations_<pkg>`) is independent, so the order
+    // only matters for foreign-key references (none today, but
+    // catalog → session → task → schedule → workflow is the natural
+    // dependency chain).
+    try {
+      await applyCatalogMigrations(client);
+      await applySessionMigrations(client);
+      await applyTaskMigrations(client);
+      await applyScheduleMigrations(client);
+      await applyWorkflowMigrations(client);
+    } catch (err) {
+      client.close();
+      throw err;
+    }
+
+    // Per-package drizzle handles (typed by each pkg's schema).
+    const catalogDb = wrapCatalogClient(client);
+    const sessionDb = wrapSessionClient(client);
+    const taskDb = wrapTaskClient(client);
+    const scheduleDb = wrapScheduleClient(client);
+    const workflowDb = wrapWorkflowClient(client);
+
+    // Partial-failure safety: if a later compose throws, close
+    // the shared client so the WAL lock is released.
     const cleanup: Array<() => Promise<void>> = [];
+    cleanup.push(async () => client.close());
     const teardown = async (): Promise<void> => {
       while (cleanup.length > 0) {
         const fn = cleanup.pop();
@@ -471,7 +517,7 @@ export class WorkspaceContextRegistry {
       return workflowRef;
     };
     try {
-      catalogModule = await composeCatalog({ dbFile });
+      catalogModule = await composeCatalog({ db: catalogDb });
       cleanup.push(() => catalogModule.close());
       const catalogPorts = makeCatalogRuntimePorts(catalogModule);
       const agentResolver: AgentResolver = {
@@ -500,7 +546,7 @@ export class WorkspaceContextRegistry {
           })),
       };
       sessionModule = await composeSessionModule({
-        dbFile,
+        db: sessionDb,
         agentResolver,
         contentSource: catalogPorts,
         runtimeRegistry: this.runtimeRegistry,
@@ -510,7 +556,7 @@ export class WorkspaceContextRegistry {
       });
       cleanup.push(() => sessionModule.close());
       taskModule = await composeTaskModule({
-        dbFile,
+        db: taskDb,
         agentResolver: taskAgentResolver,
         contentSource: catalogPorts,
         runtimeRegistry: this.runtimeRegistry,
@@ -526,7 +572,7 @@ export class WorkspaceContextRegistry {
       // file is reused (WAL-mode shared connection); migrations are
       // idempotent.
       scheduleModule = await composeScheduleModule({
-        dbFile,
+        db: scheduleDb,
         logger: this.logger,
       });
       cleanup.push(() => scheduleModule.close());
@@ -579,7 +625,7 @@ export class WorkspaceContextRegistry {
         getModule: getWorkflowModule,
       });
       workflowModule = await composeWorkflowModule({
-        dbFile,
+        db: workflowDb,
         workspaceDir: workspace.workspaceDir,
         logger: this.logger,
         runners: { coordinator: coordRunner, worker: workerRunner, human: humanRunner },
@@ -659,6 +705,14 @@ export class WorkspaceContextRegistry {
         }
         try {
           await catalogModule.close();
+        } catch (err) {
+          errors.push(err);
+        }
+        // Close the shared libsql client LAST — modules drain their
+        // engines first, so all in-flight SQL completes before the
+        // connection is torn down.
+        try {
+          client.close();
         } catch (err) {
           errors.push(err);
         }

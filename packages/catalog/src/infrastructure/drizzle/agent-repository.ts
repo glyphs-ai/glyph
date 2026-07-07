@@ -14,7 +14,7 @@
  * transaction. State-only mutations (enable/disable/ack) omit `files`.
  */
 
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
 import type { AgentEntity } from "../../domain/agent-entity.js";
@@ -32,12 +32,12 @@ import {
   agentSkillDeps,
   agents,
 } from "./agent-schema.js";
-import type { Db } from "./catalog-db.js";
+import type { Tx } from "./catalog-db.js";
 
 export class DrizzleAgentRepository implements AgentRepository {
-  private readonly db: Db;
+  private readonly db: Tx;
 
-  constructor(opts: { db: Db }) {
+  constructor(opts: { db: Tx }) {
     this.db = opts.db;
   }
 
@@ -92,47 +92,39 @@ export class DrizzleAgentRepository implements AgentRepository {
         const mcpDeps = AgentMapper.toMcpDepRows(agent);
         const agentDeps = AgentMapper.toAgentDepRows(agent);
         const fileRows = files === undefined ? null : AgentMapper.toFileRows(agent, files);
-        await this.db.run(sql.raw("SAVEPOINT agent_save"));
-        try {
-          await this.db
-            .insert(agents)
-            .values(row)
-            .onConflictDoUpdate({
-              target: agents.fqn,
-              set: {
-                origin: row.origin,
-                description: row.description,
-                version: row.version,
-                prereqs: row.prereqs,
-                prereqsAck: row.prereqsAck,
-                disabledByUser: row.disabledByUser,
-                updatedAt: row.updatedAt,
-              },
-            })
-            .run();
-          await this.db.delete(agentSkillDeps).where(eq(agentSkillDeps.sourceFqn, agent.id)).run();
-          if (skillDeps.length > 0) {
-            await this.db.insert(agentSkillDeps).values(skillDeps).run();
+        await this.db
+          .insert(agents)
+          .values(row)
+          .onConflictDoUpdate({
+            target: agents.fqn,
+            set: {
+              origin: row.origin,
+              description: row.description,
+              version: row.version,
+              prereqs: row.prereqs,
+              prereqsAck: row.prereqsAck,
+              disabledByUser: row.disabledByUser,
+              updatedAt: row.updatedAt,
+            },
+          })
+          .run();
+        await this.db.delete(agentSkillDeps).where(eq(agentSkillDeps.sourceFqn, agent.id)).run();
+        if (skillDeps.length > 0) {
+          await this.db.insert(agentSkillDeps).values(skillDeps).run();
+        }
+        await this.db.delete(agentMcpDeps).where(eq(agentMcpDeps.sourceFqn, agent.id)).run();
+        if (mcpDeps.length > 0) {
+          await this.db.insert(agentMcpDeps).values(mcpDeps).run();
+        }
+        await this.db.delete(agentAgentDeps).where(eq(agentAgentDeps.sourceFqn, agent.id)).run();
+        if (agentDeps.length > 0) {
+          await this.db.insert(agentAgentDeps).values(agentDeps).run();
+        }
+        if (fileRows !== null) {
+          await this.db.delete(agentFiles).where(eq(agentFiles.agentFqn, agent.id)).run();
+          if (fileRows.length > 0) {
+            await this.db.insert(agentFiles).values(fileRows).run();
           }
-          await this.db.delete(agentMcpDeps).where(eq(agentMcpDeps.sourceFqn, agent.id)).run();
-          if (mcpDeps.length > 0) {
-            await this.db.insert(agentMcpDeps).values(mcpDeps).run();
-          }
-          await this.db.delete(agentAgentDeps).where(eq(agentAgentDeps.sourceFqn, agent.id)).run();
-          if (agentDeps.length > 0) {
-            await this.db.insert(agentAgentDeps).values(agentDeps).run();
-          }
-          if (fileRows !== null) {
-            await this.db.delete(agentFiles).where(eq(agentFiles.agentFqn, agent.id)).run();
-            if (fileRows.length > 0) {
-              await this.db.insert(agentFiles).values(fileRows).run();
-            }
-          }
-          await this.db.run(sql.raw("RELEASE SAVEPOINT agent_save"));
-        } catch (e) {
-          await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT agent_save"));
-          await this.db.run(sql.raw("RELEASE SAVEPOINT agent_save"));
-          throw e;
         }
       })(),
       DrizzleAgentRepository.asDatabaseUnavailable,
@@ -142,19 +134,11 @@ export class DrizzleAgentRepository implements AgentRepository {
   delete(id: AgentFqn): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => {
-        await this.db.run(sql.raw("SAVEPOINT agent_delete"));
-        try {
-          await this.db.delete(agentFiles).where(eq(agentFiles.agentFqn, id)).run();
-          await this.db.delete(agentSkillDeps).where(eq(agentSkillDeps.sourceFqn, id)).run();
-          await this.db.delete(agentMcpDeps).where(eq(agentMcpDeps.sourceFqn, id)).run();
-          await this.db.delete(agentAgentDeps).where(eq(agentAgentDeps.sourceFqn, id)).run();
-          await this.db.delete(agents).where(eq(agents.fqn, id)).run();
-          await this.db.run(sql.raw("RELEASE SAVEPOINT agent_delete"));
-        } catch (e) {
-          await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT agent_delete"));
-          await this.db.run(sql.raw("RELEASE SAVEPOINT agent_delete"));
-          throw e;
-        }
+        await this.db.delete(agentFiles).where(eq(agentFiles.agentFqn, id)).run();
+        await this.db.delete(agentSkillDeps).where(eq(agentSkillDeps.sourceFqn, id)).run();
+        await this.db.delete(agentMcpDeps).where(eq(agentMcpDeps.sourceFqn, id)).run();
+        await this.db.delete(agentAgentDeps).where(eq(agentAgentDeps.sourceFqn, id)).run();
+        await this.db.delete(agents).where(eq(agents.fqn, id)).run();
       })(),
       DrizzleAgentRepository.asDatabaseUnavailable,
     );

@@ -37,6 +37,8 @@
     "@glyphs-ai/workflow": "workspace:*",
     "@glyphs-ai/workspace": "workspace:*",
     "@hono/zod-openapi": "^1.4.0",
+    "@libsql/client": "^0.17.4",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.7.11",
     "neverthrow": "^8.2.0",
     "pino": "^9.5.0",

@@ -158,5 +158,7 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
   };
 }
 
+export type { Tx } from "./infrastructure/drizzle/workflow-db.js";
+export { wrapClient } from "./infrastructure/drizzle/workflow-db.js";
 export type { Db };
 export { schema };

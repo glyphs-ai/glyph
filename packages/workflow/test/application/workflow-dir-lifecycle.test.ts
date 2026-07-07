@@ -99,7 +99,7 @@ describe("workflowDir lifecycle", () => {
     // violation or any DB-level write failure). The use-case must remove the
     // freshly reserved workflowDir on the catch path so the next operator sees
     // a consistent fs/db state.
-    const spy = vi.spyOn(f.db, "run").mockImplementation(() => {
+    const spy = vi.spyOn(f.db, "insert").mockImplementation(() => {
       throw new Error("simulated tx failure");
     });
 

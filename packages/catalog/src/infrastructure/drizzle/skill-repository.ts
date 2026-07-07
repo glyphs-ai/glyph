@@ -12,21 +12,21 @@
  * transaction. State-only mutations (ack prereqs) omit `files`.
  */
 
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
 import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
 import type { SkillEntity } from "../../domain/skill-entity.js";
 import type { SkillFqn } from "../../domain/skill-fqn.js";
 import type { SkillNotFound, SkillRepository } from "../../domain/skill-repository.js";
-import type { Db } from "./catalog-db.js";
+import type { Tx } from "./catalog-db.js";
 import { SkillMapper } from "./skill-mapper.js";
 import { skillFiles, skillMcpDeps, skillSkillDeps, skills } from "./skill-schema.js";
 
 export class DrizzleSkillRepository implements SkillRepository {
-  private readonly db: Db;
+  private readonly db: Tx;
 
-  constructor(opts: { db: Db }) {
+  constructor(opts: { db: Tx }) {
     this.db = opts.db;
   }
 
@@ -75,42 +75,34 @@ export class DrizzleSkillRepository implements SkillRepository {
         const skillDeps = SkillMapper.toSkillDepRows(skill);
         const mcpDeps = SkillMapper.toMcpDepRows(skill);
         const fileRows = files === undefined ? null : SkillMapper.toFileRows(skill, files);
-        await this.db.run(sql.raw("SAVEPOINT skill_save"));
-        try {
-          await this.db
-            .insert(skills)
-            .values(row)
-            .onConflictDoUpdate({
-              target: skills.fqn,
-              set: {
-                origin: row.origin,
-                description: row.description,
-                version: row.version,
-                prereqs: row.prereqs,
-                prereqsAck: row.prereqsAck,
-                updatedAt: row.updatedAt,
-              },
-            })
-            .run();
-          await this.db.delete(skillSkillDeps).where(eq(skillSkillDeps.sourceFqn, skill.id)).run();
-          if (skillDeps.length > 0) {
-            await this.db.insert(skillSkillDeps).values(skillDeps).run();
+        await this.db
+          .insert(skills)
+          .values(row)
+          .onConflictDoUpdate({
+            target: skills.fqn,
+            set: {
+              origin: row.origin,
+              description: row.description,
+              version: row.version,
+              prereqs: row.prereqs,
+              prereqsAck: row.prereqsAck,
+              updatedAt: row.updatedAt,
+            },
+          })
+          .run();
+        await this.db.delete(skillSkillDeps).where(eq(skillSkillDeps.sourceFqn, skill.id)).run();
+        if (skillDeps.length > 0) {
+          await this.db.insert(skillSkillDeps).values(skillDeps).run();
+        }
+        await this.db.delete(skillMcpDeps).where(eq(skillMcpDeps.sourceFqn, skill.id)).run();
+        if (mcpDeps.length > 0) {
+          await this.db.insert(skillMcpDeps).values(mcpDeps).run();
+        }
+        if (fileRows !== null) {
+          await this.db.delete(skillFiles).where(eq(skillFiles.skillFqn, skill.id)).run();
+          if (fileRows.length > 0) {
+            await this.db.insert(skillFiles).values(fileRows).run();
           }
-          await this.db.delete(skillMcpDeps).where(eq(skillMcpDeps.sourceFqn, skill.id)).run();
-          if (mcpDeps.length > 0) {
-            await this.db.insert(skillMcpDeps).values(mcpDeps).run();
-          }
-          if (fileRows !== null) {
-            await this.db.delete(skillFiles).where(eq(skillFiles.skillFqn, skill.id)).run();
-            if (fileRows.length > 0) {
-              await this.db.insert(skillFiles).values(fileRows).run();
-            }
-          }
-          await this.db.run(sql.raw("RELEASE SAVEPOINT skill_save"));
-        } catch (e) {
-          await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT skill_save"));
-          await this.db.run(sql.raw("RELEASE SAVEPOINT skill_save"));
-          throw e;
         }
       })(),
       DrizzleSkillRepository.asDatabaseUnavailable,
@@ -120,18 +112,10 @@ export class DrizzleSkillRepository implements SkillRepository {
   delete(fqn: SkillFqn): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => {
-        await this.db.run(sql.raw("SAVEPOINT skill_delete"));
-        try {
-          await this.db.delete(skillFiles).where(eq(skillFiles.skillFqn, fqn)).run();
-          await this.db.delete(skillSkillDeps).where(eq(skillSkillDeps.sourceFqn, fqn)).run();
-          await this.db.delete(skillMcpDeps).where(eq(skillMcpDeps.sourceFqn, fqn)).run();
-          await this.db.delete(skills).where(eq(skills.fqn, fqn)).run();
-          await this.db.run(sql.raw("RELEASE SAVEPOINT skill_delete"));
-        } catch (e) {
-          await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT skill_delete"));
-          await this.db.run(sql.raw("RELEASE SAVEPOINT skill_delete"));
-          throw e;
-        }
+        await this.db.delete(skillFiles).where(eq(skillFiles.skillFqn, fqn)).run();
+        await this.db.delete(skillSkillDeps).where(eq(skillSkillDeps.sourceFqn, fqn)).run();
+        await this.db.delete(skillMcpDeps).where(eq(skillMcpDeps.sourceFqn, fqn)).run();
+        await this.db.delete(skills).where(eq(skills.fqn, fqn)).run();
       })(),
       DrizzleSkillRepository.asDatabaseUnavailable,
     );

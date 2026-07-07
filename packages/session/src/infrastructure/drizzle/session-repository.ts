@@ -7,7 +7,7 @@ import type {
   SessionNotFound,
   SessionRepository,
 } from "../../domain/session-repository.js";
-import type { Db } from "./session-db.js";
+import type { Tx } from "./session-db.js";
 import { SessionMapper, type SessionRow } from "./session-mapper.js";
 import { sessions } from "./session-schema.js";
 
@@ -21,10 +21,10 @@ import { sessions } from "./session-schema.js";
  * the changed columns (or no-op).
  */
 export class DrizzleSessionRepository implements SessionRepository {
-  private readonly db: Db;
+  private readonly db: Tx;
   private readonly snapshots = new WeakMap<SessionEntity, SessionRow>();
 
-  constructor(opts: { db: Db }) {
+  constructor(opts: { db: Tx }) {
     this.db = opts.db;
   }
 

@@ -286,3 +286,7 @@ export {
   type CatalogModuleOptions,
   composeCatalog,
 } from "./catalog-module.js";
+// ─── infrastructure seams (shared-db support) ──────────────────────
+export { type Db, type Tx, wrapClient } from "./infrastructure/drizzle/catalog-db.js";
+export { applyCatalogMigrations } from "./infrastructure/drizzle/catalog-migrations.js";
+export { type CatalogScope, createCatalogScope } from "./infrastructure/drizzle/catalog-scope.js";

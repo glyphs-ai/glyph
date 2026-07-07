@@ -19,7 +19,7 @@ import { RecoverOrphanedTasksUseCase } from "./application/recover-orphaned-task
 import { ResolveArtifactPathUseCase } from "./application/resolve-artifact-path.js";
 import { InMemoryLiveProcessRegistry } from "./application/supervision/in-memory-live-process-registry.js";
 import { TaskSupervisor } from "./application/supervision/task-supervisor.js";
-import { openDb } from "./infrastructure/drizzle/task-db.js";
+import { type Db, openDb } from "./infrastructure/drizzle/task-db.js";
 import { DrizzleTaskQueries } from "./infrastructure/drizzle/task-queries.js";
 import { DrizzleTaskRepository } from "./infrastructure/drizzle/task-repository.js";
 import { LocalTaskSandbox, tasksRoot } from "./infrastructure/file/local-task-sandbox.js";
@@ -53,9 +53,10 @@ export interface TaskModule {
   close(): Promise<void>;
 }
 
-export interface TaskModuleOptions {
-  /** Absolute path to the per-workspace `workspace.db`. */
-  readonly dbFile: string;
+export type TaskModuleOptions = (
+  | { readonly db: Db; readonly dbFile?: never }
+  | { readonly dbFile: string; readonly db?: never }
+) & {
   /** Resolves catalog agents (adapter over `@glyphs-ai/catalog`, wired by the host). */
   readonly agentResolver: AgentResolver;
   /** Supplies agent/skill/mcp bytes to `runtime.launchHeadless` (catalog satisfies it). */
@@ -70,7 +71,7 @@ export interface TaskModuleOptions {
   readonly now?: () => Date;
   /** Test seam: random byte source for id generation. */
   readonly randomBytes?: (n: number) => Buffer;
-}
+};
 
 /**
  * Open the task DB (WAL + migrations) and assemble the module. The file is
@@ -79,7 +80,16 @@ export interface TaskModuleOptions {
  * use-cases.
  */
 export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskModule> {
-  const { db, close } = await openDb(opts.dbFile);
+  let db: Db;
+  let closeDb: () => void;
+  if ("db" in opts && opts.db !== undefined) {
+    db = opts.db;
+    closeDb = () => {};
+  } else {
+    const opened = await openDb(opts.dbFile as string);
+    db = opened.db;
+    closeDb = opened.close;
+  }
   const logger = opts.logger ?? pino({ level: "silent" });
   const now = opts.now ?? (() => new Date());
   const randomBytes = opts.randomBytes ?? cryptoRandomBytes;
@@ -139,7 +149,7 @@ export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskMo
       return supervisor.shutdown();
     },
     async close() {
-      close();
+      closeDb();
     },
   };
 }

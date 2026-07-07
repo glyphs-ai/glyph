@@ -103,6 +103,11 @@ export {
   validationProblem,
 } from "./schemas/problem.js";
 export {
+  type RequestScope,
+  type ScopeDbHandles,
+  transactionMiddleware,
+} from "./transaction-middleware.js";
+export {
   WorkflowCoordAgentNotCapableError,
   WorkflowCoordSpecError,
 } from "./wiring/workflow-coord-task-runner.js";

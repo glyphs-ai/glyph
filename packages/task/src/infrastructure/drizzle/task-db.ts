@@ -1,10 +1,24 @@
+import type { ResultSet } from "@libsql/client";
 import { type Client, createClient } from "@libsql/client";
 import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 import { applyTaskMigrations } from "./task-migrations.js";
 import * as schema from "./task-schema.js";
 
 /** The pkg's drizzle DB handle, parameterized by the task tables. */
 export type Db = LibSQLDatabase<typeof schema>;
+
+/**
+ * Common query-capable handle — both {@link Db} and a drizzle transaction
+ * satisfy this interface. Repositories accept `Tx` so they can participate
+ * in a request-scoped transaction without owning one.
+ */
+export type Tx = BaseSQLiteDatabase<"async", ResultSet, typeof schema>;
+
+/** Wrap an existing libsql client into a typed drizzle handle (no PRAGMAs, no migrations). */
+export function wrapClient(client: Client): Db {
+  return drizzle(client, { schema });
+}
 
 /**
  * Open the task DB (libsql) in WAL mode, apply migrations, and return
