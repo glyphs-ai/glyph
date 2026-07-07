@@ -4,15 +4,15 @@ import { SessionIdSchema } from "../../../src/domain/session-id.js";
 import { openDb } from "../../../src/infrastructure/drizzle/session-db.js";
 import { DrizzleSessionRepository } from "../../../src/infrastructure/drizzle/session-repository.js";
 
-function setupRepo(): DrizzleSessionRepository {
-  const { db } = openDb(":memory:");
+async function setupRepo(): Promise<DrizzleSessionRepository> {
+  const { db } = await openDb(":memory:");
   return new DrizzleSessionRepository({ db });
 }
 
 let repo: DrizzleSessionRepository;
 
-beforeEach(() => {
-  repo = setupRepo();
+beforeEach(async () => {
+  repo = await setupRepo();
 });
 
 const STATE_A = {

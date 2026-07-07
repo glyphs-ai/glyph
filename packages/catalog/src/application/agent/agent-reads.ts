@@ -62,18 +62,18 @@ function bucketBySource(
   return buckets;
 }
 
-function assembleAgent(db: Db, row: AgentRow): AgentView {
-  const skillDeps = db
+async function assembleAgent(db: Db, row: AgentRow): Promise<AgentView> {
+  const skillDeps = await db
     .select({ target: agentSkillDeps.targetFqn })
     .from(agentSkillDeps)
     .where(eq(agentSkillDeps.sourceFqn, row.fqn))
     .all();
-  const mcpDeps = db
+  const mcpDeps = await db
     .select({ target: agentMcpDeps.targetFqn })
     .from(agentMcpDeps)
     .where(eq(agentMcpDeps.sourceFqn, row.fqn))
     .all();
-  const agentDeps = db
+  const agentDeps = await db
     .select({ target: agentAgentDeps.targetFqn })
     .from(agentAgentDeps)
     .where(eq(agentAgentDeps.sourceFqn, row.fqn))
@@ -86,34 +86,34 @@ function assembleAgent(db: Db, row: AgentRow): AgentView {
 }
 
 /** One agent (row + assembled deps) by fqn, or `undefined` when absent. */
-export function selectAgentByFqn(db: Db, fqn: string): AgentView | undefined {
-  const row = db.select().from(agents).where(eq(agents.fqn, fqn)).get();
-  return row === undefined ? undefined : assembleAgent(db, row);
+export async function selectAgentByFqn(db: Db, fqn: string): Promise<AgentView | undefined> {
+  const row = await db.select().from(agents).where(eq(agents.fqn, fqn)).get();
+  return row === undefined ? undefined : await assembleAgent(db, row);
 }
 
 /** One agent (row + assembled deps) by origin, or `undefined` when absent. */
-export function selectAgentByOrigin(db: Db, origin: string): AgentView | undefined {
-  const row = db.select().from(agents).where(eq(agents.origin, origin)).get();
-  return row === undefined ? undefined : assembleAgent(db, row);
+export async function selectAgentByOrigin(db: Db, origin: string): Promise<AgentView | undefined> {
+  const row = await db.select().from(agents).where(eq(agents.origin, origin)).get();
+  return row === undefined ? undefined : await assembleAgent(db, row);
 }
 
 /** Every installed agent (row + assembled deps), ordered by fqn. */
-export function selectAllAgents(db: Db): AgentView[] {
-  const rows = db.select().from(agents).orderBy(agents.fqn).all();
+export async function selectAllAgents(db: Db): Promise<AgentView[]> {
+  const rows = await db.select().from(agents).orderBy(agents.fqn).all();
   const skillDeps = bucketBySource(
-    db
+    await db
       .select({ source: agentSkillDeps.sourceFqn, target: agentSkillDeps.targetFqn })
       .from(agentSkillDeps)
       .all(),
   );
   const mcpDeps = bucketBySource(
-    db
+    await db
       .select({ source: agentMcpDeps.sourceFqn, target: agentMcpDeps.targetFqn })
       .from(agentMcpDeps)
       .all(),
   );
   const agentDeps = bucketBySource(
-    db
+    await db
       .select({ source: agentAgentDeps.sourceFqn, target: agentAgentDeps.targetFqn })
       .from(agentAgentDeps)
       .all(),
@@ -132,9 +132,12 @@ export function selectAllAgents(db: Db): AgentView[] {
  * on (reads only the agent-agent edge table's `target_fqn`). Used to guard
  * uninstall: an agent still referenced here has dependents.
  */
-export function collectReferencedAgentFqns(db: Db): Set<string> {
+export async function collectReferencedAgentFqns(db: Db): Promise<Set<string>> {
   const referenced = new Set<string>();
-  for (const dep of db.select({ target: agentAgentDeps.targetFqn }).from(agentAgentDeps).all()) {
+  for (const dep of await db
+    .select({ target: agentAgentDeps.targetFqn })
+    .from(agentAgentDeps)
+    .all()) {
     referenced.add(dep.target);
   }
   return referenced;

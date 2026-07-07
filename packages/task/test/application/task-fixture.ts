@@ -112,14 +112,14 @@ export interface SupervisorFixture {
   cleanup(): void;
 }
 
-export function buildSupervisorFixture(
+export async function buildSupervisorFixture(
   opts: { logger?: Logger; autoExitOnKill?: boolean } = {},
-): SupervisorFixture {
+): Promise<SupervisorFixture> {
   const workspaceDir = mkdtempSync(join(tmpdir(), "task-sup-"));
   // The workspace provisioner pre-creates `<workspaceDir>/tasks/` in prod;
   // reserve uses {recursive:false} so the test must create it too.
   mkdirSync(tasksRoot(workspaceDir), { recursive: true });
-  const { db, close } = openDb(":memory:");
+  const { db, close } = await openDb(":memory:");
   const repo = new DrizzleTaskRepository({ db });
   const sandbox = new LocalTaskSandbox({ root: tasksRoot(workspaceDir) });
   const runtime = new FakeHeadlessRuntime();

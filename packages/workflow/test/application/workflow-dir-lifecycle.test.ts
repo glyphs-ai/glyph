@@ -95,12 +95,11 @@ describe("workflowDir lifecycle", () => {
   });
 
   it("tx-failure inside createWorkflow rolls back the workflowDir (no orphan)", async () => {
-    // Force the repository's write tx to throw (simulating a unique-constraint
+    // Force the repository's write to throw (simulating a unique-constraint
     // violation or any DB-level write failure). The use-case must remove the
     // freshly reserved workflowDir on the catch path so the next operator sees
-    // a consistent fs/db state. The repository isn't exposed, so we fail the
-    // underlying write tx instead.
-    const spy = vi.spyOn(f.db, "transaction").mockImplementation(() => {
+    // a consistent fs/db state.
+    const spy = vi.spyOn(f.db, "run").mockImplementation(() => {
       throw new Error("simulated tx failure");
     });
 

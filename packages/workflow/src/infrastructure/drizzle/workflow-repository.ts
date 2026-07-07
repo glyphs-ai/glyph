@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import type { WorkflowNodeEntity } from "../../domain/node/workflow-node-entity.js";
@@ -38,15 +38,19 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
     WorkflowNotFound | WorkflowEntityCorruption | DatabaseUnavailable
   > {
     return ResultAsync.fromPromise(
-      Promise.resolve().then(() => {
-        const workflowRow = this.db.select().from(workflows).where(eq(workflows.id, id)).get();
+      (async () => {
+        const workflowRow = await this.db
+          .select()
+          .from(workflows)
+          .where(eq(workflows.id, id))
+          .get();
         if (workflowRow === undefined) return { kind: "missing" as const };
-        const nodeRows = this.db
+        const nodeRows = await this.db
           .select()
           .from(workflowNodes)
           .where(eq(workflowNodes.workflowId, id))
           .all();
-        const edgeRows = this.db
+        const edgeRows = await this.db
           .select()
           .from(workflowEdges)
           .where(eq(workflowEdges.workflowId, id))
@@ -60,7 +64,7 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
           return { kind: "corrupt" as const, error: entity.error };
         }
         return { kind: "ok" as const, entity: entity.value };
-      }),
+      })(),
       mapToDatabaseUnavailable,
     ).andThen((result) => {
       if (result.kind === "missing")
@@ -72,39 +76,47 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
 
   save(entity: WorkflowEntity): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      Promise.resolve().then(() =>
-        this.db.transaction((tx) => {
+      (async () => {
+        await this.db.run(sql.raw("SAVEPOINT wf_save"));
+        try {
           const snapshot = entity.__snapshot();
           if (snapshot.header === null) {
-            tx.insert(workflows).values(WorkflowMapper.toWorkflowRow(entity)).run();
+            await this.db.insert(workflows).values(WorkflowMapper.toWorkflowRow(entity)).run();
             for (const node of entity.nodes)
-              tx.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
+              await this.db.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
             for (const edge of entity.edges)
-              tx.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
+              await this.db.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
+            await this.db.run(sql.raw("RELEASE SAVEPOINT wf_save"));
             return;
           }
           if (headerChanged(snapshot.header, entity))
-            tx.update(workflows)
+            await this.db
+              .update(workflows)
               .set(workflowPatch(entity))
               .where(eq(workflows.id, entity.id))
               .run();
           const currentNodes = new Map(entity.nodes.map((node) => [node.id, node]));
           for (const node of entity.nodes)
             if (!snapshot.nodes.has(node.id))
-              tx.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
+              await this.db.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
           for (const id of snapshot.nodes.keys())
             if (!currentNodes.has(id))
-              tx.delete(workflowNodes).where(eq(workflowNodes.id, id)).run();
+              await this.db.delete(workflowNodes).where(eq(workflowNodes.id, id)).run();
           for (const [id, snap] of snapshot.nodes) {
             const node = currentNodes.get(id);
             if (node !== undefined && nodeChanged(snap, node))
-              tx.update(workflowNodes).set(nodePatch(node)).where(eq(workflowNodes.id, id)).run();
+              await this.db
+                .update(workflowNodes)
+                .set(nodePatch(node))
+                .where(eq(workflowNodes.id, id))
+                .run();
           }
           const currentEdgeKeys = new Set(entity.edges.map((edge) => edgeKey(edge.from, edge.to)));
           for (const key of snapshot.edgeKeys)
             if (!currentEdgeKeys.has(key)) {
               const edge = splitEdgeKey(key);
-              tx.delete(workflowEdges)
+              await this.db
+                .delete(workflowEdges)
                 .where(
                   and(
                     eq(workflowEdges.workflowId, entity.id),
@@ -116,22 +128,31 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
             }
           for (const edge of entity.edges)
             if (!snapshot.edgeKeys.has(edgeKey(edge.from, edge.to)))
-              tx.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
-        }),
-      ),
+              await this.db.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
+          await this.db.run(sql.raw("RELEASE SAVEPOINT wf_save"));
+        } catch (e) {
+          await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT wf_save"));
+          throw e;
+        }
+      })(),
       mapToDatabaseUnavailable,
     );
   }
 
   delete(id: WorkflowId): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      Promise.resolve().then(() =>
-        this.db.transaction((tx) => {
-          tx.delete(workflowEdges).where(eq(workflowEdges.workflowId, id)).run();
-          tx.delete(workflowNodes).where(eq(workflowNodes.workflowId, id)).run();
-          tx.delete(workflows).where(eq(workflows.id, id)).run();
-        }),
-      ),
+      (async () => {
+        await this.db.run(sql.raw("SAVEPOINT wf_delete"));
+        try {
+          await this.db.delete(workflowEdges).where(eq(workflowEdges.workflowId, id)).run();
+          await this.db.delete(workflowNodes).where(eq(workflowNodes.workflowId, id)).run();
+          await this.db.delete(workflows).where(eq(workflows.id, id)).run();
+          await this.db.run(sql.raw("RELEASE SAVEPOINT wf_delete"));
+        } catch (e) {
+          await this.db.run(sql.raw("ROLLBACK TO SAVEPOINT wf_delete"));
+          throw e;
+        }
+      })(),
       mapToDatabaseUnavailable,
     );
   }

@@ -31,8 +31,8 @@ let close: () => void;
 let mcpRepo: DrizzleMcpRepository;
 let useCase: GetMcpByOriginUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openDb(":memory:");
   db = opened.db;
   close = opened.close;
   mcpRepo = new DrizzleMcpRepository({ db });

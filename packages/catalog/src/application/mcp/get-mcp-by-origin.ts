@@ -42,7 +42,7 @@ export class GetMcpByOriginUseCase
   ): UseCaseResult<GetMcpByOriginResponse, GetMcpByOriginError> {
     const { origin } = request;
     return this.deps.queries
-      .query((db) => db.select().from(mcps).where(eq(mcps.origin, origin)).get())
+      .query(async (db) => await db.select().from(mcps).where(eq(mcps.origin, origin)).get())
       .andThen(
         (row): UseCaseResult<GetMcpByOriginResponse, GetMcpByOriginError> =>
           row === undefined

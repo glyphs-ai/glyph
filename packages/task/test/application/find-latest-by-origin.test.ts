@@ -13,8 +13,8 @@ let closeDb: () => void = () => {};
 let repo: DrizzleTaskRepository;
 let useCase: FindLatestByOriginUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openDb(":memory:");
   db = opened.db;
   closeDb = opened.close;
   repo = new DrizzleTaskRepository({ db });

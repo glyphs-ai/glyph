@@ -471,7 +471,7 @@ export class WorkspaceContextRegistry {
       return workflowRef;
     };
     try {
-      catalogModule = composeCatalog({ dbFile });
+      catalogModule = await composeCatalog({ dbFile });
       cleanup.push(() => catalogModule.close());
       const catalogPorts = makeCatalogRuntimePorts(catalogModule);
       const agentResolver: AgentResolver = {

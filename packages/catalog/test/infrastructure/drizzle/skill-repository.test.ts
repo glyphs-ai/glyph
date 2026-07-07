@@ -11,8 +11,8 @@ import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skil
  */
 let repo: DrizzleSkillRepository;
 
-beforeEach(() => {
-  repo = new DrizzleSkillRepository({ db: openDb(":memory:").db });
+beforeEach(async () => {
+  repo = new DrizzleSkillRepository({ db: await (await openDb(":memory:")).db });
 });
 
 const NOW = "2025-01-01T00:00:00.000Z";

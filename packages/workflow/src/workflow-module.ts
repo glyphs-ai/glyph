@@ -88,7 +88,7 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
     db = opts.db;
     closeDb = () => {};
   } else {
-    const opened = openDb(opts.dbFile as string);
+    const opened = await openDb(opts.dbFile as string);
     db = opened.db;
     closeDb = opened.close;
   }

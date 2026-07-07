@@ -50,7 +50,7 @@ describe("WorkflowModule.cancelNode", () => {
       coordSpec: { agent: "coord-next" },
     });
     const nodeId = workerIds.w!;
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: nodeId,
       status: "running",
       runningAt: "2026-06-07T01:00:00.000Z",
@@ -84,7 +84,7 @@ describe("WorkflowModule.cancelNode", () => {
       coordSpec: { agent: "coord-next" },
     });
     const nodeId = workerIds.w!;
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: nodeId,
       status: "succeeded",
       endedAt: "2026-06-07T01:00:00.000Z",
@@ -105,7 +105,7 @@ describe("WorkflowModule.cancelNode", () => {
       coordSpec: { agent: "coord-next" },
     });
     const nodeId = workerIds.w!;
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: nodeId,
       status: "running",
       runningAt: "2026-06-07T01:00:00.000Z",

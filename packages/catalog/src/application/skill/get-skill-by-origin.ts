@@ -43,7 +43,7 @@ export class GetSkillByOriginUseCase
   ): UseCaseResult<GetSkillByOriginResponse, GetSkillByOriginError> {
     const { origin } = request;
     return this.deps.queries
-      .query((db) => db.select().from(skills).where(eq(skills.origin, origin)).get())
+      .query(async (db) => await db.select().from(skills).where(eq(skills.origin, origin)).get())
       .andThen(
         (row): UseCaseResult<GetSkillByOriginResponse, GetSkillByOriginError> =>
           row === undefined

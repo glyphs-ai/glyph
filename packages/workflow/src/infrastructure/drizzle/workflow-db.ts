@@ -1,33 +1,30 @@
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
-import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
+import { type Client, createClient } from "@libsql/client";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import { applyWorkflowMigrations } from "./workflow-migrations.js";
 import * as schema from "./workflow-schema.js";
 
 /** The pkg's drizzle DB handle, parameterized by the workflow tables. */
-export type Db = BetterSQLite3Database<typeof schema>;
+export type Db = LibSQLDatabase<typeof schema>;
 
 /**
- * Open the workflow DB in WAL mode, apply migrations, and return the drizzle
- * handle plus `close`. The file is the per-workspace `workspace.db`, shared
- * with sibling packages via per-pkg migration tables (`__drizzle_migrations_workflow`);
- * each opens its own connection. Tests pass `:memory:`.
+ * Open the workflow DB (libsql) in WAL mode, apply migrations, and
+ * return the drizzle handle plus `close`. The file is the per-workspace
+ * `workspace.db`, shared with sibling packages via per-pkg migration
+ * tables (`__drizzle_migrations_workflow`); each opens its own
+ * connection. Tests pass `:memory:`.
  */
-export function openDb(dbFile: string): { db: Db; close(): void } {
-  const sqlite: BetterSqliteDatabase = new Database(dbFile);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("synchronous = NORMAL");
-  // No `foreign_keys = ON`: the schema has no FK constraints, so the pragma
-  // would be a no-op that misleads readers.
-  sqlite.pragma("busy_timeout = 5000");
-  const db: Db = drizzle(sqlite, { schema });
-  // Migration failure must close the SQLite handle before propagating: a
-  // leaked handle would hold the WAL lock and break a subsequent retry from
-  // the same caller (EBUSY until process exit).
+export async function openDb(dbFile: string): Promise<{ db: Db; close(): void }> {
+  const url = dbFile === ":memory:" ? "file::memory:" : `file:${dbFile}`;
+  const client: Client = createClient({ url });
+  await client.execute("PRAGMA journal_mode = WAL");
+  await client.execute("PRAGMA synchronous = NORMAL");
+  await client.execute("PRAGMA busy_timeout = 5000");
   try {
-    applyWorkflowMigrations(db);
+    await applyWorkflowMigrations(client);
   } catch (err) {
-    sqlite.close();
+    client.close();
     throw err;
   }
-  return { db, close: () => sqlite.close() };
+  const db: Db = drizzle(client, { schema });
+  return { db, close: () => client.close() };
 }

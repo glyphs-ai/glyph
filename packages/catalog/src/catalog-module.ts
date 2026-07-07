@@ -93,8 +93,8 @@ export interface CatalogModule {
   close(): Promise<void>;
 }
 
-export function composeCatalog(opts: CatalogModuleOptions): CatalogModule {
-  const { db, close } = openDb(opts.dbFile);
+export async function composeCatalog(opts: CatalogModuleOptions): Promise<CatalogModule> {
+  const { db, close } = await openDb(opts.dbFile);
   const registry = defaultRegistry();
 
   const agentRepo = new DrizzleAgentRepository({ db });

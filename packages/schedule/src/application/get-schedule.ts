@@ -52,8 +52,8 @@ export class GetScheduleUseCase
     if (idResult.isErr()) return errAsync(idResult.error);
     const id = idResult.value;
     const q = this.deps.query;
-    return q.query((db) => {
-      const row = db.select().from(q.schedules).where(eq(q.schedules.id, id)).get();
+    return q.query(async (db) => {
+      const row = await db.select().from(q.schedules).where(eq(q.schedules.id, id)).get();
       if (row === undefined) return null;
       // A kind-scoped read (e.g. GET /schedules/task/:sid) treats a row of a
       // different kind as absent, so the wire never leaks the actual kind.

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TaskBriefSchema } from "../../../src/domain/task-brief.js";
 import { TaskEntity } from "../../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../../src/domain/task-id.js";
@@ -10,11 +10,16 @@ import { tasks } from "../../../src/infrastructure/drizzle/task-schema.js";
 const CREATED_AT = "2026-05-08T01:05:00.000Z";
 
 let db: Db;
+let closeDb: () => void = () => {};
 let repo: DrizzleTaskRepository;
 
-beforeEach(() => {
-  ({ db } = openDb(":memory:"));
+beforeEach(async () => {
+  ({ db, close: closeDb } = await openDb(":memory:"));
   repo = new DrizzleTaskRepository({ db });
+});
+
+afterEach(() => {
+  closeDb();
 });
 
 function id(n: number): TaskId {
@@ -116,7 +121,8 @@ describe("DrizzleTaskRepository — listTerminalByOrigin", () => {
   it("warn-skips a corrupted terminal row so it is never surfaced for deletion", async () => {
     // A terminal row with no success payload fails reconstruction. Insert it
     // raw (bypassing the mapper) to simulate on-disk corruption.
-    db.insert(tasks)
+    await db
+      .insert(tasks)
       .values({
         id: "20260508-00000009",
         agent: "a",

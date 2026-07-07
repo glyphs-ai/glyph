@@ -56,13 +56,13 @@ function bucketBySource(
   return buckets;
 }
 
-function assembleSkill(db: Db, row: SkillRow): SkillView {
-  const skillDeps = db
+async function assembleSkill(db: Db, row: SkillRow): Promise<SkillView> {
+  const skillDeps = await db
     .select({ target: skillSkillDeps.targetFqn })
     .from(skillSkillDeps)
     .where(eq(skillSkillDeps.sourceFqn, row.fqn))
     .all();
-  const mcpDeps = db
+  const mcpDeps = await db
     .select({ target: skillMcpDeps.targetFqn })
     .from(skillMcpDeps)
     .where(eq(skillMcpDeps.sourceFqn, row.fqn))
@@ -74,28 +74,28 @@ function assembleSkill(db: Db, row: SkillRow): SkillView {
 }
 
 /** One skill (row + assembled deps) by fqn, or `undefined` when absent. */
-export function selectSkillByFqn(db: Db, fqn: string): SkillView | undefined {
-  const row = db.select().from(skills).where(eq(skills.fqn, fqn)).get();
-  return row === undefined ? undefined : assembleSkill(db, row);
+export async function selectSkillByFqn(db: Db, fqn: string): Promise<SkillView | undefined> {
+  const row = await db.select().from(skills).where(eq(skills.fqn, fqn)).get();
+  return row === undefined ? undefined : await assembleSkill(db, row);
 }
 
 /** One skill (row + assembled deps) by origin, or `undefined` when absent. */
-export function selectSkillByOrigin(db: Db, origin: string): SkillView | undefined {
-  const row = db.select().from(skills).where(eq(skills.origin, origin)).get();
-  return row === undefined ? undefined : assembleSkill(db, row);
+export async function selectSkillByOrigin(db: Db, origin: string): Promise<SkillView | undefined> {
+  const row = await db.select().from(skills).where(eq(skills.origin, origin)).get();
+  return row === undefined ? undefined : await assembleSkill(db, row);
 }
 
 /** Every installed skill (row + assembled deps), ordered by fqn. */
-export function selectAllSkills(db: Db): SkillView[] {
-  const rows = db.select().from(skills).orderBy(skills.fqn).all();
+export async function selectAllSkills(db: Db): Promise<SkillView[]> {
+  const rows = await db.select().from(skills).orderBy(skills.fqn).all();
   const skillDeps = bucketBySource(
-    db
+    await db
       .select({ source: skillSkillDeps.sourceFqn, target: skillSkillDeps.targetFqn })
       .from(skillSkillDeps)
       .all(),
   );
   const mcpDeps = bucketBySource(
-    db
+    await db
       .select({ source: skillMcpDeps.sourceFqn, target: skillMcpDeps.targetFqn })
       .from(skillMcpDeps)
       .all(),
@@ -110,12 +110,18 @@ export function selectAllSkills(db: Db): SkillView[] {
  * (reads only the two skill-dep edge tables' `target_fqn`); a skill absent from
  * it is orphaned.
  */
-export function collectReferencedSkillFqns(db: Db): Set<string> {
+export async function collectReferencedSkillFqns(db: Db): Promise<Set<string>> {
   const referenced = new Set<string>();
-  for (const dep of db.select({ target: agentSkillDeps.targetFqn }).from(agentSkillDeps).all()) {
+  for (const dep of await db
+    .select({ target: agentSkillDeps.targetFqn })
+    .from(agentSkillDeps)
+    .all()) {
     referenced.add(dep.target);
   }
-  for (const dep of db.select({ target: skillSkillDeps.targetFqn }).from(skillSkillDeps).all()) {
+  for (const dep of await db
+    .select({ target: skillSkillDeps.targetFqn })
+    .from(skillSkillDeps)
+    .all()) {
     referenced.add(dep.target);
   }
   return referenced;

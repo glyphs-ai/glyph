@@ -26,20 +26,16 @@ export class ListMcpsUseCase implements UseCase<ListMcpsRequest, ListMcpsRespons
   constructor(private readonly deps: ListMcpsDeps) {}
 
   execute(_request: ListMcpsRequest): UseCaseResult<ListMcpsResponse, ListMcpsError> {
-    return this.deps.queries.query((db) => {
-      const referenced = collectReferencedMcpFqns(db);
-      return db
-        .select()
-        .from(mcps)
-        .orderBy(mcps.fqn)
-        .all()
-        .map((row) => ({
-          fqn: row.fqn,
-          origin: row.origin,
-          orphaned: !referenced.has(row.fqn),
-          installedAt: row.installedAt,
-          updatedAt: row.updatedAt,
-        }));
+    return this.deps.queries.query(async (db) => {
+      const referenced = await collectReferencedMcpFqns(db);
+      const rows = await db.select().from(mcps).orderBy(mcps.fqn).all();
+      return rows.map((row) => ({
+        fqn: row.fqn,
+        origin: row.origin,
+        orphaned: !referenced.has(row.fqn),
+        installedAt: row.installedAt,
+        updatedAt: row.updatedAt,
+      }));
     });
   }
 }

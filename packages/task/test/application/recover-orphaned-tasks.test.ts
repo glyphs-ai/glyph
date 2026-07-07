@@ -1,5 +1,5 @@
 import { errAsync } from "neverthrow";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RecoverOrphanedTasksUseCase } from "../../src/application/recover-orphaned-tasks.js";
 import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import { TaskEntity } from "../../src/domain/task-entity.js";
@@ -18,9 +18,11 @@ const CREATED_AT = "2026-05-08T01:05:00.000Z";
 let repo: DrizzleTaskRepository;
 let query: DrizzleTaskQueries;
 let useCase: RecoverOrphanedTasksUseCase;
+let closeDb: () => void = () => {};
 
-beforeEach(() => {
-  const { db } = openDb(":memory:");
+beforeEach(async () => {
+  const { db, close } = await openDb(":memory:");
+  closeDb = close;
   repo = new DrizzleTaskRepository({ db });
   query = new DrizzleTaskQueries({ db });
   useCase = new RecoverOrphanedTasksUseCase({
@@ -29,6 +31,10 @@ beforeEach(() => {
     now: () => new Date(CREATED_AT),
     logger: captureLogger().logger,
   });
+});
+
+afterEach(() => {
+  closeDb();
 });
 
 function running(hex: string): TaskEntity {

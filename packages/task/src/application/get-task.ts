@@ -60,8 +60,8 @@ export class GetTaskUseCase implements UseCase<GetTaskRequest, GetTaskResponse, 
     const deps = this.deps;
     const q = deps.query;
     return q
-      .query((db): GetTaskResponse => {
-        const row = db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
+      .query(async (db): Promise<GetTaskResponse> => {
+        const row = await db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
         return row === undefined ? null : projectTaskRow(row);
       })
       .andThen((view) => {

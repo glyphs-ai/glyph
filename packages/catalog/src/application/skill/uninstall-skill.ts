@@ -49,7 +49,9 @@ export class UninstallSkillUseCase
     const deps = this.deps;
     return safeTry<UninstallSkillResponse, UninstallSkillError>(async function* () {
       yield* deps.skillRepo.get(fqn);
-      const referenced = yield* deps.queries.query((db) => collectReferencedSkillFqns(db).has(fqn));
+      const referenced = yield* deps.queries.query(async (db) =>
+        (await collectReferencedSkillFqns(db)).has(fqn),
+      );
       if (referenced) {
         return err<UninstallSkillResponse, UninstallSkillError>({ type: "HasDependents", fqn });
       }

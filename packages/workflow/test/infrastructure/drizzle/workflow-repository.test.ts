@@ -73,8 +73,8 @@ let db: Db;
 let close: () => void;
 let repo: DrizzleWorkflowRepository;
 
-beforeEach(() => {
-  ({ db, close } = openDb(":memory:"));
+beforeEach(async () => {
+  ({ db, close } = await openDb(":memory:"));
   repo = new DrizzleWorkflowRepository({ db });
 });
 
@@ -115,7 +115,8 @@ describe("DrizzleWorkflowRepository — save insert / get round-trip", () => {
 
   it("get surfaces WorkflowEntityCorruption for a row with an invalid status enum", async () => {
     (await repo.save(makeWorkflow(wfId(1))))._unsafeUnwrap();
-    db.update(workflows)
+    await db
+      .update(workflows)
       .set({ status: "bogus" })
       .where(eq(workflows.id, "20260607-00000001"))
       .run();
@@ -198,21 +199,21 @@ describe("DrizzleWorkflowRepository — delete", () => {
     expect(r.isErr()).toBe(true);
     expect(r._unsafeUnwrapErr().type).toBe("WorkflowNotFound");
     expect(
-      db
+      await db
         .select()
         .from(workflows)
         .where(eq(workflows.id, wfId(1)))
         .all(),
     ).toEqual([]);
     expect(
-      db
+      await db
         .select()
         .from(workflowNodes)
         .where(eq(workflowNodes.workflowId, wfId(1)))
         .all(),
     ).toEqual([]);
     expect(
-      db
+      await db
         .select()
         .from(workflowEdges)
         .where(eq(workflowEdges.workflowId, wfId(1)))

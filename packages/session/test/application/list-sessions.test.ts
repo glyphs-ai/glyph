@@ -43,14 +43,14 @@ function entity(
   };
 }
 
-function setup(): {
+async function setup(): Promise<{
   readonly db: Db;
   readonly useCase: ListSessionsUseCase;
   readonly runtimeRegistry: MockProxy<RuntimeRegistry>;
   readonly runtime: MockProxy<Runtime>;
   readonly sandbox: MockProxy<SessionSandbox>;
-} {
-  const { db } = openDb(":memory:");
+}> {
+  const { db } = await openDb(":memory:");
   const runtimeRegistry = mock<RuntimeRegistry>();
   const runtime = mock<Runtime>();
   const sandbox = mock<SessionSandbox>();
@@ -75,7 +75,7 @@ function setup(): {
 function failingQueries(): SessionQueries {
   return {
     sessions,
-    query<T>(_fn: (db: Db) => T) {
+    query<T>(_fn: (db: Db) => T | Promise<T>) {
       return errAsync<T, DatabaseUnavailable>({
         type: "DatabaseUnavailable",
         cause: new Error("boom"),
@@ -86,7 +86,7 @@ function failingQueries(): SessionQueries {
 
 describe("ListSessionsUseCase", () => {
   it("drops sessions whose runtime is unregistered and sorts newest-first", async () => {
-    const { db, useCase } = setup();
+    const { db, useCase } = await setup();
     await seed(db, entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"));
     await seed(db, entity(UNREG, "gemini", "2026-05-09T00:00:00.000Z"));
     await seed(db, entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z"));
@@ -96,7 +96,7 @@ describe("ListSessionsUseCase", () => {
   });
 
   it("filters by agent", async () => {
-    const { db, useCase } = setup();
+    const { db, useCase } = await setup();
     await seed(db, entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"));
     await seed(db, entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z", { agent: "public/other" }));
 
@@ -105,7 +105,7 @@ describe("ListSessionsUseCase", () => {
   });
 
   it("filters by createdSince with an inclusive lower bound", async () => {
-    const { db, useCase } = setup();
+    const { db, useCase } = await setup();
     await seed(db, entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"));
     await seed(db, entity(UNREG, "copilot", "2026-05-09T00:00:00.000Z"));
     await seed(db, entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z"));
@@ -117,7 +117,7 @@ describe("ListSessionsUseCase", () => {
   });
 
   it("sorts by refreshed activity newest-first", async () => {
-    const { db, useCase, runtime } = setup();
+    const { db, useCase, runtime } = await setup();
     await seed(
       db,
       entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z", { runtimeSessionId: "rsid-old" }),
@@ -141,7 +141,7 @@ describe("ListSessionsUseCase", () => {
   });
 
   it("activeSince filters never-active rows on their createdAt", async () => {
-    const { db, useCase } = setup();
+    const { db, useCase } = await setup();
     await seed(db, entity(OLDER, "copilot", "2026-05-08T00:00:00.000Z"));
     await seed(db, entity(NEWER, "copilot", "2026-05-10T00:00:00.000Z"));
 

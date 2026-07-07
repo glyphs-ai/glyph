@@ -48,8 +48,8 @@ export class GetTaskActivityStreamUseCase
     const deps = this.deps;
     const q = deps.query;
     return q
-      .query((db) => {
-        const row = db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
+      .query(async (db) => {
+        const row = await db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
         return row === undefined ? null : projectTaskRow(row);
       })
       .map((view): GetTaskActivityStreamResponse => {

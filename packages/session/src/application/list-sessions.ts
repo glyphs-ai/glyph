@@ -57,12 +57,12 @@ export class ListSessionsUseCase
     const deps = this.deps;
     const q = deps.query;
     return q
-      .query((db) => {
+      .query(async (db) => {
         const filters: SQL[] = [];
         if (createdSince !== undefined) filters.push(gte(q.sessions.createdAt, createdSince));
         if (agent !== undefined) filters.push(eq(q.sessions.agent, agent));
         const select = db.select().from(q.sessions);
-        return filters.length > 0 ? select.where(and(...filters)).all() : select.all();
+        return filters.length > 0 ? await select.where(and(...filters)).all() : await select.all();
       })
       .andThen((rows) =>
         ResultAsync.fromSafePromise(Promise.all(rows.map((r) => toListSessionsEntry(deps, r)))),

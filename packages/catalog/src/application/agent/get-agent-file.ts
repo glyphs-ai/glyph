@@ -22,8 +22,8 @@ export class GetAgentFileUseCase
 
   execute(request: GetAgentFileRequest): UseCaseResult<GetAgentFileResponse, GetAgentFileError> {
     const { id, relPath } = request;
-    return this.deps.queries.query((db) => {
-      const row = db
+    return this.deps.queries.query(async (db) => {
+      const row = await db
         .select({ content: agentFiles.content })
         .from(agentFiles)
         .where(and(eq(agentFiles.agentFqn, id), eq(agentFiles.relPath, relPath)))

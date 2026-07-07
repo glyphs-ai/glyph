@@ -86,7 +86,7 @@ export interface ScheduleTestHandle {
   readonly repo: DrizzleScheduleRepository;
   readonly taskHandler: StubHandler;
   readonly nowRef: { value: Date };
-  readonly db: ReturnType<typeof openTestScheduleDb>;
+  readonly db: Awaited<ReturnType<typeof openTestScheduleDb>>;
   setNow(d: Date): void;
   close(): Promise<void>;
 }
@@ -100,7 +100,7 @@ export async function makeScheduleTestHandle(
     readonly skipRegisterTask?: boolean;
   } = {},
 ): Promise<ScheduleTestHandle> {
-  const db = openTestScheduleDb();
+  const db = await openTestScheduleDb();
   const taskHandler = opts.taskHandler ?? makeStubHandler();
   const nowRef = { value: opts.initialNow ?? new Date("2026-05-01T00:00:00.000Z") };
   const module = await composeScheduleModule({

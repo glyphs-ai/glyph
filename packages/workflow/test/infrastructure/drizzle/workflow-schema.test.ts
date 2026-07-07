@@ -1,9 +1,28 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
+import { type Client, createClient } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
+
+async function removeDir(path: string): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      rmSync(path, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error)) throw error;
+      if (error.code !== "EPERM" && error.code !== "EBUSY") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  try {
+    rmSync(path, { recursive: true, force: true });
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error)) throw error;
+    if (error.code !== "EPERM" && error.code !== "EBUSY") throw error;
+  }
+}
 
 /**
  * Schema smoke test. Verifies the migration set produces the three workflow
@@ -15,35 +34,34 @@ import { openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
  */
 
 let dir: string;
-let sqlite: BetterSqliteDatabase;
+let client: Client;
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "wf-schema-"));
   const dbFile = join(dir, "workspace.db");
-  // openDb applies the migrations to the file, then we close it and read the
-  // resulting schema through a raw connection.
-  openDb(dbFile).close();
-  sqlite = new Database(dbFile);
+  const { close } = await openDb(dbFile);
+  close();
+  client = createClient({ url: `file:${dbFile}` });
 });
 
-afterEach(() => {
-  sqlite.close();
-  rmSync(dir, { recursive: true, force: true });
+afterEach(async () => {
+  client.close();
+  await removeDir(dir);
 });
 
 describe("workflows schema", () => {
-  it("creates workflows, workflow_nodes, workflow_edges tables", () => {
-    const rows = sqlite
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-      .all() as { name: string }[];
+  it("creates workflows, workflow_nodes, workflow_edges tables", async () => {
+    const rows = (
+      await client.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+    ).rows as unknown as { name: string }[];
     const names = rows.map((r) => r.name);
     expect(names).toContain("workflows");
     expect(names).toContain("workflow_nodes");
     expect(names).toContain("workflow_edges");
   });
 
-  it("workflows table has the expected column set", () => {
-    const cols = sqlite.prepare("PRAGMA table_info('workflows')").all() as {
+  it("workflows table has the expected column set", async () => {
+    const cols = (await client.execute("PRAGMA table_info('workflows')")).rows as unknown as {
       name: string;
       notnull: number;
     }[];
@@ -80,8 +98,8 @@ describe("workflows schema", () => {
     }
   });
 
-  it("workflow_nodes table has the expected column set", () => {
-    const cols = sqlite.prepare("PRAGMA table_info('workflow_nodes')").all() as {
+  it("workflow_nodes table has the expected column set", async () => {
+    const cols = (await client.execute("PRAGMA table_info('workflow_nodes')")).rows as unknown as {
       name: string;
       type: string;
       notnull: number;
@@ -119,8 +137,8 @@ describe("workflows schema", () => {
     expect(phase?.type.toUpperCase()).toBe("INTEGER");
   });
 
-  it("workflow_edges table has the expected column set + composite PK", () => {
-    const cols = sqlite.prepare("PRAGMA table_info('workflow_edges')").all() as {
+  it("workflow_edges table has the expected column set + composite PK", async () => {
+    const cols = (await client.execute("PRAGMA table_info('workflow_edges')")).rows as unknown as {
       name: string;
       pk: number;
     }[];
@@ -130,10 +148,10 @@ describe("workflows schema", () => {
     expect(pkCols.sort()).toEqual(["from_node_id", "to_node_id", "workflow_id"].sort());
   });
 
-  it("creates the indexes the substrate read patterns rely on", () => {
-    const rows = sqlite
-      .prepare("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")
-      .all() as { name: string }[];
+  it("creates the indexes the substrate read patterns rely on", async () => {
+    const rows = (
+      await client.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")
+    ).rows as unknown as { name: string }[];
     const names = rows.map((r) => r.name);
     // Workflow listings filter on status; admin lookup filters on
     // coordinator_agent.
@@ -148,10 +166,12 @@ describe("workflows schema", () => {
     expect(names).toContain("workflow_edges_to_idx");
   });
 
-  it("uses the per-pkg journal table __drizzle_migrations_workflow", () => {
-    const rows = sqlite
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '__drizzle%'")
-      .all() as { name: string }[];
+  it("uses the per-pkg journal table __drizzle_migrations_workflow", async () => {
+    const rows = (
+      await client.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '__drizzle%'",
+      )
+    ).rows as unknown as { name: string }[];
     expect(rows.map((r) => r.name)).toContain("__drizzle_migrations_workflow");
   });
 });

@@ -4,7 +4,7 @@
 // biome-ignore-all format: keep generator output stable across runs.
 // biome-ignore-all lint: generated, may include unused/long lines.
 
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import type { Client } from "@libsql/client";
 import type { MigrationMeta } from "drizzle-orm/migrator";
 
 export const MIGRATIONS: readonly MigrationMeta[] = [
@@ -20,27 +20,30 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
 ];
 
 /**
- * Run drizzle's official migration applier against `db`. Thin typed
- * shim over drizzle's `@internal` `dialect` + `session` props (same
- * props drizzle's own `migrate()` from `drizzle-orm/better-sqlite3/migrator`
- * touches) so consumers don't repeat the cast.
+ * Apply migrations against a libsql `client` using `batch(..., "write")`.
  *
- * **Per-pkg `migrationsTable`**: `__drizzle_migrations_session`.
- * Each entity pkg owns its own journal table so co-tenant pkgs in the
- * same SQLite file don't trip drizzle's global `folderMillis` watermark
- * check — drizzle's own bookkeeping is namespaced by table, so per-pkg
- * tables let migrations apply independently. Every glyph pkg follows
- * the `__drizzle_migrations_<pkg>` convention; deviating from it would
- * silently re-apply migrations or skip them.
+ * **Per-pkg journal table**: `__drizzle_migrations_session`.
  */
-export function applySessionMigrations<T extends Record<string, unknown>>(
-  db: BetterSQLite3Database<T>,
-): void {
-  const internals = db as unknown as {
-    dialect: { migrate(m: readonly MigrationMeta[], s: unknown, c?: { migrationsTable: string }): void };
-    session: unknown;
-  };
-  internals.dialect.migrate(MIGRATIONS, internals.session, {
-    migrationsTable: "__drizzle_migrations_session",
-  });
+export async function applySessionMigrations(client: Client): Promise<void> {
+  await client.execute(
+    "CREATE TABLE IF NOT EXISTS __drizzle_migrations_session (id INTEGER PRIMARY KEY, hash text NOT NULL, created_at numeric)",
+  );
+  const applied = await client.execute(
+    "SELECT created_at FROM __drizzle_migrations_session ORDER BY created_at DESC LIMIT 1",
+  );
+  const lastRow = applied.rows.at(0);
+  const lastMillis = lastRow !== undefined ? Number(lastRow.created_at) : -1;
+  for (const migration of MIGRATIONS) {
+    if (lastMillis >= migration.folderMillis) continue;
+    await client.batch(
+      [
+        ...migration.sql,
+        {
+          sql: "INSERT INTO __drizzle_migrations_session (hash, created_at) VALUES (?, ?)",
+          args: [migration.hash, migration.folderMillis],
+        },
+      ],
+      "write",
+    );
+  }
 }

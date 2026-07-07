@@ -98,8 +98,8 @@ let skillRepo: DrizzleSkillRepository;
 let mcpRepo: DrizzleMcpRepository;
 let useCase: ResolveAgentUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openDb(":memory:");
   db = opened.db;
   close = opened.close;
   agentRepo = new DrizzleAgentRepository({ db });

@@ -38,10 +38,10 @@ export class GetSkillUseCase implements UseCase<GetSkillRequest, GetSkillRespons
   execute(request: GetSkillRequest): UseCaseResult<GetSkillResponse, GetSkillError> {
     const { id } = request;
     return this.deps.queries
-      .query((db): GetSkillResponse | undefined => {
-        const skill = selectSkillByFqn(db, id);
+      .query(async (db): Promise<GetSkillResponse | undefined> => {
+        const skill = await selectSkillByFqn(db, id);
         if (skill === undefined) return undefined;
-        const referencedSkillFqns = collectReferencedSkillFqns(db);
+        const referencedSkillFqns = await collectReferencedSkillFqns(db);
         const dependencies =
           skill.dependencyRefs.skills.length > 0 || skill.dependencyRefs.mcps.length > 0
             ? {

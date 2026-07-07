@@ -28,14 +28,14 @@ export class ListAgentFilesUseCase
     request: ListAgentFilesRequest,
   ): UseCaseResult<ListAgentFilesResponse, ListAgentFilesError> {
     const { id } = request;
-    return this.deps.queries.query((db) =>
-      db
+    return this.deps.queries.query(async (db) => {
+      const rows = await db
         .select({ relPath: agentFiles.relPath, content: agentFiles.content })
         .from(agentFiles)
         .where(eq(agentFiles.agentFqn, id))
         .orderBy(agentFiles.relPath)
-        .all()
-        .map((row) => ({ relPath: row.relPath, size: row.content.byteLength })),
-    );
+        .all();
+      return rows.map((row) => ({ relPath: row.relPath, size: row.content.byteLength }));
+    });
   }
 }

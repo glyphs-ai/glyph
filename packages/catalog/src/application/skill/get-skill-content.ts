@@ -43,8 +43,8 @@ export class GetSkillContentUseCase
   ): UseCaseResult<GetSkillContentResponse, GetSkillContentError> {
     const { id } = request;
     return this.deps.queries
-      .query((db) => {
-        const row = db
+      .query(async (db) => {
+        const row = await db
           .select({ content: skillFiles.content })
           .from(skillFiles)
           .where(and(eq(skillFiles.skillFqn, id), eq(skillFiles.relPath, ANCHOR)))

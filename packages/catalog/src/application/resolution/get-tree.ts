@@ -3,9 +3,9 @@
  * reachable graph. Persisted dependency rows are fqn-based; the graph surface is
  * origin-based so it can be diffed against upstream manifests.
  *
- * The walk is entirely read-side: it runs synchronously inside one
- * `CatalogQueries.query` lambda (better-sqlite3 is synchronous), so a driver
- * fault surfaces once as `DatabaseUnavailable`.
+ * The walk is entirely read-side: it runs inside one
+ * `CatalogQueries.query` lambda, so a driver fault surfaces once as
+ * `DatabaseUnavailable`.
  */
 
 import { z } from "zod";
@@ -36,13 +36,13 @@ export class GetTreeUseCase implements UseCase<GetTreeRequest, GetTreeResponse, 
 
   execute(request: GetTreeRequest): UseCaseResult<GetTreeResponse, GetTreeError> {
     const seed = request.origin;
-    return this.deps.queries.query((db): GetTreeResponse => {
+    return this.deps.queries.query(async (db): Promise<GetTreeResponse> => {
       const nodes = new Map<string, ResolvedNode>();
       const visited = new Set<string>();
-      const visit = (origin: string): void => {
+      const visit = async (origin: string): Promise<void> => {
         if (visited.has(origin)) return;
         visited.add(origin);
-        const node = loadNode(db, origin);
+        const node = await loadNode(db, origin);
         if (node === null) return;
         nodes.set(origin, node);
         for (const depOrigin of [
@@ -50,18 +50,18 @@ export class GetTreeUseCase implements UseCase<GetTreeRequest, GetTreeResponse, 
           ...node.dependencyRefs.skills,
           ...node.dependencyRefs.agents,
         ]) {
-          visit(depOrigin);
+          await visit(depOrigin);
         }
       };
-      visit(seed);
+      await visit(seed);
       return { nodes: [...nodes.values()], conflicts: [] };
     });
   }
 }
 
 /** Resolve an origin to its installed node, trying agent → skill → mcp. */
-function loadNode(db: Db, origin: string): ResolvedNode | null {
-  const agent = selectAgentByOrigin(db, origin);
+async function loadNode(db: Db, origin: string): Promise<ResolvedNode | null> {
+  const agent = await selectAgentByOrigin(db, origin);
   if (agent !== undefined) {
     return {
       kind: "agent",
@@ -70,13 +70,13 @@ function loadNode(db: Db, origin: string): ResolvedNode | null {
       version: agent.version,
       content: "",
       dependencyRefs: {
-        skills: skillOrigins(db, agent.dependencyRefs.skills),
-        mcps: mcpOrigins(db, agent.dependencyRefs.mcps),
-        agents: agentOrigins(db, agent.dependencyRefs.agents),
+        skills: await skillOrigins(db, agent.dependencyRefs.skills),
+        mcps: await mcpOrigins(db, agent.dependencyRefs.mcps),
+        agents: await agentOrigins(db, agent.dependencyRefs.agents),
       },
     };
   }
-  const skill = selectSkillByOrigin(db, origin);
+  const skill = await selectSkillByOrigin(db, origin);
   if (skill !== undefined) {
     return {
       kind: "skill",
@@ -85,13 +85,13 @@ function loadNode(db: Db, origin: string): ResolvedNode | null {
       version: skill.version,
       content: "",
       dependencyRefs: {
-        skills: skillOrigins(db, skill.dependencyRefs.skills),
-        mcps: mcpOrigins(db, skill.dependencyRefs.mcps),
+        skills: await skillOrigins(db, skill.dependencyRefs.skills),
+        mcps: await mcpOrigins(db, skill.dependencyRefs.mcps),
         agents: [],
       },
     };
   }
-  const mcp = selectMcpByOrigin(db, origin);
+  const mcp = await selectMcpByOrigin(db, origin);
   if (mcp !== undefined) {
     return {
       kind: "mcp",
@@ -106,14 +106,18 @@ function loadNode(db: Db, origin: string): ResolvedNode | null {
 }
 
 /** Map dependency fqns to their installed origins; unresolved fqns pass through. */
-function skillOrigins(db: Db, fqns: readonly string[]): string[] {
-  return fqns.map((fqn) => selectSkillByFqn(db, fqn)?.origin ?? fqn);
+async function skillOrigins(db: Db, fqns: readonly string[]): Promise<string[]> {
+  return await Promise.all(
+    fqns.map(async (fqn) => (await selectSkillByFqn(db, fqn))?.origin ?? fqn),
+  );
 }
 
-function mcpOrigins(db: Db, fqns: readonly string[]): string[] {
-  return fqns.map((fqn) => selectMcpByFqn(db, fqn)?.origin ?? fqn);
+async function mcpOrigins(db: Db, fqns: readonly string[]): Promise<string[]> {
+  return await Promise.all(fqns.map(async (fqn) => (await selectMcpByFqn(db, fqn))?.origin ?? fqn));
 }
 
-function agentOrigins(db: Db, fqns: readonly string[]): string[] {
-  return fqns.map((fqn) => selectAgentByFqn(db, fqn)?.origin ?? fqn);
+async function agentOrigins(db: Db, fqns: readonly string[]): Promise<string[]> {
+  return await Promise.all(
+    fqns.map(async (fqn) => (await selectAgentByFqn(db, fqn))?.origin ?? fqn),
+  );
 }

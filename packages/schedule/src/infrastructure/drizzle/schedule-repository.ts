@@ -14,8 +14,7 @@ import { type NewScheduleRow, schedules } from "./schedule-schema.js";
 
 /**
  * Drizzle-backed write-side adapter for {@link ScheduleRepository}. Wraps the
- * synchronous better-sqlite3 calls so any driver fault becomes
- * `DatabaseUnavailable`.
+ * async libsql calls so any driver fault becomes `DatabaseUnavailable`.
  *
  * Change-tracking lives here, not on the entity: `get` snapshots the loaded
  * row into a `WeakMap` keyed on the returned entity; `save` looks the entity
@@ -41,7 +40,7 @@ export class DrizzleScheduleRepository implements ScheduleRepository {
     id: ScheduleId,
   ): ResultAsync<ScheduleEntity, ScheduleNotFound | DatabaseUnavailable | ScheduleCorruption> {
     return ResultAsync.fromPromise(
-      (async () => this.db.select().from(schedules).where(eq(schedules.id, id)).get())(),
+      this.db.select().from(schedules).where(eq(schedules.id, id)).get(),
       DrizzleScheduleRepository.asDatabaseUnavailable,
     ).andThen((row) => {
       if (row === undefined) {
@@ -60,33 +59,25 @@ export class DrizzleScheduleRepository implements ScheduleRepository {
   save(entity: ScheduleEntity): ResultAsync<void, DatabaseUnavailable> {
     const current = ScheduleMapper.toRow(entity);
     const snapshot = this.snapshots.get(entity);
-    // Untracked entity ⇒ never loaded ⇒ INSERT (a freshly created aggregate).
     if (snapshot === undefined) {
       return ResultAsync.fromPromise(
-        (async () => {
-          this.db.insert(schedules).values(current).run();
-        })(),
+        this.db.insert(schedules).values(current).run(),
         DrizzleScheduleRepository.asDatabaseUnavailable,
       ).map(() => this.track(entity, current));
     }
-    // Tracked entity: UPDATE only the columns that diverged from the snapshot.
     const diff = diffRow(snapshot, current);
     if (Object.keys(diff).length === 0) return okAsync(undefined);
     return ResultAsync.fromPromise(
-      (async () => {
-        this.db.update(schedules).set(diff).where(eq(schedules.id, entity.id)).run();
-      })(),
+      this.db.update(schedules).set(diff).where(eq(schedules.id, entity.id)).run(),
       DrizzleScheduleRepository.asDatabaseUnavailable,
     ).map(() => this.track(entity, current));
   }
 
   delete(id: ScheduleId): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      (async () => {
-        this.db.delete(schedules).where(eq(schedules.id, id)).run();
-      })(),
+      this.db.delete(schedules).where(eq(schedules.id, id)).run(),
       DrizzleScheduleRepository.asDatabaseUnavailable,
-    );
+    ).map(() => undefined);
   }
 
   /** Record the persisted row as the entity's tracked snapshot. */

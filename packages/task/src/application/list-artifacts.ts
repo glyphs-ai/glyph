@@ -36,8 +36,8 @@ export class ListArtifactsUseCase
     const { id } = ListArtifactsRequestSchema.parse(request);
     const q = this.deps.query;
     return q
-      .query((db): boolean => {
-        const row = db
+      .query(async (db): Promise<boolean> => {
+        const row = await db
           .select({ success: q.tasks.success })
           .from(q.tasks)
           .where(eq(q.tasks.id, id))

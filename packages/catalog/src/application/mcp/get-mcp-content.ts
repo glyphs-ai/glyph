@@ -38,7 +38,9 @@ export class GetMcpContentUseCase
   execute(request: GetMcpContentRequest): UseCaseResult<GetMcpContentResponse, GetMcpContentError> {
     const { id } = request;
     return this.deps.queries
-      .query((db) => db.select({ spec: mcps.spec }).from(mcps).where(eq(mcps.fqn, id)).get())
+      .query(
+        async (db) => await db.select({ spec: mcps.spec }).from(mcps).where(eq(mcps.fqn, id)).get(),
+      )
       .andThen(
         (row): UseCaseResult<GetMcpContentResponse, GetMcpContentError> =>
           row === undefined

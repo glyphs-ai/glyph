@@ -53,7 +53,7 @@ export interface SessionModuleOptions {
  * file is the per-workspace `workspace.db`; tests pass `:memory:`.
  */
 export async function composeSessionModule(opts: SessionModuleOptions): Promise<SessionModule> {
-  const { db, close } = openDb(opts.dbFile);
+  const { db, close } = await openDb(opts.dbFile);
   const repo = new DrizzleSessionRepository({ db });
   const query = new DrizzleSessionQueries({ db });
   const runtimeRegistry = opts.runtimeRegistry;

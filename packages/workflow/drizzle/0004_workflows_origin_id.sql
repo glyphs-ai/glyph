@@ -9,13 +9,7 @@ CREATE TEMP TABLE `_assert_workflows_origin_backfill` (`x`);
 --> statement-breakpoint
 CREATE TEMP TRIGGER `_assert_workflows_origin_backfill_trg` BEFORE INSERT ON `_assert_workflows_origin_backfill`
 BEGIN
-  SELECT RAISE(
-    FAIL,
-    'workflows backfill incomplete: '
-      || (SELECT count(*) FROM `workflows` WHERE `origin` != 'standalone' AND `origin_id` IS NULL)
-      || ' non-standalone row(s) without origin_id; offending ids: '
-      || (SELECT group_concat(`id`) FROM `workflows` WHERE `origin` != 'standalone' AND `origin_id` IS NULL)
-  )
+  SELECT RAISE(FAIL, 'workflows backfill incomplete')
   WHERE EXISTS (SELECT 1 FROM `workflows` WHERE `origin` != 'standalone' AND `origin_id` IS NULL);
 END;
 --> statement-breakpoint

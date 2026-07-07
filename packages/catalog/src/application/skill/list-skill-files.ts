@@ -28,14 +28,14 @@ export class ListSkillFilesUseCase
     request: ListSkillFilesRequest,
   ): UseCaseResult<ListSkillFilesResponse, ListSkillFilesError> {
     const { id } = request;
-    return this.deps.queries.query((db) =>
-      db
+    return this.deps.queries.query(async (db) => {
+      const rows = await db
         .select({ relPath: skillFiles.relPath, content: skillFiles.content })
         .from(skillFiles)
         .where(eq(skillFiles.skillFqn, id))
         .orderBy(skillFiles.relPath)
-        .all()
-        .map((row) => ({ relPath: row.relPath, size: row.content.byteLength })),
-    );
+        .all();
+      return rows.map((row) => ({ relPath: row.relPath, size: row.content.byteLength }));
+    });
   }
 }

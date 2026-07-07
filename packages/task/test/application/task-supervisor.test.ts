@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe("TaskSupervisor.runDispatch", () => {
   it("persists a running row, materialises the workdir, and arms the exit watcher", async () => {
-    fx = buildSupervisorFixture();
+    fx = await buildSupervisorFixture();
     const running = (
       await fx.supervisor.runDispatch(dispatchArgs({ runtime: fx.runtime }))
     )._unsafeUnwrap();
@@ -32,7 +32,7 @@ describe("TaskSupervisor.runDispatch", () => {
   });
 
   it("classifies a clean exit (code 0) as succeeded and collects the agent output", async () => {
-    fx = buildSupervisorFixture();
+    fx = await buildSupervisorFixture();
     const running = (
       await fx.supervisor.runDispatch(dispatchArgs({ runtime: fx.runtime }))
     )._unsafeUnwrap();
@@ -46,7 +46,7 @@ describe("TaskSupervisor.runDispatch", () => {
   });
 
   it("classifies a non-zero exit as failed/execution", async () => {
-    fx = buildSupervisorFixture();
+    fx = await buildSupervisorFixture();
     const running = (
       await fx.supervisor.runDispatch(dispatchArgs({ runtime: fx.runtime }))
     )._unsafeUnwrap();
@@ -65,7 +65,7 @@ describe("TaskSupervisor.runDispatch", () => {
 
 describe("TaskSupervisor.cancel", () => {
   it("kills a running subprocess and records a user cancellation", async () => {
-    fx = buildSupervisorFixture({ autoExitOnKill: true });
+    fx = await buildSupervisorFixture({ autoExitOnKill: true });
     const running = (
       await fx.supervisor.runDispatch(dispatchArgs({ runtime: fx.runtime }))
     )._unsafeUnwrap();
@@ -77,7 +77,7 @@ describe("TaskSupervisor.cancel", () => {
   });
 
   it("rejects cancelling a terminal task with InvalidTransition", async () => {
-    fx = buildSupervisorFixture();
+    fx = await buildSupervisorFixture();
     const running = (
       await fx.supervisor.runDispatch(dispatchArgs({ runtime: fx.runtime }))
     )._unsafeUnwrap();
@@ -90,7 +90,7 @@ describe("TaskSupervisor.cancel", () => {
   });
 
   it("returns TaskNotFound for an unknown id", async () => {
-    fx = buildSupervisorFixture();
+    fx = await buildSupervisorFixture();
     const ghost = TaskIdSchema.parse("20260508-000000ff");
     expect((await fx.supervisor.cancel(ghost))._unsafeUnwrapErr().type).toBe("TaskNotFound");
   });
@@ -98,7 +98,7 @@ describe("TaskSupervisor.cancel", () => {
 
 describe("TaskSupervisor.shutdown", () => {
   it("kills every live subprocess and records failure/cascade", async () => {
-    fx = buildSupervisorFixture({ autoExitOnKill: true });
+    fx = await buildSupervisorFixture({ autoExitOnKill: true });
     const running = (
       await fx.supervisor.runDispatch(dispatchArgs({ runtime: fx.runtime }))
     )._unsafeUnwrap();
@@ -112,7 +112,7 @@ describe("TaskSupervisor.shutdown", () => {
   });
 
   it("refuses cancel while shutting down", async () => {
-    fx = buildSupervisorFixture({ autoExitOnKill: true });
+    fx = await buildSupervisorFixture({ autoExitOnKill: true });
     const running = (
       await fx.supervisor.runDispatch(dispatchArgs({ runtime: fx.runtime }))
     )._unsafeUnwrap();

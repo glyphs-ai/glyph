@@ -55,11 +55,14 @@ export class GetWorkflowNodeUseCase
     const { workflowId, nodeId } = GetWorkflowNodeRequestSchema.parse(request);
     const q = this.deps.query;
     return q
-      .query((db) => db.select().from(q.workflowNodes).where(eq(q.workflowNodes.id, nodeId)).get())
+      .query(
+        async (db) =>
+          await db.select().from(q.workflowNodes).where(eq(q.workflowNodes.id, nodeId)).get(),
+      )
       .andThen((row) =>
         row === undefined || row.workflowId !== workflowId
           ? errAsync({ type: "WorkflowNodeNotFound" as const, workflowId, nodeId })
-          : q.query(() => toGetWorkflowNodeResponse(row)),
+          : q.query(async () => toGetWorkflowNodeResponse(row)),
       );
   }
 }

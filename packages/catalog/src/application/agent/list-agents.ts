@@ -37,8 +37,8 @@ export class ListAgentsUseCase
   constructor(private readonly deps: ListAgentsDeps) {}
 
   execute(_request: ListAgentsRequest): UseCaseResult<ListAgentsResponse, ListAgentsError> {
-    return this.deps.queries.query((db) =>
-      selectAllAgents(db).map((agent) => ({
+    return this.deps.queries.query(async (db) =>
+      (await selectAllAgents(db)).map((agent) => ({
         id: agent.fqn,
         disabledByUser: agent.disabledByUser,
         skills: [...agent.dependencyRefs.skills],

@@ -21,8 +21,8 @@ let runtimeRegistry: MockProxy<RuntimeRegistry>;
 let runtime: MockProxy<Runtime & { readActivity: NonNullable<Runtime["readActivity"]> }>;
 let useCase: GetTaskActivityUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openDb(":memory:");
   db = opened.db;
   closeDb = opened.close;
   repo = new DrizzleTaskRepository({ db });

@@ -16,7 +16,7 @@ import { sessions } from "./session-schema.js";
 export interface SessionQueries {
   readonly sessions: typeof sessions;
   /** Run one read fn; a driver throw becomes DatabaseUnavailable. */
-  query<T>(fn: (db: Db) => T): ResultAsync<T, DatabaseUnavailable>;
+  query<T>(fn: (db: Db) => T | Promise<T>): ResultAsync<T, DatabaseUnavailable>;
 }
 
 export class DrizzleSessionQueries implements SessionQueries {
@@ -27,7 +27,7 @@ export class DrizzleSessionQueries implements SessionQueries {
     this.db = opts.db;
   }
 
-  query<T>(fn: (db: Db) => T): ResultAsync<T, DatabaseUnavailable> {
+  query<T>(fn: (db: Db) => T | Promise<T>): ResultAsync<T, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       Promise.resolve().then(() => fn(this.db)),
       (cause) => ({ type: "DatabaseUnavailable", cause }),

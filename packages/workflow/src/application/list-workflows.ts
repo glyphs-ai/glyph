@@ -68,7 +68,7 @@ export class ListWorkflowsUseCase
   ): UseCaseResult<ListWorkflowsResponse, ListWorkflowsError> {
     const parsed = ListWorkflowsRequestSchema.parse(request);
     const q = this.deps.query;
-    return q.query((db) => {
+    return q.query(async (db) => {
       const conditions: SQL[] = [];
       if (parsed.coordinatorAgent !== undefined)
         conditions.push(eq(q.workflows.coordinatorAgent, parsed.coordinatorAgent));
@@ -89,8 +89,13 @@ export class ListWorkflowsUseCase
       const where = conditions.length === 0 ? undefined : and(...conditions);
       const rows =
         where === undefined
-          ? db.select().from(q.workflows).orderBy(desc(q.workflows.createdAt)).all()
-          : db.select().from(q.workflows).where(where).orderBy(desc(q.workflows.createdAt)).all();
+          ? await db.select().from(q.workflows).orderBy(desc(q.workflows.createdAt)).all()
+          : await db
+              .select()
+              .from(q.workflows)
+              .where(where)
+              .orderBy(desc(q.workflows.createdAt))
+              .all();
       return rows.map(toListWorkflowsEntry);
     });
   }

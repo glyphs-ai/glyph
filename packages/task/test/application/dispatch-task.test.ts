@@ -11,8 +11,8 @@ let fx: SupervisorFixture;
 let resolver: MockProxy<AgentResolver>;
 let useCase: DispatchTaskUseCase;
 
-beforeEach(() => {
-  fx = buildSupervisorFixture();
+beforeEach(async () => {
+  fx = await buildSupervisorFixture();
   resolver = mock<AgentResolver>();
   resolver.getEntry.mockReturnValue(okAsync({ status: "ready" }));
   resolver.resolve.mockReturnValue(okAsync(RESOLVED));

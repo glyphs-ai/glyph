@@ -43,8 +43,13 @@ export class RecoverOrphanedTasksUseCase
     const deps = this.deps;
     const q = deps.query;
     return q
-      .query((db) =>
-        db.select({ id: q.tasks.id }).from(q.tasks).where(eq(q.tasks.status, "running")).all(),
+      .query(
+        async (db) =>
+          await db
+            .select({ id: q.tasks.id })
+            .from(q.tasks)
+            .where(eq(q.tasks.status, "running"))
+            .all(),
       )
       .andThen((rows) =>
         ResultAsync.fromSafePromise(

@@ -28,8 +28,8 @@ let close: () => void;
 let agentRepo: DrizzleAgentRepository;
 let useCase: GetAgentContentUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openDb(":memory:");
   db = opened.db;
   close = opened.close;
   agentRepo = new DrizzleAgentRepository({ db });

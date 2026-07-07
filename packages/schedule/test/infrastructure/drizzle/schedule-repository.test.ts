@@ -23,12 +23,12 @@ function createOpts(name: string, agent: string): CreateScheduleOpts {
 }
 
 describe("ScheduleRepository.findAll({ kind, dataEquals }) — generic JSON-extract filter", () => {
-  let db: ReturnType<typeof openTestScheduleDb>;
+  let db: Awaited<ReturnType<typeof openTestScheduleDb>>;
   let repo: DrizzleScheduleRepository;
   let queries: DrizzleScheduleQueries;
 
-  beforeEach(() => {
-    db = openTestScheduleDb();
+  beforeEach(async () => {
+    db = await openTestScheduleDb();
     repo = new DrizzleScheduleRepository({ db: db.db });
     queries = new DrizzleScheduleQueries({ db: db.db });
   });
@@ -53,8 +53,8 @@ describe("ScheduleRepository.findAll({ kind, dataEquals }) — generic JSON-extr
     readonly kind?: string;
     readonly dataEquals?: { readonly path: string; readonly value: string | number | boolean };
   }) {
-    const result = await queries.query((handle) => {
-      const rows = handle.select().from(queries.schedules).all();
+    const result = await queries.query(async (handle) => {
+      const rows = await handle.select().from(queries.schedules).all();
       return rows
         .map((row) => ({
           name: row.name,
@@ -89,11 +89,12 @@ describe("ScheduleRepository.findAll({ kind, dataEquals }) — generic JSON-extr
 
   it("EXPLAIN QUERY PLAN engages schedules_target_agent_idx when both predicates are present", async () => {
     await insert("550e8400-e29b-41d4-a716-446655440000", createOpts("a", "writer"));
-    const plan = db.sqlite
-      .prepare(
-        "EXPLAIN QUERY PLAN SELECT * FROM schedules WHERE target_kind = 'task' AND json_extract(target_json, '$.agent') = ?",
-      )
-      .all("writer") as { detail: string }[];
+    const plan = (
+      await db.client.execute({
+        sql: "EXPLAIN QUERY PLAN SELECT * FROM schedules WHERE target_kind = 'task' AND json_extract(target_json, '$.agent') = ?",
+        args: ["writer"],
+      })
+    ).rows as unknown as { detail: string }[];
     const planText = plan.map((p) => p.detail).join(" | ");
     expect(planText).toMatch(/USING (COVERING )?INDEX schedules_target_agent_idx/);
   });
@@ -104,27 +105,23 @@ describe("ScheduleRepository.findAll({ kind, dataEquals }) — generic JSON-extr
       trigger: { kind: "cron", expr: "0 9 * * *", tz: "UTC" },
       target: { kind: "task", data: { workflow: { id: "wf-1" } } },
     });
-    const result = await queries.query((handle) =>
-      handle
-        .select()
-        .from(queries.schedules)
-        .all()
-        .filter(
-          (row) =>
-            (JSON.parse(row.targetJson) as { workflow?: { id?: string } }).workflow?.id === "wf-1",
-        ),
+    const result = await queries.query(async (handle) =>
+      (await handle.select().from(queries.schedules).all()).filter(
+        (row) =>
+          (JSON.parse(row.targetJson) as { workflow?: { id?: string } }).workflow?.id === "wf-1",
+      ),
     );
     expect(result._unsafeUnwrap().map((e) => e.name)).toEqual(["n"]);
   });
 });
 
 describe("DrizzleScheduleRepository CRUD", () => {
-  let db: ReturnType<typeof openTestScheduleDb>;
+  let db: Awaited<ReturnType<typeof openTestScheduleDb>>;
   let repo: DrizzleScheduleRepository;
   const id = ScheduleIdSchema.parse("550e8400-e29b-41d4-a716-446655440000");
 
-  beforeEach(() => {
-    db = openTestScheduleDb();
+  beforeEach(async () => {
+    db = await openTestScheduleDb();
     repo = new DrizzleScheduleRepository({ db: db.db });
   });
 

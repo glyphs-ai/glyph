@@ -547,7 +547,7 @@ describe("WorkflowModule.addSubgraph", () => {
       coordSpec: { agent: "coord-next" },
     });
     const target = workerIds.target!;
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: target,
       status: "running",
       runningAt: "2026-06-07T01:00:00.000Z",
@@ -661,7 +661,7 @@ describe("WorkflowModule.addSubgraph", () => {
       coordSpec: { agent: "coord-next" },
     });
     const deadParent = workerIds.dead!;
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: deadParent,
       status: "failed",
       endedAt: "2026-06-07T01:00:00.000Z",

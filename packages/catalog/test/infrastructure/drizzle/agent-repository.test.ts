@@ -11,8 +11,8 @@ import { openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
  */
 let repo: DrizzleAgentRepository;
 
-beforeEach(() => {
-  repo = new DrizzleAgentRepository({ db: openDb(":memory:").db });
+beforeEach(async () => {
+  repo = new DrizzleAgentRepository({ db: await (await openDb(":memory:")).db });
 });
 
 const NOW = "2025-01-01T00:00:00.000Z";

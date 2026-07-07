@@ -44,9 +44,9 @@ export class ListSkillsUseCase
   constructor(private readonly deps: ListSkillsDeps) {}
 
   execute(_request: ListSkillsRequest): UseCaseResult<ListSkillsResponse, ListSkillsError> {
-    return this.deps.queries.query((db) => {
-      const referencedSkillFqns = collectReferencedSkillFqns(db);
-      return selectAllSkills(db).map((skill) => {
+    return this.deps.queries.query(async (db) => {
+      const referencedSkillFqns = await collectReferencedSkillFqns(db);
+      return (await selectAllSkills(db)).map((skill) => {
         const dependencies =
           skill.dependencyRefs.skills.length > 0 || skill.dependencyRefs.mcps.length > 0
             ? {

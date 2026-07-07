@@ -10,8 +10,8 @@ import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-re
  */
 let repo: DrizzleMcpRepository;
 
-beforeEach(() => {
-  repo = new DrizzleMcpRepository({ db: openDb(":memory:").db });
+beforeEach(async () => {
+  repo = new DrizzleMcpRepository({ db: await (await openDb(":memory:")).db });
 });
 
 const NOW = "2025-01-01T00:00:00.000Z";

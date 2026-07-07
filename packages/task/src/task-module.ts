@@ -79,7 +79,7 @@ export interface TaskModuleOptions {
  * use-cases.
  */
 export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskModule> {
-  const { db, close } = openDb(opts.dbFile);
+  const { db, close } = await openDb(opts.dbFile);
   const logger = opts.logger ?? pino({ level: "silent" });
   const now = opts.now ?? (() => new Date());
   const randomBytes = opts.randomBytes ?? cryptoRandomBytes;

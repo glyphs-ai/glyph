@@ -50,7 +50,9 @@ export class UninstallMcpUseCase
     const deps = this.deps;
     return safeTry<UninstallMcpResponse, UninstallMcpError>(async function* () {
       yield* deps.mcpRepo.get(fqn);
-      const referenced = yield* deps.queries.query((db) => collectReferencedMcpFqns(db).has(fqn));
+      const referenced = yield* deps.queries.query(async (db) =>
+        (await collectReferencedMcpFqns(db)).has(fqn),
+      );
       if (referenced) {
         return err<UninstallMcpResponse, UninstallMcpError>({ type: "HasDependents", fqn });
       }

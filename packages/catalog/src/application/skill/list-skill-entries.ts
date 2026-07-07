@@ -73,10 +73,10 @@ export class ListSkillEntriesUseCase
   execute(
     _request: ListSkillEntriesRequest,
   ): UseCaseResult<ListSkillEntriesResponse, ListSkillEntriesError> {
-    return this.deps.queries.query((db) => {
-      const installed = selectAllSkills(db);
-      const referencedSkillFqns = collectReferencedSkillFqns(db);
-      const installedMcpFqns = selectInstalledMcpFqns(db);
+    return this.deps.queries.query(async (db) => {
+      const installed = await selectAllSkills(db);
+      const referencedSkillFqns = await collectReferencedSkillFqns(db);
+      const installedMcpFqns = await selectInstalledMcpFqns(db);
       const skillByFqn = new Map<string, SkillView>(installed.map((s) => [s.fqn, s] as const));
 
       const skillCache = new Map<string, ComputedStatus>();

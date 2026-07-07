@@ -45,7 +45,7 @@ export class AggregateByOriginUseCase
     if (originIds.length === 0) return okAsync(new Map());
     const q = this.deps.query;
     return q
-      .query((db) => {
+      .query(async (db) => {
         const predicates: SQL[] = [
           eq(q.tasks.origin, origin),
           inArray(q.tasks.originId, [...originIds]),
@@ -53,7 +53,7 @@ export class AggregateByOriginUseCase
         if (statusIn !== undefined && statusIn.length > 0) {
           predicates.push(inArray(q.tasks.status, [...statusIn]));
         }
-        return db
+        return await db
           .select({ originId: q.tasks.originId, status: q.tasks.status })
           .from(q.tasks)
           .where(and(...predicates))

@@ -78,11 +78,11 @@ export class ListAgentEntriesUseCase
   execute(
     _request: ListAgentEntriesRequest,
   ): UseCaseResult<ListAgentEntriesResponse, ListAgentEntriesError> {
-    return this.deps.queries.query((db) => {
-      const installed = selectAllAgents(db);
-      const skills = selectAllSkills(db);
-      const referencedSkillFqns = collectReferencedSkillFqns(db);
-      const installedMcpFqns = selectInstalledMcpFqns(db);
+    return this.deps.queries.query(async (db) => {
+      const installed = await selectAllAgents(db);
+      const skills = await selectAllSkills(db);
+      const referencedSkillFqns = await collectReferencedSkillFqns(db);
+      const installedMcpFqns = await selectInstalledMcpFqns(db);
       const skillByFqn = new Map<string, SkillView>(skills.map((s) => [s.fqn, s]));
 
       const skillCache = new Map<string, ComputedStatus>();

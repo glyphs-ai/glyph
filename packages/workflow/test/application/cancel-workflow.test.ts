@@ -34,7 +34,7 @@ describe("WorkflowModule.cancelWorkflow", () => {
     });
     const pending = workerIds.pending!;
     const running = workerIds.running!;
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: running,
       status: "running",
       runningAt: "2026-06-07T01:00:00.000Z",

@@ -108,7 +108,7 @@ describe("ScheduleService.recover resilience (P1 regression)", () => {
   });
 
   it("recordFired failure does not corrupt the schedule (no double-fire on re-recover)", async () => {
-    const db = openTestScheduleDb();
+    const db = await openTestScheduleDb();
     const plannedFireIso = "2026-05-01T18:00:00.000Z";
     const seeded = createEntity();
     seeded.recordFired("2026-05-01T09:00:00.000Z", plannedFireIso);

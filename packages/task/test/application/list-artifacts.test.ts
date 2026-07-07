@@ -22,8 +22,8 @@ let sandbox: LocalTaskSandbox;
 let useCase: ListArtifactsUseCase;
 let wsRoot: string;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openDb(":memory:");
   db = opened.db;
   closeDb = opened.close;
   repo = new DrizzleTaskRepository({ db });

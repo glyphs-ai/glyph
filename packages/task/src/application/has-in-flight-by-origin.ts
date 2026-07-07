@@ -35,19 +35,20 @@ export class HasInFlightByOriginUseCase
     const { origin, originId } = HasInFlightByOriginRequestSchema.parse(request);
     const q = this.deps.query;
     return q
-      .query((db) =>
-        db
-          .select({ id: q.tasks.id })
-          .from(q.tasks)
-          .where(
-            and(
-              eq(q.tasks.origin, origin),
-              eq(q.tasks.originId, originId),
-              notInArray(q.tasks.status, [...TERMINAL_TASK_STATUSES]),
-            ),
-          )
-          .limit(1)
-          .get(),
+      .query(
+        async (db) =>
+          await db
+            .select({ id: q.tasks.id })
+            .from(q.tasks)
+            .where(
+              and(
+                eq(q.tasks.origin, origin),
+                eq(q.tasks.originId, originId),
+                notInArray(q.tasks.status, [...TERMINAL_TASK_STATUSES]),
+              ),
+            )
+            .limit(1)
+            .get(),
       )
       .map((row) => row !== undefined);
   }

@@ -79,7 +79,7 @@ describe("WorkflowModule.finishWorkflow", () => {
       coordSpec: { agent: "coord-next" },
     });
     const runningTask = workerIds.running!;
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: runningTask,
       status: "running",
       runningAt: "2026-06-07T01:00:00.000Z",

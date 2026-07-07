@@ -44,16 +44,16 @@ export class AggregateWorkflowsByOriginUseCase
     request: AggregateWorkflowsByOriginRequest,
   ): UseCaseResult<AggregateWorkflowsByOriginResponse, AggregateWorkflowsByOriginError> {
     const parsed = AggregateWorkflowsByOriginRequestSchema.parse(request);
-    if (parsed.originIds.length === 0) return this.deps.query.query(() => ({}));
+    if (parsed.originIds.length === 0) return this.deps.query.query(async () => ({}));
     const q = this.deps.query;
-    return q.query((db) => {
+    return q.query(async (db) => {
       const conditions: SQL[] = [
         eq(q.workflows.origin, parsed.origin),
         inArray(q.workflows.originId, [...parsed.originIds]),
       ];
       if (parsed.statusIn !== undefined && parsed.statusIn.length > 0)
         conditions.push(inArray(q.workflows.status, [...parsed.statusIn]));
-      const rows = db
+      const rows = await db
         .select({
           originId: q.workflows.originId,
           totalCount: count(),

@@ -130,11 +130,9 @@ describe("ScheduleService.recover", () => {
     other.module.engine.registerKind("task", makeStubHandler());
     try {
       const row = ScheduleMapper.toRow(entity());
-      other.db.sqlite
-        .prepare(
-          "INSERT INTO schedules (id, name, trigger_kind, trigger_expr, trigger_tz, target_kind, target_json, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'workflow', ?, 1, ?, ?)",
-        )
-        .run(
+      await other.db.client.execute({
+        sql: "INSERT INTO schedules (id, name, trigger_kind, trigger_expr, trigger_tz, target_kind, target_json, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'workflow', ?, 1, ?, ?)",
+        args: [
           row.id,
           row.name,
           row.triggerKind,
@@ -143,7 +141,8 @@ describe("ScheduleService.recover", () => {
           row.targetJson,
           row.createdAt,
           row.updatedAt,
-        );
+        ],
+      });
       const result = await other.module.engine.recover();
       expect(result.isErr()).toBe(true);
       const error = result._unsafeUnwrapErr();
@@ -163,11 +162,9 @@ describe("ScheduleService.recover", () => {
     other.module.engine.registerKind("task", makeStubHandler());
     try {
       const row = ScheduleMapper.toRow(entity({ enabled: false }));
-      other.db.sqlite
-        .prepare(
-          "INSERT INTO schedules (id, name, trigger_kind, trigger_expr, trigger_tz, target_kind, target_json, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'workflow', ?, 0, ?, ?)",
-        )
-        .run(
+      await other.db.client.execute({
+        sql: "INSERT INTO schedules (id, name, trigger_kind, trigger_expr, trigger_tz, target_kind, target_json, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'workflow', ?, 0, ?, ?)",
+        args: [
           row.id,
           row.name,
           row.triggerKind,
@@ -176,7 +173,8 @@ describe("ScheduleService.recover", () => {
           row.targetJson,
           row.createdAt,
           row.updatedAt,
-        );
+        ],
+      });
       const result = await other.module.engine.recover();
       expect(result.isErr()).toBe(true);
       expect(result._unsafeUnwrapErr().type).toBe("ScheduleKindNotRegistered");
@@ -195,11 +193,9 @@ describe("ScheduleService.recover", () => {
     other.module.engine.registerKind("task", taskStub);
     try {
       const row = ScheduleMapper.toRow(entity({ enabled: false }));
-      other.db.sqlite
-        .prepare(
-          "INSERT INTO schedules (id, name, trigger_kind, trigger_expr, trigger_tz, target_kind, target_json, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'workflow', ?, 0, ?, ?)",
-        )
-        .run(
+      await other.db.client.execute({
+        sql: "INSERT INTO schedules (id, name, trigger_kind, trigger_expr, trigger_tz, target_kind, target_json, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'workflow', ?, 0, ?, ?)",
+        args: [
           row.id,
           row.name,
           row.triggerKind,
@@ -208,7 +204,8 @@ describe("ScheduleService.recover", () => {
           row.targetJson,
           row.createdAt,
           row.updatedAt,
-        );
+        ],
+      });
       expect((await other.module.engine.recover())._unsafeUnwrapErr().type).toBe(
         "ScheduleKindNotRegistered",
       );
