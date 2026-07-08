@@ -9,7 +9,7 @@ version: 0.6.0
 
 The framework every workflow coordinator wake-up loads: how to read the DAG, what schema reviewer workers emit in `verdict.json`, how to plumb context into worker briefs, and how to author a sibling strategy skill. The case bank, brief templates, and stop condition for any given workflow live in a sibling **strategy skill**; the scaffolding here is strategy-agnostic.
 
-CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `prune-subgraph`, `update-spec`, `finish`, `task show`) are stable command names — consult your catalog's CLI skill for exact flags.
+CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `prune-subgraph`, `update-spec`, `finish`, `task list`, `task show`) are stable command names — consult your catalog's CLI skill for exact flags.
 
 ---
 
@@ -68,9 +68,9 @@ PARENT_IDS=$(jq -r --arg self "$SELF" \
   '.edges[] | select(.to == $self) | .from' <<<"$DAG")
 ```
 
-### Classify a parent: (kind, status, agent, taskId)
+### Classify a parent: (kind, status, agent)
 
-For each parent id, pull the node from the DAG; for worker parents also pull the task record via `glyph task show`:
+For each parent id, pull the node from the DAG. Every classifier field comes straight off the node:
 
 ```
 for PID in $PARENT_IDS; do
@@ -78,23 +78,33 @@ for PID in $PARENT_IDS; do
   KIND=$(jq -r '.kind' <<<"$NODE")          # "worker" | "coordinator"
   STATUS=$(jq -r '.status' <<<"$NODE")      # "succeeded" | "failed" | "cancelled" | ...
   AGENT=$(jq -r '.spec.agent // empty' <<<"$NODE")
-  TASK_ID=$(jq -r '.taskId // empty' <<<"$NODE")
 done
 ```
 
-The 4-tuple `(kind, status, agent, taskId)` is the case-bank classifier key. `agent` is empty for `kind: "coordinator"` nodes; `taskId` is empty until the node has been dispatched.
+The 3-tuple `(kind, status, agent)` is the case-bank classifier key. `agent` is empty for `kind: "coordinator"` nodes. A DAG node carries **no** task id: a worker node maps to zero-or-more task runs (one per dispatch / retry), resolved by origin — never stored on the node.
+
+### Resolve a worker node's task run(s)
+
+A worker node's tasks are dispatched with `origin: "workflow"`, `originId: <nodeId>`. List them — newest-first — with the origin filter; the head of the list is the latest run (empty until the node has been dispatched):
+
+```
+TASKS=$(glyph task list --origin workflow --origin-id "$PID" --json)
+LATEST_TASK_ID=$(jq -r '.[0].id // empty' <<<"$TASKS")
+```
+
+Read that run's verdict via `glyph task show "$LATEST_TASK_ID" --json` (workers stay workflow-unaware — see §D).
 
 ### Find prior-iter siblings (same agent, lower phase)
 
-Nearest sibling with the same `spec.agent` and a lower `phase`:
+Nearest sibling with the same `spec.agent` and a lower `phase`, then its latest task run via the same origin lookup:
 
 ```
 PRIOR=$(jq -r --arg agent "$WORKER_AGENT" --argjson myPhase "$MY_PHASE" '
   [ .nodes[]
     | select(.spec.agent == $agent and .phase < $myPhase) ]
   | sort_by(.phase) | last // empty | .id' <<<"$DAG")
-PRIOR_TASK_ID=$(jq -r --arg id "$PRIOR" \
-  '.nodes[] | select(.id == $id) | .taskId' <<<"$DAG")
+PRIOR_TASK_ID=$(glyph task list --origin workflow --origin-id "$PRIOR" --json \
+  | jq -r '.[0].id // empty')
 ```
 
 The strategy writes `${PRIOR_*_TASK_ID}` into the next worker's brief; the worker fetches the prior `verdict.json` itself via `glyph task show` (workers stay workflow-unaware — see §D).
@@ -291,7 +301,7 @@ Content-only: **no `dependencies:`** (the coord agent already declares the gener
 
 1. **Case bank** — enumerate every parent-classification case. Each case carries the matching predicate on `(kind, status, agent)` tuples of own direct parents (use the §B classifier) plus an action: `addSubgraph: <node list>` (with the new workers + briefs + a trailing `next-coord` per §B) or `finishWorkflow(<outcome>, "<message>")`. Fall-through is forbidden; every reachable parent combination must match exactly one case (see "Failure-mode coverage" below). Note: coord-judgment interventions (e.g. inserting a human node on repeated failures) are meta-actions outside the parent-classification model — they are triggered by coord's own assessment, not by a classifier match, and need not appear as a case predicate.
 2. **Brief guidance** — for each worker role the strategy dispatches, describe what the assembled brief should convey. Follow the §D principles: workflow goal, what this worker must do in the current iteration, where to find prior outputs (task ids, artifact paths), and the output protocol the worker must follow. The case bank references guidance sections by name (e.g. `brief-guidance=<engineer-iter>`); coord assembles the actual brief at runtime by reading workflow context and DAG state.
-3. **Context sources table** — for each piece of runtime information the briefs reference, document where coord pulls it from (`workflow.id`, `workflow.brief`, a parent `taskId`, DAG-derived counters, artifact paths, etc.). Coord consults this table when assembling briefs to ensure all relevant context is included.
+3. **Context sources table** — for each piece of runtime information the briefs reference, document where coord pulls it from (`workflow.id`, `workflow.brief`, a parent worker's latest task id via `task list --origin workflow --origin-id <nodeId>`, DAG-derived counters, artifact paths, etc.). Coord consults this table when assembling briefs to ensure all relevant context is included.
 4. **Stop condition** — the explicit predicate that triggers `finishWorkflow(succeeded, ...)`. Strategies without a clean terminal state MUST NOT exist in this catalog.
 5. **Failure-mode coverage** — an explicit `(role, terminal status)` matrix mapping each cell to the case that catches it, so a future author editing the case bank can re-check coverage without re-deriving it.
 6. **Agent compatibility statement** — at the bottom of the skill body, list each agent the strategy dispatches with the minimum AGENTS.md version it was validated against. When any of those agents publishes a new minor / major version, the strategy author re-reads the agent's AGENTS.md and bumps the strategy's version if any brief guidance needs updating. Coord uses this list at runtime pre-flight (see §D) to decide whether the strategy + agent are still in sync.

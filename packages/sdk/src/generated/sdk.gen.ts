@@ -134,7 +134,7 @@ export const postApiWorkspacesByIdSessionsBySidSpawn = <ThrowOnError extends boo
 });
 
 /**
- * List standalone tasks
+ * List tasks (standalone by default, or scoped to an origin)
  */
 export const getApiWorkspacesByIdTasks = <ThrowOnError extends boolean = false>(options: Options<GetApiWorkspacesByIdTasksData, ThrowOnError>): RequestResult<GetApiWorkspacesByIdTasksResponses, GetApiWorkspacesByIdTasksErrors, ThrowOnError> => (options.client ?? client).get<GetApiWorkspacesByIdTasksResponses, GetApiWorkspacesByIdTasksErrors, ThrowOnError>({ url: '/api/workspaces/{id}/tasks', ...options });
 

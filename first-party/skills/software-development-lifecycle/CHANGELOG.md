@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3 (2026-07-07)
+
+- Resolve worker task ids by origin instead of a non-existent node `taskId`. The two-reviewer case, the prior-dev PR-number derivation, and the context-sources table (prior review / designer task id, branch name, PR number) now obtain a node's latest run via `glyph task list --origin workflow --origin-id <nodeId> --json | jq -r '.[0].id'` before `glyph task show`, matching the corrected `official/workflow-coordination` §B pattern (a DAG node carries no `taskId`).
+
 ## 0.3.2 (2026-07-07)
 
 - Declare `official/workflow-coordination` and `official/cli` under `dependencies.skills` in the frontmatter; the body already names both.

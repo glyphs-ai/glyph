@@ -4,6 +4,10 @@
 
 - Add a **Correcting a not_started node's spec** section: when to use `workflow update-spec` (typo/brief/agent-swap, same kind + edges) vs. `prune`/`remove-node` + re-add (kind change, restructure); the patch is a partial overlay (omitted fields keep their prior value); never patch a coordinator node (`CoordSpecNotEditable`). Add a Commands-table row and list `workflow update-spec` under **Write Access**.
 
+## 0.2.3 (2026-07-07)
+
+- Correct the parent-classifier reference to the 3-tuple `(kind, status, agent)` — a DAG node carries no `taskId`. Rewrite "Verdict parsing" so each reviewer parent's task run is resolved by origin (`glyph task list --origin workflow --origin-id <parent-node-id> --json | jq -r '.[0].id'`) before `glyph task show`, instead of reading a non-existent `<parent.taskId>` off the node.
+
 ## 0.2.2 (2026-07-07)
 
 - Replace the inline copy of `official/workflow-coordination` §A steps 1–9 in the Wake-up loop with a single pointer ("Run §A of the loaded skill"); fold the standalone **Discipline** bullets into **✅ Always** (adds "re-read the DAG on every wake-up" and "use §B DAG introspection snippets") and delete the standalone list. Drop the §A/§B/§C/§D/§E TOC narration from Setup step 1.

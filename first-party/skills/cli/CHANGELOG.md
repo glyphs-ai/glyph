@@ -1,12 +1,22 @@
 # Changelog
 
-## 0.4.0 (2026-07-07)
+## 0.5.0 (2026-07-08)
 
 Document the `workflow update-spec` command (partial spec patch for `not_started` worker/human nodes).
 
 - `references/commands.md#workflow` — add the `workflow update-spec <wfid> <nid>` section (`--patch` flag, `PATCH …/nodes/:nid/spec` route, body-discriminated `target` union, `{ node }` response, full failure-mode list). Bump the subcommand index + count (13 → 14) and add the subcommand-map row.
 - `references/error-codes.md` — add `NodeKindMismatch` (400) and `CoordSpecNotEditable` (400) rows under the Workflows section.
 - `SKILL.md` — note `update-spec` in the `workflow` command-surface summary row.
+
+## 0.4.1 (2026-07-08)
+
+Document origin-scoped task listing, tighten the `--origin` contract, and correct the workflow-node task-linkage shape.
+
+- `references/commands.md#task` — document `task list --origin <kind> --origin-id <id>`: both-or-neither flags (partial pair exits `2`), valid kinds `schedule | workflow`, newest-first `Task[]` across all statuses, and the `origin: <kind>:<id>` table scope header. Standalone tasks are returned by default when `--origin` is omitted — no explicit `--origin standalone` is needed (standalone tasks have no `originId`).
+- `references/error-codes.md` — add `OriginQueryMalformed` (400, partial origin pair) under Tasks. `--origin` is a closed wire enum (`schedule | workflow`), so an out-of-set value surfaces as the shared `ValidationError` (400).
+- Correct the `Task` wire shape in `references/json-shapes.md`: `origin` is the kind alone (`standalone | schedule | workflow`) paired with a top-level `originId`, not a compound `schedule:<sid>` string, and the routing id is **not** nested under `metadata`.
+- Kill the `WorkflowNode.taskId` fiction: a DAG node carries **no** `taskId`. `references/commands.md#workflow` (`dag`, `node-show`, `cancel-node`) and `references/json-shapes.md#workflownode` now resolve a node's task run(s) by origin (`task list --origin workflow --origin-id <nodeId>`), and the node's human-response fields are documented under `metadata.response`, not as top-level `responseInput` / `responseChoiceId`.
+- `schedule list-tasks` output note now states `origin: "schedule"`, `originId: <sid>` (equivalent to `task list --origin schedule --origin-id <sid>`).
 
 ## 0.3.0 (2026-07-07)
 

@@ -2,7 +2,7 @@
 name: software-development-lifecycle
 scope: official
 description: "Strategy skill for the official/coordinator agent — the engineer → review+designer iterate-to-clean orchestration: case bank, brief guidance, context sources, stop condition, failure-mode coverage"
-version: 0.3.2
+version: 0.3.3
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/workflow-coordination"
@@ -44,7 +44,8 @@ CASE "one parent, worker, agent=official/engineer, status in (failed, cancelled)
 
 CASE "two parents, both worker, agents in {official/reviewer, official/designer}":
   for each parent:
-    fetch task:    glyph task show <parent.taskId> --json
+    resolve run:   TID = glyph task list --origin workflow --origin-id <parent node id> --json | jq -r '.[0].id'
+    fetch task:    glyph task show <TID> --json
     fetch verdict: read <workdir>/artifact/verdict.json (parse per §C of generic skill)
   blockers_and_majors = [
     f for v in verdicts for f in v.findings if f.severity in ('blocker', 'major')
@@ -59,7 +60,8 @@ CASE "two parents, both worker, agents in {official/reviewer, official/designer}
 
   # Both reviewers APPROVE — run CI quality gate before declaring success.
   prior_dev = most recent (highest-phase) agent=official/engineer worker node in the DAG
-  pr_number = derive from glyph task show <prior_dev.taskId> --json
+  prior_dev_task = glyph task list --origin workflow --origin-id <prior_dev node id> --json | jq -r '.[0].id'
+  pr_number = derive from glyph task show <prior_dev_task> --json
               (the engineer's success.output and/or activity log carry the
               `gh pr create` URL; parse the PR number from the URL —
               no new engineer contract required)
@@ -272,10 +274,10 @@ When assembling briefs, coord pulls context from these sources. The specific dat
 | Workflow brief | `workflow.brief` | Always included; verbatim, no rewriting |
 | Workflow details | `workflow.details` (may be `null`) | Include when non-empty |
 | Iteration number | count of `official/engineer` worker nodes already in the DAG, +1 | Dev iteration 2+ briefs |
-| Prior review task id | `taskId` of the most recent `agent=official/reviewer` worker parent of the prior coord (the reviewer-in-pair, NOT a ci-waiter) | Dev iteration 2+ briefs — point worker to where findings live |
-| Prior designer task id | `taskId` of the most recent `agent=official/designer` worker parent of the prior coord | Dev iteration 2+ briefs |
-| Branch name | derived from the prior dev task: parse `pr_number` from `glyph task show <prior_dev.taskId> --json`, then `gh pr view <pr_number> --json headRefName -q '.headRefName'` | Dev iteration 2+ briefs |
-| PR number | derived from the prior dev task: parse PR number from `glyph task show <prior_dev.taskId> --json` (its `success.output` carries the `gh pr create` URL) | Dev iteration 2+, ci-waiter, and human approval prompt |
+| Prior review task id | latest task id of the most recent `agent=official/reviewer` worker parent of the prior coord (the reviewer-in-pair, NOT a ci-waiter), resolved via `task list --origin workflow --origin-id <that node id>` | Dev iteration 2+ briefs — point worker to where findings live |
+| Prior designer task id | latest task id of the most recent `agent=official/designer` worker parent of the prior coord, resolved via `task list --origin workflow --origin-id <that node id>` | Dev iteration 2+ briefs |
+| Branch name | derived from the prior dev task: resolve its id via `task list --origin workflow --origin-id <prior dev node id>`, parse `pr_number` from `glyph task show <that id> --json`, then `gh pr view <pr_number> --json headRefName -q '.headRefName'` | Dev iteration 2+ briefs |
+| PR number | derived from the prior dev task: resolve its id via `task list --origin workflow --origin-id <prior dev node id>`, parse PR number from `glyph task show <that id> --json` (its `success.output` carries the `gh pr create` URL) | Dev iteration 2+, ci-waiter, and human approval prompt |
 | Human response | `metadata.response` from human parent node via `glyph workflow node-show` | Dev iteration briefs dispatched after human feedback |
 
 Prior-iter lookups use the "Find prior-iter siblings" snippet from the generic skill §B (same agent FQN, lower phase). For prior review specifically, restrict the lookup to reviewer nodes that paired with a designer sibling — i.e. ignore `ci-waiter` reviewer nodes (single-parent shape per the case bank).

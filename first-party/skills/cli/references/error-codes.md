@@ -67,6 +67,7 @@ Treat every value in the table below as a contract.
 | code | HTTP | meaning | fix |
 |---|---|---|---|
 | `TaskNotFound` | 404 | Task id unknown | `glyph task list` to find it |
+| `OriginQueryMalformed` | 400 | `task list` got `--origin` / `--origin-id` (HTTP `origin` / `originId`) partially — one without the other | Supply both flags together, or neither |
 | `AgentNotFound` | 404 | Agent FQN not installed | `glyph catalog agent install --url <url>` |
 | `EntryNotReady` | 409 | Agent is blocked — see `reason` | See "EntryNotReady reasons" below |
 | `RuntimeDoesNotSupportTasks` | 501 | Runtime can't dispatch tasks | Pick a runtime that does (e.g. copilot) |

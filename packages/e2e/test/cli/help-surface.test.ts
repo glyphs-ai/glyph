@@ -227,6 +227,8 @@ describe.skipIf(!BIN_AVAILABLE)("CLI help surface", () => {
 
       Commands:
         list [options]                List standalone tasks in the current workspace
+                                      (or an origin's tasks with
+                                      --origin/--origin-id)
         dispatch [options]            Dispatch a new task
         show [options] <task-id>      Print one task's metadata
         rm [options] <task-id>        Remove a task. Requires task to be in a
@@ -254,7 +256,7 @@ describe.skipIf(!BIN_AVAILABLE)("CLI help surface", () => {
         list [options]                                 List workflows in the current workspace
         create [options]                               Seed a new workflow + its initial coordinator node
         show [options] <workflow-id>                   Print one workflow's header (status, iterationCount, timestamps)
-        node-show [options] <workflow-id> <node-id>    Print one workflow node's projected wire shape (with taskId enrichment)
+        node-show [options] <workflow-id> <node-id>    Print one workflow node's projected wire shape
         dag [options] <workflow-id>                    Print the full DAG snapshot (header + nodes + edges)
         cancel [options] <workflow-id>                 Cancel a running workflow (flips status → cancelled, reconciles non-terminal nodes)
         rm [options] <workflow-id>                     Remove a terminal workflow

@@ -2,7 +2,7 @@
 name: cli
 scope: official
 description: "Control a glyph server from the CLI — workspaces, agents, tasks, sessions, schedules, catalog, workflows, and server lifecycle"
-version: 0.4.0
+version: 0.5.0
 ---
 
 # official/cli skill
@@ -31,7 +31,7 @@ Every workspace-scoped command inherits `--server / --workspace-id / --output / 
 | --- | --- | --- |
 | `workspace` | Create / list / show / update / remove / reload workspaces; print current id | `references/commands.md#workspace` |
 | `session` | Manage interactive sessions (list / new / show / rm / spawn a terminal) | `references/commands.md#session` |
-| `task` | Dispatch one-shot tasks, inspect them, tail activity, cancel, remove | `references/commands.md#task` |
+| `task` | Dispatch one-shot tasks, list (incl. scoped by `--origin`), inspect them, tail activity, cancel, remove | `references/commands.md#task` |
 | `schedule` | Cron-triggered task launchers (create / list / patch / enable / disable / run / preview / list-tasks) | `references/commands.md#schedule` |
 | `catalog` | Install / sync / enable / disable agents, skills, MCPs | `references/commands.md#catalog` |
 | `workflow` | Seed a workflow, read/mutate its live DAG (expand, patch a not_started node's spec via `update-spec`), respond to human nodes, terminate | `references/commands.md#workflow` |

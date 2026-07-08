@@ -10267,6 +10267,27 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "type": "string",
             },
           },
+          {
+            "in": "query",
+            "name": "origin",
+            "required": false,
+            "schema": {
+              "enum": [
+                "schedule",
+                "workflow",
+              ],
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "originId",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
         ],
         "responses": {
           "200": {
@@ -10481,7 +10502,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "description": "Service unavailable",
           },
         },
-        "summary": "List standalone tasks",
+        "summary": "List tasks (standalone by default, or scoped to an origin)",
         "tags": [
           "tasks",
         ],
