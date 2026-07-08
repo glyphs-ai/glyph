@@ -98,21 +98,15 @@ export const UpdateWorkflowNodeSpecRequestSchema = z
   .object({
     workflowId: WorkflowIdSchema,
     nodeId: WorkflowNodeIdSchema,
-    expectedSpecVersion: z.number().int().nonnegative(),
     target: UpdateWorkflowNodeSpecTargetSchema,
   })
   .strict();
 export type UpdateWorkflowNodeSpecRequest = z.infer<typeof UpdateWorkflowNodeSpecRequestSchema>;
 
-/**
- * Response wraps the patched single-node view with the post-patch
- * `newSpecVersion` (always equal to `node.specVersion`) so a caller can thread
- * the next optimistic-concurrency token without an extra read.
- */
+/** Response wraps the patched single-node view. */
 export const UpdateWorkflowNodeSpecResponseSchema = z
   .object({
     node: GetWorkflowNodeResponseSchema,
-    newSpecVersion: z.number().int().nonnegative(),
   })
   .strict();
 export type UpdateWorkflowNodeSpecResponse = z.infer<typeof UpdateWorkflowNodeSpecResponseSchema>;
@@ -134,14 +128,13 @@ export interface UpdateWorkflowNodeSpecDeps {
  * Apply a partial spec patch to a single still-`not_started` worker/human node.
  *
  * Flow: load the aggregate → refuse a terminal workflow → run the shared
- * precondition guard (existence / not-coordinator / kind-match / not-started /
- * specVersion) so the runner is chosen for the right kind and any structural
- * reject happens before IO → shallow-merge `{...currentSpec, ...patch}` →
- * validate the merged spec through the target kind's runner (full validation,
- * exactly as create/add-subgraph do) → mutate the aggregate (bumping
- * `specVersion`) → save. A rejected patch performs no write. Unlike
- * add/prune-subgraph this does NOT nudge the engine: patching a `not_started`
- * node's spec cannot make it newly dispatch-eligible.
+ * precondition guard (existence / not-coordinator / kind-match / not-started)
+ * so the runner is chosen for the right kind and any structural reject happens
+ * before IO → shallow-merge `{...currentSpec, ...patch}` → validate the merged
+ * spec through the target kind's runner (full validation, exactly as
+ * create/add-subgraph do) → mutate the aggregate → save. A rejected patch
+ * performs no write. Unlike add/prune-subgraph this does NOT nudge the engine:
+ * patching a `not_started` node's spec cannot make it newly dispatch-eligible.
  */
 export class UpdateWorkflowNodeSpecUseCase
   implements
@@ -156,7 +149,7 @@ export class UpdateWorkflowNodeSpecUseCase
     request: UpdateWorkflowNodeSpecRequest,
   ): UseCaseResult<UpdateWorkflowNodeSpecResponse, UpdateWorkflowNodeSpecError> {
     const parsed = UpdateWorkflowNodeSpecRequestSchema.parse(request);
-    const { workflowId, nodeId, expectedSpecVersion, target } = parsed;
+    const { workflowId, nodeId, target } = parsed;
     return new ResultAsync(
       (async () => {
         const workflow = await this.deps.repo.get(workflowId);
@@ -171,14 +164,13 @@ export class UpdateWorkflowNodeSpecUseCase
             status: wf.status,
           });
         // Structural guard before validate: picks the runner for the correct
-        // kind and surfaces coord/kind/status/version rejects ahead of any
-        // spec-shape error.
+        // kind and surfaces coord/kind/status rejects ahead of any spec-shape
+        // error.
         const guarded = assertNodeSpecUpdatable({
           workflowId,
           nodeId,
           node: wf.nodes.find((n) => n.id === nodeId),
           expectedKind: target.kind,
-          expectedSpecVersion,
         });
         if (guarded.isErr()) return err(guarded.error);
         const merged = mergeSpec(guarded.value.spec, target.patch);
@@ -200,7 +192,6 @@ export class UpdateWorkflowNodeSpecUseCase
         const updated = wf.updateNodeSpec({
           nodeId,
           expectedKind: target.kind,
-          expectedSpecVersion,
           validatedSpec: validated.value,
         });
         if (updated.isErr()) return err(updated.error);
@@ -208,7 +199,6 @@ export class UpdateWorkflowNodeSpecUseCase
         if (saved.isErr()) return err(saved.error);
         return ok({
           node: toNodeView(updated.value),
-          newSpecVersion: updated.value.specVersion,
         });
       })(),
     );
@@ -237,7 +227,6 @@ function toNodeView(node: WorkflowNodeEntity): GetWorkflowNodeResponse {
     ...(node.readyAt !== undefined ? { readyAt: node.readyAt } : {}),
     ...(node.runningAt !== undefined ? { runningAt: node.runningAt } : {}),
     ...(node.endedAt !== undefined ? { endedAt: node.endedAt } : {}),
-    specVersion: node.specVersion,
   };
 }
 

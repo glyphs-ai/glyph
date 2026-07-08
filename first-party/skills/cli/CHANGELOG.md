@@ -4,9 +4,8 @@
 
 Document the `workflow update-spec` command (partial spec patch for `not_started` worker/human nodes).
 
-- `references/commands.md#workflow` — add the `workflow update-spec <wfid> <nid>` section (`--patch` + `--expect-spec-version` flags, `PATCH …/nodes/:nid/spec` route, body-discriminated `target` union, `{ node, newSpecVersion }` response, full failure-mode list). Bump the subcommand index + count (13 → 14) and add the subcommand-map row.
-- `references/json-shapes.md` — document the new `specVersion` field on `WorkflowNode`.
-- `references/error-codes.md` — add `NodeKindMismatch` (400), `CoordSpecNotEditable` (400), and `SpecVersionConflict` (409) rows under the Workflows section.
+- `references/commands.md#workflow` — add the `workflow update-spec <wfid> <nid>` section (`--patch` flag, `PATCH …/nodes/:nid/spec` route, body-discriminated `target` union, `{ node }` response, full failure-mode list). Bump the subcommand index + count (13 → 14) and add the subcommand-map row.
+- `references/error-codes.md` — add `NodeKindMismatch` (400) and `CoordSpecNotEditable` (400) rows under the Workflows section.
 - `SKILL.md` — note `update-spec` in the `workflow` command-surface summary row.
 
 ## 0.3.0 (2026-07-07)

@@ -70,7 +70,6 @@ export const GetWorkflowDagResponseSchema = z.object({
         readyAt: z.string().optional(),
         runningAt: z.string().optional(),
         endedAt: z.string().optional(),
-        specVersion: z.number().int().nonnegative(),
       }),
     )
     .readonly(),
@@ -166,7 +165,6 @@ function toGetWorkflowDagNode(row: WorkflowNodeRow): GetWorkflowDagResponse["nod
     ...(row.readyAt !== null ? { readyAt: row.readyAt } : {}),
     ...(row.runningAt !== null ? { runningAt: row.runningAt } : {}),
     ...(row.endedAt !== null ? { endedAt: row.endedAt } : {}),
-    specVersion: row.specVersion,
   };
 }
 

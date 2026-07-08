@@ -2,7 +2,7 @@
 
 ## 0.6.0 (2026-07-07)
 
-- Document `update-spec`, the in-place partial-patch for a still-`not_started` node's spec, in §B. A new "Correct a not_started node's spec via update-spec" sub-section teaches the decision boundary: patch in place when only the spec changes (same kind, same edges — preserving node id + edges instead of churning them via prune+re-add); prune + re-add for a kind change or edge/parent restructure; `cancel-node` (neither) once a node has dispatched. States the two hard rules — read the current `specVersion` and pass it back as the expected version, re-reading + retrying on a version-conflict; and never patch a coordinator node (system-owned, substrate-rejected) — a wrong coord is a graph-structure problem. Keeps the section neutral of exact CLI flags (defers to `official/cli`). The framework command-name list in the lead-in now cites `update-spec`.
+- Document `update-spec`, the in-place partial-patch for a still-`not_started` node's spec, in §B. A new "Correct a not_started node's spec via update-spec" sub-section teaches the decision boundary: patch in place when only the spec changes (same kind, same edges — preserving node id + edges instead of churning them via prune+re-add); prune + re-add for a kind change or edge/parent restructure; `cancel-node` (neither) once a node has dispatched. States the hard rule — never patch a coordinator node (system-owned, substrate-rejected) — a wrong coord is a graph-structure problem. Keeps the section neutral of exact CLI flags (defers to `official/cli`). The framework command-name list in the lead-in now cites `update-spec`.
 
 ## 0.5.0 (2026-07-07)
 

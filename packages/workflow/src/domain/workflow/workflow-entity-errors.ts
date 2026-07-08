@@ -130,17 +130,3 @@ export type CoordSpecNotEditable = {
   readonly workflowId: string;
   readonly nodeId: string;
 };
-
-/**
- * An optimistic-concurrency check failed: the `specVersion` the caller supplied
- * no longer matches the node's current `specVersion` (a concurrent patch landed
- * first). `expected` is the caller's stale version; `actual` is the node's
- * current one. Rejected before any write.
- */
-export type SpecVersionConflict = {
-  readonly type: "SpecVersionConflict";
-  readonly workflowId: string;
-  readonly nodeId: string;
-  readonly expected: number;
-  readonly actual: number;
-};

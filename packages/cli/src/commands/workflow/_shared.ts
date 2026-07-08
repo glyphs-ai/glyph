@@ -49,7 +49,6 @@ export function renderNode(
     readonly phase: number;
     readonly status: string;
     readonly spec?: unknown;
-    readonly specVersion?: number;
     readonly createdAt: string;
     readonly readyAt?: string;
     readonly runningAt?: string;
@@ -66,7 +65,6 @@ export function renderNode(
     kind: specKind,
     status: node.status,
     agent: agentForSpec(node.spec),
-    ...(node.specVersion !== undefined ? { specVersion: node.specVersion } : {}),
     createdAt: node.createdAt,
     ...(node.readyAt !== undefined ? { readyAt: node.readyAt } : {}),
     ...(node.runningAt !== undefined ? { runningAt: node.runningAt } : {}),

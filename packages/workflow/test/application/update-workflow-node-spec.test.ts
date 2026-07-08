@@ -45,28 +45,19 @@ describe("WorkflowModule.updateNodeSpec — happy paths", () => {
     await f.close();
   });
 
-  it("new nodes start at specVersion 0", async () => {
-    const { workflowId, workerId } = await seed(f);
-    const node = (await f.module.getNode.execute({ workflowId, nodeId: workerId }))._unsafeUnwrap();
-    expect(node.specVersion).toBe(0);
-  });
-
-  it("patches a worker brief, preserving other keys and bumping specVersion", async () => {
+  it("patches a worker brief, preserving other keys", async () => {
     const { workflowId, workerId } = await seed(f);
 
-    const { node: res, newSpecVersion } = (
+    const { node: res } = (
       await f.module.updateNodeSpec.execute({
         workflowId,
         nodeId: workerId,
-        expectedSpecVersion: 0,
         target: { kind: "worker", patch: { brief: "revised brief" } },
       })
     )._unsafeUnwrap();
 
     // Shallow merge keeps `agent`, overwrites `brief`.
     expect(res.spec).toEqual({ agent: "w", brief: "revised brief" });
-    expect(res.specVersion).toBe(1);
-    expect(newSpecVersion).toBe(1);
     expect(res.kind).toBe("worker");
 
     // The runner sees the MERGED spec, not just the patch.
@@ -80,7 +71,6 @@ describe("WorkflowModule.updateNodeSpec — happy paths", () => {
       await f.module.getNode.execute({ workflowId, nodeId: workerId })
     )._unsafeUnwrap();
     expect(reread.spec).toEqual({ agent: "w", brief: "revised brief" });
-    expect(reread.specVersion).toBe(1);
   });
 
   it("patches multiple worker fields at once", async () => {
@@ -89,7 +79,6 @@ describe("WorkflowModule.updateNodeSpec — happy paths", () => {
       await f.module.updateNodeSpec.execute({
         workflowId,
         nodeId: workerId,
-        expectedSpecVersion: 0,
         target: { kind: "worker", patch: { agent: "w2", brief: "b2", details: "d", runtime: "r" } },
       })
     )._unsafeUnwrap();
@@ -98,17 +87,14 @@ describe("WorkflowModule.updateNodeSpec — happy paths", () => {
 
   it("patches a human prompt, preserving promptStyle", async () => {
     const { workflowId, humanId } = await seed(f);
-    const { node: res, newSpecVersion } = (
+    const { node: res } = (
       await f.module.updateNodeSpec.execute({
         workflowId,
         nodeId: humanId,
-        expectedSpecVersion: 0,
         target: { kind: "human", patch: { prompt: "really approve?" } },
       })
     )._unsafeUnwrap();
     expect(res.spec).toEqual({ prompt: "really approve?", promptStyle: "plain" });
-    expect(res.specVersion).toBe(1);
-    expect(newSpecVersion).toBe(1);
     expect(res.kind).toBe("human");
   });
 
@@ -120,7 +106,6 @@ describe("WorkflowModule.updateNodeSpec — happy paths", () => {
       await f.module.updateNodeSpec.execute({
         workflowId,
         nodeId: workerId,
-        expectedSpecVersion: 0,
         target: { kind: "worker", patch: { brief: "raw" } },
       })
     )._unsafeUnwrap();
@@ -128,7 +113,7 @@ describe("WorkflowModule.updateNodeSpec — happy paths", () => {
   });
 });
 
-describe("WorkflowModule.updateNodeSpec — optimistic concurrency", () => {
+describe("WorkflowModule.updateNodeSpec — consecutive patches", () => {
   let f: WorkflowFixture;
   beforeEach(async () => {
     f = await buildWorkflowFixture({ randomUUID: fixedRandomUUID(VALID_UUIDS) });
@@ -137,59 +122,23 @@ describe("WorkflowModule.updateNodeSpec — optimistic concurrency", () => {
     await f.close();
   });
 
-  it("rejects a stale specVersion with SpecVersionConflict {expected, actual}", async () => {
+  it("applies consecutive patches, each merging onto the last", async () => {
     const { workflowId, workerId } = await seed(f);
-    const r = await f.module.updateNodeSpec.execute({
-      workflowId,
-      nodeId: workerId,
-      expectedSpecVersion: 3,
-      target: { kind: "worker", patch: { brief: "x" } },
-    });
-    expect(r.isErr()).toBe(true);
-    expect(r._unsafeUnwrapErr()).toMatchObject({
-      type: "SpecVersionConflict",
-      nodeId: workerId,
-      expected: 3,
-      actual: 0,
-    });
-  });
-
-  it("a second patch at the now-stale version conflicts; the current version succeeds", async () => {
-    const { workflowId, workerId } = await seed(f);
-    // 0 → 1
     (
       await f.module.updateNodeSpec.execute({
         workflowId,
         nodeId: workerId,
-        expectedSpecVersion: 0,
         target: { kind: "worker", patch: { brief: "first" } },
       })
     )._unsafeUnwrap();
 
-    // Replaying version 0 now conflicts.
-    const stale = await f.module.updateNodeSpec.execute({
-      workflowId,
-      nodeId: workerId,
-      expectedSpecVersion: 0,
-      target: { kind: "worker", patch: { brief: "second" } },
-    });
-    expect(stale._unsafeUnwrapErr()).toMatchObject({
-      type: "SpecVersionConflict",
-      expected: 0,
-      actual: 1,
-    });
-
-    // Using the current version (1) succeeds and bumps to 2.
-    const { node: ok, newSpecVersion } = (
+    const { node: ok } = (
       await f.module.updateNodeSpec.execute({
         workflowId,
         nodeId: workerId,
-        expectedSpecVersion: 1,
         target: { kind: "worker", patch: { brief: "second" } },
       })
     )._unsafeUnwrap();
-    expect(ok.specVersion).toBe(2);
-    expect(newSpecVersion).toBe(2);
     expect(ok.spec).toEqual({ agent: "w", brief: "second" });
   });
 });
@@ -208,7 +157,6 @@ describe("WorkflowModule.updateNodeSpec — guard rejections", () => {
     const r = await f.module.updateNodeSpec.execute({
       workflowId,
       nodeId: trailingCoordId,
-      expectedSpecVersion: 0,
       target: { kind: "worker", patch: { brief: "x" } },
     });
     expect(r._unsafeUnwrapErr()).toMatchObject({
@@ -222,7 +170,6 @@ describe("WorkflowModule.updateNodeSpec — guard rejections", () => {
     const r = await f.module.updateNodeSpec.execute({
       workflowId,
       nodeId: trailingCoordId,
-      expectedSpecVersion: 0,
       target: { kind: "human", patch: { prompt: "x" } },
     });
     expect(r._unsafeUnwrapErr().type).toBe("CoordSpecNotEditable");
@@ -233,7 +180,6 @@ describe("WorkflowModule.updateNodeSpec — guard rejections", () => {
     const r = await f.module.updateNodeSpec.execute({
       workflowId,
       nodeId: workerId,
-      expectedSpecVersion: 0,
       target: { kind: "human", patch: { prompt: "x" } },
     });
     expect(r._unsafeUnwrapErr()).toMatchObject({
@@ -254,7 +200,6 @@ describe("WorkflowModule.updateNodeSpec — guard rejections", () => {
     const r = await f.module.updateNodeSpec.execute({
       workflowId,
       nodeId: workerId,
-      expectedSpecVersion: 0,
       target: { kind: "worker", patch: { brief: "x" } },
     });
     expect(r._unsafeUnwrapErr()).toMatchObject({
@@ -271,7 +216,6 @@ describe("WorkflowModule.updateNodeSpec — guard rejections", () => {
     const r = await f.module.updateNodeSpec.execute({
       workflowId,
       nodeId: workerId,
-      expectedSpecVersion: 0,
       target: { kind: "worker", patch: { brief: "x" } },
     });
     expect(r._unsafeUnwrapErr()).toMatchObject({
@@ -287,19 +231,16 @@ describe("WorkflowModule.updateNodeSpec — guard rejections", () => {
     await f.module.updateNodeSpec.execute({
       workflowId,
       nodeId: workerId,
-      expectedSpecVersion: 0,
       target: { kind: "worker", patch: { brief: "x" } },
     });
     const node = (await f.module.getNode.execute({ workflowId, nodeId: workerId }))._unsafeUnwrap();
     expect(node.spec).toEqual({ agent: "w", brief: "original" });
-    expect(node.specVersion).toBe(0);
   });
 
   it("rejects when the workflow does not exist", async () => {
     const r = await f.module.updateNodeSpec.execute({
       workflowId: MISSING_WORKFLOW_ID,
       nodeId: VALID_UUIDS[0]!,
-      expectedSpecVersion: 0,
       target: { kind: "worker", patch: { brief: "x" } },
     });
     expect(r._unsafeUnwrapErr().type).toBe("WorkflowNotFound");
@@ -310,7 +251,6 @@ describe("WorkflowModule.updateNodeSpec — guard rejections", () => {
     const r = await f.module.updateNodeSpec.execute({
       workflowId,
       nodeId: VALID_UUIDS[15]!,
-      expectedSpecVersion: 0,
       target: { kind: "worker", patch: { brief: "x" } },
     });
     expect(r._unsafeUnwrapErr()).toMatchObject({
@@ -330,7 +270,6 @@ describe("WorkflowModule.updateNodeSpec — guard rejections", () => {
     const r = await f.module.updateNodeSpec.execute({
       workflowId,
       nodeId: workerId,
-      expectedSpecVersion: 0,
       target: { kind: "worker", patch: { brief: "x" } },
     });
     expect(r._unsafeUnwrapErr().type).toBe("WorkflowAlreadyTerminal");
@@ -366,7 +305,6 @@ describe("update-workflow-node-spec request/patch schemas", () => {
     const parsed = UpdateWorkflowNodeSpecRequestSchema.safeParse({
       workflowId: "20260607-abcdef01",
       nodeId: VALID_UUIDS[0]!,
-      expectedSpecVersion: 0,
       target: { kind: "coordinator", patch: { agent: "x" } },
     });
     expect(parsed.success).toBe(false);
@@ -380,7 +318,6 @@ describe("update-workflow-node-spec request/patch schemas", () => {
         f.module.updateNodeSpec.execute({
           workflowId,
           nodeId: workerId,
-          expectedSpecVersion: 0,
           target: { kind: "worker", patch: {} },
         }),
       ).toThrow();

@@ -10,7 +10,6 @@ function makeNode(overrides: Partial<WorkflowNode> = {}): WorkflowNode {
     kind: "worker",
     status: "running",
     phase: 0,
-    specVersion: 0,
     spec: { kind: "worker", agent: "official/engineer", brief: "default brief" },
     metadata: {},
     createdAt: "2026-05-28T00:00:00.000Z",

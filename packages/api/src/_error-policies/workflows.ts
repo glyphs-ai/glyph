@@ -141,13 +141,6 @@ const WORKFLOW_ATOM_TABLE = {
     title: "Coordinator spec not editable",
     detail: (err) => `workflow node ${err.nodeId} is a coordinator; its spec is not editable`,
   },
-  SpecVersionConflict: {
-    status: 409,
-    title: "Spec version conflict",
-    detail: (err) =>
-      `workflow node ${err.nodeId} spec version ${err.expected} is stale (current: ${err.actual})`,
-    extension: (err) => ({ expected: err.expected, actual: err.actual }),
-  },
   WorkflowDeleteRequiresTerminal: {
     status: 409,
     title: "Workflow delete requires terminal state",

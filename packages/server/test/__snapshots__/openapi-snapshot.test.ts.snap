@@ -13913,10 +13913,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                             "type": "string",
                           },
                           "spec": {},
-                          "specVersion": {
-                            "minimum": 0,
-                            "type": "integer",
-                          },
                           "status": {
                             "enum": [
                               "not_started",
@@ -13941,7 +13937,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "status",
                           "metadata",
                           "createdAt",
-                          "specVersion",
                         ],
                         "type": "object",
                       },
@@ -14489,9 +14484,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "spec": {},
-                    "specVersion": {
-                      "type": "number",
-                    },
                     "status": {
                       "enum": [
                         "not_started",
@@ -14516,7 +14508,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "status",
                     "metadata",
                     "createdAt",
-                    "specVersion",
                   ],
                   "type": "object",
                 },
@@ -14627,9 +14618,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "spec": {},
-                    "specVersion": {
-                      "type": "number",
-                    },
                     "status": {
                       "enum": [
                         "not_started",
@@ -14654,7 +14642,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "status",
                     "metadata",
                     "createdAt",
-                    "specVersion",
                   ],
                   "type": "object",
                 },
@@ -14802,9 +14789,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                       "type": "string",
                     },
                     "spec": {},
-                    "specVersion": {
-                      "type": "number",
-                    },
                     "status": {
                       "enum": [
                         "not_started",
@@ -14829,7 +14813,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                     "status",
                     "metadata",
                     "createdAt",
-                    "specVersion",
                   ],
                   "type": "object",
                 },
@@ -14928,10 +14911,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
               "schema": {
                 "additionalProperties": false,
                 "properties": {
-                  "expectedSpecVersion": {
-                    "minimum": 0,
-                    "type": "integer",
-                  },
                   "target": {
                     "oneOf": [
                       {
@@ -15027,7 +15006,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                   },
                 },
                 "required": [
-                  "expectedSpecVersion",
                   "target",
                 ],
                 "type": "object",
@@ -15043,10 +15021,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
-                    "newSpecVersion": {
-                      "minimum": 0,
-                      "type": "integer",
-                    },
                     "node": {
                       "properties": {
                         "createdAt": {
@@ -15081,9 +15055,6 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                           "type": "string",
                         },
                         "spec": {},
-                        "specVersion": {
-                          "type": "number",
-                        },
                         "status": {
                           "enum": [
                             "not_started",
@@ -15108,14 +15079,12 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                         "status",
                         "metadata",
                         "createdAt",
-                        "specVersion",
                       ],
                       "type": "object",
                     },
                   },
                   "required": [
                     "node",
-                    "newSpecVersion",
                   ],
                   "type": "object",
                 },
@@ -15151,7 +15120,7 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
                 },
               },
             },
-            "description": "Workflow terminal, node not mutable, or spec version conflict",
+            "description": "Workflow terminal or node not mutable",
           },
           "422": {
             "content": {

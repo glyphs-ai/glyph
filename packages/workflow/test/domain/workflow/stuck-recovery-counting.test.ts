@@ -94,7 +94,6 @@ function coord(
     readyAt: undefined,
     runningAt: undefined,
     endedAt: opts.status === "succeeded" ? NOW : undefined,
-    specVersion: 0,
   });
 }
 
@@ -111,7 +110,6 @@ function worker(id: WorkflowNodeId, status: "succeeded" | "running"): WorkflowNo
     readyAt: undefined,
     runningAt: undefined,
     endedAt: status === "succeeded" ? NOW : undefined,
-    specVersion: 0,
   });
 }
 

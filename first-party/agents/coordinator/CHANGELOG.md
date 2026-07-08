@@ -2,7 +2,7 @@
 
 ## 0.3.0 (2026-07-07)
 
-- Add a **Correcting a not_started node's spec** section: when to use `workflow update-spec` (typo/brief/agent-swap, same kind + edges) vs. `prune`/`remove-node` + re-add (kind change, restructure); always `node-show --json` first to read `specVersion` and pass `--expect-spec-version`; re-read + retry on `SpecVersionConflict` (409); never patch a coordinator node (`CoordSpecNotEditable`). Add a Commands-table row and list `workflow update-spec` under **Write Access**.
+- Add a **Correcting a not_started node's spec** section: when to use `workflow update-spec` (typo/brief/agent-swap, same kind + edges) vs. `prune`/`remove-node` + re-add (kind change, restructure); the patch is a partial overlay (omitted fields keep their prior value); never patch a coordinator node (`CoordSpecNotEditable`). Add a Commands-table row and list `workflow update-spec` under **Write Access**.
 
 ## 0.2.2 (2026-07-07)
 

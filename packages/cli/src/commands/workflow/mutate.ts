@@ -259,21 +259,14 @@ export interface WorkflowUpdateSpecOpts extends WorkspaceFlagOpts {
    * pre-GET, so there is no `--kind` flag.
    */
   readonly patch: string;
-  /**
-   * Required optimistic-concurrency guard: the node's current `specVersion`
-   * (read it via `workflow node-show <wfid> <nid> --json`). A stale value is
-   * rejected by the server with 409 SpecVersionConflict.
-   */
-  readonly expectSpecVersion: string;
 }
 
 /**
  * Patch a still-`not_started` worker/human node's spec. The command first
  * GETs the node to resolve its kind (coordinator nodes are rejected — their
- * spec is not editable), then PATCHes the partial patch under the supplied
- * `--expect-spec-version`. The server shallow-merges the patch onto the
- * current spec, re-validates the merged spec authoritatively, and bumps
- * `specVersion` by one (returned as `newSpecVersion`).
+ * spec is not editable), then PATCHes the partial patch. The server
+ * shallow-merges the patch onto the current spec and re-validates the merged
+ * spec authoritatively before persisting it.
  */
 export async function workflowUpdateSpec(
   workflowId: string,
@@ -288,13 +281,6 @@ export async function workflowUpdateSpec(
   }
   if (typeof opts.patch !== "string" || opts.patch.trim() === "") {
     return { exitCode: 2, stderr: "missing required --patch <path>\n" };
-  }
-  if (typeof opts.expectSpecVersion !== "string" || opts.expectSpecVersion.trim() === "") {
-    return { exitCode: 2, stderr: "missing required --expect-spec-version <n>\n" };
-  }
-  const expectedSpecVersion = Number(opts.expectSpecVersion);
-  if (!Number.isInteger(expectedSpecVersion) || expectedSpecVersion < 0) {
-    return { exitCode: 2, stderr: "--expect-spec-version must be a non-negative integer\n" };
   }
   const patchResult = readJsonFileArg("--patch", opts.patch);
   if (!patchResult.ok) {
@@ -319,7 +305,6 @@ export async function workflowUpdateSpec(
       return { exitCode: 2, stderr: `${targetResult.error}\n` };
     }
     const body: PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData["body"] = {
-      expectedSpecVersion,
       target: targetResult.target,
     };
     const result = unwrap(
@@ -334,8 +319,6 @@ export async function workflowUpdateSpec(
       "workflow-id": workflowId,
       "node-id": nodeId,
       kind: node.kind,
-      oldSpecVersion: expectedSpecVersion,
-      newSpecVersion: result.newSpecVersion,
       message: "spec updated",
     });
     return { exitCode: 0, stdout: `${summary}\n${renderNode(result.node, opts)}` };

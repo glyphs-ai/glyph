@@ -92,7 +92,6 @@ export type {
   CoordSpecNotEditable,
   EmptyParents,
   NodeKindMismatch,
-  SpecVersionConflict,
   SubgraphError,
   WorkflowDagConflict,
   WorkflowNodeNotFound,

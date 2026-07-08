@@ -72,7 +72,6 @@ function makeCoordView(): GetWorkflowNodeResponse {
     spec: { agent: "coord-agent" },
     phase: 0,
     status: "running",
-    specVersion: 0,
     metadata: {},
     createdAt: "2026-06-07T00:00:00.000Z",
     readyAt: "2026-06-07T00:00:00.000Z",
@@ -88,7 +87,6 @@ function makeWorkerView(): GetWorkflowNodeResponse {
     spec: { agent: "writer", brief: "draft" },
     phase: 1,
     status: "not_started",
-    specVersion: 0,
     metadata: {},
     createdAt: "2026-06-07T00:00:01.000Z",
   };
@@ -116,7 +114,7 @@ function stubModule(overrides: Partial<Record<keyof WorkflowModule, unknown>>): 
     cancelWorkflow: stubUseCase(undefined),
     addSubgraph: stubUseCase({ insertedNodes: [] }),
     pruneSubgraph: stubUseCase({ prunedNodeIds: [], prunedEdges: [] }),
-    updateNodeSpec: stubUseCase({ node: makeWorkerView(), newSpecVersion: 0 }),
+    updateNodeSpec: stubUseCase({ node: makeWorkerView() }),
     cancelNode: stubUseCase(undefined),
     finishWorkflow: stubUseCase(undefined),
     respondHumanNode: stubUseCase(makeWorkerView()),
@@ -841,17 +839,15 @@ describe("workflowsRoutes — pruneSubgraph (POST /:wfid/prune)", () => {
 
 describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", () => {
   const workerBody = {
-    expectedSpecVersion: 0,
     target: { kind: "worker" as const, patch: { brief: "revised brief" } },
   };
 
-  it("forwards (workflowId, nodeId, expectedSpecVersion, target) and returns node + newSpecVersion", async () => {
+  it("forwards (workflowId, nodeId, target) and returns node", async () => {
     const patched: GetWorkflowNodeResponse = {
       ...makeWorkerView(),
       spec: { agent: "writer", brief: "revised brief" },
-      specVersion: 1,
     };
-    const updateNodeSpec = stubUseCase({ node: patched, newSpecVersion: 1 });
+    const updateNodeSpec = stubUseCase({ node: patched });
     const module = stubModule({ updateNodeSpec });
     const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
       method: "PATCH",
@@ -859,27 +855,23 @@ describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", ()
       body: JSON.stringify(workerBody),
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { node: Record<string, unknown>; newSpecVersion: number };
+    const body = (await res.json()) as { node: Record<string, unknown> };
     expect(body.node.id).toBe(WORKER_NID);
-    expect(body.newSpecVersion).toBe(1);
-    expect(body.node.specVersion).toBe(1);
     expect(body.node.spec).toEqual({ agent: "writer", brief: "revised brief" });
     expect(updateNodeSpec.execute).toHaveBeenCalledWith({
       workflowId: WID,
       nodeId: WORKER_NID,
-      expectedSpecVersion: 0,
       target: { kind: "worker", patch: { brief: "revised brief" } },
     });
   });
 
   it("forwards a human-kind patch", async () => {
-    const updateNodeSpec = stubUseCase({ node: makeWorkerView(), newSpecVersion: 3 });
+    const updateNodeSpec = stubUseCase({ node: makeWorkerView() });
     const module = stubModule({ updateNodeSpec });
     const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        expectedSpecVersion: 2,
         target: { kind: "human", patch: { prompt: "Approve?", promptStyle: "plain" } },
       }),
     });
@@ -887,7 +879,6 @@ describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", ()
     expect(updateNodeSpec.execute).toHaveBeenCalledWith({
       workflowId: WID,
       nodeId: WORKER_NID,
-      expectedSpecVersion: 2,
       target: { kind: "human", patch: { prompt: "Approve?", promptStyle: "plain" } },
     });
   });
@@ -909,7 +900,6 @@ describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", ()
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        expectedSpecVersion: 0,
         target: { kind: "human", patch: { prompt: "hi", promptStyle: "plain" } },
       }),
     });
@@ -939,31 +929,6 @@ describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", ()
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("CoordSpecNotEditable");
-  });
-
-  it("maps SpecVersionConflict to 409 with expected/actual", async () => {
-    const updateNodeSpec = {
-      execute: vi.fn(() =>
-        errAsync({
-          type: "SpecVersionConflict" as const,
-          workflowId: WID,
-          nodeId: WORKER_NID,
-          expected: 0,
-          actual: 3,
-        }),
-      ),
-    };
-    const module = stubModule({ updateNodeSpec });
-    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(workerBody),
-    });
-    expect(res.status).toBe(409);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("SpecVersionConflict");
-    expect(body.expected).toBe(0);
-    expect(body.actual).toBe(3);
   });
 
   it("maps WorkflowNodeNotMutable to 409", async () => {
@@ -1048,7 +1013,7 @@ describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", ()
     const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expectedSpecVersion: 0, target: { kind: "worker", patch: {} } }),
+      body: JSON.stringify({ target: { kind: "worker", patch: {} } }),
     });
     expect(res.status).toBe(400);
     expect(module.updateNodeSpec.execute).not.toHaveBeenCalled();
@@ -1060,7 +1025,6 @@ describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", ()
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        expectedSpecVersion: 0,
         target: { kind: "worker", patch: { bogus: "x" } },
       }),
     });
@@ -1074,20 +1038,8 @@ describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", ()
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        expectedSpecVersion: 0,
         target: { kind: "coordinator", patch: { agent: "x" } },
       }),
-    });
-    expect(res.status).toBe(400);
-    expect(module.updateNodeSpec.execute).not.toHaveBeenCalled();
-  });
-
-  it("rejects a missing expectedSpecVersion with 400", async () => {
-    const module = stubModule({ updateNodeSpec: { execute: vi.fn() } });
-    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: { kind: "worker", patch: { brief: "x" } } }),
     });
     expect(res.status).toBe(400);
     expect(module.updateNodeSpec.execute).not.toHaveBeenCalled();
@@ -1104,7 +1056,6 @@ describe("workflowsRoutes — cancelNode (POST /:wfid/nodes/:nid/cancel)", () =>
       spec: { agent: "writer", brief: "draft" },
       phase: 1,
       status: "cancelled",
-      specVersion: 0,
       metadata: {},
       createdAt: "2026-06-07T00:00:01.000Z",
       readyAt: "2026-06-07T00:00:02.000Z",

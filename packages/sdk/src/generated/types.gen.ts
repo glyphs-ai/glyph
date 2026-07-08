@@ -2629,7 +2629,6 @@ export type GetApiWorkspacesByIdWorkflowsByWfidDagResponses = {
             readyAt?: string;
             runningAt?: string;
             endedAt?: string;
-            specVersion: number;
         }>;
         edges: Array<{
             workflowId: string;
@@ -2687,7 +2686,6 @@ export type GetApiWorkspacesByIdWorkflowsByWfidNodesByNidResponses = {
         readyAt?: string;
         runningAt?: string;
         endedAt?: string;
-        specVersion: number;
     };
 };
 
@@ -2990,7 +2988,6 @@ export type PostApiWorkspacesByIdWorkflowsByWfidPruneResponse = PostApiWorkspace
 
 export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData = {
     body: {
-        expectedSpecVersion: number;
         target: {
             kind: 'worker';
             patch: {
@@ -3030,7 +3027,7 @@ export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors = {
      */
     404: Problem;
     /**
-     * Workflow terminal, node not mutable, or spec version conflict
+     * Workflow terminal or node not mutable
      */
     409: Problem;
     /**
@@ -3068,9 +3065,7 @@ export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses = {
             readyAt?: string;
             runningAt?: string;
             endedAt?: string;
-            specVersion: number;
         };
-        newSpecVersion: number;
     };
 };
 
@@ -3126,7 +3121,6 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelResponses = {
         readyAt?: string;
         runningAt?: string;
         endedAt?: string;
-        specVersion: number;
     };
 };
 
@@ -3275,7 +3269,6 @@ export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidRespondResponses = {
         readyAt?: string;
         runningAt?: string;
         endedAt?: string;
-        specVersion: number;
     };
 };
 

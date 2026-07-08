@@ -152,7 +152,6 @@ function nodePatch(node: WorkflowNodeEntity): Partial<WorkflowNodeRow> {
     readyAt: row.readyAt ?? null,
     runningAt: row.runningAt ?? null,
     endedAt: row.endedAt ?? null,
-    specVersion: node.specVersion,
   };
 }
 function headerChanged(snapshot: WorkflowHeaderSnapshot | null, entity: WorkflowEntity): boolean {
@@ -195,8 +194,7 @@ function nodeChanged(snapshot: WorkflowNodeSnapshot, node: WorkflowNodeEntity): 
     row.metadata !== snapRow.metadata ||
     row.readyAt !== snapRow.readyAt ||
     row.runningAt !== snapRow.runningAt ||
-    row.endedAt !== snapRow.endedAt ||
-    node.specVersion !== snapshot.specVersion
+    row.endedAt !== snapRow.endedAt
   );
 }
 function edgeKey(from: string, to: string): string {

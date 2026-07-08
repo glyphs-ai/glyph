@@ -345,7 +345,6 @@ Returned by `workflow node-show`, and one element of `WorkflowDag.nodes`.
   "runningAt": "2026-07-06T14:05:06.000Z",              // when the runtime picked it up
   "endedAt":   "2026-07-06T14:20:00.000Z",              // absent while running
   "taskId":    "20260706-abcd1234",                     // present after dispatch for coordinator/worker nodes; look up via `task show`
-  "specVersion": 0,                                     // optimistic-concurrency token; starts at 0, bumps +1 per successful `update-spec`
   "responseInput":   "freeform text",                   // human node — set on respond
   "responseChoiceId": "approve"                          // human node — set on respond
 }

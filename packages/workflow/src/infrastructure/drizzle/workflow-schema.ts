@@ -115,7 +115,6 @@ export const workflowNodes = sqliteTable(
     runningAt: text("running_at"),
     endedAt: text("ended_at"),
     metadata: text("metadata").notNull().default("{}"),
-    specVersion: integer("spec_version").notNull().default(0),
   },
   (t) => [
     index("workflow_nodes_workflow_idx").on(t.workflowId),

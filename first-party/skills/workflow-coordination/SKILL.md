@@ -185,13 +185,12 @@ Not every mistake needs a retract-and-rebuild. When a queued `not_started` node 
 
 Decide by what's changing:
 
-- **Spec only, same kind, same edges → `update-spec`.** A partial overlay: name only the fields that change; the rest keep their prior value. It bumps a per-node `specVersion` so two coord ticks that both read the same version can't silently clobber each other — the second patch loses with a version-conflict and must re-read.
+- **Spec only, same kind, same edges → `update-spec`.** A partial overlay: name only the fields that change; the rest keep their prior value.
 - **Kind change, or any edge/parent restructure → prune + re-add.** `update-spec` cannot change a node's `kind` and never touches edges. Retract via `prune-subgraph` and re-queue the corrected shape via `add-subgraph`.
 - **Node already dispatched (`ready`/`running`/terminal) → neither.** A started node is real work; its spec is frozen. `cancel-node` the worker and queue a replacement if the plan changed.
 
-Two hard rules:
+One hard rule:
 
-- **Read before you patch.** Read the node's current `specVersion` first and pass it back as the expected version; on a version-conflict, re-read and retry with the fresh value. Never force-write over an unread version.
 - **Never patch a coordinator node.** Coordinator specs are system-owned — the substrate rejects a coord `update-spec`. A wrong coordinator is a graph-structure problem: prune the coord (and its dependents) and re-plan, don't try to edit it.
 
 Exact flags and body shape live in the `official/cli` skill (`workflow update-spec`); this section is *when*, not *how*.

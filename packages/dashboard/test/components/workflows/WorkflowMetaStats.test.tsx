@@ -30,7 +30,6 @@ function makeNode(id: string, phase: number, status: NodeStatus): WorkflowNode {
     spec: { kind: "worker", agent: "official/engineer", brief: id },
     metadata: {},
     createdAt: "2026-05-28T00:00:00.000Z",
-    specVersion: 0,
   };
 }
 

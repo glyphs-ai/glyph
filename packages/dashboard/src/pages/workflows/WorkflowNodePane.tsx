@@ -91,14 +91,12 @@ export function WorkflowNodePane({
 
   const total = orderedNodes.length;
   const position = currentIndex + 1;
-  const currentNode = orderedNodes[currentIndex] ?? null;
 
   const pill = (
     <WorkflowNodeNav
       workflowBrief={workflow.brief}
       position={position}
       total={total}
-      specVersion={currentNode?.specVersion ?? null}
       onBack={onBack}
       onPrev={prevId !== null ? () => onNavigate(prevId) : null}
       onNext={nextId !== null ? () => onNavigate(nextId) : null}
@@ -152,7 +150,6 @@ interface WorkflowNodeNavProps {
   workflowBrief: string;
   position: number;
   total: number;
-  specVersion: number | null;
   onBack: () => void;
   onPrev: (() => void) | null;
   onNext: (() => void) | null;
@@ -172,7 +169,6 @@ function WorkflowNodeNav({
   workflowBrief,
   position,
   total,
-  specVersion,
   onBack,
   onPrev,
   onNext,
@@ -219,15 +215,6 @@ function WorkflowNodeNav({
       >
         ›
       </button>
-      {specVersion !== null ? (
-        <span
-          className="workflow-node-spec-version"
-          data-testid="workflow-node-spec-version"
-          title="Spec version (optimistic-concurrency token for updateNodeSpec)"
-        >
-          spec v{specVersion}
-        </span>
-      ) : null}
     </nav>
   );
 }

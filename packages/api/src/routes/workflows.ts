@@ -649,7 +649,7 @@ export function workflowsRoutes(
         200: jsonResponse(UpdateWorkflowNodeSpecResponseSchema, "Patched node"),
         400: errorResponse("Malformed request body, node kind mismatch, or coordinator target"),
         404: errorResponse("Workflow or node not found"),
-        409: errorResponse("Workflow terminal, node not mutable, or spec version conflict"),
+        409: errorResponse("Workflow terminal or node not mutable"),
         422: errorResponse("Merged node spec invalid"),
         500: errorResponse("Internal error"),
         503: errorResponse("Service unavailable"),
@@ -664,7 +664,6 @@ export function workflowsRoutes(
           await resolve(c).updateNodeSpec.execute({
             workflowId: wfid as WorkflowId,
             nodeId: nid as WorkflowNodeId,
-            expectedSpecVersion: body.expectedSpecVersion,
             target: body.target,
           }),
         );

@@ -46,7 +46,7 @@ the strategy skill the workflow has selected (for v1: always
 | Read worker artifacts | check `<workdir>/artifact/verdict.json` (workDir from `glyph task show --json`'s `workdir` field) |
 | Read a human node's response | `glyph workflow node-show $WF <node-id> --json` → `metadata.response` |
 | Expand the DAG | `glyph workflow add-subgraph $WF --spec-file <payload.json>` |
-| Correct a not_started node's spec | `glyph workflow node-show $WF <node-id> --json` (read `specVersion`) → `glyph workflow update-spec $WF <node-id> --patch <file> --expect-spec-version <n>` |
+| Correct a not_started node's spec | `glyph workflow update-spec $WF <node-id> --patch <file>` |
 | Terminate the workflow | `glyph workflow finish $WF --outcome <succeeded\|failed> --message "..."` |
 | Cleanup (rare) | `glyph workflow remove-node`, `workflow remove-edge`, `workflow cancel-node` |
 
@@ -58,8 +58,7 @@ Before a node dispatches (`status: not_started`) I can make a small correction t
 
 - **Use `update-spec` for**: fixing a typo, tightening a brief, swapping the worker `agent`, adjusting a human `prompt`/`choices` — any change that keeps the node's `kind` and its place in the graph.
 - **Use `prune`/`remove-node` + `add-subgraph` (re-add) for**: changing a node's `kind`, or any restructuring of parents/edges. `update-spec` cannot change `kind` and never touches edges.
-- **Always read first**: `glyph workflow node-show $WF <node-id> --json` to read the current `specVersion`, then pass it as `--expect-spec-version <n>`. The patch is a **partial overlay** — omitted fields keep their prior value.
-- **Handle conflict**: a `SpecVersionConflict` (409) means another writer patched the node after my read. Re-read `node-show --json` and retry with the fresh `specVersion` — never blindly force.
+- **Always read first**: `glyph workflow node-show $WF <node-id> --json` to confirm the node's kind and that it's still `not_started`. The patch is a **partial overlay** — omitted fields keep their prior value.
 - **Never on a coordinator node**: coordinator specs are system-owned; `update-spec` rejects them (`CoordSpecNotEditable`). If a coord node is wrong, that's a graph-structure problem, not a spec edit.
 
 Strategy-level guidance on *when* a correction is warranted lives in `official/workflow-coordination`; this section is the mechanical how.

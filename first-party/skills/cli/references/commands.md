@@ -439,17 +439,17 @@ The target node must be `kind === "human"` and `status === "running"`. On succes
 
 ### `workflow update-spec <workflow-id> <node-id>`
 
-- Required flags: `--patch <path>` (JSON file with the partial spec fields to overlay) and `--expect-spec-version <n>` (the `specVersion` you read from `node-show`)
+- Required flag: `--patch <path>` (JSON file with the partial spec fields to overlay)
 - Route: `PATCH /workspaces/:id/workflows/:wfid/nodes/:nid/spec`
-- Body: `{ expectedSpecVersion, target }` where `target` is a **body-discriminated** union keyed on `target.kind`:
+- Body: `{ target }` where `target` is a **body-discriminated** union keyed on `target.kind`:
   - `{ "kind": "worker", "agent"?, "brief"?, "details"?, "runtime"? }` — any subset; at least one field
   - `{ "kind": "human", "prompt"?, "promptStyle"?, "choices"? }` — any subset; at least one field
   - The CLI reads the node's kind (via a pre-`node-show`) and builds the discriminant for you; the `--patch` file may be the bare fields (`{ "brief": "…" }`) or wrapped (`{ "patch": { "brief": "…" } }`)
-- Output: `{ node, newSpecVersion }` — the full patched `WorkflowNode` plus the bumped version (always `node.specVersion`)
+- Output: `{ node }` — the full patched `WorkflowNode`
 - Only `not_started` worker/human nodes are patchable. Coordinator nodes are rejected (`CoordSpecNotEditable`); this is a **partial** overlay — omitted fields keep their prior value
-- Failure modes: **400** `NodeKindMismatch` (body kind ≠ node kind) / `CoordSpecNotEditable` (coord node) / invalid body; **422** `NodeSpecError` (patched spec fails validation); **404** `WorkflowNodeNotFound`; **409** `WorkflowNodeNotMutable` (node already dispatched) / `SpecVersionConflict` (stale `--expect-spec-version`) / `WorkflowAlreadyTerminal`
+- Failure modes: **400** `NodeKindMismatch` (body kind ≠ node kind) / `CoordSpecNotEditable` (coord node) / invalid body; **422** `NodeSpecError` (patched spec fails validation); **404** `WorkflowNodeNotFound`; **409** `WorkflowNodeNotMutable` (node already dispatched) / `WorkflowAlreadyTerminal`
 
-Read `specVersion` from `workflow node-show <wfid> <nid> --json` first, pass it as `--expect-spec-version`, and on a `SpecVersionConflict` (409) re-read and retry — a concurrent patch won the race.
+The CLI pre-reads the node (via `node-show`) to resolve its kind and reject coordinator targets before patching; you only supply `--patch`.
 
 ---
 

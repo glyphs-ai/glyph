@@ -121,7 +121,6 @@ export interface WorkflowNodeSnapshot {
   readonly runningAt: string | undefined;
   readonly endedAt: string | undefined;
   readonly metadata: Readonly<Record<string, unknown>>;
-  readonly specVersion: number;
 }
 
 export interface WorkflowHeaderSnapshot {
@@ -510,20 +509,17 @@ export class WorkflowEntity {
 
   /**
    * Replace a still-`not_started` worker/human node's spec with an already
-   * runner-validated `validatedSpec`, bumping the node's `specVersion`. Rejects
-   * before any mutation via {@link assertNodeSpecUpdatable} (kind/coord/status
-   * guards + optimistic-concurrency check) and refuses terminal workflows, so a
-   * rejected patch leaves the aggregate untouched. Returns the updated node so
-   * the caller can project the new `specVersion` back to the client.
+   * runner-validated `validatedSpec`. Rejects before any mutation via
+   * {@link assertNodeSpecUpdatable} (kind/coord/status guards) and refuses
+   * terminal workflows, so a rejected patch leaves the aggregate untouched.
+   * Returns the updated node so the caller can project it back to the client.
    *
    * The spec must already be validated by the target kind's runner — this
-   * method trusts `validatedSpec` and does not re-validate; the version bump is
-   * what a subsequent patch's optimistic-concurrency check compares against.
+   * method trusts `validatedSpec` and does not re-validate.
    */
   updateNodeSpec(args: {
     readonly nodeId: WorkflowNodeId;
     readonly expectedKind: WorkflowNodeKind;
-    readonly expectedSpecVersion: number;
     readonly validatedSpec: unknown;
   }): Result<WorkflowNodeEntity, WorkflowAlreadyTerminal | NodeSpecUpdateGuardError> {
     const running = this.requireRunning();
@@ -533,7 +529,6 @@ export class WorkflowEntity {
       nodeId: args.nodeId,
       node: this.nodeById(args.nodeId),
       expectedKind: args.expectedKind,
-      expectedSpecVersion: args.expectedSpecVersion,
     });
     if (guarded.isErr()) return err(guarded.error);
     const updated = guarded.value.withPatchedSpec(args.validatedSpec);
@@ -1196,7 +1191,6 @@ function nodeSnapshot(node: WorkflowNodeEntity): WorkflowNodeSnapshot {
     runningAt: node.runningAt,
     endedAt: node.endedAt,
     metadata: Object.freeze({ ...node.metadata }),
-    specVersion: node.specVersion,
   });
 }
 

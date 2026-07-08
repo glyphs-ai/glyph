@@ -36,13 +36,6 @@
       "when": 1782490918798,
       "tag": "0004_workflows_origin_id",
       "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1782490918799,
-      "tag": "0005_workflow_nodes_spec_version",
-      "breakpoints": true
     }
   ]
 }

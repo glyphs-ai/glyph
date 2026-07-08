@@ -217,15 +217,10 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
       "--patch <path>",
       "Path to a JSON file with the partial patch — either { patch: {...} } or the patch object directly",
     )
-    .requiredOption(
-      "--expect-spec-version <n>",
-      "Optimistic-concurrency guard: the node's current specVersion (read via node-show --json)",
-    )
     .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
       slot.result = await workflowUpdateSpec(workflowId, nodeId, {
         ...parseWorkspaceFlags(opts),
         patch: pickString(opts, "patch") ?? "",
-        expectSpecVersion: pickString(opts, "expectSpecVersion") ?? "",
       });
     });
 

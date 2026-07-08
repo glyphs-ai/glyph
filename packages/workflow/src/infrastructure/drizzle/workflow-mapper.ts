@@ -57,7 +57,6 @@ export const WorkflowMapper = {
       readyAt: entity.readyAt ?? null,
       runningAt: entity.runningAt ?? null,
       endedAt: entity.endedAt ?? null,
-      specVersion: entity.specVersion,
     };
   },
   toEdgeRow(entity: WorkflowEdgeEntity): NewWorkflowEdgeRow {
@@ -222,7 +221,6 @@ function toNodeEntity(row: WorkflowNodeRow): Result<WorkflowNodeEntity, Workflow
       readyAt: row.readyAt ?? undefined,
       runningAt: row.runningAt ?? undefined,
       endedAt: row.endedAt ?? undefined,
-      specVersion: row.specVersion,
     }),
   );
 }

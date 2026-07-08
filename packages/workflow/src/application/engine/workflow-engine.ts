@@ -354,7 +354,6 @@ function toNodeEntity(row: WorkflowNodeRow): WorkflowNodeEntity {
     readyAt: row.readyAt ?? undefined,
     runningAt: row.runningAt ?? undefined,
     endedAt: row.endedAt ?? undefined,
-    specVersion: row.specVersion,
   });
 }
 

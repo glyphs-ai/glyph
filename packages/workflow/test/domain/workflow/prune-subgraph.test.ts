@@ -55,7 +55,6 @@ function node(opts: {
     readyAt: undefined,
     runningAt: undefined,
     endedAt: TERMINAL.has(status) ? NOW : undefined,
-    specVersion: 0,
   });
 }
 
