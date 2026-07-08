@@ -47,23 +47,22 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  // Mirror production teardown (`workspace-context` close): checkpoint the
-  // WAL back into the main DB *before* closing. On Windows/NTFS the kernel
-  // keeps an exclusive lock on `workspace.db-wal` / `-shm` after
-  // `client.close()` unless the WAL has been truncated, which makes the
-  // scratch-dir removal below race the lock manager — fatal under the
-  // parallel-fork disk contention of the full server suite.
-  try {
-    await client.execute("PRAGMA wal_checkpoint(TRUNCATE)");
-  } catch {
-    // best-effort — the close below still releases the connection
-  }
+  // Windows-safe teardown MUST stay wall-clock bounded. The server suite
+  // runs test files in parallel forks, and the 300s+ catalog-sync suite
+  // starves this fork so heavily that libsql's raw `client.close()` releases
+  // the `workspace.db-wal` / `-shm` fd late. The follow-up `rm` then blocks
+  // on the still-locked files *inside* a single syscall — past rmScratch's
+  // own retry budget, which only spaces out *attempts*. Cap the whole
+  // cleanup with a timer race (a CPU-scheduled timeout fires independently of
+  // the lock-blocked rm) so the hook can never approach vitest's hookTimeout.
+  // If cleanup outlives the budget we abandon it and leak the temp dir —
+  // harmless: os.tmpdir is reaped and each test mkdtemps a fresh scratch.
   try {
     client.close();
   } catch {
     // best-effort
   }
-  await rmScratch(scratch);
+  await Promise.race([rmScratch(scratch), new Promise((r) => setTimeout(r, 15_000))]);
 });
 
 describe("request-scoped transaction atomicity", () => {
