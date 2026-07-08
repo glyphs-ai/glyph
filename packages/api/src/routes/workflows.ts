@@ -30,6 +30,7 @@
  *   - `POST   /:wfid/subgraph`            — batch insert N nodes + M edges
  *   - `POST   /:wfid/prune`               — batch retract N not-started nodes + adjacent edges
  *   - `POST   /:wfid/nodes/:nid/cancel`   — cancel a worker-kind node
+ *   - `PATCH  /:wfid/nodes/:nid/spec`     — patch a not-started worker/human node's spec
  *   - `POST   /:wfid/nodes/:nid/respond`  - answer a waiting human-kind node
  *   - `POST   /:wfid/finish`              — flip workflow terminal
  *
@@ -80,6 +81,8 @@ import {
   ListWorkflowsResponseSchema,
   PruneWorkflowSubgraphRequestSchema,
   PruneWorkflowSubgraphResponseSchema,
+  UpdateWorkflowNodeSpecRequestSchema,
+  UpdateWorkflowNodeSpecResponseSchema,
   CancelWorkflowRequestSchema as WorkflowCancelWorkflowRequestSchema,
   CreateWorkflowRequestSchema as WorkflowCreateWorkflowRequestSchema,
   FinishWorkflowRequestSchema as WorkflowFinishWorkflowRequestSchema,
@@ -624,6 +627,57 @@ export function workflowsRoutes(
           route: "workflows.pruneSubgraph",
           policy: workflowsErrorPolicy,
           meta: { workflowId: wfid as WorkflowId },
+        });
+      }
+    },
+  );
+
+  // ── PATCH /:wfid/nodes/:nid/spec — updateNodeSpec ────────────────
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/{wfid}/nodes/{nid}/spec",
+      tags: ["workflows"],
+      summary: "Patch a not-started node's spec",
+      request: {
+        params: z.object({ wfid: z.string(), nid: z.string() }),
+        body: jsonRequest(
+          UpdateWorkflowNodeSpecRequestSchema.omit({ workflowId: true, nodeId: true }),
+        ),
+      },
+      responses: {
+        200: jsonResponse(UpdateWorkflowNodeSpecResponseSchema, "Patched node"),
+        400: errorResponse("Malformed request body, node kind mismatch, or coordinator target"),
+        404: errorResponse("Workflow or node not found"),
+        409: errorResponse("Workflow terminal or node not mutable"),
+        422: errorResponse("Merged node spec invalid"),
+        500: errorResponse("Internal error"),
+        503: errorResponse("Service unavailable"),
+      },
+    }),
+    async (c) => {
+      const wfid = c.req.param("wfid");
+      const nid = c.req.param("nid");
+      const body = c.req.valid("json");
+      try {
+        const result = unwrapWorkflow(
+          await resolve(c).updateNodeSpec.execute({
+            workflowId: wfid as WorkflowId,
+            nodeId: nid as WorkflowNodeId,
+            target: body.target,
+          }),
+        );
+        logEvent(c, "workflow.updateNodeSpec", {
+          workflowId: wfid as WorkflowId,
+          nodeId: nid as WorkflowNodeId,
+          kind: body.target.kind,
+        });
+        return c.json(result);
+      } catch (err) {
+        return respondWorkflowError(c, err, {
+          route: "workflows.updateNodeSpec",
+          policy: workflowsErrorPolicy,
+          meta: { workflowId: wfid as WorkflowId, nodeId: nid as WorkflowNodeId },
         });
       }
     },

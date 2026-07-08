@@ -14898,6 +14898,288 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
         ],
       },
     },
+    "/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "wfid",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "nid",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "target": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "worker",
+                            ],
+                            "type": "string",
+                          },
+                          "patch": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "agent": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "brief": {
+                                "type": "string",
+                              },
+                              "details": {
+                                "type": "string",
+                              },
+                              "runtime": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                            },
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "patch",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "human",
+                            ],
+                            "type": "string",
+                          },
+                          "patch": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "choices": {
+                                "items": {
+                                  "properties": {
+                                    "id": {
+                                      "minLength": 1,
+                                      "type": "string",
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "id",
+                                    "label",
+                                  ],
+                                  "type": "object",
+                                },
+                                "maxItems": 5,
+                                "type": "array",
+                              },
+                              "prompt": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "promptStyle": {
+                                "enum": [
+                                  "plain",
+                                  "markdown",
+                                ],
+                                "type": "string",
+                              },
+                            },
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "patch",
+                        ],
+                        "type": "object",
+                      },
+                    ],
+                  },
+                },
+                "required": [
+                  "target",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "node": {
+                      "properties": {
+                        "createdAt": {
+                          "type": "string",
+                        },
+                        "endedAt": {
+                          "type": "string",
+                        },
+                        "id": {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "coordinator",
+                            "worker",
+                            "human",
+                          ],
+                          "type": "string",
+                        },
+                        "metadata": {
+                          "additionalProperties": {},
+                          "type": "object",
+                        },
+                        "phase": {
+                          "type": "number",
+                        },
+                        "readyAt": {
+                          "type": "string",
+                        },
+                        "runningAt": {
+                          "type": "string",
+                        },
+                        "spec": {},
+                        "status": {
+                          "enum": [
+                            "not_started",
+                            "ready",
+                            "running",
+                            "succeeded",
+                            "failed",
+                            "cancelled",
+                          ],
+                          "type": "string",
+                        },
+                        "workflowId": {
+                          "pattern": "^\\d{8}-[0-9a-f]{8}$",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "id",
+                        "workflowId",
+                        "kind",
+                        "phase",
+                        "status",
+                        "metadata",
+                        "createdAt",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "node",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Patched node",
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Malformed request body, node kind mismatch, or coordinator target",
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Workflow or node not found",
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Workflow terminal or node not mutable",
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Merged node spec invalid",
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Internal error",
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem",
+                },
+              },
+            },
+            "description": "Service unavailable",
+          },
+        },
+        "summary": "Patch a not-started node's spec",
+        "tags": [
+          "workflows",
+        ],
+      },
+    },
     "/api/workspaces/{id}/workflows/{wfid}/prune": {
       "post": {
         "parameters": [

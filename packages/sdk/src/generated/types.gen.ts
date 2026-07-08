@@ -2988,6 +2988,91 @@ export type PostApiWorkspacesByIdWorkflowsByWfidPruneResponses = {
 
 export type PostApiWorkspacesByIdWorkflowsByWfidPruneResponse = PostApiWorkspacesByIdWorkflowsByWfidPruneResponses[keyof PostApiWorkspacesByIdWorkflowsByWfidPruneResponses];
 
+export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecData = {
+    body: {
+        target: {
+            kind: 'worker';
+            patch: {
+                agent?: string;
+                brief?: string;
+                details?: string;
+                runtime?: string;
+            };
+        } | {
+            kind: 'human';
+            patch: {
+                prompt?: string;
+                promptStyle?: 'plain' | 'markdown';
+                choices?: Array<{
+                    id: string;
+                    label: string;
+                }>;
+            };
+        };
+    };
+    path: {
+        id: string;
+        wfid: string;
+        nid: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{id}/workflows/{wfid}/nodes/{nid}/spec';
+};
+
+export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors = {
+    /**
+     * Malformed request body, node kind mismatch, or coordinator target
+     */
+    400: Problem;
+    /**
+     * Workflow or node not found
+     */
+    404: Problem;
+    /**
+     * Workflow terminal or node not mutable
+     */
+    409: Problem;
+    /**
+     * Merged node spec invalid
+     */
+    422: Problem;
+    /**
+     * Internal error
+     */
+    500: Problem;
+    /**
+     * Service unavailable
+     */
+    503: Problem;
+};
+
+export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecError = PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors[keyof PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecErrors];
+
+export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses = {
+    /**
+     * Patched node
+     */
+    200: {
+        node: {
+            id: string;
+            workflowId: string;
+            kind: 'coordinator' | 'worker' | 'human';
+            spec?: unknown;
+            phase: number;
+            status: 'not_started' | 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+            metadata: {
+                [key: string]: unknown;
+            };
+            createdAt: string;
+            readyAt?: string;
+            runningAt?: string;
+            endedAt?: string;
+        };
+    };
+};
+
+export type PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponse = PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses[keyof PatchApiWorkspacesByIdWorkflowsByWfidNodesByNidSpecResponses];
+
 export type PostApiWorkspacesByIdWorkflowsByWfidNodesByNidCancelData = {
     body?: never;
     path: {

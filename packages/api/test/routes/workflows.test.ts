@@ -114,6 +114,7 @@ function stubModule(overrides: Partial<Record<keyof WorkflowModule, unknown>>): 
     cancelWorkflow: stubUseCase(undefined),
     addSubgraph: stubUseCase({ insertedNodes: [] }),
     pruneSubgraph: stubUseCase({ prunedNodeIds: [], prunedEdges: [] }),
+    updateNodeSpec: stubUseCase({ node: makeWorkerView() }),
     cancelNode: stubUseCase(undefined),
     finishWorkflow: stubUseCase(undefined),
     respondHumanNode: stubUseCase(makeWorkerView()),
@@ -833,6 +834,215 @@ describe("workflowsRoutes — pruneSubgraph (POST /:wfid/prune)", () => {
       body: JSON.stringify({ nodeIds: [] }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("workflowsRoutes — updateNodeSpec (PATCH /:wfid/nodes/:nid/spec)", () => {
+  const workerBody = {
+    target: { kind: "worker" as const, patch: { brief: "revised brief" } },
+  };
+
+  it("forwards (workflowId, nodeId, target) and returns node", async () => {
+    const patched: GetWorkflowNodeResponse = {
+      ...makeWorkerView(),
+      spec: { agent: "writer", brief: "revised brief" },
+    };
+    const updateNodeSpec = stubUseCase({ node: patched });
+    const module = stubModule({ updateNodeSpec });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerBody),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { node: Record<string, unknown> };
+    expect(body.node.id).toBe(WORKER_NID);
+    expect(body.node.spec).toEqual({ agent: "writer", brief: "revised brief" });
+    expect(updateNodeSpec.execute).toHaveBeenCalledWith({
+      workflowId: WID,
+      nodeId: WORKER_NID,
+      target: { kind: "worker", patch: { brief: "revised brief" } },
+    });
+  });
+
+  it("forwards a human-kind patch", async () => {
+    const updateNodeSpec = stubUseCase({ node: makeWorkerView() });
+    const module = stubModule({ updateNodeSpec });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target: { kind: "human", patch: { prompt: "Approve?", promptStyle: "plain" } },
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(updateNodeSpec.execute).toHaveBeenCalledWith({
+      workflowId: WID,
+      nodeId: WORKER_NID,
+      target: { kind: "human", patch: { prompt: "Approve?", promptStyle: "plain" } },
+    });
+  });
+
+  it("maps NodeKindMismatch to 400 with expected/actual", async () => {
+    const updateNodeSpec = {
+      execute: vi.fn(() =>
+        errAsync({
+          type: "NodeKindMismatch" as const,
+          workflowId: WID,
+          nodeId: WORKER_NID,
+          expected: "human" as const,
+          actual: "worker" as const,
+        }),
+      ),
+    };
+    const module = stubModule({ updateNodeSpec });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target: { kind: "human", patch: { prompt: "hi", promptStyle: "plain" } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("NodeKindMismatch");
+    expect(body.expected).toBe("human");
+    expect(body.actual).toBe("worker");
+  });
+
+  it("maps CoordSpecNotEditable to 400", async () => {
+    const updateNodeSpec = {
+      execute: vi.fn(() =>
+        errAsync({
+          type: "CoordSpecNotEditable" as const,
+          workflowId: WID,
+          nodeId: COORD_NID,
+        }),
+      ),
+    };
+    const module = stubModule({ updateNodeSpec });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${COORD_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerBody),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("CoordSpecNotEditable");
+  });
+
+  it("maps WorkflowNodeNotMutable to 409", async () => {
+    const updateNodeSpec = {
+      execute: vi.fn(() =>
+        errAsync({
+          type: "WorkflowNodeNotMutable" as const,
+          workflowId: WID,
+          nodeId: WORKER_NID,
+          status: "running" as const,
+          verb: "updateNodeSpec",
+        }),
+      ),
+    };
+    const module = stubModule({ updateNodeSpec });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerBody),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("WorkflowNodeNotMutable");
+  });
+
+  it("maps WorkflowNodeNotFound to 404", async () => {
+    const updateNodeSpec = {
+      execute: vi.fn(() =>
+        errAsync({ type: "WorkflowNodeNotFound" as const, workflowId: WID, nodeId: WORKER_NID }),
+      ),
+    };
+    const module = stubModule({ updateNodeSpec });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerBody),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("maps WorkflowAlreadyTerminal to 409", async () => {
+    const updateNodeSpec = {
+      execute: vi.fn(() =>
+        errAsync({
+          type: "WorkflowAlreadyTerminal" as const,
+          workflowId: WID,
+          status: "succeeded" as const,
+        }),
+      ),
+    };
+    const module = stubModule({ updateNodeSpec });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerBody),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("maps NodeSpecError to 422", async () => {
+    const updateNodeSpec = {
+      execute: vi.fn(() =>
+        errAsync({
+          type: "NodeSpecError" as const,
+          nodeKind: "worker" as const,
+          reason: "agent not found: ghost",
+          cause: new WorkflowCoordSpecError("agent not found: ghost"),
+        }),
+      ),
+    };
+    const module = stubModule({ updateNodeSpec });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerBody),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("rejects an empty patch with 400", async () => {
+    const module = stubModule({ updateNodeSpec: { execute: vi.fn() } });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: { kind: "worker", patch: {} } }),
+    });
+    expect(res.status).toBe(400);
+    expect(module.updateNodeSpec.execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown patch key with 400", async () => {
+    const module = stubModule({ updateNodeSpec: { execute: vi.fn() } });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${WORKER_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target: { kind: "worker", patch: { bogus: "x" } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(module.updateNodeSpec.execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects a coordinator target kind with 400", async () => {
+    const module = stubModule({ updateNodeSpec: { execute: vi.fn() } });
+    const res = await mountRoutes(module).request(`/${WID}/nodes/${COORD_NID}/spec`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target: { kind: "coordinator", patch: { agent: "x" } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(module.updateNodeSpec.execute).not.toHaveBeenCalled();
   });
 });
 

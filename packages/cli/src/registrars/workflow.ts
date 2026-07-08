@@ -8,9 +8,10 @@
  * for the design rationale behind each flag.
  *
  * Mutation primitives: add-node / add-subgraph / add-edge / prune-subgraph /
- * cancel-node / finish — the DAG-growth + terminal primitives a coord agent
- * calls via HTTP from its task. Only still-`not_started` nodes can be retracted
- * (prune-subgraph); started / terminal nodes are immutable.
+ * update-spec / cancel-node / finish — the DAG-growth + terminal primitives a
+ * coord agent calls via HTTP from its task. A still-`not_started` node can be
+ * retracted (prune-subgraph) or have its spec patched (update-spec);
+ * started / terminal nodes are immutable.
  */
 
 import { readFileSync } from "node:fs";
@@ -30,6 +31,7 @@ import {
   workflowRespond,
   workflowRm,
   workflowShow,
+  workflowUpdateSpec,
 } from "../commands/workflow.js";
 import {
   optionalString,
@@ -204,6 +206,21 @@ export function registerWorkflowCommands(program: Command, slot: Slot): void {
       slot.result = await workflowPruneSubgraph(workflowId, {
         ...parseWorkspaceFlags(opts),
         specFile: pickString(opts, "specFile") ?? "",
+      });
+    });
+
+  withWorkspaceFlags(workflowCmd.command("update-spec"))
+    .description("Coord-only: patch a not-started worker/human node's spec (partial, whitelisted)")
+    .argument("<workflow-id>", "Workflow id")
+    .argument("<node-id>", "Node id (must be not_started; coordinator nodes are rejected)")
+    .requiredOption(
+      "--patch <path>",
+      "Path to a JSON file with the partial patch — either { patch: {...} } or the patch object directly",
+    )
+    .action(async (workflowId: string, nodeId: string, opts: Record<string, unknown>) => {
+      slot.result = await workflowUpdateSpec(workflowId, nodeId, {
+        ...parseWorkspaceFlags(opts),
+        patch: pickString(opts, "patch") ?? "",
       });
     });
 

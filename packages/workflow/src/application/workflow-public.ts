@@ -40,6 +40,10 @@ export {
   WorkflowNodeRetryMetadataSchema,
   WorkflowNodeRetryReasonSchema,
 } from "../domain/node/workflow-node-retry.js";
+export {
+  assertNodeSpecUpdatable,
+  type NodeSpecUpdateGuardError,
+} from "../domain/node/workflow-node-spec-update.js";
 export type {
   TerminalWorkflowNodeStatus,
   WorkflowNodeStatus,
@@ -85,7 +89,9 @@ export {
   WorkflowEntity,
 } from "../domain/workflow/workflow-entity.js";
 export type {
+  CoordSpecNotEditable,
   EmptyParents,
+  NodeKindMismatch,
   SubgraphError,
   WorkflowDagConflict,
   WorkflowNodeNotFound,

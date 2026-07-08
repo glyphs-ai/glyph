@@ -100,6 +100,15 @@ export class WorkflowNodeEntity {
     );
   }
 
+  /**
+   * Replace the node's spec with a runner-validated `spec`. Only a
+   * still-`not_started` node reaches this path (enforced by the
+   * spec-update guard), so the swap is safe and self-contained.
+   */
+  withPatchedSpec(spec: unknown): WorkflowNodeEntity {
+    return this.withPatch({ spec });
+  }
+
   get id(): WorkflowNodeId {
     return this._id;
   }

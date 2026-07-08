@@ -2,14 +2,14 @@
 name: workflow-coordination
 scope: official
 description: "Generic workflow-coordinator framework — operating model, DAG introspection patterns, verdict.json schema, brief-plumbing meta-pattern, and authoring guidance for strategy skills"
-version: 0.5.1
+version: 0.6.0
 ---
 
 # Glyph Workflow Coordination Skill
 
 The framework every workflow coordinator wake-up loads: how to read the DAG, what schema reviewer workers emit in `verdict.json`, how to plumb context into worker briefs, and how to author a sibling strategy skill. The case bank, brief templates, and stop condition for any given workflow live in a sibling **strategy skill**; the scaffolding here is strategy-agnostic.
 
-CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `prune-subgraph`, `finish`, `task list`, `task show`) are stable command names — consult your catalog's CLI skill for exact flags.
+CLI invocations cited below (`workflow show`, `dag`, `node-show`, `add-subgraph`, `prune-subgraph`, `update-spec`, `finish`, `task list`, `task show`) are stable command names — consult your catalog's CLI skill for exact flags.
 
 ---
 
@@ -188,6 +188,22 @@ The substrate removes those nodes **and every edge touching them** in one transa
 | `rootCoordProtected` | A target is the phase-0 bootstrap coordinator. | Never prune the root; it anchors the whole DAG. |
 | `orphan` | Removing the batch would strand a surviving node with no parents. `reason.nodeId` is the would-be orphan. | Include the orphan in the same prune batch, or keep the parent it depends on. |
 | `coordChainBroken` | A surviving coordinator would keep only worker parents (its coord parent was pruned). `reason.nodeId` is that coord. | Prune the dependent coord in the same batch, or keep a coord parent for it. |
+
+### Correct a not_started node's spec via update-spec
+
+Not every mistake needs a retract-and-rebuild. When a queued `not_started` node is structurally right but its **spec** is wrong — a typo in a brief, a brief that needs tightening, the wrong worker `agent`, a human `prompt`/`choices` tweak — patch it in place with `workflow update-spec` instead of pruning and re-adding. Patching preserves the node's id and all its edges; prune+re-add churns both and can re-wake the wrong coord.
+
+Decide by what's changing:
+
+- **Spec only, same kind, same edges → `update-spec`.** A partial overlay: name only the fields that change; the rest keep their prior value.
+- **Kind change, or any edge/parent restructure → prune + re-add.** `update-spec` cannot change a node's `kind` and never touches edges. Retract via `prune-subgraph` and re-queue the corrected shape via `add-subgraph`.
+- **Node already dispatched (`ready`/`running`/terminal) → neither.** A started node is real work; its spec is frozen. `cancel-node` the worker and queue a replacement if the plan changed.
+
+One hard rule:
+
+- **Never patch a coordinator node.** Coordinator specs are system-owned — the substrate rejects a coord `update-spec`. A wrong coordinator is a graph-structure problem: prune the coord (and its dependents) and re-plan, don't try to edit it.
+
+Exact flags and body shape live in the `official/cli` skill (`workflow update-spec`); this section is *when*, not *how*.
 
 ---
 
