@@ -43,19 +43,28 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     ],
     bps: true,
     folderMillis: 3,
-    hash: "8390805dad532b541ec56fadca7459a002c717d9f9ee25753b4e7d6caad9a72d",
+    hash: "994e7649884854299a619d9e3d7d38e9831940fed69b48f08b6201d37847c006",
   },
 ];
 
 /**
  * Apply migrations against a libsql `client` using `batch(..., "write")`,
- * which runs each migration's statements atomically on the single client
- * connection.
+ * which runs each migration's statements atomically on the *single* client
+ * connection. This is deliberately NOT drizzle's `migrate()` (from
+ * `drizzle-orm/libsql/migrator`): that opens a separate interactive-transaction
+ * connection, which a plain `:memory:` url cannot share (every libsql
+ * connection is its own in-memory db) — so drizzle's migrator can only run
+ * against a file. Batch keeps a single connection, so the same applier works
+ * for both file and `:memory:` (tests), with no leaked transaction handle.
  *
- * **Per-pkg journal table**: `__drizzle_migrations_task`.
- * Each entity pkg owns its own table so co-tenant pkgs in one SQLite file
- * apply independently; the `created_at` watermark skips already-applied
+ * **Per-pkg journal table**: `__drizzle_migrations_task`. Each
+ * entity pkg owns its own table so co-tenant pkgs in one SQLite file apply
+ * independently; the `created_at` watermark skips already-applied
  * migrations.
+ *
+ * This package's journal table is `__drizzle_migrations_task`; its
+ * migrations share one lineage with the `tasks` schema in a shared
+ * workspace.db.
  */
 export async function applyTaskMigrations(client: Client): Promise<void> {
   await client.execute(

@@ -20,12 +20,17 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
 
 /**
  * Apply migrations against a libsql `client` using `batch(..., "write")`,
- * which runs each migration's statements atomically on the single client
- * connection.
+ * which runs each migration's statements atomically on the *single* client
+ * connection. This is deliberately NOT drizzle's `migrate()` (from
+ * `drizzle-orm/libsql/migrator`): that opens a separate interactive-transaction
+ * connection, which a plain `:memory:` url cannot share (every libsql
+ * connection is its own in-memory db) — so drizzle's migrator can only run
+ * against a file. Batch keeps a single connection, so the same applier works
+ * for both file and `:memory:` (tests), with no leaked transaction handle.
  *
- * **Per-pkg journal table**: `__drizzle_migrations___PKG__`.
- * Each entity pkg owns its own table so co-tenant pkgs in one SQLite file
- * apply independently; the `created_at` watermark skips already-applied
+ * **Per-pkg journal table**: `__drizzle_migrations___PKG__`. Each
+ * entity pkg owns its own table so co-tenant pkgs in one SQLite file apply
+ * independently; the `created_at` watermark skips already-applied
  * migrations.
  */
 export async function apply__Entity__Migrations(client: Client): Promise<void> {

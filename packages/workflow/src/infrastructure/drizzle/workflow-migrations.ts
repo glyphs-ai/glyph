@@ -63,14 +63,24 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     ],
     bps: true,
     folderMillis: 5,
-    hash: "cb8b6a4b630981e32a6d8abfd0cc17e62ff3aa626f91d8887102710f5ae28a1c",
+    hash: "46c62fddcf1bb752532a7225596712f9f693c5e7b42ffce5fd9a10a09968305a",
   },
 ];
 
 /**
- * Apply migrations against a libsql `client` using `batch(..., "write")`.
+ * Apply migrations against a libsql `client` using `batch(..., "write")`,
+ * which runs each migration's statements atomically on the *single* client
+ * connection. This is deliberately NOT drizzle's `migrate()` (from
+ * `drizzle-orm/libsql/migrator`): that opens a separate interactive-transaction
+ * connection, which a plain `:memory:` url cannot share (every libsql
+ * connection is its own in-memory db) — so drizzle's migrator can only run
+ * against a file. Batch keeps a single connection, so the same applier works
+ * for both file and `:memory:` (tests), with no leaked transaction handle.
  *
- * **Per-pkg journal table**: `__drizzle_migrations_workflow`.
+ * **Per-pkg journal table**: `__drizzle_migrations_workflow`. Each
+ * entity pkg owns its own table so co-tenant pkgs in one SQLite file apply
+ * independently; the `created_at` watermark skips already-applied
+ * migrations.
  */
 export async function applyWorkflowMigrations(client: Client): Promise<void> {
   await client.execute(

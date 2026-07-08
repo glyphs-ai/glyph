@@ -685,10 +685,7 @@ file and break it, that's a `git restore` away (if you're lucky) or a
   when a side-effect needs verification (e.g. confirming the
   service routes a write through the atomic-write helper rather
   than `fs.writeFile` directly).
-- Vitest runs in `forks` pool across every pkg. better-sqlite3's
-  native binding segfaults on worker-thread teardown on Windows;
-  forks isolate per-file with a separate process so the segfault
-  becomes a localised failure instead of a workspace-wide outage.
+- Vitest runs in `forks` pool across every pkg. libsql's native binding requires process-level isolation on Windows.
 
 ## Coding conventions
 
