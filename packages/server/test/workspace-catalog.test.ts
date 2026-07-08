@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Application } from "@glyphs-ai/api";
@@ -8,6 +8,7 @@ import type { WorkspaceModule, WorkspaceName } from "@glyphs-ai/workspace";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  rmScratch,
   type ServerTestSubsystem,
   setupTestSubsystem,
   teardownTestSubsystem,
@@ -26,7 +27,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await teardownTestSubsystem(sys);
-  await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+  await rmScratch(scratch);
 });
 
 async function ensureWorkspace(name: string): Promise<{ id: string; workspaceDir: string }> {

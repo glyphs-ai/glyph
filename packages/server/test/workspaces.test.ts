@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { workspacesRoutes } from "@glyphs-ai/api";
@@ -9,6 +9,7 @@ import { requestId } from "../src/middleware/request-id.js";
 import { requestLogger } from "../src/middleware/request-logger.js";
 import { captureLogger } from "./_capture-logger.js";
 import {
+  rmScratch,
   type ServerTestSubsystem,
   setupTestSubsystem,
   teardownTestSubsystem,
@@ -24,7 +25,7 @@ afterEach(async () => {
   for (const sys of openSubsystems.splice(0)) {
     await teardownTestSubsystem(sys);
   }
-  await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+  await rmScratch(scratch);
 });
 
 async function makeApp() {
