@@ -48,4 +48,4 @@ export {
   type List__Entity__sResponse,
   List__Entity__sResponseSchema,
 } from "./application/list-__entity-kebab__s.js";
-export { type Db, openDb } from "./infrastructure/drizzle/__entity-kebab__-db.js";
+export type { Db } from "./infrastructure/drizzle/__entity-kebab__-db.js";

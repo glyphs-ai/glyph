@@ -8,13 +8,13 @@ import { SessionIdSchema } from "../../src/domain/session-id.js";
 import type { DatabaseUnavailable } from "../../src/domain/session-repository.js";
 import type { SessionSandbox } from "../../src/domain/session-sandbox.js";
 import type { Db } from "../../src/infrastructure/drizzle/session-db.js";
-import { openDb } from "../../src/infrastructure/drizzle/session-db.js";
 import { SessionMapper } from "../../src/infrastructure/drizzle/session-mapper.js";
 import {
   DrizzleSessionQueries,
   type SessionQueries,
 } from "../../src/infrastructure/drizzle/session-queries.js";
 import { sessions } from "../../src/infrastructure/drizzle/session-schema.js";
+import { openTestDb } from "../testing.js";
 
 const NEWER = SessionIdSchema.parse("20260510-aaaaaaaa");
 const OLDER = SessionIdSchema.parse("20260508-bbbbbbbb");
@@ -50,7 +50,7 @@ async function setup(): Promise<{
   readonly runtime: MockProxy<Runtime>;
   readonly sandbox: MockProxy<SessionSandbox>;
 }> {
-  const { db } = await openDb(":memory:");
+  const { db } = await openTestDb(":memory:");
   const runtimeRegistry = mock<RuntimeRegistry>();
   const runtime = mock<Runtime>();
   const sandbox = mock<SessionSandbox>();

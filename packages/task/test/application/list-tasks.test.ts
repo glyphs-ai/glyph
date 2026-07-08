@@ -4,9 +4,9 @@ import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import { TaskEntity } from "../../src/domain/task-entity.js";
 import { TaskIdSchema } from "../../src/domain/task-id.js";
 import type { Db } from "../../src/infrastructure/drizzle/task-db.js";
-import { openDb } from "../../src/infrastructure/drizzle/task-db.js";
 import { DrizzleTaskQueries } from "../../src/infrastructure/drizzle/task-queries.js";
 import { DrizzleTaskRepository } from "../../src/infrastructure/drizzle/task-repository.js";
+import { openTestDb } from "../testing.js";
 
 let db: Db;
 let closeDb: () => void = () => {};
@@ -14,7 +14,7 @@ let repo: DrizzleTaskRepository;
 let useCase: ListTasksUseCase;
 
 beforeEach(async () => {
-  const opened = await openDb(":memory:");
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   closeDb = opened.close;
   repo = new DrizzleTaskRepository({ db });
@@ -165,7 +165,7 @@ describe("ListTasksUseCase — origin scoping", () => {
     );
 
     // A second, independent workspace db with a colliding origin pair.
-    const other = await openDb(":memory:");
+    const other = await openTestDb(":memory:");
     try {
       const otherRepo = new DrizzleTaskRepository({ db: other.db });
       const otherUseCase = new ListTasksUseCase({

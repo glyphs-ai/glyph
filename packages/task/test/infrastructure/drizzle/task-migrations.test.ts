@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openDb } from "../../../src/infrastructure/drizzle/task-db.js";
+import { openTestDb } from "../../testing.js";
 
 async function removeDir(path: string): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -39,9 +39,9 @@ afterEach(async () => {
   await removeDir(dir);
 });
 
-describe("openDb / applyTaskMigrations", () => {
+describe("openTestDb / applyTaskMigrations", () => {
   it("creates the tasks table with the origin_id column and the task journal", async () => {
-    const { close } = await openDb(dbFile);
+    const { close } = await openTestDb(dbFile);
     close();
 
     raw = createClient({ url: `file:${dbFile}` });
@@ -84,8 +84,8 @@ describe("openDb / applyTaskMigrations", () => {
   });
 
   it("is idempotent — reopening an already-migrated file does not throw", async () => {
-    (await openDb(dbFile)).close();
-    const reopened = await openDb(dbFile);
+    (await openTestDb(dbFile)).close();
+    const reopened = await openTestDb(dbFile);
     reopened.close();
   });
 });

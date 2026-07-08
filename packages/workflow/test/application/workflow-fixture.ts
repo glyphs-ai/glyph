@@ -39,10 +39,11 @@ import {
 import type { WorkflowNodeKind } from "../../src/domain/node/workflow-node-kind.js";
 import type { WorkflowNodeStatus } from "../../src/domain/node/workflow-node-status.js";
 import { type WorkflowId, WorkflowIdSchema } from "../../src/domain/workflow/workflow-id.js";
-import { type Db, openDb } from "../../src/infrastructure/drizzle/workflow-db.js";
+import type { Db } from "../../src/infrastructure/drizzle/workflow-db.js";
 import { workflowNodes } from "../../src/infrastructure/drizzle/workflow-schema.js";
 import { workflowRoot } from "../../src/infrastructure/file/workflow-sandbox.js";
 import { composeWorkflowModule, type WorkflowModule } from "../../src/workflow-module.js";
+import { openTestDb } from "../testing.js";
 
 export interface ValidateCall {
   readonly spec: unknown;
@@ -155,7 +156,7 @@ export async function buildWorkflowFixture(
     readonly humanRunner?: StubRunner;
   } = {},
 ): Promise<WorkflowFixture> {
-  const { db, close: closeDb } = await openDb(":memory:");
+  const { db, close: closeDb } = await openTestDb(":memory:");
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-test-"));
   // Mirror @glyphs-ai/workspace's `register` provisioning step: create the
   // `workflows/` parent that `WorkflowSandbox.reserve` assumes exists (it

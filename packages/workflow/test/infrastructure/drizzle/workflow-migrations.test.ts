@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Client, createClient } from "@libsql/client";
 import { describe, expect, it } from "vitest";
-import { openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
 import {
   applyWorkflowMigrations,
   MIGRATIONS,
 } from "../../../src/infrastructure/drizzle/workflow-migrations.js";
+import { openTestDb } from "../../testing.js";
 
 async function removeDir(path: string): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -35,7 +35,7 @@ async function openMigratedFileDb(): Promise<{
 }> {
   const dir = mkdtempSync(join(tmpdir(), "wf-mig-"));
   const dbFile = join(dir, "workspace.db");
-  const { close } = await openDb(dbFile);
+  const { close } = await openTestDb(dbFile);
   close();
   const client = createClient({ url: `file:${dbFile}` });
   return {

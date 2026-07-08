@@ -4,13 +4,13 @@ import { RecoverOrphanedTasksUseCase } from "../../src/application/recover-orpha
 import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import { TaskEntity } from "../../src/domain/task-entity.js";
 import { TaskIdSchema } from "../../src/domain/task-id.js";
-import { openDb } from "../../src/infrastructure/drizzle/task-db.js";
 import {
   DrizzleTaskQueries,
   type TaskQueries,
 } from "../../src/infrastructure/drizzle/task-queries.js";
 import { DrizzleTaskRepository } from "../../src/infrastructure/drizzle/task-repository.js";
 import { tasks } from "../../src/infrastructure/drizzle/task-schema.js";
+import { openTestDb } from "../testing.js";
 import { captureLogger } from "./task-fixture.js";
 
 const CREATED_AT = "2026-05-08T01:05:00.000Z";
@@ -21,7 +21,7 @@ let useCase: RecoverOrphanedTasksUseCase;
 let closeDb: () => void = () => {};
 
 beforeEach(async () => {
-  const { db, close } = await openDb(":memory:");
+  const { db, close } = await openTestDb(":memory:");
   closeDb = close;
   repo = new DrizzleTaskRepository({ db });
   query = new DrizzleTaskQueries({ db });

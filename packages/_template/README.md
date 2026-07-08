@@ -24,12 +24,12 @@ read-side query seam:
         __entity-kebab__-public.ts         # named public domain/error re-exports
       infrastructure/drizzle/          # adapters implementing ports/seams
         __entity-kebab__-schema.ts         # drizzle table
-        __entity-kebab__-db.ts             # openDb -> { db, close }
+        __entity-kebab__-db.ts             # Db type + apply__Entity__Migrations re-export
         __entity-kebab__-migrations.ts     # AUTO-GENERATED from drizzle/*.sql (never hand-edit)
         __entity-kebab__-mapper.ts         # row <-> entity mapper
         __entity-kebab__-repository.ts     # write-side Drizzle adapter
         __entity-kebab__-queries.ts        # read-side Drizzle query seam
-      __entity-kebab__-module.ts       # composition root: compose__Entity__Module({ dbFile })
+      __entity-kebab__-module.ts       # composition root: compose__Entity__Module({ db })
       index.ts                         # named public surface; no export *
     test/                              # mirrors src/ 1:1; test data is inlined (no fixtures/helpers)
 

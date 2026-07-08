@@ -7,13 +7,14 @@ import {
 import { WorkflowBriefSchema } from "../../../src/domain/workflow/workflow-brief.js";
 import { WorkflowEntity } from "../../../src/domain/workflow/workflow-entity.js";
 import { type WorkflowId, WorkflowIdSchema } from "../../../src/domain/workflow/workflow-id.js";
-import { type Db, openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
+import type { Db } from "../../../src/infrastructure/drizzle/workflow-db.js";
 import { DrizzleWorkflowRepository } from "../../../src/infrastructure/drizzle/workflow-repository.js";
 import {
   workflowEdges,
   workflowNodes,
   workflows,
 } from "../../../src/infrastructure/drizzle/workflow-schema.js";
+import { openTestDb } from "../../testing.js";
 
 const NOW = "2026-06-07T00:00:00.000Z";
 const NODE_UUIDS = [
@@ -74,7 +75,7 @@ let close: () => void;
 let repo: DrizzleWorkflowRepository;
 
 beforeEach(async () => {
-  ({ db, close } = await openDb(":memory:"));
+  ({ db, close } = await openTestDb(":memory:"));
   repo = new DrizzleWorkflowRepository({ db });
 });
 

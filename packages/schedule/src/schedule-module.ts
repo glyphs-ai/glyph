@@ -9,7 +9,7 @@ import { PatchScheduleUseCase } from "./application/patch-schedule.js";
 import { DefaultScheduleKindRegistry } from "./application/ports/schedule-kind-registry.js";
 import { PreviewScheduleUseCase } from "./application/preview-schedule.js";
 import { RunScheduleUseCase } from "./application/run-schedule.js";
-import { type Db, openDb } from "./infrastructure/drizzle/schedule-db.js";
+import type { Db } from "./infrastructure/drizzle/schedule-db.js";
 import { DrizzleScheduleQueries } from "./infrastructure/drizzle/schedule-queries.js";
 import { DrizzleScheduleRepository } from "./infrastructure/drizzle/schedule-repository.js";
 
@@ -22,8 +22,8 @@ import { DrizzleScheduleRepository } from "./infrastructure/drizzle/schedule-rep
  * drive its lifecycle: register every kind via `engine.registerKind(...)` BEFORE
  * `engine.recover()` (recover freezes the registry and preflights every row's
  * `target_kind`). `close()` shuts the engine down (clearing timers, awaiting
- * in-flight fires) BEFORE releasing the SQLite handle — an in-flight fire
- * callback would otherwise wake onto a closed db.
+ * in-flight fires) so no in-flight fire callback wakes onto a closed db after
+ * the host releases the shared handle.
  */
 export interface ScheduleModule {
   readonly createSchedule: CreateScheduleUseCase;
@@ -35,14 +35,12 @@ export interface ScheduleModule {
   readonly previewSchedule: PreviewScheduleUseCase;
   /** The stateful scheduler; hosts drive registerKind / recover / shutdown. */
   readonly engine: ScheduleEngine;
-  /** Shut the engine down, then close the module-owned SQLite connection. */
+  /** Shut the engine down. The host owns and closes the shared connection. */
   close(): Promise<void>;
 }
 
-export type ScheduleModuleOptions = (
-  | { readonly db: Db; readonly dbFile?: never }
-  | { readonly dbFile: string; readonly db?: never }
-) & {
+export type ScheduleModuleOptions = {
+  readonly db: Db;
   readonly logger?: Logger;
   /** Test seam: clock for id generation + timestamps. */
   readonly now?: () => Date;
@@ -51,25 +49,16 @@ export type ScheduleModuleOptions = (
 };
 
 /**
- * Open the schedule DB (WAL + migrations) and assemble the module. Production
- * callers pass `dbFile` (the per-workspace `workspace.db`); tests pass an
- * existing `db` (e.g. `:memory:`) which the module does NOT close.
+ * Assemble the module around a caller-provided drizzle handle over the
+ * per-workspace `workspace.db`. The host owns the connection lifecycle;
+ * package tests build one via `openTestDb` in `test/testing.ts`.
  */
 export async function composeScheduleModule(opts: ScheduleModuleOptions): Promise<ScheduleModule> {
   const logger = opts.logger ?? pino({ level: "silent" });
   const now = opts.now ?? (() => new Date());
   const randomUUID = opts.randomUUID ?? cryptoRandomUUID;
 
-  let db: Db;
-  let closeDb: () => void;
-  if ("db" in opts && opts.db !== undefined) {
-    db = opts.db;
-    closeDb = () => {};
-  } else {
-    const opened = await openDb(opts.dbFile as string);
-    db = opened.db;
-    closeDb = opened.close;
-  }
+  const { db } = opts;
 
   const registry = new DefaultScheduleKindRegistry();
   const repo = new DrizzleScheduleRepository({ db });
@@ -87,7 +76,6 @@ export async function composeScheduleModule(opts: ScheduleModuleOptions): Promis
     engine,
     async close() {
       await engine.shutdown();
-      closeDb();
     },
   };
 }

@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Client, createClient } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openDb } from "../../../src/infrastructure/drizzle/schedule-db.js";
 import { MIGRATIONS } from "../../../src/infrastructure/drizzle/schedule-migrations.js";
+import { openTestDb } from "../../testing.js";
 
 async function removeDir(path: string): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -59,7 +59,7 @@ describe("schedules migrations inventory", () => {
   });
 });
 
-describe("openDb / applyScheduleMigrations", () => {
+describe("openTestDb / applyScheduleMigrations", () => {
   let dir: string;
   let dbFile: string;
   let raw: Client;
@@ -67,7 +67,7 @@ describe("openDb / applyScheduleMigrations", () => {
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "schedule-mig-"));
     dbFile = join(dir, "workspace.db");
-    const { close } = await openDb(dbFile);
+    const { close } = await openTestDb(dbFile);
     close();
     raw = createClient({ url: `file:${dbFile}` });
   });

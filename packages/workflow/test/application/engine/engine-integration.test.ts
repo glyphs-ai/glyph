@@ -37,9 +37,9 @@ import type {
 } from "../../../src/application/ports/workflow-node-runner.js";
 import type { DatabaseUnavailable } from "../../../src/domain/workflow/workflow-repository.js";
 import type { WorkflowId, WorkflowNodeId } from "../../../src/index.js";
-import { openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
 import { workflowRoot } from "../../../src/infrastructure/file/workflow-sandbox.js";
 import { composeWorkflowModule, type WorkflowModule } from "../../../src/workflow-module.js";
+import { openTestDb } from "../../testing.js";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -147,7 +147,7 @@ interface Harness {
 async function makeHarness(): Promise<Harness> {
   const coord = makeAutoSucceedRunner("coord");
   const worker = makeAutoSucceedRunner("worker");
-  const dbHandle = await openDb(":memory:");
+  const dbHandle = await openTestDb(":memory:");
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-engine-test-"));
   // Mirror the workspace provisioner: createWorkflow now requires
   // `workflows/` to exist (mkdir leaf is `{recursive: false}`).

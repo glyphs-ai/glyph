@@ -30,9 +30,9 @@ import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import type { TaskEntity } from "../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../src/domain/task-id.js";
 import { TERMINAL_TASK_STATUSES } from "../../src/domain/task-status.js";
-import { openDb } from "../../src/infrastructure/drizzle/task-db.js";
 import { DrizzleTaskRepository } from "../../src/infrastructure/drizzle/task-repository.js";
 import { LocalTaskSandbox, tasksRoot } from "../../src/infrastructure/file/local-task-sandbox.js";
+import { openTestDb } from "../testing.js";
 
 export const RESOLVED: ResolvedAgent = { agent: { fqn: "demo" }, skills: [], mcps: [] };
 
@@ -119,7 +119,7 @@ export async function buildSupervisorFixture(
   // The workspace provisioner pre-creates `<workspaceDir>/tasks/` in prod;
   // reserve uses {recursive:false} so the test must create it too.
   mkdirSync(tasksRoot(workspaceDir), { recursive: true });
-  const { db, close } = await openDb(":memory:");
+  const { db, close } = await openTestDb(":memory:");
   const repo = new DrizzleTaskRepository({ db });
   const sandbox = new LocalTaskSandbox({ root: tasksRoot(workspaceDir) });
   const runtime = new FakeHeadlessRuntime();

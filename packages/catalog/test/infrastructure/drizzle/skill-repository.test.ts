@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { SkillEntity } from "../../../src/domain/skill-entity.js";
 import type { SkillFqn } from "../../../src/domain/skill-fqn.js";
-import { openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
 import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
+import { openTestDb } from "../../testing.js";
 
 /**
- * In-memory SQLite (migrations applied by `openDb`). Exercises the write-side
+ * In-memory SQLite (migrations applied by `openTestDb`). Exercises the write-side
  * triad — get (load aggregate) / save (row + dep edges + file tree) / delete.
  * Read projections are covered by the application-layer queries tests.
  */
 let repo: DrizzleSkillRepository;
 
 beforeEach(async () => {
-  repo = new DrizzleSkillRepository({ db: await (await openDb(":memory:")).db });
+  repo = new DrizzleSkillRepository({ db: await (await openTestDb(":memory:")).db });
 });
 
 const NOW = "2025-01-01T00:00:00.000Z";

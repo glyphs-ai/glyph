@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Client, createClient } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
+import { openTestDb } from "../../testing.js";
 
 async function removeDir(path: string): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -39,7 +39,7 @@ let client: Client;
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "wf-schema-"));
   const dbFile = join(dir, "workspace.db");
-  const { close } = await openDb(dbFile);
+  const { close } = await openTestDb(dbFile);
   close();
   client = createClient({ url: `file:${dbFile}` });
 });

@@ -19,7 +19,7 @@ import { RecoverOrphanedTasksUseCase } from "./application/recover-orphaned-task
 import { ResolveArtifactPathUseCase } from "./application/resolve-artifact-path.js";
 import { InMemoryLiveProcessRegistry } from "./application/supervision/in-memory-live-process-registry.js";
 import { TaskSupervisor } from "./application/supervision/task-supervisor.js";
-import { type Db, openDb } from "./infrastructure/drizzle/task-db.js";
+import type { Db } from "./infrastructure/drizzle/task-db.js";
 import { DrizzleTaskQueries } from "./infrastructure/drizzle/task-queries.js";
 import { DrizzleTaskRepository } from "./infrastructure/drizzle/task-repository.js";
 import { LocalTaskSandbox, tasksRoot } from "./infrastructure/file/local-task-sandbox.js";
@@ -49,14 +49,12 @@ export interface TaskModule {
   liveCount(): number;
   /** Kill live subprocesses, drain exit watchers, and stop accepting new dispatches. */
   shutdown(): Promise<void>;
-  /** Close the underlying SQLite connection. Does NOT stop subprocesses — call `shutdown` first. */
+  /** No-op on the DB — the host owns the connection. Does NOT stop subprocesses; call `shutdown` first. */
   close(): Promise<void>;
 }
 
-export type TaskModuleOptions = (
-  | { readonly db: Db; readonly dbFile?: never }
-  | { readonly dbFile: string; readonly db?: never }
-) & {
+export type TaskModuleOptions = {
+  readonly db: Db;
   /** Resolves catalog agents (adapter over `@glyphs-ai/catalog`, wired by the host). */
   readonly agentResolver: AgentResolver;
   /** Supplies agent/skill/mcp bytes to `runtime.launchHeadless` (catalog satisfies it). */
@@ -74,22 +72,14 @@ export type TaskModuleOptions = (
 };
 
 /**
- * Open the task DB (WAL + migrations) and assemble the module. The file is
- * the per-workspace `workspace.db`; tests pass `:memory:`. The `TaskSupervisor`
+ * Assemble the module around a caller-provided drizzle handle over the
+ * per-workspace `workspace.db`. The host owns the connection; package tests
+ * build one via `openTestDb` in `test/testing.ts`. The `TaskSupervisor`
  * is the single stateful dependency shared by the dispatch / cancel / delete
  * use-cases.
  */
 export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskModule> {
-  let db: Db;
-  let closeDb: () => void;
-  if ("db" in opts && opts.db !== undefined) {
-    db = opts.db;
-    closeDb = () => {};
-  } else {
-    const opened = await openDb(opts.dbFile as string);
-    db = opened.db;
-    closeDb = opened.close;
-  }
+  const { db } = opts;
   const logger = opts.logger ?? pino({ level: "silent" });
   const now = opts.now ?? (() => new Date());
   const randomBytes = opts.randomBytes ?? cryptoRandomBytes;
@@ -149,7 +139,7 @@ export async function composeTaskModule(opts: TaskModuleOptions): Promise<TaskMo
       return supervisor.shutdown();
     },
     async close() {
-      closeDb();
+      // The host owns the shared connection; the module holds no handle to close.
     },
   };
 }

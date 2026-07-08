@@ -2,17 +2,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AgentEntity } from "../../../src/domain/agent-entity.js";
 import type { AgentFqn } from "../../../src/domain/agent-fqn.js";
 import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
-import { openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import { openTestDb } from "../../testing.js";
 
 /**
- * In-memory SQLite (migrations applied by `openDb`). Exercises the write-side
+ * In-memory SQLite (migrations applied by `openTestDb`). Exercises the write-side
  * triad — get (load aggregate) / save (row + dep edges + file tree) / delete.
  * Read projections are covered by the application-layer queries tests.
  */
 let repo: DrizzleAgentRepository;
 
 beforeEach(async () => {
-  repo = new DrizzleAgentRepository({ db: await (await openDb(":memory:")).db });
+  repo = new DrizzleAgentRepository({ db: await (await openTestDb(":memory:")).db });
 });
 
 const NOW = "2025-01-01T00:00:00.000Z";

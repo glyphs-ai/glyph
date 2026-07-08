@@ -66,7 +66,7 @@ packages/catalog/src/
   infrastructure/drizzle/   persistence adapter (sole DB syscall site)
     catalog-schema.ts        Drizzle tables (private; only types exported)
     catalog-migrations.ts    applyCatalogMigrations
-    catalog-db.ts            openDb(dbFile): prod + test factory
+    catalog-db.ts            Db type + applyCatalogMigrations re-export
     agent-repository.ts      per-entity repository (skill / mcp mirror)
   infrastructure/source/    outbound content adapter (origin → bytes): File / GitHub / ADO
 drizzle/                   generated SQL migrations (committed)

@@ -7,9 +7,9 @@ import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import { TaskEntity } from "../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../src/domain/task-id.js";
 import type { Db } from "../../src/infrastructure/drizzle/task-db.js";
-import { openDb } from "../../src/infrastructure/drizzle/task-db.js";
 import { DrizzleTaskQueries } from "../../src/infrastructure/drizzle/task-queries.js";
 import { DrizzleTaskRepository } from "../../src/infrastructure/drizzle/task-repository.js";
+import { openTestDb } from "../testing.js";
 
 const ID: TaskId = TaskIdSchema.parse("20260508-00000001");
 const CREATED_AT = "2026-05-08T01:05:00.000Z";
@@ -22,7 +22,7 @@ let runtime: MockProxy<Runtime & { streamActivity: NonNullable<Runtime["streamAc
 let useCase: GetTaskActivityStreamUseCase;
 
 beforeEach(async () => {
-  const opened = await openDb(":memory:");
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   closeDb = opened.close;
   repo = new DrizzleTaskRepository({ db });

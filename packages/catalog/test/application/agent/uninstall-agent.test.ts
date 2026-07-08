@@ -3,8 +3,9 @@ import { UninstallAgentUseCase } from "../../../src/application/agent/uninstall-
 import { AgentEntity, type AgentEntityArgs } from "../../../src/domain/agent-entity.js";
 import { AgentFqnSchema } from "../../../src/domain/agent-fqn.js";
 import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
-import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import type { Db } from "../../../src/infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
+import { openTestDb } from "../../testing.js";
 
 const AGENT_ID = AgentFqnSchema.parse("public/triage");
 const DEPENDENT_AGENT_ID = AgentFqnSchema.parse("public/reviewer");
@@ -31,7 +32,7 @@ let agentRepo: DrizzleAgentRepository;
 let useCase: UninstallAgentUseCase;
 
 beforeEach(async () => {
-  const opened = await openDb(":memory:");
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   close = opened.close;
   agentRepo = new DrizzleAgentRepository({ db });

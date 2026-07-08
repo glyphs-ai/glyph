@@ -40,7 +40,7 @@ import { ListSkillFilesUseCase } from "./application/skill/list-skill-files.js";
 import { ListSkillsUseCase } from "./application/skill/list-skills.js";
 import { UninstallSkillUseCase } from "./application/skill/uninstall-skill.js";
 import { DrizzleAgentRepository } from "./infrastructure/drizzle/agent-repository.js";
-import { type Db, openDb } from "./infrastructure/drizzle/catalog-db.js";
+import type { Db } from "./infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "./infrastructure/drizzle/catalog-queries.js";
 import { DrizzleMcpRepository } from "./infrastructure/drizzle/mcp-repository.js";
 import { DrizzleSkillRepository } from "./infrastructure/drizzle/skill-repository.js";
@@ -49,9 +49,7 @@ import { JsonMcpSource } from "./infrastructure/source/json-mcp-source.js";
 import { MarkdownAgentSource } from "./infrastructure/source/markdown-agent-source.js";
 import { MarkdownSkillSource } from "./infrastructure/source/markdown-skill-source.js";
 
-export type CatalogModuleOptions =
-  | { readonly db: Db; readonly dbFile?: never }
-  | { readonly dbFile: string; readonly db?: never };
+export type CatalogModuleOptions = { readonly db: Db };
 
 export interface CatalogModule {
   readonly installAgent: InstallAgentUseCase;
@@ -88,21 +86,12 @@ export interface CatalogModule {
   readonly listAgents: ListAgentsUseCase;
   readonly listSkills: ListSkillsUseCase;
   readonly listMcps: ListMcpsUseCase;
-  /** Closes the underlying SQLite connection. Idempotent. */
+  /** No-op: the host owns the shared connection. Kept for lifecycle symmetry. */
   close(): Promise<void>;
 }
 
 export async function composeCatalog(opts: CatalogModuleOptions): Promise<CatalogModule> {
-  let db: Db;
-  let closeDb: () => void;
-  if ("db" in opts && opts.db !== undefined) {
-    db = opts.db;
-    closeDb = () => {};
-  } else {
-    const opened = await openDb(opts.dbFile as string);
-    db = opened.db;
-    closeDb = opened.close;
-  }
+  const { db } = opts;
   const registry = defaultRegistry();
 
   const agentRepo = new DrizzleAgentRepository({ db });
@@ -162,7 +151,7 @@ export async function composeCatalog(opts: CatalogModuleOptions): Promise<Catalo
     listSkills: new ListSkillsUseCase({ queries }),
     listMcps: new ListMcpsUseCase({ queries }),
     async close() {
-      closeDb();
+      // The host owns the shared connection; the module holds no handle to close.
     },
   };
 }
