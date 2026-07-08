@@ -46,7 +46,7 @@ If you only touched one package, narrow the test step with `--filter` to save ti
 - **Language:** TypeScript 5.9 (strict; ESM only)
 - **Linter / formatter:** Biome 2.4
 - **Test runner:** Vitest 4
-- **DB layer:** better-sqlite3 12 + drizzle-orm 0.45 (sync at the SQLite layer, async at the service boundary)
+- **DB layer:** @libsql/client + drizzle-orm 0.45 (async throughout)
 - **HTTP server:** Hono 4 on `@hono/node-server` (single package: `packages/server`)
 - **Logging:** Pino 9 + pino-pretty + pino-roll
 - **Dashboard:** React 19 + Vite 8 + CodeMirror 6 (`packages/dashboard`); plain `styles.css`, no Tailwind

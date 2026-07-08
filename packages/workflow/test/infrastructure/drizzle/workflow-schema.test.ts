@@ -30,7 +30,7 @@ async function removeDir(path: string): Promise<void> {
  * columns, NOT NULL / DEFAULT shape, and indexes. Drives the schema via the
  * migration runner so a future migration that drifts the table shape is caught
  * here, not at the first production deploy. Raw SQLite introspection uses a
- * separate better-sqlite3 connection opened on the migrated file.
+ * separate libsql connection opened on the migrated file.
  */
 
 let dir: string;

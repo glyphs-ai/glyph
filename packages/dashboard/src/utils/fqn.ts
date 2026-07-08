@@ -9,7 +9,7 @@
  *      cannot tree-shake any subset out, even if no consumer reads
  *      those properties. A value import therefore pulls the catalog's
  *      entire entity-services graph into the browser bundle,
- *      including `node:fs/promises`, `better-sqlite3`, `tar-stream`,
+ *      including `node:fs/promises`, `@libsql/client`, `tar-stream`,
  *      and other Node-only modules → runtime crash on first render
  *      ("Module 'node:fs/promises' has been externalized for browser
  *      compatibility…").

@@ -10,7 +10,8 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     // Forks, not threads. Matches every other glyph pkg (see the
-    // template vitest config for the better-sqlite3 segfault rationale)
+    // Forks, not threads. libsql's native binding requires process-level
+    // isolation on Windows. Match every other glyph pkg.
     // and gives each e2e file its own process so a leaked subprocess
     // can't poison sibling files.
     pool: "forks",

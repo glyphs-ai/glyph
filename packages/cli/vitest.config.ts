@@ -5,11 +5,13 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
     environment: "node",
     globals: false,
-    // Forks, not threads. better-sqlite3's native binding segfaults
+    // Forks, not threads. libsql's native binding requires process-level
+    // isolation on Windows. Match every other glyph pkg.
     // (Windows 0xC0000005) on worker-thread teardown, which on a
     // pnpm-r run cascades from "this pkg failed" into "every later
     // pkg never ran". Forks isolate per-file with a separate process
-    // and the segfault becomes a single localised failure. Match
+    // Forks, not threads. libsql's native binding requires process-level
+    // isolation on Windows. Match every other glyph pkg.
     // every other glyph pkg.
     pool: "forks",
     testTimeout: 30000,

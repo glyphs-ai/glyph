@@ -1,7 +1,7 @@
 // Bump libuv's default thread pool from 4 → 16 so concurrent purge
 // fs.rm calls and dashboard polls don't queue up behind each other.
 // Set BEFORE any other import that uses fs / zlib / crypto worker
-// threads (better-sqlite3, pino-roll, hono/node-server). `??=` lets
+// threads (libsql, pino-roll, hono/node-server). `??=` lets
 // operators override via env.
 process.env.UV_THREADPOOL_SIZE ??= "16";
 

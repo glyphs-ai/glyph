@@ -5,8 +5,8 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
     environment: "node",
     globals: false,
-    // `forks` rather than the default `threads`: better-sqlite3's
-    // native binding segfaults on worker-thread teardown on Windows.
+    // Forks, not threads. libsql's native binding requires process-level
+    // isolation on Windows. Match every other glyph pkg.
     pool: "forks",
     testTimeout: 15000,
   },

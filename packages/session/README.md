@@ -186,8 +186,7 @@ pnpm --filter @glyphs-ai/session typecheck
 pnpm --filter @glyphs-ai/session test
 ```
 
-Vitest runs in `forks` pool (better-sqlite3's native binding
-segfaults on worker-thread teardown on Windows).
+Vitest runs in `forks` pool (libsql's native binding requires process-level isolation on Windows).
 
 ## License
 
