@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.6.0 (2026-07-08)
+
+Backfill previously-undocumented CLI subcommands **and** correct stale schedule route paths that never got updated after PR #52's `schedules/{task,workflow}` kind-split (audited registrar/CLI/routes against docs; no code changes to the CLI or API).
+
+### Added
+
+- `references/commands.md#workflow` — add the `workflow prune-subgraph <wfid>` section (`--spec-file <path>`, `POST …/prune` route, `{ nodeIds }` body, `{ prunedNodeIds, prunedEdges }` response, full failure-mode table). Add the subcommand-map row and bump the count (14 → 15).
+- `references/commands.md#schedule` — rewrite the group intro to name the workflow-target variants (`create-workflow` / `patch-workflow` / `list-workflows`) instead of hand-waving them as "only differs in the target.kind field". Add sections for `schedule create-workflow` (`POST …/schedules/workflow`, `--coord-agent` required), `schedule patch-workflow` (`PATCH …/schedules/workflow/:sid`), and `schedule list-workflows` (`GET …/scheduled-workflows[?scheduleId=<sid>]`).
+- `references/error-codes.md` — add `WorkflowPruneRejected` (422) row to the Workflows section and a new "WorkflowPruneRejected reasons" subsection with all five `reason.kind` variants (`nodeNotFound`, `nodeNotStarted`, `rootCoordProtected`, `orphan`, `coordChainBroken`).
+
+### Fixed (stale routes from PR #52 kind-split)
+
+Every shared `glyph schedule` subcommand documented a pre-kind-split route (`/schedules/:sid/...`) that no longer exists. The CLI actually hits `/schedules/task/:sid/...` first and falls back to `/schedules/workflow/:sid/...` on 404. All corrected against `packages/cli/src/commands/schedule/{mutate,read}.ts` + `packages/api/src/routes/schedules/`:
+
+- `schedule list`: was `GET /schedules`; real is two parallel calls to `GET /schedules/task` + `GET /schedules/workflow` merged client-side (agent filter maps to `?agent=` on task, `?coordinatorAgent=` on workflow).
+- `schedule create`: was `POST /schedules`; real is `POST /schedules/task`.
+- `schedule show`: was `GET /schedules/:sid`; real is `GET /schedules/task/:sid` → 404 fallback to workflow.
+- `schedule enable` / `disable`: doc claimed dedicated `POST .../enable` / `.../disable` routes. **Those routes do not exist.** The CLI PATCHes `{enabled: true|false}` (task → workflow fallback). Doc rewritten to match.
+- `schedule patch`: added "task-kind only" caveat and cross-link to `patch-workflow` (previous wording implied kind was derived from the row, which is misleading since the URL is not).
+- `schedule rm`: was `DELETE /schedules/:sid`; real is `DELETE /schedules/task/:sid` → workflow fallback. Also documented `{deletedDispatchCount}` response.
+- `schedule run`: was `POST /schedules/:sid/run`; real is `POST /schedules/task/:sid/run` → workflow fallback (returns `Task` or `WorkflowHeader` depending on kind).
+- `schedule preview`: was `GET /schedules/:sid/preview`; real is `GET /schedules/task/:sid/preview` → workflow fallback. Also called out the sibling `GET /schedules/preview-cron?cron=&tz=` endpoint (not yet wired to a CLI subcommand).
+- `schedule list-tasks`: was `GET /schedules/list-tasks`; real is `GET /scheduled-tasks` (sibling collection of `/tasks`, hardcoded to `origin === "schedule"`).
+- `references/commands.md#catalog` — drop the `update` and `patch` rows from the Agent/Skill/MCP shared-shape table. Neither exists in the registrar or the API (`packages/api/src/routes/catalog/{agents,skills,mcps}.ts` expose only GET/POST/DELETE); content replacement lives behind `sync-resolve` → `sync --plan-token`, called out explicitly below the table.
+- `references/error-codes.md` — update the `CoordSpecNotEditable` fix cue from `prune`+re-add to `prune-subgraph`+re-add (real command name).
+
+### Chore
+
+- `SKILL.md` — version bump only.
+
 ## 0.5.0 (2026-07-08)
 
 Document the `workflow update-spec` command (partial spec patch for `not_started` worker/human nodes).

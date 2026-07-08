@@ -161,63 +161,88 @@ Per-group subcommand reference for `glyph workspace / session / task / schedule 
 
 ## schedule
 
-`glyph schedule <sub>` — cron-driven task launchers scoped to the workspace. Each schedule has a `trigger` (cron expression + IANA tz) and a `target` (task or workflow shape) that gets dispatched on fire. All examples cover the task-target variant; the workflow-target variant only differs in the `target.kind` field.
+`glyph schedule <sub>` — cron-driven task/workflow launchers scoped to the workspace. Each schedule has a `trigger` (cron expression + IANA tz) and a `target` — either a **task** shape (`create` / `patch`, wire route `.../schedules/task`) or a **workflow** shape (`create-workflow` / `patch-workflow`, wire route `.../schedules/workflow`). The two kinds share `show` / `enable` / `disable` / `rm` / `run` / `preview` and each have their own `list`-variant (`list-tasks` for schedule-launched **task** runs; `list-workflows` for schedule-launched **workflow** runs; `list` for the schedules themselves).
 
 ### `schedule list`
 
 - Optional filters: `--agent <fqn>`, `--enabled <bool>` (`"true"` | `"false"`)
-- Route: `GET /workspaces/:id/schedules`
-- Output: `Schedule[]` (see [json-shapes.md#schedule](./json-shapes.md#schedule))
+- Route: `GET /workspaces/:id/schedules/task` + `GET /workspaces/:id/schedules/workflow` — the CLI calls both in parallel and merges results (each kind lives on its own collection). `--agent` maps to `?agent=` on the task list and `?coordinatorAgent=` on the workflow list.
+- Output: `Schedule[]` (see [json-shapes.md#schedule](./json-shapes.md#schedule)) — unified table with a synthetic `kind` column (`task` | `workflow`)
 
 ### `schedule create`
 
 - Required flags: `--name <text>`, `--agent <fqn>`, `--brief <text>`, `--cron <expr>` (5-field), `--tz <iana>`
 - Optional flags: `--details <text>` (mirrors `task dispatch --details`), `--runtime <kind>` (default `copilot`), `--disabled` (create disabled; default is enabled)
-- Route: `POST /workspaces/:id/schedules`
+- Route: `POST /workspaces/:id/schedules/task`
 - Body: `{ name, trigger: { cron, tz }, target: { kind: "task", agent, brief, details?, runtime? }, enabled }`
-- Output: `Schedule`
+- Output: `Schedule` (task-kind)
 - Failure: `BadRequest` (400) for invalid cron / tz strings
+
+### `schedule create-workflow`
+
+- Required flags: `--name <text>`, `--coord-agent <fqn>` (must be coord-eligible), `--brief <text>` (≤ 200 chars), `--cron <expr>` (5-field), `--tz <iana>`
+- Optional flags: `--details <text>` (`""` is treated as omitted), `--disabled` (create disabled; default enabled)
+- Route: `POST /workspaces/:id/schedules/workflow`
+- Body: `{ name, trigger: { cron, tz }, target: { kind: "workflow", coordinatorAgent, brief, details? }, enabled }`
+- Output: `Schedule` (workflow-kind)
+- Failure: same as `create` (`InvalidCronExpr` 400, `InvalidTimezone` 400); coord-agent capability is validated on fire, not create
 
 ### `schedule show <schedule-id>`
 
-- Route: `GET /workspaces/:id/schedules/:sid`
-- Output: `Schedule`
+- Route: `GET /workspaces/:id/schedules/task/:sid` — falls back to `GET /workspaces/:id/schedules/workflow/:sid` on 404 (task-kind and workflow-kind live on sibling collections; the CLI tries task first and re-dispatches to workflow if the id isn't there).
+- Output: `Schedule` (either kind)
 
 ### `schedule enable <schedule-id>` / `schedule disable <schedule-id>`
 
-- Routes: `POST /workspaces/:id/schedules/:sid/enable` / `.../disable`
-- Enable re-arms the timer (server recomputes the next fire relative to now). Disable cancels the timer only — **in-flight tasks are unaffected** (they run to terminal on their own).
-- Equivalent shorthands live on `schedule patch --enabled` / `--no-enabled`.
+- There is **no dedicated enable/disable route**. The CLI sends `PATCH /workspaces/:id/schedules/task/:sid` with body `{ enabled: true | false }`, falling back to `PATCH .../schedules/workflow/:sid` on 404. Equivalent to `schedule patch --enabled` / `--no-enabled` (or `patch-workflow --enabled` / `--no-enabled` for workflow-kind).
+- Enable re-arms the timer (server recomputes the next fire relative to now). Disable cancels the timer only — **in-flight tasks/workflows are unaffected** (they run to terminal on their own).
 
 ### `schedule patch <schedule-id>`
 
 - Optional flags (any subset): `--name <text>`, `--cron <expr>` (5/6/7-field), `--tz <iana>`, `--agent <fqn>`, `--brief <text>`, `--details <text>`, `--clear-details`, `--runtime <kind>`, `--clear-runtime`, `--enabled` / `--no-enabled`
-- Route: `PATCH /workspaces/:id/schedules/task/:sid` (the URL is discriminated by target kind — the CLI derives it from the schedule row)
+- Route: `PATCH /workspaces/:id/schedules/task/:sid` — **task-kind only** (for workflow-kind schedules use [`patch-workflow`](#schedule-patch-workflow-schedule-id))
 - Body: sparse JSON — only the flags you passed. `target` is deep-merged server-side: string sets a field, `null` deletes it (`details` / `runtime`), absent keeps existing. `trigger` is wholesale-replace (if you pass only `--cron` OR only `--tz`, the CLI GETs first to fill the other field).
 - Output: `Schedule`
 - Note: `--details ""` is treated as omitted (does NOT clear). Use `--clear-details` explicitly.
 
+### `schedule patch-workflow <schedule-id>`
+
+- Optional flags (any subset): `--name <text>`, `--cron <expr>`, `--tz <iana>`, `--coord-agent <fqn>`, `--brief <text>`, `--details <text>`, `--clear-details`, `--enabled` / `--no-enabled`
+- Route: `PATCH /workspaces/:id/schedules/workflow/:sid`
+- Body: sparse JSON — same deep-merge / wholesale-replace semantics as `patch` (target deep-merged, trigger wholesale-replaced; if you pass only `--cron` OR only `--tz`, the CLI GETs first to fill the other field)
+- Output: `Schedule` (workflow-kind)
+- Note: `--details ""` is treated as omitted. Use `--clear-details` to actually drop the field.
+
 ### `schedule rm <schedule-id>`
 
-- Route: `DELETE /workspaces/:id/schedules/:sid`
-- Refuses (409) if the schedule is enabled or has in-flight tasks. Disable + cancel first.
+- Route: `DELETE /workspaces/:id/schedules/task/:sid` — falls back to `DELETE .../schedules/workflow/:sid` on 404
+- Response: `{ deletedDispatchCount: number }` (surfaced by the CLI as a suffix on the human-readable line)
+- Refuses (409) if the schedule is enabled or has in-flight tasks/workflows. Disable + cancel first.
 
 ### `schedule run <schedule-id>`
 
-- Route: `POST /workspaces/:id/schedules/:sid/run`
-- Fires the schedule **out-of-band** — does NOT advance the cron cursor. Useful for manual re-runs / smoke tests. Returns the dispatched task's `Task`.
+- Route: `POST /workspaces/:id/schedules/task/:sid/run` — falls back to `POST .../schedules/workflow/:sid/run` on 404
+- Fires the schedule **out-of-band** — does NOT advance the cron cursor. Useful for manual re-runs / smoke tests. Returns the dispatched `Task` (task-kind) or `WorkflowHeader` (workflow-kind).
 
 ### `schedule preview <schedule-id>`
 
 - Optional flags: `-n <count>` — number of upcoming fires to compute (1..100, default probably 10; check `--help`)
-- Route: `GET /workspaces/:id/schedules/:sid/preview[?n=N]`
+- Route: `GET /workspaces/:id/schedules/task/:sid/preview[?n=N]` — falls back to `GET .../schedules/workflow/:sid/preview[?n=N]` on 404
 - Output: `{ describe: string, nextRuns: string[] }` — `describe` is a human-readable summary of the cron expr (e.g. `"At 09:00 on every day"`); `nextRuns` are ISO 8601 timestamps in the schedule's tz.
+
+> One kindless preview endpoint also exists: `GET /workspaces/:id/schedules/preview-cron?cron=<expr>&tz=<iana>[&n=N]` — preview an arbitrary cron expression without creating a schedule row. Not currently wired to a `glyph schedule` subcommand.
 
 ### `schedule list-tasks`
 
 - Optional filters: `--schedule-id <id>`, `--agent <fqn>`, `--runtime <kind>`, `--created-since <iso>`, `--status <csv>`
-- Route: `GET /workspaces/:id/schedules/list-tasks`
+- Route: `GET /workspaces/:id/scheduled-tasks` (sibling collection of `/tasks`, hardcoded to `origin === "schedule"`)
 - Output: `Task[]` — same shape as `task list`, but scoped to schedule-origin tasks (`origin: "schedule"`, `originId: <sid>`). Equivalent to `task list --origin schedule --origin-id <sid>`.
+
+### `schedule list-workflows`
+
+- Optional filters: `--schedule-id <id>` (narrow to one schedule's runs)
+- Route: `GET /workspaces/:id/scheduled-workflows[?scheduleId=<sid>]`
+- Output: `WorkflowHeader[]` — workflows whose `origin === "schedule"` (and, when `--schedule-id` is passed, whose `originId` matches). Sibling of `list-tasks` for the workflow-kind target.
 
 ---
 
@@ -240,11 +265,11 @@ All three groups (`catalog agent`, `catalog skill`, `catalog mcp`) share the sam
 | `resolve` | `POST /workspaces/:id/catalog/{agents,skills}/resolve` | Preview an install plan (network fetch, read prereqs, see deps) |
 | `show <fqn>` | `GET /workspaces/:id/catalog/{agents,skills,mcps}/:fqn` | Show one entry (`--anchor` on agent/skill returns just the header bytes) |
 | `install` | `POST /workspaces/:id/catalog/{agents,skills,mcps}` | Install by `--url <origin>` OR `--file <abs-path>` |
-| `update <fqn>` | `PUT /workspaces/:id/catalog/{agents,skills,mcps}/:fqn` | Replace content (`--content <text>` or `--content-file <path>`; agents/skills only, MCPs use their own JSON shape) |
-| `patch <fqn>` | `PATCH /workspaces/:id/catalog/{agents,skills}/:fqn` | Patch metadata (`--metadata <json>` or `--metadata-file <path>`; agents/skills only) |
 | `rm <fqn>` | `DELETE /workspaces/:id/catalog/{agents,skills,mcps}/:fqn` | Remove |
 | `sync-resolve <fqn>` | `POST /workspaces/:id/catalog/{agents,skills,mcps}/:fqn/sync-resolve` | Preview a re-sync plan against the upstream origin (mints a single-use `planToken`, 5-min TTL) |
 | `sync <fqn>` | `POST /workspaces/:id/catalog/{agents,skills,mcps}/:fqn/sync` | Apply a previewed sync plan (`--plan-token <token>`; `PlanTokenInvalid` 410 if expired) |
+
+Content replacement lives behind `sync` (not a separate `update`/`patch`) — preview via `sync-resolve`, then apply via `sync --plan-token`. There is no PUT/PATCH surface on catalog entries.
 
 Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neither):
 
@@ -268,7 +293,7 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 
 `glyph workflow <sub>` covers workflow header + live DAG read + DAG mutation + termination. Mutation subcommands are typically invoked by an orchestrator agent inside a running workflow; this doc documents the surface, not the orchestration recipe.
 
-> All 14 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`).
+> All 15 subcommands are workspace-scoped and inherit the common flags (`--server / --workspace-id / --output / --json`).
 
 ### Subcommand map
 
@@ -281,6 +306,7 @@ Additional **agent-only** subcommands (skills have `ack-prereqs`; MCPs have neit
 | [`workflow node-show`](#workflow-node-show-workflow-id-node-id) | Print one node's projected wire shape |
 | [`workflow add-node`](#workflow-add-node-workflow-id) | Insert one node attached to existing parents |
 | [`workflow add-subgraph`](#workflow-add-subgraph-workflow-id) | Insert N nodes + intra-batch edges atomically |
+| [`workflow prune-subgraph`](#workflow-prune-subgraph-workflow-id) | Retract N `not_started` nodes + adjacent edges atomically |
 | [`workflow add-edge`](#workflow-add-edge-workflow-id) | Add a single edge between two existing nodes |
 | [`workflow cancel-node`](#workflow-cancel-node-workflow-id-node-id) | Cancel a single worker node |
 | [`workflow cancel`](#workflow-cancel-workflow-id) | Cancel a running workflow (operator) |
@@ -380,6 +406,27 @@ Substrate rules enforced atomically:
 - No cycles; the substrate rejects the whole batch on any invariant violation and inserts nothing.
 
 The coord strategies build their "dev + next-coord" or "review + designer + next-coord" expansions with this command so the engine sees a self-consistent DAG slice.
+
+### `workflow prune-subgraph <workflow-id>`
+
+- Required flags: `--spec-file <path>` — JSON matching `{ nodeIds: [id, ...] }` (min 1)
+- Route: `POST /workspaces/:id/workflows/:wfid/prune`
+- Body: `PruneWorkflowSubgraphRequest` — `{ nodeIds: WorkflowNodeId[] }`
+- Output: `PruneWorkflowSubgraphResponse` — `{ prunedNodeIds: WorkflowNodeId[], prunedEdges: [{ from, to }] }`
+
+Structural inverse of [`add-subgraph`](#workflow-add-subgraph-workflow-id). Retracts N still-`not_started` nodes and all their adjacent edges atomically. The whole batch is rejected before any write on any invariant violation, so a rejected prune leaves the aggregate untouched. On success the substrate performs one save plus one tick nudge — pruning `not_started` nodes cannot by itself create newly-eligible dispatch candidates, so the tick is for symmetry with `add-subgraph`, not because new work becomes ready.
+
+Coord strategies use this to walk back a speculative subgraph slice (e.g. after a verdict retraction) before adding a corrected one. `update-spec` is the right tool when only a single `not_started` node's spec is wrong; `prune-subgraph` + `add-subgraph` is for structural changes (kind swap, edge/parent restructure). Coordinator nodes themselves can be pruned as long as they aren't the root and the surviving graph still has a coord successor for every non-terminal branch.
+
+Failure modes (all `WorkflowPruneRejected`, 422 — see [error-codes.md](./error-codes.md#workflows)):
+
+| `reason.kind` | Cause |
+| --- | --- |
+| `nodeNotFound` | A target id isn't in the DAG |
+| `nodeNotStarted` | A target has already dispatched (only `not_started` is prunable) |
+| `rootCoordProtected` | A target is the root coordinator |
+| `orphan` | Removal would orphan a surviving node (lose all its parents) |
+| `coordChainBroken` | Removal would leave a surviving non-terminal branch with no coord successor |
 
 ### `workflow add-edge <workflow-id>`
 

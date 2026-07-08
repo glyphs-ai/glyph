@@ -95,7 +95,8 @@ Treat every value in the table below as a contract.
 | `WorkflowAlreadyTerminal` | 409 | Workflow is already terminal | No mutation on terminal workflows |
 | `WorkflowNodeNotMutable` | 409 | Node isn't mutable from its current status | Check `fromStatus` extension |
 | `NodeKindMismatch` | 400 | `update-spec` body kind doesn't match the node's kind | Read `expected`/`actual` extensions; send the matching body kind |
-| `CoordSpecNotEditable` | 400 | Tried to `update-spec` a coordinator node (system-owned) | Never patch coord nodes; `prune`+re-add if the graph must change |
+| `CoordSpecNotEditable` | 400 | Tried to `update-spec` a coordinator node (system-owned) | Never patch coord nodes; `prune-subgraph`+re-add if the graph must change |
+| `WorkflowPruneRejected` | 422 | `prune-subgraph` batch rejected by an invariant (see `reason.kind`) | See "WorkflowPruneRejected reasons" below |
 | `WorkflowDeleteRequiresTerminal` | 409 | Workflow must be terminal before delete | Cancel/finish it first |
 | `WorkflowDeleteHasInFlightTasks` | 409 | Delete blocked by in-flight tasks (route-inline) | Cancel/wait for the tasks |
 | `WorkflowDagConflict` | 409 | DAG mutation would violate an invariant | Read `reason` — orphan, cycle, parent state, etc |
@@ -160,6 +161,18 @@ The `/spawn` route wraps most launch failures as `200 {ok: false, code, error}` 
 | `NotFound` | 404 | Generic 404 emitted inline from a handler (e.g. artifact id) | Check the id; usually a typo or stale reference |
 | `DatabaseUnavailable` | 503 | SQLite backing store unavailable (any package) | Server-side; surface with request id |
 | `internal error` (no `code`) | 500 | Server-side fault whose underlying error name was suppressed (not on the safe-error allow-list). Message alone won't tell you remediation | Surface to user with the request id from server logs |
+
+## WorkflowPruneRejected reasons
+
+`WorkflowPruneRejected` (422) always carries a `reason` object keyed on `reason.kind`. `prune-subgraph` is fully atomic — any one of these rejects the whole batch before any write. The extension also carries the offending `workflowId` and (for all five kinds) the `nodeId` at fault.
+
+| `reason.kind` | meaning | fix |
+|---|---|---|
+| `nodeNotFound` | Target `nodeId` isn't in the DAG | Re-fetch `workflow dag <wfid>`; drop the stale id from the batch |
+| `nodeNotStarted` | Target has already dispatched (`status` extension shows the actual status) | Only `not_started` nodes are prunable. Use `cancel-node` for a running node, or drop it from the batch if terminal |
+| `rootCoordProtected` | Target is the root coordinator | The root coord can never be pruned. Use `workflow cancel` + `workflow rm` if you want to remove the workflow itself |
+| `orphan` | Removal would orphan a surviving node (leave it with zero parents) | Include the orphan-to-be in the same prune batch, or add a replacement edge in a following `add-subgraph` |
+| `coordChainBroken` | Removal would leave a surviving non-terminal branch with no coord successor | Add the replacement coord in the same batch via `add-subgraph` before/instead of pruning the current one |
 
 ## EntryNotReady reasons
 
