@@ -610,23 +610,32 @@ export class WorkflowEntity {
     nowIso: string,
   ): Result<
     { readonly retryCoordInserted: WorkflowNodeId | null; readonly workflowFailed: boolean },
-    WorkflowNodeNotFound | IllegalNodeTransition
+    WorkflowNodeNotFound
   > {
     const node = this.nodeById(nodeId);
     if (node === undefined || node.workflowId !== this.id)
       return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId });
+
+    // Idempotent: already terminal → no-op.
     if (isTerminalWorkflowNodeStatus(node.status))
       return ok({ retryCoordInserted: null, workflowFailed: false });
-    if (this.status !== "running" && status !== "cancelled")
-      return err({
-        type: "IllegalNodeTransition",
-        workflowId: this.id,
-        nodeId,
-        status: this.status,
-        verb: "markNodeTerminal",
-      });
+
+    // node.status and workflow.status live on independent axes:
+    //   - node.status     = "did this runner deliver a terminal verdict?"
+    //   - workflow.status = "what did the aggregate deliver?"
+    // A coord that calls finishWorkflow(failed) from its own tick still
+    // succeeded as a runner (it delivered the decision). A coord subprocess
+    // that crashes after finishWorkflow(succeeded) is a failed runner on a
+    // succeeded workflow. Both are legal facts; record them verbatim rather
+    // than reject a legitimate runner-side event. Policy already ran in
+    // finishWorkflow / reconcileCancel / checkStuckAndRecover — this method is
+    // a write-through recording point, not a second policy layer.
     this.replaceNode(node.withPatch({ status, endedAt: nowIso }));
-    return ok(this.checkStuckAndRecover(nowIso));
+
+    // Stuck-recovery only has something to recover to while the workflow is
+    // still running; once terminal there is nothing to synthesize.
+    if (this.status === "running") return ok(this.checkStuckAndRecover(nowIso));
+    return ok({ retryCoordInserted: null, workflowFailed: false });
   }
 
   __snapshot(): WorkflowSnapshot {
