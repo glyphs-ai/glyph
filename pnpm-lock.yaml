@@ -448,12 +448,18 @@ importers:
       '@glyphs-ai/terminal':
         specifier: workspace:*
         version: link:../terminal
+      '@libsql/client':
+        specifier: ^0.17.4
+        version: 0.17.4
       '@types/node':
         specifier: ^22.19.17
         version: 22.19.17
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@libsql/client@0.17.4)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(knex@3.2.10(better-sqlite3@12.10.0))
       tsx:
         specifier: ^4.19.0
         version: 4.21.0

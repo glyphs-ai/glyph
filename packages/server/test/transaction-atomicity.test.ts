@@ -1,32 +1,32 @@
 /**
  * Integration tests proving the request-scoped transaction middleware
- * provides atomicity:
+ * (`packages/server/src/middleware/transaction.ts`) provides atomicity:
  *
  *   1. A throw inside a transaction rolls back ALL prior writes.
  *   2. Successful transaction commits ALL writes atomically.
+ *
+ * Lives in `server` (not `api`): it drives the merged catalog + task schema
+ * over a single libsql client, mirroring how the middleware wraps each request
+ * in one drizzle transaction spanning both packages' tables.
  *
  * Uses a real file-backed SQLite DB (not :memory:) so WAL semantics
  * are exercised as they would be in production.
  */
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { type Client, createClient } from "@libsql/client";
-import { sql } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-// Windows WAL lock latency: the libsql client holds the WAL file
-// briefly after close(). Increase hook timeout for the rm() retries.
-vi.setConfig({ hookTimeout: 60_000 });
-
 import {
   applyCatalogMigrations,
   type Db as CatalogDb,
   schema as catalogSchema,
 } from "@glyphs-ai/catalog";
 import { applyTaskMigrations, schema as taskSchema } from "@glyphs-ai/task";
+import { type Client, createClient } from "@libsql/client";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { rmScratch } from "./_test-support.js";
 
 let scratch: string;
 let client: Client;
@@ -47,18 +47,23 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  // Mirror production teardown (`workspace-context` close): checkpoint the
+  // WAL back into the main DB *before* closing. On Windows/NTFS the kernel
+  // keeps an exclusive lock on `workspace.db-wal` / `-shm` after
+  // `client.close()` unless the WAL has been truncated, which makes the
+  // scratch-dir removal below race the lock manager — fatal under the
+  // parallel-fork disk contention of the full server suite.
+  try {
+    await client.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+  } catch {
+    // best-effort — the close below still releases the connection
+  }
   try {
     client.close();
   } catch {
     // best-effort
   }
-  // Best-effort cleanup; WAL locks on Windows can outlive the process.
-  try {
-    await new Promise((r) => setTimeout(r, 200));
-    await rm(scratch, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
-  } catch {
-    // Leaking a temp dir is acceptable in CI; WAL cleanup is not blocking.
-  }
+  await rmScratch(scratch);
 });
 
 describe("request-scoped transaction atomicity", () => {
