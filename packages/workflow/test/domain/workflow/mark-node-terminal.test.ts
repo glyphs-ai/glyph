@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { WorkflowEdgeEntity } from "../../../src/domain/edge/workflow-edge-entity.js";
 import { WorkflowNodeEntity } from "../../../src/domain/node/workflow-node-entity.js";
 import {
@@ -16,9 +16,12 @@ import { WorkflowIdSchema } from "../../../src/domain/workflow/workflow-id.js";
  * its own tick, so the workflow settles before the coord's runner-side callback
  * arrives. `node.status` ("did this runner deliver a terminal verdict?") and
  * `workflow.status` ("what did the aggregate deliver?") are independent axes, so
- * the verdict is recorded verbatim — including success/failure crossovers —
- * rather than rejected. Only an already-terminal node (idempotency) or an absent
- * node (`WorkflowNodeNotFound`) short-circuits the write.
+ * the verdict is recorded verbatim rather than rejected — with one narrow
+ * exception: a late `failed` callback on a `succeeded` workflow is coerced to
+ * `cancelled` (a `succeeded` workflow is the strongest external promise, and a
+ * post-decision runner crash has no downstream utility). Only an already-terminal
+ * node (idempotency) or an absent node (`WorkflowNodeNotFound`) short-circuits
+ * the write.
  */
 
 const WF_ID = WorkflowIdSchema.parse("20260708-0000cafe");
@@ -119,23 +122,74 @@ describe("markNodeTerminal — late callback after workflow succeeded", () => {
     expect(wf.status).toBe("succeeded");
   });
 
-  it("records a 'failed' callback on a succeeded workflow (crossover, verbatim)", () => {
-    // A coord subprocess that crashes after finishWorkflow(succeeded) is a
-    // failed runner on a succeeded workflow — a legal fact, recorded not rejected.
+  it("coerces a late 'failed' callback on a succeeded workflow to 'cancelled' (invariant guard)", () => {
+    // A worker/coord subprocess crashing after `finishWorkflow(succeeded)` was
+    // already called is post-decision runner noise; recording it verbatim would
+    // leak a "failed node inside succeeded workflow" surprise to every consumer.
+    // Coerce to `cancelled` — same shape reconcileCancel already uses for
+    // "runner didn't deliver, workflow moved on."
     const wf = runningWorkflow(
       [coord(COORD_ID, 0, "succeeded"), worker(WORKER_ID, 1, "running")],
       [edge(COORD_ID, WORKER_ID)],
     );
     expect(wf.succeed({ output: "done" }, FINISHED).isOk()).toBe(true);
 
-    const res = wf.markNodeTerminal(WORKER_ID, "failed", CALLBACK);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const res = wf.markNodeTerminal(WORKER_ID, "failed", CALLBACK);
+      expect(res.isOk()).toBe(true);
+      expect(res._unsafeUnwrap()).toEqual({ retryCoordInserted: null, workflowFailed: false });
 
-    expect(res.isOk()).toBe(true);
-    expect(res._unsafeUnwrap()).toEqual({ retryCoordInserted: null, workflowFailed: false });
-    expect(nodeStatus(wf, WORKER_ID)).toBe("failed");
-    expect(wf.nodes.find((n) => n.id === WORKER_ID)?.endedAt).toBe(CALLBACK);
-    // workflow.status is a separate axis — the aggregate outcome is untouched.
-    expect(wf.status).toBe("succeeded");
+      // The recorded status is coerced.
+      expect(nodeStatus(wf, WORKER_ID)).toBe("cancelled");
+      expect(wf.nodes.find((n) => n.id === WORKER_ID)?.endedAt).toBe(CALLBACK);
+      expect(wf.status).toBe("succeeded"); // workflow outcome untouched
+
+      // Telemetry emitted with a stable shape.
+      expect(warn).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(warn.mock.calls[0]?.[0] as string);
+      expect(payload).toMatchObject({
+        event: "workflow.markNodeTerminal.crossover_coerced",
+        workflowStatus: "succeeded",
+        runnerStatus: "failed",
+        recordedStatus: "cancelled",
+      });
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("records a 'failed' callback on a failed workflow verbatim (crossover NOT coerced)", () => {
+    const wf = runningWorkflow([worker(WORKER_ID, 0, "running")]);
+    expect(wf.fail({ kind: "coordinator", message: "boom" }, FINISHED).isOk()).toBe(true);
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const res = wf.markNodeTerminal(WORKER_ID, "failed", CALLBACK);
+      expect(res.isOk()).toBe(true);
+      expect(nodeStatus(wf, WORKER_ID)).toBe("failed");
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("does NOT coerce a 'cancelled' callback on a succeeded workflow (reconcileCancel path stays exact)", () => {
+    const wf = runningWorkflow(
+      [coord(COORD_ID, 0, "succeeded"), worker(WORKER_ID, 1, "running")],
+      [edge(COORD_ID, WORKER_ID)],
+    );
+    expect(wf.succeed({ output: "done" }, FINISHED).isOk()).toBe(true);
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const res = wf.markNodeTerminal(WORKER_ID, "cancelled", CALLBACK);
+      expect(res.isOk()).toBe(true);
+      expect(nodeStatus(wf, WORKER_ID)).toBe("cancelled");
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("accepts a 'cancelled' callback on a succeeded workflow (reconcileCancel orphan path)", () => {

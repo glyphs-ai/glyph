@@ -620,17 +620,36 @@ export class WorkflowEntity {
     if (isTerminalWorkflowNodeStatus(node.status))
       return ok({ retryCoordInserted: null, workflowFailed: false });
 
-    // node.status and workflow.status live on independent axes:
-    //   - node.status     = "did this runner deliver a terminal verdict?"
-    //   - workflow.status = "what did the aggregate deliver?"
-    // A coord that calls finishWorkflow(failed) from its own tick still
-    // succeeded as a runner (it delivered the decision). A coord subprocess
-    // that crashes after finishWorkflow(succeeded) is a failed runner on a
-    // succeeded workflow. Both are legal facts; record them verbatim rather
-    // than reject a legitimate runner-side event. Policy already ran in
-    // finishWorkflow / reconcileCancel / checkStuckAndRecover — this method is
-    // a write-through recording point, not a second policy layer.
-    this.replaceNode(node.withPatch({ status, endedAt: nowIso }));
+    // Narrow invariant: `workflow.status = "succeeded"` is our strongest external
+    // promise. A late `failed` runner callback is fully explained by post-decision
+    // runner noise (a subprocess crashing after `finishWorkflow(succeeded)` was
+    // already called) and has no downstream utility — the workflow won't retry,
+    // won't flip, won't notify. Recording it verbatim would leak a "failed node
+    // inside a succeeded workflow" surprise into every downstream consumer and
+    // force them to defensively re-check node statuses. Coerce to `cancelled`,
+    // which already covers "runner did not deliver a successful verdict and the
+    // workflow moved on" (see `reconcileCancel`'s use of `cancelled` for the same
+    // shape of event).
+    //
+    // All other crossovers keep the iter2 write-through semantics: node.status
+    // and workflow.status live on independent axes, and rejecting a legitimate
+    // runner fact is the class of bug iter1 introduced.
+    if (this.status === "succeeded" && status === "failed") {
+      console.warn(
+        JSON.stringify({
+          event: "workflow.markNodeTerminal.crossover_coerced",
+          workflowId: this.id,
+          nodeId,
+          workflowStatus: this.status,
+          runnerStatus: status,
+          recordedStatus: "cancelled",
+        }),
+      );
+    }
+    const effectiveStatus =
+      this.status === "succeeded" && status === "failed" ? "cancelled" : status;
+
+    this.replaceNode(node.withPatch({ status: effectiveStatus, endedAt: nowIso }));
 
     // Stuck-recovery only has something to recover to while the workflow is
     // still running; once terminal there is nothing to synthesize.
