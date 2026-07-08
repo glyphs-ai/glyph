@@ -151,6 +151,17 @@ export {
   type RespondToHumanNodeResponse,
   RespondToHumanNodeResponseSchema,
 } from "./application/respond-to-human-node.js";
+export {
+  type HumanSpecPatch,
+  HumanSpecPatchSchema,
+  type UpdateWorkflowNodeSpecError,
+  type UpdateWorkflowNodeSpecRequest,
+  UpdateWorkflowNodeSpecRequestSchema,
+  type UpdateWorkflowNodeSpecResponse,
+  UpdateWorkflowNodeSpecResponseSchema,
+  type WorkerSpecPatch,
+  WorkerSpecPatchSchema,
+} from "./application/update-workflow-node-spec.js";
 // ─── Shared cross-use-case surface (re-exported from domain) ───────
 export * from "./application/workflow-public.js";
 export { applyWorkflowMigrations } from "./infrastructure/drizzle/workflow-migrations.js";

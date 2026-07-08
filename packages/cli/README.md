@@ -81,8 +81,7 @@ workflow) takes the parent positional first, then the nested positional:
 
 ```
 glyph workflow node-show     <workflow-id> <node-id>
-glyph workflow remove-node   <workflow-id> <node-id>
-glyph workflow replace-spec  <workflow-id> <node-id> --spec-file <path>
+glyph workflow update-spec   <workflow-id> <node-id> --spec-file <path>
 glyph workflow cancel-node   <workflow-id> <node-id>
 glyph workflow respond       <workflow-id> <node-id>
 ```

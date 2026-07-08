@@ -7,6 +7,10 @@ import { COORDINATOR_KIND, HUMAN_KIND, WORKER_KIND } from "../node/workflow-node
 import type { WorkflowNodeRetryMetadata } from "../node/workflow-node-retry.js";
 import { extractWorkflowNodeRetryMetadata } from "../node/workflow-node-retry.js";
 import {
+  assertNodeSpecUpdatable,
+  type NodeSpecUpdateGuardError,
+} from "../node/workflow-node-spec-update.js";
+import {
   isTerminalWorkflowNodeStatus,
   type TerminalWorkflowNodeStatus,
   type WorkflowNodeStatus,
@@ -501,6 +505,35 @@ export class WorkflowEntity {
       return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId });
     this.replaceNode(node.withPatch({ metadata }));
     return ok(undefined);
+  }
+
+  /**
+   * Replace a still-`not_started` worker/human node's spec with an already
+   * runner-validated `validatedSpec`. Rejects before any mutation via
+   * {@link assertNodeSpecUpdatable} (kind/coord/status guards) and refuses
+   * terminal workflows, so a rejected patch leaves the aggregate untouched.
+   * Returns the updated node so the caller can project it back to the client.
+   *
+   * The spec must already be validated by the target kind's runner — this
+   * method trusts `validatedSpec` and does not re-validate.
+   */
+  updateNodeSpec(args: {
+    readonly nodeId: WorkflowNodeId;
+    readonly expectedKind: WorkflowNodeKind;
+    readonly validatedSpec: unknown;
+  }): Result<WorkflowNodeEntity, WorkflowAlreadyTerminal | NodeSpecUpdateGuardError> {
+    const running = this.requireRunning();
+    if (running.isErr()) return err(running.error);
+    const guarded = assertNodeSpecUpdatable({
+      workflowId: this.id,
+      nodeId: args.nodeId,
+      node: this.nodeById(args.nodeId),
+      expectedKind: args.expectedKind,
+    });
+    if (guarded.isErr()) return err(guarded.error);
+    const updated = guarded.value.withPatchedSpec(args.validatedSpec);
+    this.replaceNode(updated);
+    return ok(updated);
   }
 
   addRetryCoordNode(args: {

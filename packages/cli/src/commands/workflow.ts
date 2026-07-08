@@ -7,12 +7,13 @@
  * contract:
  *  - `add-node` / `add-subgraph` / `add-edge`         -- grow the DAG
  *  - `prune-subgraph`                                 -- retract not-started nodes
+ *  - `update-spec`                                    -- patch a not-started node's spec
  *  - `cancel-node`                                    -- terminate one worker
  *  - `finish`                                         -- flip the workflow terminal
  *
  * The DAG grows by append; retraction is limited to still-`not_started`
- * nodes via `prune-subgraph`. Once a node has started it is immutable, and a
- * node's spec cannot be replaced.
+ * nodes via `prune-subgraph`. A still-`not_started` node's spec can be
+ * patched via `update-spec`. Once a node has started it is immutable.
  *
  * Layout: this file is a thin facade. Command implementations live in
  * sibling concern modules under `./workflow/` -- `read.ts` (list /

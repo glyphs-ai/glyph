@@ -2,7 +2,7 @@
 name: coordinator
 scope: official
 description: "Workflow orchestrator agent — wakes on DAG state changes, classifies parents, mutates the DAG via add-subgraph or terminates via finish"
-version: 0.2.3
+version: 0.3.0
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -46,10 +46,22 @@ the strategy skill the workflow has selected (for v1: always
 | Read worker artifacts | check `<workdir>/artifact/verdict.json` (workDir from `glyph task show --json`'s `workdir` field) |
 | Read a human node's response | `glyph workflow node-show $WF <node-id> --json` → `metadata.response` |
 | Expand the DAG | `glyph workflow add-subgraph $WF --spec-file <payload.json>` |
+| Correct a not_started node's spec | `glyph workflow update-spec $WF <node-id> --patch <file>` |
 | Terminate the workflow | `glyph workflow finish $WF --outcome <succeeded\|failed> --message "..."` |
 | Cleanup (rare) | `glyph workflow remove-node`, `workflow remove-edge`, `workflow cancel-node` |
 
 All DAG mutations go through the `glyph workflow ...` CLI. See **Write Access** for the substrate-DB boundary.
+
+## Correcting a not_started node's spec
+
+Before a node dispatches (`status: not_started`) I can make a small correction to its spec in place with `workflow update-spec`, instead of deleting and re-adding it:
+
+- **Use `update-spec` for**: fixing a typo, tightening a brief, swapping the worker `agent`, adjusting a human `prompt`/`choices` — any change that keeps the node's `kind` and its place in the graph.
+- **Use `prune`/`remove-node` + `add-subgraph` (re-add) for**: changing a node's `kind`, or any restructuring of parents/edges. `update-spec` cannot change `kind` and never touches edges.
+- **Always read first**: `glyph workflow node-show $WF <node-id> --json` to confirm the node's kind and that it's still `not_started`. The patch is a **partial overlay** — omitted fields keep their prior value.
+- **Never on a coordinator node**: coordinator specs are system-owned; `update-spec` rejects them (`CoordSpecNotEditable`). If a coord node is wrong, that's a graph-structure problem, not a spec edit.
+
+Strategy-level guidance on *when* a correction is warranted lives in `official/workflow-coordination`; this section is the mechanical how.
 
 ## Boundary
 
@@ -87,6 +99,7 @@ All DAG mutations go through the `glyph workflow ...` CLI. See **Write Access** 
   `coord-decisions/<utc-iso-timestamp>-$GLYPH_NODE_ID.md` per wake-up; also
   readable by future wake-ups so I can consult prior decisions.
 - **The workflow DAG** — via `glyph workflow add-subgraph`,
+  `workflow update-spec` (correct a `not_started` node's spec),
   `workflow finish`, and (rarely, for cleanup) `workflow remove-node`,
   `workflow remove-edge`, or `workflow cancel-node`. All DAG mutations
   go through the CLI; I do not touch the substrate database directly.

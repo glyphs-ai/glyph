@@ -160,6 +160,7 @@ describe("@glyphs-ai/workflow public API guard", () => {
       "cancelWorkflow",
       "addSubgraph",
       "pruneSubgraph",
+      "updateNodeSpec",
       "respondHumanNode",
       "getWorkflow",
       "listWorkflows",

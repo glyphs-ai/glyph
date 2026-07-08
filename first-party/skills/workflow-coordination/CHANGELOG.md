@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 (2026-07-07)
+
+- Document `update-spec`, the in-place partial-patch for a still-`not_started` node's spec, in §B. A new "Correct a not_started node's spec via update-spec" sub-section teaches the decision boundary: patch in place when only the spec changes (same kind, same edges — preserving node id + edges instead of churning them via prune+re-add); prune + re-add for a kind change or edge/parent restructure; `cancel-node` (neither) once a node has dispatched. States the hard rule — never patch a coordinator node (system-owned, substrate-rejected) — a wrong coord is a graph-structure problem. Keeps the section neutral of exact CLI flags (defers to `official/cli`). The framework command-name list in the lead-in now cites `update-spec`.
+
 ## 0.5.1 (2026-07-07)
 
 - Correct §B parent classification: a DAG node carries **no** `taskId`, so the classifier key is the 3-tuple `(kind, status, agent)` (was mislabelled a 4-tuple that read a non-existent `.taskId` off the node). A worker node's task run(s) are now resolved by origin — a new "Resolve a worker node's task run(s)" sub-section uses `glyph task list --origin workflow --origin-id <nodeId> --json` (newest-first, `.[0]` is the latest run). The prior-iter sibling snippet resolves `PRIOR_TASK_ID` the same way instead of reading `.taskId` off the sibling node.
