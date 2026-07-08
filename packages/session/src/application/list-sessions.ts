@@ -5,7 +5,7 @@ import { z } from "zod";
 import { type SessionId, SessionIdSchema } from "../domain/session-id.js";
 import type { DatabaseUnavailable } from "../domain/session-repository.js";
 import type { SessionSandbox } from "../domain/session-sandbox.js";
-import type { SessionRow } from "../infrastructure/drizzle/session-mapper.js";
+import type { SessionRow } from "../infrastructure/drizzle/session-db.js";
 import type { SessionQueries } from "../infrastructure/drizzle/session-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 

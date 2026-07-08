@@ -1,8 +1,8 @@
 import { type Client, createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import type { Db } from "../src/infrastructure/drizzle/session-db.js";
+import * as schema from "../src/infrastructure/drizzle/session-db.js";
 import { applySessionMigrations } from "../src/infrastructure/drizzle/session-migrations.js";
-import * as schema from "../src/infrastructure/drizzle/session-schema.js";
 
 /**
  * Test-only DB opener. Applies PRAGMAs + migrations against a fresh

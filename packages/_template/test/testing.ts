@@ -1,8 +1,8 @@
 import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import type { Db } from "../src/infrastructure/drizzle/__entity-kebab__-db.js";
+import * as schema from "../src/infrastructure/drizzle/__entity-kebab__-db.js";
 import { apply__Entity__Migrations } from "../src/infrastructure/drizzle/__entity-kebab__-migrations.js";
-import * as schema from "../src/infrastructure/drizzle/__entity-kebab__-schema.js";
 
 /**
  * Test-only DB opener. Applies PRAGMAs + migrations against a fresh

@@ -13,6 +13,7 @@
 import { eq } from "drizzle-orm";
 import type { AgentDependencyRefs } from "../../domain/agent-deps.js";
 import {
+  type AgentRow,
   agentAgentDeps,
   agentMcpDeps,
   agentSkillDeps,
@@ -32,8 +33,6 @@ export interface AgentView {
   readonly installedAt: string;
   readonly updatedAt: string;
 }
-
-type AgentRow = typeof agents.$inferSelect;
 
 function toAgentView(row: AgentRow, dependencyRefs: AgentDependencyRefs): AgentView {
   return {

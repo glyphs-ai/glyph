@@ -1,8 +1,8 @@
 import { type Client, createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import type { Db } from "../src/infrastructure/drizzle/task-db.js";
+import * as schema from "../src/infrastructure/drizzle/task-db.js";
 import { applyTaskMigrations } from "../src/infrastructure/drizzle/task-migrations.js";
-import * as schema from "../src/infrastructure/drizzle/task-schema.js";
 
 /**
  * Test-only DB opener. Applies PRAGMAs + migrations against a fresh

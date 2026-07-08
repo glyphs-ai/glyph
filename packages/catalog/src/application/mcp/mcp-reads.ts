@@ -12,10 +12,8 @@
 import { eq } from "drizzle-orm";
 import { agentMcpDeps } from "../../infrastructure/drizzle/agent-schema.js";
 import type { Db } from "../../infrastructure/drizzle/catalog-db.js";
-import { mcps } from "../../infrastructure/drizzle/mcp-schema.js";
+import { type McpRow, mcps } from "../../infrastructure/drizzle/mcp-schema.js";
 import { skillMcpDeps } from "../../infrastructure/drizzle/skill-schema.js";
-
-export type McpRow = typeof mcps.$inferSelect;
 
 /** One MCP row by fqn, or `undefined` when absent. */
 export async function selectMcpByFqn(db: Db, fqn: string): Promise<McpRow | undefined> {

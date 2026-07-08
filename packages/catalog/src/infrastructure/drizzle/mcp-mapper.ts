@@ -12,9 +12,7 @@
 
 import { McpEntity } from "../../domain/mcp-entity.js";
 import type { McpFqn } from "../../domain/mcp-fqn.js";
-import type { mcps } from "./mcp-schema.js";
-
-export type McpRow = typeof mcps.$inferSelect;
+import type { McpRow } from "./mcp-schema.js";
 
 export const McpMapper = {
   toDomain(row: McpRow): McpEntity {

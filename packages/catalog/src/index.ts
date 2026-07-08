@@ -288,6 +288,6 @@ export {
 } from "./catalog-module.js";
 // ─── infrastructure seams (shared-db support) ──────────────────────
 export type { Db } from "./infrastructure/drizzle/catalog-db.js";
+export * as schema from "./infrastructure/drizzle/catalog-db.js";
 export { applyCatalogMigrations } from "./infrastructure/drizzle/catalog-migrations.js";
-export * as schema from "./infrastructure/drizzle/catalog-schema.js";
 export { type CatalogScope, createCatalogScope } from "./infrastructure/drizzle/catalog-scope.js";

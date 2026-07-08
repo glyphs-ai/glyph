@@ -3,8 +3,8 @@ import { ZodError } from "zod";
 import { Get__Entity__UseCase } from "../../src/application/get-__entity-kebab__.js";
 import type { __Entity__Id } from "../../src/domain/__entity-kebab__-id.js";
 import type { Db } from "../../src/infrastructure/drizzle/__entity-kebab__-db.js";
+import { __entities__ } from "../../src/infrastructure/drizzle/__entity-kebab__-db.js";
 import { Drizzle__Entity__Queries } from "../../src/infrastructure/drizzle/__entity-kebab__-queries.js";
-import { __entities__ } from "../../src/infrastructure/drizzle/__entity-kebab__-schema.js";
 import { openTestDb } from "../testing.js";
 
 const VALID_ID = "11111111-1111-4111-8111-111111111111" as __Entity__Id;

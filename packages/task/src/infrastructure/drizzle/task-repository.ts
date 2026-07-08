@@ -10,8 +10,8 @@ import type {
 } from "../../domain/task-repository.js";
 import { TERMINAL_TASK_STATUSES } from "../../domain/task-status.js";
 import type { Db } from "./task-db.js";
+import { type NewTaskRow, tasks } from "./task-db.js";
 import { TaskMapper } from "./task-mapper.js";
-import { type NewTaskRow, tasks } from "./task-schema.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 

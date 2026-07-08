@@ -4,7 +4,7 @@ import type { ScheduleCorruption } from "../../domain/schedule/schedule-errors.j
 import { ScheduleIdSchema } from "../../domain/schedule/schedule-id.js";
 import type { ScheduleTargetEnvelope } from "../../domain/schedule/schedule-target.js";
 import type { ScheduleTrigger } from "../../domain/schedule/schedule-trigger.js";
-import type { NewScheduleRow, ScheduleRow } from "./schedule-schema.js";
+import type { NewScheduleRow, ScheduleRow } from "./schedule-db.js";
 
 /**
  * Row ↔ entity mapping for the schedules table. The write side

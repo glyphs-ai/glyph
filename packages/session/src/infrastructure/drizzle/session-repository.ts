@@ -7,9 +7,8 @@ import type {
   SessionNotFound,
   SessionRepository,
 } from "../../domain/session-repository.js";
-import type { Db } from "./session-db.js";
-import { SessionMapper, type SessionRow } from "./session-mapper.js";
-import { sessions } from "./session-schema.js";
+import { type Db, type SessionRow, sessions } from "./session-db.js";
+import { SessionMapper } from "./session-mapper.js";
 
 /**
  * Drizzle-backed write-side adapter for {@link SessionRepository}.

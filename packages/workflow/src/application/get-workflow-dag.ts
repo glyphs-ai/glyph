@@ -29,12 +29,12 @@ import {
   type WorkflowSuccess,
   WorkflowSuccessSchema,
 } from "../domain/workflow/workflow-success.js";
-import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries.js";
 import type {
   WorkflowEdgeRow,
   WorkflowNodeRow,
   WorkflowRow,
-} from "../infrastructure/drizzle/workflow-schema.js";
+} from "../infrastructure/drizzle/workflow-db.js";
+import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const GetWorkflowDagRequestSchema = z.object({ workflowId: WorkflowIdSchema }).strict();

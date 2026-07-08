@@ -60,6 +60,12 @@ export {
 export { describeCron } from "./infrastructure/cron/describe.js";
 // ─── Infrastructure: db, migrations, schema, queries, describe ──────
 export type { Db } from "./infrastructure/drizzle/schedule-db.js";
+export * as schema from "./infrastructure/drizzle/schedule-db.js";
+export {
+  type NewScheduleRow,
+  type ScheduleRow,
+  schedules,
+} from "./infrastructure/drizzle/schedule-db.js";
 export { ScheduleMapper } from "./infrastructure/drizzle/schedule-mapper.js";
 export {
   applyScheduleMigrations,
@@ -70,12 +76,6 @@ export {
   type ScheduleQueries,
 } from "./infrastructure/drizzle/schedule-queries.js";
 export { DrizzleScheduleRepository } from "./infrastructure/drizzle/schedule-repository.js";
-export * as schema from "./infrastructure/drizzle/schedule-schema.js";
-export {
-  type NewScheduleRow,
-  type ScheduleRow,
-  schedules,
-} from "./infrastructure/drizzle/schedule-schema.js";
 export {
   createScheduleScope,
   type ScheduleScope,

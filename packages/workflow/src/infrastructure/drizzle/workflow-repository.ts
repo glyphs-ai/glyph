@@ -14,10 +14,9 @@ import type {
   WorkflowNotFound,
   WorkflowRepository,
 } from "../../domain/workflow/workflow-repository.js";
-import type { Db } from "./workflow-db.js";
+import type { Db, NewWorkflowNodeRow, NewWorkflowRow, WorkflowNodeRow } from "./workflow-db.js";
+import { workflowEdges, workflowNodes, workflows } from "./workflow-db.js";
 import { WorkflowMapper } from "./workflow-mapper.js";
-import type { NewWorkflowNodeRow, NewWorkflowRow, WorkflowNodeRow } from "./workflow-schema.js";
-import { workflowEdges, workflowNodes, workflows } from "./workflow-schema.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 

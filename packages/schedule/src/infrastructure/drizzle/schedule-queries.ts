@@ -1,7 +1,7 @@
 import { ResultAsync } from "neverthrow";
 import type { DatabaseUnavailable } from "../../domain/schedule/schedule-repository.js";
 import type { Db } from "./schedule-db.js";
-import { schedules } from "./schedule-schema.js";
+import { schedules } from "./schedule-db.js";
 
 /**
  * Read-side port for the schedule CQRS query model. Exposes the table so read

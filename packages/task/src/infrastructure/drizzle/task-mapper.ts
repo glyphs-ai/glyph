@@ -5,7 +5,7 @@ import type { TaskFailure } from "../../domain/task-failure.js";
 import type { TaskOrigin } from "../../domain/task-origin.js";
 import type { TaskStatus } from "../../domain/task-status.js";
 import type { TaskSuccess } from "../../domain/task-success.js";
-import type { NewTaskRow, TaskRow } from "./task-schema.js";
+import type { NewTaskRow, TaskRow } from "./task-db.js";
 
 /**
  * Row ↔ entity mapper for the `tasks` table. `metadata.runtime` is promoted

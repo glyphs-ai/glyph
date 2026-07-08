@@ -4,8 +4,8 @@ import { type ScheduleId, ScheduleIdSchema } from "../domain/schedule/schedule-i
 import type { DatabaseUnavailable } from "../domain/schedule/schedule-repository.js";
 import { ScheduleTargetEnvelopeSchema } from "../domain/schedule/schedule-target.js";
 import { ScheduleTriggerSchema } from "../domain/schedule/schedule-trigger.js";
+import type { ScheduleRow } from "../infrastructure/drizzle/schedule-db.js";
 import type { ScheduleQueries } from "../infrastructure/drizzle/schedule-queries.js";
-import type { ScheduleRow } from "../infrastructure/drizzle/schedule-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 /**

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { AgentEntity } from "../../../src/domain/agent-entity.js";
 import type { AgentFqn } from "../../../src/domain/agent-fqn.js";
-import {
-  type AgentDepRow,
-  AgentMapper,
-  type AgentRow,
-} from "../../../src/infrastructure/drizzle/agent-mapper.js";
+import { AgentMapper } from "../../../src/infrastructure/drizzle/agent-mapper.js";
+import type {
+  AgentRow,
+  AgentSkillDepRow,
+} from "../../../src/infrastructure/drizzle/agent-schema.js";
+
+type AgentDepRow = AgentSkillDepRow;
 
 const FQN = "public/triage" as AgentFqn;
 

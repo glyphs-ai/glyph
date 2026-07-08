@@ -1,8 +1,8 @@
 import { type Client, createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import type { Db } from "../src/infrastructure/drizzle/schedule-db.js";
+import * as schema from "../src/infrastructure/drizzle/schedule-db.js";
 import { applyScheduleMigrations } from "../src/infrastructure/drizzle/schedule-migrations.js";
-import * as schema from "../src/infrastructure/drizzle/schedule-schema.js";
 
 /**
  * Test-only DB opener. Applies PRAGMAs + migrations against a fresh

@@ -9,8 +9,8 @@ import type {
   ScheduleRepository,
 } from "../../domain/schedule/schedule-repository.js";
 import type { Db } from "./schedule-db.js";
+import { type NewScheduleRow, schedules } from "./schedule-db.js";
 import { ScheduleMapper } from "./schedule-mapper.js";
-import { type NewScheduleRow, schedules } from "./schedule-schema.js";
 
 /**
  * Drizzle-backed write-side adapter for {@link ScheduleRepository}. Wraps the

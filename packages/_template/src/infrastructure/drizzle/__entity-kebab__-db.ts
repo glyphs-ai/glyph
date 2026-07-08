@@ -1,11 +1,20 @@
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import type * as schema from "./__entity-kebab__-schema.js";
+import type { ResultSet } from "@libsql/client";
+import { type BaseSQLiteDatabase, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-/** The pkg's drizzle DB handle, parameterized by the __PKG__ tables. */
-export type Db = BetterSQLite3Database<typeof schema>;
+/** Table for the __Entity__ aggregate; rows map to `__Entity__Entity`. */
+export const __entities__ = sqliteTable("__entities__", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  createdAt: text("created_at").notNull(),
+  archived: integer("archived", { mode: "boolean" }).notNull(),
+});
+
+export type __Entity__Row = typeof __entities__.$inferSelect;
+export type New__Entity__Row = typeof __entities__.$inferInsert;
 
 /**
- * Re-exported here so hosts can apply this package's migrations against the
- * SQLite client they build (see `packages/api/src/workspace-context.ts`).
+ * The pkg's drizzle DB handle, parameterized by the __PKG__ tables above.
+ * A request-scoped drizzle transaction also satisfies this type, so
+ * repositories and queries stay unaware of whether they run inside one.
  */
-export { apply__Entity__Migrations } from "./__entity-kebab__-migrations.js";
+export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof import("./__entity-kebab__-db.js")>;

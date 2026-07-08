@@ -23,8 +23,7 @@ read-side query seam:
         list-__entity-kebab__s.ts          # read use-case; query seam
         __entity-kebab__-public.ts         # named public domain/error re-exports
       infrastructure/drizzle/          # adapters implementing ports/seams
-        __entity-kebab__-schema.ts         # drizzle table
-        __entity-kebab__-db.ts             # Db type + apply__Entity__Migrations re-export
+        __entity-kebab__-db.ts             # drizzle tables, Row types, and pkg Db type
         __entity-kebab__-migrations.ts     # AUTO-GENERATED from drizzle/*.sql (never hand-edit)
         __entity-kebab__-mapper.ts         # row <-> entity mapper
         __entity-kebab__-repository.ts     # write-side Drizzle adapter

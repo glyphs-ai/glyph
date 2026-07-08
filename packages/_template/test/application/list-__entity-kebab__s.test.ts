@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { List__Entity__sUseCase } from "../../src/application/list-__entity-kebab__s.js";
 import type { __Entity__Id } from "../../src/domain/__entity-kebab__-id.js";
 import type { Db } from "../../src/infrastructure/drizzle/__entity-kebab__-db.js";
+import { __entities__ } from "../../src/infrastructure/drizzle/__entity-kebab__-db.js";
 import { Drizzle__Entity__Queries } from "../../src/infrastructure/drizzle/__entity-kebab__-queries.js";
-import { __entities__ } from "../../src/infrastructure/drizzle/__entity-kebab__-schema.js";
 import { openTestDb } from "../testing.js";
 
 let db: Db;

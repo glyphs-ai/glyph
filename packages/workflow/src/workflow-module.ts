@@ -20,9 +20,9 @@ import { ResolveWorkflowArtifactPathUseCase } from "./application/resolve-workfl
 import { RespondToHumanNodeUseCase } from "./application/respond-to-human-node.js";
 import { UpdateWorkflowNodeSpecUseCase } from "./application/update-workflow-node-spec.js";
 import type { Db } from "./infrastructure/drizzle/workflow-db.js";
+import * as schema from "./infrastructure/drizzle/workflow-db.js";
 import { DrizzleWorkflowQueries } from "./infrastructure/drizzle/workflow-queries.js";
 import { DrizzleWorkflowRepository } from "./infrastructure/drizzle/workflow-repository.js";
-import * as schema from "./infrastructure/drizzle/workflow-schema.js";
 import { WorkflowSandbox, workflowRoot } from "./infrastructure/file/workflow-sandbox.js";
 
 /**

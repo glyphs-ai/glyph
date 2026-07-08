@@ -14,7 +14,12 @@ import { eq } from "drizzle-orm";
 import type { SkillDependencyRefs } from "../../domain/skill-deps.js";
 import { agentSkillDeps } from "../../infrastructure/drizzle/agent-schema.js";
 import type { Db } from "../../infrastructure/drizzle/catalog-db.js";
-import { skillMcpDeps, skillSkillDeps, skills } from "../../infrastructure/drizzle/skill-schema.js";
+import {
+  type SkillRow,
+  skillMcpDeps,
+  skillSkillDeps,
+  skills,
+} from "../../infrastructure/drizzle/skill-schema.js";
 
 export interface SkillView {
   readonly fqn: string;
@@ -27,8 +32,6 @@ export interface SkillView {
   readonly installedAt: string;
   readonly updatedAt: string;
 }
-
-type SkillRow = typeof skills.$inferSelect;
 
 function toSkillView(row: SkillRow, dependencyRefs: SkillDependencyRefs): SkillView {
   return {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { workflows } from "../../src/infrastructure/drizzle/workflow-schema.js";
+import { workflows } from "../../src/infrastructure/drizzle/workflow-db.js";
 import { buildWorkflowFixture, type WorkflowFixture } from "./workflow-fixture.js";
 
 let f: WorkflowFixture;

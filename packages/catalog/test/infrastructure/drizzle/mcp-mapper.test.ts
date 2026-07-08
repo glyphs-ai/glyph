@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { McpEntity } from "../../../src/domain/mcp-entity.js";
 import type { McpFqn } from "../../../src/domain/mcp-fqn.js";
-import { McpMapper, type McpRow } from "../../../src/infrastructure/drizzle/mcp-mapper.js";
+import { McpMapper } from "../../../src/infrastructure/drizzle/mcp-mapper.js";
+import type { McpRow } from "../../../src/infrastructure/drizzle/mcp-schema.js";
 
 const ROW: McpRow = {
   fqn: "azure/mcp",

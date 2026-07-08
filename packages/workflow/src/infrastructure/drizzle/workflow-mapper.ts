@@ -23,7 +23,7 @@ import type {
   WorkflowEdgeRow,
   WorkflowNodeRow,
   WorkflowRow,
-} from "./workflow-schema.js";
+} from "./workflow-db.js";
 
 export const WorkflowMapper = {
   toWorkflowRow(entity: WorkflowEntity): NewWorkflowRow {

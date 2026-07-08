@@ -40,7 +40,7 @@ import type { WorkflowNodeKind } from "../../src/domain/node/workflow-node-kind.
 import type { WorkflowNodeStatus } from "../../src/domain/node/workflow-node-status.js";
 import { type WorkflowId, WorkflowIdSchema } from "../../src/domain/workflow/workflow-id.js";
 import type { Db } from "../../src/infrastructure/drizzle/workflow-db.js";
-import { workflowNodes } from "../../src/infrastructure/drizzle/workflow-schema.js";
+import { workflowNodes } from "../../src/infrastructure/drizzle/workflow-db.js";
 import { workflowRoot } from "../../src/infrastructure/file/workflow-sandbox.js";
 import { composeWorkflowModule, type WorkflowModule } from "../../src/workflow-module.js";
 import { openTestDb } from "../testing.js";

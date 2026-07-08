@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { SkillEntity } from "../../../src/domain/skill-entity.js";
 import type { SkillFqn } from "../../../src/domain/skill-fqn.js";
-import {
-  type SkillDepRow,
-  SkillMapper,
-  type SkillRow,
-} from "../../../src/infrastructure/drizzle/skill-mapper.js";
+import { SkillMapper } from "../../../src/infrastructure/drizzle/skill-mapper.js";
+import type {
+  SkillRow,
+  SkillSkillDepRow,
+} from "../../../src/infrastructure/drizzle/skill-schema.js";
+
+type SkillDepRow = SkillSkillDepRow;
 
 const FQN = "public/tool-use" as SkillFqn;
 

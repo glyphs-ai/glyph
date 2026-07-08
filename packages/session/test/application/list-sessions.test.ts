@@ -8,12 +8,12 @@ import { SessionIdSchema } from "../../src/domain/session-id.js";
 import type { DatabaseUnavailable } from "../../src/domain/session-repository.js";
 import type { SessionSandbox } from "../../src/domain/session-sandbox.js";
 import type { Db } from "../../src/infrastructure/drizzle/session-db.js";
+import { sessions } from "../../src/infrastructure/drizzle/session-db.js";
 import { SessionMapper } from "../../src/infrastructure/drizzle/session-mapper.js";
 import {
   DrizzleSessionQueries,
   type SessionQueries,
 } from "../../src/infrastructure/drizzle/session-queries.js";
-import { sessions } from "../../src/infrastructure/drizzle/session-schema.js";
 import { openTestDb } from "../testing.js";
 
 const NEWER = SessionIdSchema.parse("20260510-aaaaaaaa");

@@ -17,8 +17,8 @@ import {
   type WorkflowSuccess,
   WorkflowSuccessSchema,
 } from "../domain/workflow/workflow-success.js";
+import type { WorkflowRow } from "../infrastructure/drizzle/workflow-db.js";
 import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries.js";
-import type { WorkflowRow } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const ListWorkflowsRequestSchema = z

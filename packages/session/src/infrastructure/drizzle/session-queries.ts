@@ -1,7 +1,7 @@
 import { ResultAsync } from "neverthrow";
 import type { DatabaseUnavailable } from "../../domain/session-repository.js";
 import type { Db } from "./session-db.js";
-import { sessions } from "./session-schema.js";
+import { sessions } from "./session-db.js";
 
 /**
  * Read-side port for the session CQRS query model. Exposes the table so

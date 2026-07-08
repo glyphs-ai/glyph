@@ -8,12 +8,12 @@ import { WorkflowBriefSchema } from "../../../src/domain/workflow/workflow-brief
 import { WorkflowEntity } from "../../../src/domain/workflow/workflow-entity.js";
 import { type WorkflowId, WorkflowIdSchema } from "../../../src/domain/workflow/workflow-id.js";
 import type { Db } from "../../../src/infrastructure/drizzle/workflow-db.js";
-import { DrizzleWorkflowRepository } from "../../../src/infrastructure/drizzle/workflow-repository.js";
 import {
   workflowEdges,
   workflowNodes,
   workflows,
-} from "../../../src/infrastructure/drizzle/workflow-schema.js";
+} from "../../../src/infrastructure/drizzle/workflow-db.js";
+import { DrizzleWorkflowRepository } from "../../../src/infrastructure/drizzle/workflow-repository.js";
 import { openTestDb } from "../../testing.js";
 
 const NOW = "2026-06-07T00:00:00.000Z";

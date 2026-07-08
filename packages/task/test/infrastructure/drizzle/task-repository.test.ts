@@ -3,8 +3,8 @@ import { TaskBriefSchema } from "../../../src/domain/task-brief.js";
 import { TaskEntity } from "../../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../../src/domain/task-id.js";
 import type { Db } from "../../../src/infrastructure/drizzle/task-db.js";
+import { tasks } from "../../../src/infrastructure/drizzle/task-db.js";
 import { DrizzleTaskRepository } from "../../../src/infrastructure/drizzle/task-repository.js";
-import { tasks } from "../../../src/infrastructure/drizzle/task-schema.js";
 import { openTestDb } from "../../testing.js";
 
 const CREATED_AT = "2026-05-08T01:05:00.000Z";

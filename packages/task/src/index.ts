@@ -158,8 +158,8 @@ export * from "./application/task-public.js";
 export type { UseCase, UseCaseResult } from "./application/use-case.js";
 // ─── infrastructure seams (shared-db support) ──────────────────────
 export type { Db } from "./infrastructure/drizzle/task-db.js";
+export * as schema from "./infrastructure/drizzle/task-db.js";
 export { applyTaskMigrations } from "./infrastructure/drizzle/task-migrations.js";
-export * as schema from "./infrastructure/drizzle/task-schema.js";
 export { createTaskScope, type TaskScope } from "./infrastructure/drizzle/task-scope.js";
 // ─── on-disk task layout contract (host artifact-path resolution) ──
 export { TASK_ARTIFACT_SUBDIR, tasksRoot } from "./infrastructure/file/local-task-sandbox.js";

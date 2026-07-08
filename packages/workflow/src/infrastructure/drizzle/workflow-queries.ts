@@ -1,7 +1,7 @@
 import { ResultAsync } from "neverthrow";
 import type { DatabaseUnavailable } from "../../domain/workflow/workflow-repository.js";
 import type { Db } from "./workflow-db.js";
-import { workflowEdges, workflowNodes, workflows } from "./workflow-schema.js";
+import { workflowEdges, workflowNodes, workflows } from "./workflow-db.js";
 
 /**
  * Read-side port for the workflow CQRS query model. Exposes the three tables so

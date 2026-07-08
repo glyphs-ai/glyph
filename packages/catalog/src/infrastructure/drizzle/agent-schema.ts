@@ -84,3 +84,10 @@ export const agentMcpDeps = sqliteTable(
     uniqueIndex("agent_mcp_deps_uniq").on(t.sourceFqn, t.targetFqn),
   ],
 );
+
+export type AgentRow = typeof agents.$inferSelect;
+export type NewAgentRow = typeof agents.$inferInsert;
+export type AgentFileRow = typeof agentFiles.$inferInsert;
+export type AgentSkillDepRow = typeof agentSkillDeps.$inferInsert;
+export type AgentMcpDepRow = typeof agentMcpDeps.$inferInsert;
+export type AgentAgentDepRow = typeof agentAgentDeps.$inferInsert;

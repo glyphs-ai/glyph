@@ -1,8 +1,8 @@
 import { type Client, createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import type { Db } from "../src/infrastructure/drizzle/workflow-db.js";
+import * as schema from "../src/infrastructure/drizzle/workflow-db.js";
 import { applyWorkflowMigrations } from "../src/infrastructure/drizzle/workflow-migrations.js";
-import * as schema from "../src/infrastructure/drizzle/workflow-schema.js";
 
 /**
  * Test-only DB opener. Applies PRAGMAs + migrations against a fresh

@@ -10,16 +10,17 @@
 import { AgentEntity } from "../../domain/agent-entity.js";
 import type { AgentFqn } from "../../domain/agent-fqn.js";
 import type {
-  agentAgentDeps,
-  agentFiles,
-  agentMcpDeps,
-  agentSkillDeps,
-  agents,
+  AgentAgentDepRow,
+  AgentFileRow,
+  AgentMcpDepRow,
+  AgentRow,
+  AgentSkillDepRow,
 } from "./agent-schema.js";
 
-export type AgentRow = typeof agents.$inferSelect;
-export type AgentFileRow = typeof agentFiles.$inferInsert;
-export type AgentDepRow = typeof agentSkillDeps.$inferInsert;
+// Skill/mcp/agent dep rows are structurally identical; keep one alias for
+// mapper params so callers name the semantic kind (`skillDeps` etc) without
+// dragging three interchangeable types through the signature.
+type AgentDepRow = AgentSkillDepRow;
 
 export const AgentMapper = {
   toDomain(
@@ -68,11 +69,11 @@ export const AgentMapper = {
     return agent.dependencyRefs.skills.map((targetFqn) => ({ sourceFqn: agent.id, targetFqn }));
   },
 
-  toMcpDepRows(agent: AgentEntity): (typeof agentMcpDeps.$inferInsert)[] {
+  toMcpDepRows(agent: AgentEntity): AgentMcpDepRow[] {
     return agent.dependencyRefs.mcps.map((targetFqn) => ({ sourceFqn: agent.id, targetFqn }));
   },
 
-  toAgentDepRows(agent: AgentEntity): (typeof agentAgentDeps.$inferInsert)[] {
+  toAgentDepRows(agent: AgentEntity): AgentAgentDepRow[] {
     return agent.dependencyRefs.agents.map((targetFqn) => ({ sourceFqn: agent.id, targetFqn }));
   },
 } as const;

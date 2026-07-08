@@ -93,8 +93,8 @@ export {
 export type { UseCase, UseCaseResult } from "./application/use-case.js";
 // ─── infrastructure seams (shared-db support) ──────────────────────
 export type { Db } from "./infrastructure/drizzle/session-db.js";
+export * as schema from "./infrastructure/drizzle/session-db.js";
 export { applySessionMigrations } from "./infrastructure/drizzle/session-migrations.js";
-export * as schema from "./infrastructure/drizzle/session-schema.js";
 export { createSessionScope, type SessionScope } from "./infrastructure/drizzle/session-scope.js";
 export {
   composeSessionModule,

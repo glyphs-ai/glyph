@@ -16,8 +16,8 @@ import type {
   DatabaseUnavailable,
   WorkflowEntityCorruption,
 } from "../domain/workflow/workflow-repository.js";
+import type { WorkflowNodeRow } from "../infrastructure/drizzle/workflow-db.js";
 import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries.js";
-import type { WorkflowNodeRow } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const GetWorkflowNodeRequestSchema = z
