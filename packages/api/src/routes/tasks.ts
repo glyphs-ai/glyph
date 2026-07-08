@@ -21,7 +21,6 @@ import { respondTaskError } from "../_error-policies/tasks.js";
 import { logEvent, problemResponse } from "../_http-errors.js";
 import { createApiApp, errorResponse, jsonRequest, jsonResponse } from "../_http-helpers.js";
 import { contentTypeFor, streamFileAsResponse } from "./_artifact-stream.js";
-import { isKnownTaskOrigin, KNOWN_TASK_ORIGINS } from "./_task-origins.js";
 
 const TaskPathSchema = z.object({ tid: z.string() });
 const ArtifactQuerySchema = z.object({ path: z.string().min(1) });
@@ -179,18 +178,21 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       path: "/",
       tags: ["tasks"],
       summary: "List tasks (standalone by default, or scoped to an origin)",
-      // Query reuses the task read-model's list contract. `origin` / `originId`
-      // are re-typed to single optional wire strings (the read model accepts an
-      // array form the wire never needs) and, when supplied together, scope the
-      // listing to that origin pair — the reverse-lookup a workflow coordinator
-      // uses to enumerate a node's tasks (`origin="workflow"`,
-      // `originId=<nodeId>`). Omitted, the route stays standalone-only. Unknown
-      // params are stripped (`.strip()`); `status` is the shared `TaskStatus`
-      // enum, rejected at the boundary when invalid.
+      // Query reuses the task read-model's list contract, but `origin` is
+      // re-typed to a closed `z.enum` of the two scopable origin kinds and,
+      // when supplied together with `originId`, scopes the listing to that
+      // origin pair — the reverse-lookup a workflow coordinator uses to
+      // enumerate a node's tasks (`origin="workflow"`, `originId=<nodeId>`).
+      // `standalone` is intentionally excluded: standalone rows carry a NULL
+      // `origin_id`, so scoping to one could never match — the default
+      // (no-`origin`) path already pins standalone server-side. An unknown or
+      // `standalone` `origin` is rejected at the boundary as a `ValidationError`
+      // (as is an invalid `status`). Omitted, the route stays standalone-only.
+      // Unknown params are stripped (`.strip()`).
       request: {
         query: ListTasksRequestSchema.omit({ origin: true, originId: true })
           .extend({
-            origin: z.string().min(1).optional(),
+            origin: z.enum(["schedule", "workflow"]).optional(),
             originId: z.string().min(1).optional(),
           })
           .strip(),
@@ -211,12 +213,6 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
         return problemResponse(c, 400, {
           code: "OriginQueryMalformed",
           detail: "origin and originId must be supplied together",
-        });
-      }
-      if (origin !== undefined && !isKnownTaskOrigin(origin)) {
-        return problemResponse(c, 400, {
-          code: "UnknownOriginKind",
-          detail: `unknown origin kind; expected one of: ${KNOWN_TASK_ORIGINS.join(", ")}`,
         });
       }
 

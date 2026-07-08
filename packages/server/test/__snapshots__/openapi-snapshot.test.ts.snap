@@ -10272,7 +10272,10 @@ exports[`openapi spec > assembled /api/openapi.json matches the committed snapsh
             "name": "origin",
             "required": false,
             "schema": {
-              "minLength": 1,
+              "enum": [
+                "schedule",
+                "workflow",
+              ],
               "type": "string",
             },
           },

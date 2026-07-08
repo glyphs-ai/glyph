@@ -635,7 +635,7 @@ export type GetApiWorkspacesByIdTasksData = {
         createdSince?: string;
         runtime?: string;
         status?: 'running' | 'succeeded' | 'failed' | 'cancelled';
-        origin?: string;
+        origin?: 'schedule' | 'workflow';
         originId?: string;
     };
     url: '/api/workspaces/{id}/tasks';

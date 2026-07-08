@@ -73,9 +73,14 @@ export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> 
       >;
     }
     // Origin scoping. `opts.origin` is a raw CLI string; the server validates
-    // it against the known-origins catalog and returns a 400 (surfaced as-is)
-    // for an unknown kind. The registrar guarantees both or neither.
-    if (opts.origin !== undefined) query.origin = opts.origin;
+    // it against the `origin` enum and returns a 400 ValidationError (surfaced
+    // as-is) for an unknown or non-scopable kind (e.g. `standalone`). The
+    // registrar guarantees both or neither.
+    if (opts.origin !== undefined) {
+      query.origin = opts.origin as NonNullable<
+        NonNullable<GetApiWorkspacesByIdTasksData["query"]>["origin"]
+      >;
+    }
     if (opts.originId !== undefined) query.originId = opts.originId;
     const list = unwrap(
       await getApiWorkspacesByIdTasks({

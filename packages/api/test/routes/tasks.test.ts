@@ -316,11 +316,26 @@ describe("tasksRoutes", () => {
     expect(m.list).not.toHaveBeenCalled();
   });
 
-  it("GET /?origin=bogus&originId=x → 400 UnknownOriginKind", async () => {
+  it("GET /?origin=<unknown> → 400 ValidationError (origin is a closed enum)", async () => {
     const m = stubManager({});
     const res = await tasksRoutes(() => m).request("/?origin=workflowNode&originId=node-7");
     expect(res.status).toBe(400);
-    expect((await jsonBody(res)).code).toBe("UnknownOriginKind");
+    const body = await jsonBody(res);
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/origin/);
+    expect(m.list).not.toHaveBeenCalled();
+  });
+
+  it("GET /?origin=standalone&originId=X → 400 ValidationError (standalone not scopable)", async () => {
+    // standalone rows carry a NULL origin_id, so `?origin=standalone` could
+    // never match a paired lookup; the wire enum rejects it rather than
+    // pretending a scope exists. Standalone listing is the default no-origin path.
+    const m = stubManager({});
+    const res = await tasksRoutes(() => m).request("/?origin=standalone&originId=task-1");
+    expect(res.status).toBe(400);
+    const body = await jsonBody(res);
+    expect(body.code).toBe("ValidationError");
+    expect(JSON.stringify(body.issues)).toMatch(/origin/);
     expect(m.list).not.toHaveBeenCalled();
   });
 
