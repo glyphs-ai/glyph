@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { WorkflowRow } from "../../../src/infrastructure/drizzle/workflow-db.js";
 import { WorkflowMapper } from "../../../src/infrastructure/drizzle/workflow-mapper.js";
-import type { WorkflowRow } from "../../../src/infrastructure/drizzle/workflow-schema.js";
 
 /**
  * Terminal-payload rehydration invariants. In the CQRS layout the row↔entity

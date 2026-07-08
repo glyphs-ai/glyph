@@ -4,7 +4,7 @@
 // biome-ignore-all format: keep generator output stable across runs.
 // biome-ignore-all lint: generated, may include unused/long lines.
 
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import type { Client } from "@libsql/client";
 import type { MigrationMeta } from "drizzle-orm/migrator";
 
 export const MIGRATIONS: readonly MigrationMeta[] = [
@@ -35,7 +35,7 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
       "\nUPDATE `tasks` SET `origin_id` = json_extract(`metadata`, '$.workflowNodeId')\n  WHERE `origin` = 'workflow' AND json_extract(`metadata`, '$.workflowNodeId') IS NOT NULL;\n",
       "\nCREATE INDEX `tasks_origin_pair_idx` ON `tasks` (`origin`, `origin_id`) WHERE `origin_id` IS NOT NULL;\n",
       "\nCREATE TEMP TABLE `_assert_tasks_origin_backfill` (`x`);\n",
-      "\nCREATE TEMP TRIGGER `_assert_tasks_origin_backfill_trg` BEFORE INSERT ON `_assert_tasks_origin_backfill`\nBEGIN\n  SELECT RAISE(\n    FAIL,\n    'tasks backfill incomplete: '\n      || (SELECT count(*) FROM `tasks` WHERE `origin` NOT IN ('standalone') AND `origin_id` IS NULL)\n      || ' non-standalone row(s) without origin_id; offending ids: '\n      || (SELECT group_concat(`id`) FROM `tasks` WHERE `origin` NOT IN ('standalone') AND `origin_id` IS NULL)\n  )\n  WHERE EXISTS (SELECT 1 FROM `tasks` WHERE `origin` NOT IN ('standalone') AND `origin_id` IS NULL);\nEND;\n",
+      "\nCREATE TEMP TRIGGER `_assert_tasks_origin_backfill_trg` BEFORE INSERT ON `_assert_tasks_origin_backfill`\nBEGIN\n  SELECT RAISE(FAIL, 'tasks backfill incomplete')\n  WHERE EXISTS (SELECT 1 FROM `tasks` WHERE `origin` NOT IN ('standalone') AND `origin_id` IS NULL);\nEND;\n",
       "\nINSERT INTO `_assert_tasks_origin_backfill` VALUES (1);\n",
       "\nDROP TRIGGER `_assert_tasks_origin_backfill_trg`;\n",
       "\nDROP TABLE `_assert_tasks_origin_backfill`;\n",
@@ -43,36 +43,49 @@ export const MIGRATIONS: readonly MigrationMeta[] = [
     ],
     bps: true,
     folderMillis: 3,
-    hash: "8390805dad532b541ec56fadca7459a002c717d9f9ee25753b4e7d6caad9a72d",
+    hash: "994e7649884854299a619d9e3d7d38e9831940fed69b48f08b6201d37847c006",
   },
 ];
 
 /**
- * Run drizzle's official migration applier against `db`. Thin typed
- * shim over drizzle's `@internal` `dialect` + `session` props (same
- * props drizzle's own `migrate()` from `drizzle-orm/better-sqlite3/migrator`
- * touches) so consumers don't repeat the cast.
+ * Apply migrations against a libsql `client` using `batch(..., "write")`,
+ * which runs each migration's statements atomically on the *single* client
+ * connection. This is deliberately NOT drizzle's `migrate()` (from
+ * `drizzle-orm/libsql/migrator`): that opens a separate interactive-transaction
+ * connection, which a plain `:memory:` url cannot share (every libsql
+ * connection is its own in-memory db) — so drizzle's migrator can only run
+ * against a file. Batch keeps a single connection, so the same applier works
+ * for both file and `:memory:` (tests), with no leaked transaction handle.
  *
- * **Per-pkg `migrationsTable`**: `__drizzle_migrations_task`.
- * Each entity pkg owns its own journal table so co-tenant pkgs in the
- * same SQLite file don't trip drizzle's global `folderMillis` watermark
- * check — drizzle's own bookkeeping is namespaced by table, so per-pkg
- * tables let migrations apply independently. Every glyph pkg follows
- * the `__drizzle_migrations_<pkg>` convention; deviating from it would
- * silently re-apply migrations or skip them.
+ * **Per-pkg journal table**: `__drizzle_migrations_task`. Each
+ * entity pkg owns its own table so co-tenant pkgs in one SQLite file apply
+ * independently; the `created_at` watermark skips already-applied
+ * migrations.
  *
  * This package's journal table is `__drizzle_migrations_task`; its
  * migrations share one lineage with the `tasks` schema in a shared
  * workspace.db.
  */
-export function applyTaskMigrations<T extends Record<string, unknown>>(
-  db: BetterSQLite3Database<T>,
-): void {
-  const internals = db as unknown as {
-    dialect: { migrate(m: readonly MigrationMeta[], s: unknown, c?: { migrationsTable: string }): void };
-    session: unknown;
-  };
-  internals.dialect.migrate(MIGRATIONS, internals.session, {
-    migrationsTable: "__drizzle_migrations_task",
-  });
+export async function applyTaskMigrations(client: Client): Promise<void> {
+  await client.execute(
+    "CREATE TABLE IF NOT EXISTS __drizzle_migrations_task (id INTEGER PRIMARY KEY, hash text NOT NULL, created_at numeric)",
+  );
+  const applied = await client.execute(
+    "SELECT created_at FROM __drizzle_migrations_task ORDER BY created_at DESC LIMIT 1",
+  );
+  const lastRow = applied.rows.at(0);
+  const lastMillis = lastRow !== undefined ? Number(lastRow.created_at) : -1;
+  for (const migration of MIGRATIONS) {
+    if (lastMillis >= migration.folderMillis) continue;
+    await client.batch(
+      [
+        ...migration.sql,
+        {
+          sql: "INSERT INTO __drizzle_migrations_task (hash, created_at) VALUES (?, ?)",
+          args: [migration.hash, migration.folderMillis],
+        },
+      ],
+      "write",
+    );
+  }
 }

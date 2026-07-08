@@ -80,13 +80,13 @@ export class GetAgentEntryUseCase
 
   execute(request: GetAgentEntryRequest): UseCaseResult<GetAgentEntryResponse, GetAgentEntryError> {
     const { id } = request;
-    return this.deps.queries.query((db): GetAgentEntryResponse => {
-      const target = selectAgentByFqn(db, id);
+    return this.deps.queries.query(async (db): Promise<GetAgentEntryResponse> => {
+      const target = await selectAgentByFqn(db, id);
       if (target === undefined) return null;
 
-      const skills = selectAllSkills(db);
-      const referencedSkillFqns = collectReferencedSkillFqns(db);
-      const installedMcpFqns = selectInstalledMcpFqns(db);
+      const skills = await selectAllSkills(db);
+      const referencedSkillFqns = await collectReferencedSkillFqns(db);
+      const installedMcpFqns = await selectInstalledMcpFqns(db);
       const skillByFqn = new Map<string, SkillView>(skills.map((s) => [s.fqn, s]));
 
       const skillCache = new Map<string, ComputedStatus>();

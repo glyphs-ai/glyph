@@ -7,9 +7,8 @@ import type {
   SessionNotFound,
   SessionRepository,
 } from "../../domain/session-repository.js";
-import type { Db } from "./session-db.js";
-import { SessionMapper, type SessionRow } from "./session-mapper.js";
-import { sessions } from "./session-schema.js";
+import { type Db, type SessionRow, sessions } from "./session-db.js";
+import { SessionMapper } from "./session-mapper.js";
 
 /**
  * Drizzle-backed write-side adapter for {@link SessionRepository}.
@@ -34,7 +33,7 @@ export class DrizzleSessionRepository implements SessionRepository {
 
   get(id: SessionId): ResultAsync<SessionEntity, SessionNotFound | DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      (async () => this.db.select().from(sessions).where(eq(sessions.id, id)).get())(),
+      this.db.select().from(sessions).where(eq(sessions.id, id)).get(),
       DrizzleSessionRepository.asDatabaseUnavailable,
     ).andThen((row) => {
       if (!row) return errAsync<SessionEntity, SessionNotFound>({ type: "SessionNotFound", id });
@@ -47,33 +46,25 @@ export class DrizzleSessionRepository implements SessionRepository {
   save(entity: SessionEntity): ResultAsync<void, DatabaseUnavailable> {
     const snapshot = this.snapshots.get(entity);
     const current = SessionMapper.toRow(entity);
-    // Untracked entity ⇒ never loaded ⇒ INSERT (may hit a PRIMARY KEY conflict).
     if (snapshot === undefined) {
       return ResultAsync.fromPromise(
-        (async () => {
-          this.db.insert(sessions).values(current).run();
-        })(),
+        this.db.insert(sessions).values(current).run(),
         DrizzleSessionRepository.asDatabaseUnavailable,
       ).map(() => this.track(entity, current));
     }
-    // Tracked entity: UPDATE only the columns that diverged from the snapshot.
     const diff = diffRow(snapshot, current);
     if (Object.keys(diff).length === 0) return okAsync(undefined);
     return ResultAsync.fromPromise(
-      (async () => {
-        this.db.update(sessions).set(diff).where(eq(sessions.id, entity.id)).run();
-      })(),
+      this.db.update(sessions).set(diff).where(eq(sessions.id, entity.id)).run(),
       DrizzleSessionRepository.asDatabaseUnavailable,
     ).map(() => this.track(entity, current));
   }
 
   delete(id: SessionId): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      (async () => {
-        this.db.delete(sessions).where(eq(sessions.id, id)).run();
-      })(),
+      this.db.delete(sessions).where(eq(sessions.id, id)).run(),
       DrizzleSessionRepository.asDatabaseUnavailable,
-    );
+    ).map(() => undefined);
   }
 
   /** Record the persisted row as the entity's tracked snapshot. */

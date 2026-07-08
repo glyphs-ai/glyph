@@ -1,7 +1,7 @@
 import { ResultAsync } from "neverthrow";
 import type { DatabaseUnavailable } from "../../domain/workflow/workflow-repository.js";
 import type { Db } from "./workflow-db.js";
-import { workflowEdges, workflowNodes, workflows } from "./workflow-schema.js";
+import { workflowEdges, workflowNodes, workflows } from "./workflow-db.js";
 
 /**
  * Read-side port for the workflow CQRS query model. Exposes the three tables so
@@ -16,7 +16,7 @@ export interface WorkflowQueries {
   readonly workflowNodes: typeof workflowNodes;
   readonly workflowEdges: typeof workflowEdges;
   /** Run one read fn; a driver throw becomes DatabaseUnavailable. */
-  query<T>(fn: (db: Db) => T): ResultAsync<T, DatabaseUnavailable>;
+  query<T>(fn: (db: Db) => T | Promise<T>): ResultAsync<T, DatabaseUnavailable>;
 }
 
 export class DrizzleWorkflowQueries implements WorkflowQueries {
@@ -29,7 +29,7 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
     this.db = opts.db;
   }
 
-  query<T>(fn: (db: Db) => T): ResultAsync<T, DatabaseUnavailable> {
+  query<T>(fn: (db: Db) => T | Promise<T>): ResultAsync<T, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       Promise.resolve().then(() => fn(this.db)),
       (cause) => ({

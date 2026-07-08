@@ -8,17 +8,17 @@
 
 import { SkillEntity } from "../../domain/skill-entity.js";
 import type { SkillFqn } from "../../domain/skill-fqn.js";
-import type { skillFiles, skillMcpDeps, skillSkillDeps, skills } from "./skill-schema.js";
+import type { SkillFileRow, SkillMcpDepRow, SkillRow, SkillSkillDepRow } from "./skill-schema.js";
 
-export type SkillRow = typeof skills.$inferSelect;
-export type SkillFileRow = typeof skillFiles.$inferInsert;
-export type SkillDepRow = typeof skillSkillDeps.$inferInsert;
+// Skill-skill and skill-mcp dep rows are structurally identical (source_fqn +
+// target_fqn); alias one for the mapper params.
+type SkillDepRow = SkillSkillDepRow;
 
 export const SkillMapper = {
   toDomain(
     row: SkillRow,
     skillDeps: readonly SkillDepRow[],
-    mcpDeps: readonly (typeof skillMcpDeps.$inferInsert)[],
+    mcpDeps: readonly SkillMcpDepRow[],
   ): SkillEntity {
     return new SkillEntity({
       fqn: row.fqn as SkillFqn,
@@ -57,7 +57,7 @@ export const SkillMapper = {
     return skill.dependencyRefs.skills.map((targetFqn) => ({ sourceFqn: skill.id, targetFqn }));
   },
 
-  toMcpDepRows(skill: SkillEntity): (typeof skillMcpDeps.$inferInsert)[] {
+  toMcpDepRows(skill: SkillEntity): SkillMcpDepRow[] {
     return skill.dependencyRefs.mcps.map((targetFqn) => ({ sourceFqn: skill.id, targetFqn }));
   },
 } as const;

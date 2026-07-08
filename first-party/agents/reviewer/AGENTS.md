@@ -40,7 +40,7 @@ The default is `MODE: code` so pre-existing briefs that pre-date the introductio
 - **Repository pattern**: every service package has a `<name>-repository.ts` returning pkg-owned `Entity` types (never Drizzle `Row` types). Atomic-write helpers MUST be used in any repository module that writes to disk.
 - **Wire schemas** are owned by the domain packages (request / response zod in `application/<use-case>.ts`) and composed into `OpenAPIHono` route factories under `packages/api/src/routes/`; `@glyphs-ai/sdk` is generated from the OpenAPI spec. Dashboard and CLI import the generated operations from `@glyphs-ai/sdk` only — they MUST NOT import from `@glyphs-ai/api` or deeper.
 - **First-party catalog schema** is governed by the `official/meta-agent-schema` skill (loaded by default via this agent's `dependencies.skills`). MCP specs must be cross-platform: no `bash -c`, no `$HOME`, only `${workspaceDir}` / `${sharedDir}` placeholders.
-- **Stack**: Node ≥22, pnpm 10, TypeScript 5.9, Biome 2.4, Vitest 4, better-sqlite3 + drizzle, Hono 4 (server), React 19 + Vite 8 (dashboard).
+- **Stack**: Node ≥22, pnpm 10, TypeScript 5.9, Biome 2.4, Vitest 4, @libsql/client + drizzle, Hono 4 (server), React 19 + Vite 8 (dashboard).
 
 ## MODE: code
 

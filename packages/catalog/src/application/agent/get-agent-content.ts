@@ -29,8 +29,8 @@ export class GetAgentContentUseCase
   ): UseCaseResult<GetAgentContentResponse, GetAgentContentError> {
     const { id } = request;
     return this.deps.queries
-      .query((db) => {
-        const row = db
+      .query(async (db) => {
+        const row = await db
           .select({ content: agentFiles.content })
           .from(agentFiles)
           .where(and(eq(agentFiles.agentFqn, id), eq(agentFiles.relPath, ANCHOR)))

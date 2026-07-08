@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import { WorkspaceEntity } from "../../../src/domain/workspace-entity.js";
 import type { WorkspaceId } from "../../../src/domain/workspace-id.js";
 import type { WorkspaceName } from "../../../src/domain/workspace-name.js";
-import {
-  WorkspaceMapper,
-  type WorkspaceRow,
-} from "../../../src/infrastructure/drizzle/workspace-mapper.js";
+import type { WorkspaceRow } from "../../../src/infrastructure/drizzle/workspace-db.js";
+import { WorkspaceMapper } from "../../../src/infrastructure/drizzle/workspace-mapper.js";
 
 const ROW_LOPENED: WorkspaceRow = {
   id: "11111111-1111-4111-8111-111111111111",

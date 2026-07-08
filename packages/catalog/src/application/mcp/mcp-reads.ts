@@ -12,38 +12,31 @@
 import { eq } from "drizzle-orm";
 import { agentMcpDeps } from "../../infrastructure/drizzle/agent-schema.js";
 import type { Db } from "../../infrastructure/drizzle/catalog-db.js";
-import { mcps } from "../../infrastructure/drizzle/mcp-schema.js";
+import { type McpRow, mcps } from "../../infrastructure/drizzle/mcp-schema.js";
 import { skillMcpDeps } from "../../infrastructure/drizzle/skill-schema.js";
 
-export type McpRow = typeof mcps.$inferSelect;
-
 /** One MCP row by fqn, or `undefined` when absent. */
-export function selectMcpByFqn(db: Db, fqn: string): McpRow | undefined {
-  return db.select().from(mcps).where(eq(mcps.fqn, fqn)).get();
+export async function selectMcpByFqn(db: Db, fqn: string): Promise<McpRow | undefined> {
+  return await db.select().from(mcps).where(eq(mcps.fqn, fqn)).get();
 }
 
 /** One MCP row by origin, or `undefined` when absent. */
-export function selectMcpByOrigin(db: Db, origin: string): McpRow | undefined {
-  return db.select().from(mcps).where(eq(mcps.origin, origin)).get();
+export async function selectMcpByOrigin(db: Db, origin: string): Promise<McpRow | undefined> {
+  return await db.select().from(mcps).where(eq(mcps.origin, origin)).get();
 }
 
-export function collectReferencedMcpFqns(db: Db): Set<string> {
+export async function collectReferencedMcpFqns(db: Db): Promise<Set<string>> {
   const referenced = new Set<string>();
-  for (const dep of db.select({ target: agentMcpDeps.targetFqn }).from(agentMcpDeps).all()) {
+  for (const dep of await db.select({ target: agentMcpDeps.targetFqn }).from(agentMcpDeps).all()) {
     referenced.add(dep.target);
   }
-  for (const dep of db.select({ target: skillMcpDeps.targetFqn }).from(skillMcpDeps).all()) {
+  for (const dep of await db.select({ target: skillMcpDeps.targetFqn }).from(skillMcpDeps).all()) {
     referenced.add(dep.target);
   }
   return referenced;
 }
 
-export function selectInstalledMcpFqns(db: Db): Set<string> {
-  return new Set(
-    db
-      .select({ fqn: mcps.fqn })
-      .from(mcps)
-      .all()
-      .map((row) => row.fqn),
-  );
+export async function selectInstalledMcpFqns(db: Db): Promise<Set<string>> {
+  const rows = await db.select({ fqn: mcps.fqn }).from(mcps).all();
+  return new Set(rows.map((row) => row.fqn));
 }

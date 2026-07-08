@@ -3,9 +3,7 @@
 import { WorkspaceEntity } from "../../domain/workspace-entity.js";
 import type { WorkspaceId } from "../../domain/workspace-id.js";
 import type { WorkspaceName } from "../../domain/workspace-name.js";
-import type { workspaces } from "./workspace-schema.js";
-
-export type WorkspaceRow = typeof workspaces.$inferSelect;
+import type { WorkspaceRow } from "./workspace-db.js";
 
 export const WorkspaceMapper = {
   toDomain(row: WorkspaceRow): WorkspaceEntity {

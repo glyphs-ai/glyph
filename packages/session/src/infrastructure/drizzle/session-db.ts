@@ -1,28 +1,31 @@
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
-import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
-import { applySessionMigrations } from "./session-migrations.js";
-import * as schema from "./session-schema.js";
-
-/** The pkg's drizzle DB handle, parameterized by the session tables. */
-export type Db = BetterSQLite3Database<typeof schema>;
+import type { ResultSet } from "@libsql/client";
+import { type BaseSQLiteDatabase, index, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
- * Open the session DB in WAL mode, apply migrations, and return the
- * drizzle handle plus `close`. The file is the per-workspace
- * `workspace.db`, shared with sibling packages via per-pkg migration
- * tables; each opens its own connection.
+ * Persisted session row — the slice that survives across server
+ * lifetimes (runtime kind, agent FQN, optional runtime session id, last
+ * launch mode). Live activity (lastActiveAt / preview / workdir) is
+ * recomputed per read from the runtime + workspace layout.
  */
-export function openDb(dbFile: string): { db: Db; close(): void } {
-  const sqlite: BetterSqliteDatabase = new Database(dbFile);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("synchronous = NORMAL");
-  sqlite.pragma("busy_timeout = 5000");
-  const db: Db = drizzle(sqlite, { schema });
-  try {
-    applySessionMigrations(db);
-  } catch (err) {
-    sqlite.close();
-    throw err;
-  }
-  return { db, close: () => sqlite.close() };
-}
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    agent: text("agent").notNull(),
+    runtime: text("runtime").notNull(),
+    createdAt: text("created_at").notNull(),
+    runtimeSessionId: text("runtime_session_id"),
+    lastLaunchMode: text("last_launch_mode", { enum: ["local", "remote"] }),
+  },
+  (t) => [index("sessions_agent_idx").on(t.agent)],
+);
+
+export type SessionRow = typeof sessions.$inferSelect;
+export type NewSessionRow = typeof sessions.$inferInsert;
+
+/**
+ * The pkg's drizzle DB handle, parameterized by the sessions table above.
+ * A request-scoped drizzle transaction also satisfies this type, so
+ * repositories and queries stay unaware of whether they run inside one.
+ */
+export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof import("./session-db.js")>;

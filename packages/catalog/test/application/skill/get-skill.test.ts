@@ -6,9 +6,10 @@ import { McpFqnSchema } from "../../../src/domain/mcp-fqn.js";
 import { SkillEntity, type SkillEntityArgs } from "../../../src/domain/skill-entity.js";
 import { SkillFqnSchema } from "../../../src/domain/skill-fqn.js";
 import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
-import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import type { Db } from "../../../src/infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
 import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
+import { openTestDb } from "../../testing.js";
 
 const SKILL_ID = SkillFqnSchema.parse("public/tool-use");
 const MCP_ID = McpFqnSchema.parse("azure/mcp");
@@ -76,8 +77,8 @@ let skillRepo: DrizzleSkillRepository;
 let agentRepo: DrizzleAgentRepository;
 let useCase: GetSkillUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   close = opened.close;
   skillRepo = new DrizzleSkillRepository({ db });

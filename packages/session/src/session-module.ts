@@ -8,7 +8,7 @@ import { GetSessionUseCase } from "./application/get-session.js";
 import { ListSessionsUseCase } from "./application/list-sessions.js";
 import type { AgentResolver } from "./application/ports/agent-resolver.js";
 import { SpawnInteractiveUseCase } from "./application/spawn-interactive.js";
-import { openDb } from "./infrastructure/drizzle/session-db.js";
+import type { Db } from "./infrastructure/drizzle/session-db.js";
 import { DrizzleSessionQueries } from "./infrastructure/drizzle/session-queries.js";
 import { DrizzleSessionRepository } from "./infrastructure/drizzle/session-repository.js";
 import { LocalSessionSandbox, sessionsRoot } from "./infrastructure/file/local-session-sandbox.js";
@@ -25,13 +25,12 @@ export interface SessionModule {
   readonly deleteSession: DeleteSessionUseCase;
   readonly buildInteractiveLaunch: BuildInteractiveLaunchUseCase;
   readonly spawnInteractive: SpawnInteractiveUseCase;
-  /** Closes the underlying SQLite connection. */
+  /** No-op: the host owns the shared connection. Kept for lifecycle symmetry. */
   close(): Promise<void>;
 }
 
-export interface SessionModuleOptions {
-  /** Absolute path to the per-workspace `workspace.db`. */
-  readonly dbFile: string;
+export type SessionModuleOptions = {
+  readonly db: Db;
   /** Resolves catalog agents (adapter over `@glyphs-ai/catalog`, wired by the host). */
   readonly agentResolver: AgentResolver;
   /** Supplies agent/skill/mcp bytes to `runtime.provision` (catalog satisfies it). */
@@ -46,14 +45,15 @@ export interface SessionModuleOptions {
   readonly now?: () => Date;
   /** Test seam: random byte source for id generation. */
   readonly randomBytes?: (n: number) => Buffer;
-}
+};
 
 /**
- * Open the session DB (WAL + migrations) and assemble the module. The
- * file is the per-workspace `workspace.db`; tests pass `:memory:`.
+ * Assemble the module around a caller-provided drizzle handle over the
+ * per-workspace `workspace.db`. The host owns the connection; package tests
+ * build one via `openTestDb` in `test/testing.ts`.
  */
 export async function composeSessionModule(opts: SessionModuleOptions): Promise<SessionModule> {
-  const { db, close } = openDb(opts.dbFile);
+  const { db } = opts;
   const repo = new DrizzleSessionRepository({ db });
   const query = new DrizzleSessionQueries({ db });
   const runtimeRegistry = opts.runtimeRegistry;
@@ -89,7 +89,7 @@ export async function composeSessionModule(opts: SessionModuleOptions): Promise<
       spawner: opts.spawner,
     }),
     async close() {
-      close();
+      // The host owns the shared connection; the module holds no handle to close.
     },
   };
 }

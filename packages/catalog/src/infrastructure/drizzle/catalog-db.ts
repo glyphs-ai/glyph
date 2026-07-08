@@ -1,34 +1,22 @@
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
-import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
-import { applyCatalogMigrations } from "./catalog-migrations.js";
-import * as schema from "./catalog-schema.js";
-
-/** The pkg's drizzle DB handle, parameterized by the catalog tables. */
-export type Db = BetterSQLite3Database<typeof schema>;
-
 /**
- * Open a better-sqlite3 connection in WAL mode, run pending migrations,
- * and return the drizzle handle plus a `close`. Tests pass `":memory:"`;
- * production passes the absolute path to the catalog DB file.
+ * Persistence barrel + `Db` type for the catalog package.
  *
- * On migration failure the SQLite handle is closed before the error
- * propagates: a leaked handle would hold the WAL lock and break a
- * subsequent retry from the same caller (EBUSY on the lockfile / WAL
- * files until process exit).
+ * Re-exports the per-aggregate table definitions and their `Row` / `NewRow`
+ * types so one drizzle handle is parameterized over every catalog table and
+ * `drizzle-kit` reads a single schema entrypoint. Also exposes the pkg's
+ * drizzle `Db` handle type, which is fully determined by the tables below
+ * (a request-scoped drizzle transaction also satisfies this type, so
+ * repositories and queries stay unaware of whether they run inside one).
+ *
+ * No domain or application code imports the raw table modules directly;
+ * everything comes through this file.
  */
-export function openDb(dbFile: string): { db: Db; close(): void } {
-  const sqlite: BetterSqliteDatabase = new Database(dbFile);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("synchronous = NORMAL");
-  // No `foreign_keys = ON` — schema has no FK constraints; the pragma
-  // without FKs is a no-op and would mislead readers.
-  sqlite.pragma("busy_timeout = 5000");
-  const db: Db = drizzle(sqlite, { schema });
-  try {
-    applyCatalogMigrations(db);
-  } catch (err) {
-    sqlite.close();
-    throw err;
-  }
-  return { db, close: () => sqlite.close() };
-}
+
+import type { ResultSet } from "@libsql/client";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
+
+export * from "./agent-schema.js";
+export * from "./mcp-schema.js";
+export * from "./skill-schema.js";
+
+export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof import("./catalog-db.js")>;

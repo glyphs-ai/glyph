@@ -8,7 +8,7 @@ import type { TaskStatus } from "../../domain/task-status.js";
 import type { TaskSuccess } from "../../domain/task-success.js";
 import { TASK_ARTIFACT_SUBDIR } from "../file/local-task-sandbox.js";
 import type { Db } from "./task-db.js";
-import { type TaskRow, tasks } from "./task-schema.js";
+import { type TaskRow, tasks } from "./task-db.js";
 
 /**
  * Read-side port for the task CQRS query model. Exposes the table so read

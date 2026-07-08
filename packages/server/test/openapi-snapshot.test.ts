@@ -71,54 +71,39 @@ function buildOpenApiAppForTest(): OpenAPIHono {
 
   app.route("/api/workspaces", workspacesRoutes(stubApplication()));
 
-  const sessionsApp = createApiApp();
-  sessionsApp.route(
+  const wsApp = createApiApp();
+  wsApp.route(
     "/:id/sessions",
     sessionsRoutes(() => ({ sessions: stubSessionManager() }) as unknown as WorkspaceContext),
   );
-  app.route("/api/workspaces", sessionsApp);
-
-  const tasksApp = createApiApp();
-  tasksApp.route(
+  wsApp.route(
     "/:id/tasks",
     tasksRoutes(() => stubTaskManager()),
   );
-  app.route("/api/workspaces", tasksApp);
-
-  const scheduledTasksApp = createApiApp();
-  scheduledTasksApp.route(
+  wsApp.route(
     "/:id/scheduled-tasks",
     scheduledTasksRoutes(() => stubTaskManager()),
   );
-  app.route("/api/workspaces", scheduledTasksApp);
-
-  const scheduledWorkflowsApp = createApiApp();
-  scheduledWorkflowsApp.route(
+  wsApp.route(
     "/:id/scheduled-workflows",
     scheduledWorkflowsRoutes(() => stubWorkflowService()),
   );
-  app.route("/api/workspaces", scheduledWorkflowsApp);
-
-  const schedulesApp = createApiApp();
-  schedulesApp.route(
+  wsApp.route(
     "/:id/schedules/task",
     schedulesTaskRoutes(() => stubScheduleService()),
   );
-  schedulesApp.route(
+  wsApp.route(
     "/:id/schedules/workflow",
     schedulesWorkflowRoutes(
       () => stubScheduleService(),
       () => stubWorkflowService(),
     ),
   );
-  schedulesApp.route(
+  wsApp.route(
     "/:id/schedules/preview-cron",
     schedulesPreviewCronRoutes(() => stubScheduleService()),
   );
-  app.route("/api/workspaces", schedulesApp);
-
-  const workflowsApp = createApiApp();
-  workflowsApp.route(
+  wsApp.route(
     "/:id/workflows",
     workflowsRoutes(
       () => stubWorkflowService(),
@@ -126,14 +111,11 @@ function buildOpenApiAppForTest(): OpenAPIHono {
       () => "C:\\stub\\workspace",
     ),
   );
-  app.route("/api/workspaces", workflowsApp);
-
-  const catalogApp = createApiApp();
-  catalogApp.route(
+  wsApp.route(
     "/:id/catalog",
     catalogRoutes(() => stubCatalogModule()),
   );
-  app.route("/api/workspaces", catalogApp);
+  app.route("/api/workspaces", wsApp);
 
   return app;
 }

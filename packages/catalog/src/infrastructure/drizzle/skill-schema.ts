@@ -67,3 +67,9 @@ export const skillMcpDeps = sqliteTable(
     uniqueIndex("skill_mcp_deps_uniq").on(t.sourceFqn, t.targetFqn),
   ],
 );
+
+export type SkillRow = typeof skills.$inferSelect;
+export type NewSkillRow = typeof skills.$inferInsert;
+export type SkillFileRow = typeof skillFiles.$inferInsert;
+export type SkillSkillDepRow = typeof skillSkillDeps.$inferInsert;
+export type SkillMcpDepRow = typeof skillMcpDeps.$inferInsert;

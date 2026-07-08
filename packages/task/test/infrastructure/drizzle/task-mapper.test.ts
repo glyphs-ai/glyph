@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { TaskBriefSchema } from "../../../src/domain/task-brief.js";
 import { TaskEntity } from "../../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../../src/domain/task-id.js";
+import type { TaskRow } from "../../../src/infrastructure/drizzle/task-db.js";
 import { TaskMapper } from "../../../src/infrastructure/drizzle/task-mapper.js";
-import type { TaskRow } from "../../../src/infrastructure/drizzle/task-schema.js";
 
 const ID: TaskId = TaskIdSchema.parse("20260508-9dfbdf05");
 const CREATED_AT = "2026-05-08T01:05:00.000Z";

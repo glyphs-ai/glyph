@@ -13,22 +13,15 @@
  */
 
 import { eq } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
 import type { DatabaseUnavailable } from "../../domain/agent-repository.js";
 import type { SkillEntity } from "../../domain/skill-entity.js";
 import type { SkillFqn } from "../../domain/skill-fqn.js";
 import type { SkillNotFound, SkillRepository } from "../../domain/skill-repository.js";
+import type { Db } from "./catalog-db.js";
 import { SkillMapper } from "./skill-mapper.js";
 import { skillFiles, skillMcpDeps, skillSkillDeps, skills } from "./skill-schema.js";
-
-type Db = BetterSQLite3Database<{
-  skills: typeof skills;
-  skillFiles: typeof skillFiles;
-  skillSkillDeps: typeof skillSkillDeps;
-  skillMcpDeps: typeof skillMcpDeps;
-}>;
 
 export class DrizzleSkillRepository implements SkillRepository {
   private readonly db: Db;
@@ -54,14 +47,14 @@ export class DrizzleSkillRepository implements SkillRepository {
   ): ResultAsync<SkillEntity | undefined, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => {
-        const row = this.db.select().from(skills).where(where).get();
+        const row = await this.db.select().from(skills).where(where).get();
         if (row === undefined) return undefined;
-        const sDeps = this.db
+        const sDeps = await this.db
           .select()
           .from(skillSkillDeps)
           .where(eq(skillSkillDeps.sourceFqn, row.fqn))
           .all();
-        const mDeps = this.db
+        const mDeps = await this.db
           .select()
           .from(skillMcpDeps)
           .where(eq(skillMcpDeps.sourceFqn, row.fqn))
@@ -82,30 +75,35 @@ export class DrizzleSkillRepository implements SkillRepository {
         const skillDeps = SkillMapper.toSkillDepRows(skill);
         const mcpDeps = SkillMapper.toMcpDepRows(skill);
         const fileRows = files === undefined ? null : SkillMapper.toFileRows(skill, files);
-        this.db.transaction((tx) => {
-          tx.insert(skills)
-            .values(row)
-            .onConflictDoUpdate({
-              target: skills.fqn,
-              set: {
-                origin: row.origin,
-                description: row.description,
-                version: row.version,
-                prereqs: row.prereqs,
-                prereqsAck: row.prereqsAck,
-                updatedAt: row.updatedAt,
-              },
-            })
-            .run();
-          tx.delete(skillSkillDeps).where(eq(skillSkillDeps.sourceFqn, skill.id)).run();
-          if (skillDeps.length > 0) tx.insert(skillSkillDeps).values(skillDeps).run();
-          tx.delete(skillMcpDeps).where(eq(skillMcpDeps.sourceFqn, skill.id)).run();
-          if (mcpDeps.length > 0) tx.insert(skillMcpDeps).values(mcpDeps).run();
-          if (fileRows !== null) {
-            tx.delete(skillFiles).where(eq(skillFiles.skillFqn, skill.id)).run();
-            if (fileRows.length > 0) tx.insert(skillFiles).values(fileRows).run();
+        await this.db
+          .insert(skills)
+          .values(row)
+          .onConflictDoUpdate({
+            target: skills.fqn,
+            set: {
+              origin: row.origin,
+              description: row.description,
+              version: row.version,
+              prereqs: row.prereqs,
+              prereqsAck: row.prereqsAck,
+              updatedAt: row.updatedAt,
+            },
+          })
+          .run();
+        await this.db.delete(skillSkillDeps).where(eq(skillSkillDeps.sourceFqn, skill.id)).run();
+        if (skillDeps.length > 0) {
+          await this.db.insert(skillSkillDeps).values(skillDeps).run();
+        }
+        await this.db.delete(skillMcpDeps).where(eq(skillMcpDeps.sourceFqn, skill.id)).run();
+        if (mcpDeps.length > 0) {
+          await this.db.insert(skillMcpDeps).values(mcpDeps).run();
+        }
+        if (fileRows !== null) {
+          await this.db.delete(skillFiles).where(eq(skillFiles.skillFqn, skill.id)).run();
+          if (fileRows.length > 0) {
+            await this.db.insert(skillFiles).values(fileRows).run();
           }
-        });
+        }
       })(),
       DrizzleSkillRepository.asDatabaseUnavailable,
     );
@@ -114,12 +112,10 @@ export class DrizzleSkillRepository implements SkillRepository {
   delete(fqn: SkillFqn): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => {
-        this.db.transaction((tx) => {
-          tx.delete(skillFiles).where(eq(skillFiles.skillFqn, fqn)).run();
-          tx.delete(skillSkillDeps).where(eq(skillSkillDeps.sourceFqn, fqn)).run();
-          tx.delete(skillMcpDeps).where(eq(skillMcpDeps.sourceFqn, fqn)).run();
-          tx.delete(skills).where(eq(skills.fqn, fqn)).run();
-        });
+        await this.db.delete(skillFiles).where(eq(skillFiles.skillFqn, fqn)).run();
+        await this.db.delete(skillSkillDeps).where(eq(skillSkillDeps.sourceFqn, fqn)).run();
+        await this.db.delete(skillMcpDeps).where(eq(skillMcpDeps.sourceFqn, fqn)).run();
+        await this.db.delete(skills).where(eq(skills.fqn, fqn)).run();
       })(),
       DrizzleSkillRepository.asDatabaseUnavailable,
     );

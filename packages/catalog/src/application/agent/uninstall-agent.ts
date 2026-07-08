@@ -52,7 +52,9 @@ export class UninstallAgentUseCase
     const id = request.id;
     return this.deps.agentRepo
       .get(id)
-      .andThen(() => this.deps.queries.query((db) => collectReferencedAgentFqns(db).has(id)))
+      .andThen(() =>
+        this.deps.queries.query(async (db) => (await collectReferencedAgentFqns(db)).has(id)),
+      )
       .andThen((usedByAgent) =>
         usedByAgent
           ? errAsync<UninstallAgentResponse, HasDependents>({ type: "HasDependents", fqn: id })

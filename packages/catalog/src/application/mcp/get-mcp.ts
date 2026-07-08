@@ -29,10 +29,10 @@ export class GetMcpUseCase implements UseCase<GetMcpRequest, GetMcpResponse, Get
   execute(request: GetMcpRequest): UseCaseResult<GetMcpResponse, GetMcpError> {
     const { id } = request;
     return this.deps.queries
-      .query((db): GetMcpResponse | undefined => {
-        const row = db.select().from(mcps).where(eq(mcps.fqn, id)).get();
+      .query(async (db): Promise<GetMcpResponse | undefined> => {
+        const row = await db.select().from(mcps).where(eq(mcps.fqn, id)).get();
         if (row === undefined) return undefined;
-        const referenced = collectReferencedMcpFqns(db);
+        const referenced = await collectReferencedMcpFqns(db);
         return {
           fqn: row.fqn,
           origin: row.origin,

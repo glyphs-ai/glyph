@@ -1,15 +1,18 @@
 import type { RuntimeRegistry } from "@glyphs-ai/runtime";
 import { localSpawner } from "@glyphs-ai/terminal";
 import {
+  applyWorkspaceMigrations,
   composeWorkspaceModule,
   type DatabaseUnavailable,
   type GetWorkspaceResponse,
-  openWorkspaceDb,
+  type Db as WorkspaceDb,
   type WorkspaceId,
   type WorkspaceModule,
   type WorkspaceName,
   type WorkspaceNotFound,
 } from "@glyphs-ai/workspace";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import { ResultAsync } from "neverthrow";
 import type { Logger } from "pino";
 import {
@@ -113,7 +116,18 @@ export async function composeApplication(opts: ApplicationOpts): Promise<Applica
   // caller-provided url, then hands the bare handle to the workspace module
   // (which owns schema + use-cases, never file-path policy). This composer
   // owns the handle's lifecycle via `close()`.
-  const { db, close: closeWorkspaceDb } = await openWorkspaceDb({ url: opts.workspace.dbUrl });
+  const client = createClient({ url: opts.workspace.dbUrl });
+  await client.execute("PRAGMA journal_mode = WAL");
+  await client.execute("PRAGMA synchronous = NORMAL");
+  await client.execute("PRAGMA busy_timeout = 5000");
+  try {
+    await applyWorkspaceMigrations(client);
+  } catch (err) {
+    client.close();
+    throw err;
+  }
+  const db = drizzle(client, { schema: {} }) as unknown as WorkspaceDb;
+  const closeWorkspaceDb = () => client.close();
   let workspace: WorkspaceModule;
   try {
     workspace = await composeWorkspaceModule({

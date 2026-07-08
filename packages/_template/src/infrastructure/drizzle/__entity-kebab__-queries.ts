@@ -1,7 +1,7 @@
 import { ResultAsync } from "neverthrow";
 import type { DatabaseUnavailable } from "../../domain/__entity-kebab__-repository.js";
 import type { Db } from "./__entity-kebab__-db.js";
-import { __entities__ } from "./__entity-kebab__-schema.js";
+import { __entities__ } from "./__entity-kebab__-db.js";
 
 /**
  * Read-side port for the __Entity__ CQRS query model. Exposes the table so

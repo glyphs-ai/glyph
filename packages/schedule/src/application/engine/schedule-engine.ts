@@ -107,11 +107,12 @@ export class ScheduleEngine {
     // Preflight: every row's kind must be registered. Project just
     // (id, targetKind) so a workspace with thousands of disabled rows doesn't
     // pull every blob into memory.
-    const preflight = await this.queries.query((db) =>
-      db
-        .select({ id: this.queries.schedules.id, targetKind: this.queries.schedules.targetKind })
-        .from(this.queries.schedules)
-        .all(),
+    const preflight = await this.queries.query(
+      async (db) =>
+        await db
+          .select({ id: this.queries.schedules.id, targetKind: this.queries.schedules.targetKind })
+          .from(this.queries.schedules)
+          .all(),
     );
     if (preflight.isErr()) return err(preflight.error);
     for (const row of preflight.value) {
@@ -122,12 +123,13 @@ export class ScheduleEngine {
 
     // Arm scan: the enabled schedule ids, loaded as entities via findById so
     // the catchup path can fire + save them.
-    const enabled = await this.queries.query((db) =>
-      db
-        .select({ id: this.queries.schedules.id })
-        .from(this.queries.schedules)
-        .where(eq(this.queries.schedules.enabled, true))
-        .all(),
+    const enabled = await this.queries.query(
+      async (db) =>
+        await db
+          .select({ id: this.queries.schedules.id })
+          .from(this.queries.schedules)
+          .where(eq(this.queries.schedules.enabled, true))
+          .all(),
     );
     if (enabled.isErr()) return err(enabled.error);
 

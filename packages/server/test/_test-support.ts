@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { type Application, composeApplication } from "@glyphs-ai/api";
 import { CopilotRuntime, InMemoryRuntimeRegistry, type RuntimeRegistry } from "@glyphs-ai/runtime";
@@ -43,9 +44,8 @@ export async function setupTestSubsystem(opts: {
 }
 
 export async function teardownTestSubsystem(sys: ServerTestSubsystem): Promise<void> {
+  await new Promise((r) => setTimeout(r, 100));
   try {
-    // `application.close()` closes the internal per-workspace context
-    // registry first, then the global registry handle. Idempotent.
     await sys.close();
   } catch {
     // best-effort
@@ -62,4 +62,36 @@ export async function registerTestWorkspace(
   });
   if (result.isErr()) throw new Error(`register failed: ${JSON.stringify(result.error)}`);
   return result.value.id;
+}
+
+/**
+ * Windows-safe scratch cleanup. libsql closes its libuv fd asynchronously
+ * and the Windows kernel keeps an exclusive lock on `workspace.db-wal` /
+ * `workspace.db-shm` for a while after `client.close()` returns, so `rm`
+ * sees EBUSY. Two rules make this robust:
+ *
+ *   1. BOUNDED retry budget. Node's `rm` uses *linear* backoff — attempt
+ *      n waits `retryDelay * n`, so the cumulative wait is
+ *      `retryDelay * maxRetries * (maxRetries + 1) / 2`. A large count
+ *      (e.g. 30 * 300ms ≈ 139s) silently exceeds the hookTimeout and
+ *      hangs the whole suite. Keep the budget small (~11s here).
+ *   2. BEST-EFFORT. Cleanup is hygiene, not an assertion. If the WAL lock
+ *      outlives the budget, swallow the error: a leaked temp dir under
+ *      os.tmpdir() is harmless in CI (the OS reaps it, and the next test
+ *      mkdtemps a fresh dir) and must never fail the teardown hook.
+ */
+export async function rmScratch(scratch: string): Promise<void> {
+  // Best-effort cleanup. On Windows, libsql WAL file locks can linger
+  // after client.close(). We give it a very short budget — if it doesn't
+  // work, just leak the temp dir (CI will reap it, next test uses a fresh dir).
+  try {
+    await rm(scratch, {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 100,
+    });
+  } catch {
+    // WAL lock outlived budget — acceptable in tests.
+  }
 }

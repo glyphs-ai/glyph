@@ -63,7 +63,7 @@ export class ListTasksUseCase
     const parsed = ListTasksRequestSchema.parse(request);
     const q = this.deps.query;
     return q
-      .query((db) => {
+      .query(async (db) => {
         const filters: SQL[] = [];
         if (parsed.agent !== undefined) filters.push(eq(q.tasks.agent, parsed.agent));
         if (parsed.runtime !== undefined) filters.push(eq(q.tasks.runtime, parsed.runtime));
@@ -79,7 +79,8 @@ export class ListTasksUseCase
         }
         if (parsed.originId !== undefined) filters.push(eq(q.tasks.originId, parsed.originId));
         const select = db.select().from(q.tasks);
-        const rows = filters.length > 0 ? select.where(and(...filters)).all() : select.all();
+        const rows =
+          filters.length > 0 ? await select.where(and(...filters)).all() : await select.all();
         return rows.map(projectTaskRow);
       })
       .map((views) =>

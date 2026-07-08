@@ -4,8 +4,8 @@ import { type ScheduleId, ScheduleIdSchema } from "../domain/schedule/schedule-i
 import type { DatabaseUnavailable } from "../domain/schedule/schedule-repository.js";
 import { ScheduleTargetEnvelopeSchema } from "../domain/schedule/schedule-target.js";
 import { ScheduleTriggerSchema } from "../domain/schedule/schedule-trigger.js";
+import type { ScheduleRow } from "../infrastructure/drizzle/schedule-db.js";
 import type { ScheduleQueries } from "../infrastructure/drizzle/schedule-queries.js";
-import type { ScheduleRow } from "../infrastructure/drizzle/schedule-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 /**
@@ -77,7 +77,7 @@ export class ListSchedulesUseCase
   ): UseCaseResult<ListSchedulesResponse, ListSchedulesError> {
     const parsed = ListSchedulesRequestSchema.parse(request);
     const q = this.deps.query;
-    return q.query((db) => {
+    return q.query(async (db) => {
       const conditions: SQL[] = [];
       if (parsed.enabled !== undefined) conditions.push(eq(q.schedules.enabled, parsed.enabled));
       if (parsed.kind !== undefined) conditions.push(eq(q.schedules.targetKind, parsed.kind));
@@ -89,7 +89,7 @@ export class ListSchedulesUseCase
       }
       const base = db.select().from(q.schedules);
       const filtered = conditions.length > 0 ? base.where(and(...conditions)) : base;
-      const rows = filtered.orderBy(sql`${q.schedules.nextFireAt} ASC NULLS LAST`).all();
+      const rows = await filtered.orderBy(sql`${q.schedules.nextFireAt} ASC NULLS LAST`).all();
       return rows.map(toScheduleView);
     });
   }

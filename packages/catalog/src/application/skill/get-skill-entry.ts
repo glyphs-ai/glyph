@@ -78,13 +78,13 @@ export class GetSkillEntryUseCase
 
   execute(request: GetSkillEntryRequest): UseCaseResult<GetSkillEntryResponse, GetSkillEntryError> {
     const { id } = request;
-    return this.deps.queries.query((db): GetSkillEntryResponse => {
-      const target = selectSkillByFqn(db, id);
+    return this.deps.queries.query(async (db): Promise<GetSkillEntryResponse> => {
+      const target = await selectSkillByFqn(db, id);
       if (target === undefined) return null;
 
-      const installed = selectAllSkills(db);
-      const referencedSkillFqns = collectReferencedSkillFqns(db);
-      const installedMcpFqns = selectInstalledMcpFqns(db);
+      const installed = await selectAllSkills(db);
+      const referencedSkillFqns = await collectReferencedSkillFqns(db);
+      const installedMcpFqns = await selectInstalledMcpFqns(db);
       const skillByFqn = new Map<string, SkillView>(installed.map((s) => [s.fqn, s] as const));
 
       const skillCache = new Map<string, ComputedStatus>();

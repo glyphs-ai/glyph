@@ -26,8 +26,8 @@ export class CountAwaitingHumanUseCase
   ): UseCaseResult<CountAwaitingHumanResponse, CountAwaitingHumanError> {
     CountAwaitingHumanRequestSchema.parse(request);
     const q = this.deps.query;
-    return q.query((db) => {
-      const rows = db
+    return q.query(async (db) => {
+      const rows = await db
         .select({ workflowId: q.workflowNodes.workflowId, count: count() })
         .from(q.workflowNodes)
         .where(and(eq(q.workflowNodes.kind, "human"), eq(q.workflowNodes.status, "running")))

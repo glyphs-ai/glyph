@@ -40,7 +40,7 @@ import { ListSkillFilesUseCase } from "./application/skill/list-skill-files.js";
 import { ListSkillsUseCase } from "./application/skill/list-skills.js";
 import { UninstallSkillUseCase } from "./application/skill/uninstall-skill.js";
 import { DrizzleAgentRepository } from "./infrastructure/drizzle/agent-repository.js";
-import { openDb } from "./infrastructure/drizzle/catalog-db.js";
+import type { Db } from "./infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "./infrastructure/drizzle/catalog-queries.js";
 import { DrizzleMcpRepository } from "./infrastructure/drizzle/mcp-repository.js";
 import { DrizzleSkillRepository } from "./infrastructure/drizzle/skill-repository.js";
@@ -49,10 +49,7 @@ import { JsonMcpSource } from "./infrastructure/source/json-mcp-source.js";
 import { MarkdownAgentSource } from "./infrastructure/source/markdown-agent-source.js";
 import { MarkdownSkillSource } from "./infrastructure/source/markdown-skill-source.js";
 
-export interface CatalogModuleOptions {
-  /** Absolute path to the catalog SQLite file; tests pass ":memory:". */
-  readonly dbFile: string;
-}
+export type CatalogModuleOptions = { readonly db: Db };
 
 export interface CatalogModule {
   readonly installAgent: InstallAgentUseCase;
@@ -89,12 +86,12 @@ export interface CatalogModule {
   readonly listAgents: ListAgentsUseCase;
   readonly listSkills: ListSkillsUseCase;
   readonly listMcps: ListMcpsUseCase;
-  /** Closes the underlying SQLite connection. Idempotent. */
+  /** No-op: the host owns the shared connection. Kept for lifecycle symmetry. */
   close(): Promise<void>;
 }
 
-export function composeCatalog(opts: CatalogModuleOptions): CatalogModule {
-  const { db, close } = openDb(opts.dbFile);
+export async function composeCatalog(opts: CatalogModuleOptions): Promise<CatalogModule> {
+  const { db } = opts;
   const registry = defaultRegistry();
 
   const agentRepo = new DrizzleAgentRepository({ db });
@@ -154,7 +151,7 @@ export function composeCatalog(opts: CatalogModuleOptions): CatalogModule {
     listSkills: new ListSkillsUseCase({ queries }),
     listMcps: new ListMcpsUseCase({ queries }),
     async close() {
-      close();
+      // The host owns the shared connection; the module holds no handle to close.
     },
   };
 }

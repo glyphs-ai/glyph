@@ -13,5 +13,11 @@ export default defineConfig({
     globals: false,
     pool: "forks",
     testTimeout: 15000,
+    // Windows CI: libsql WAL-mode checkpoint + NTFS deferred lock
+    // release make teardown (module drain → client.close → rm) far
+    // slower than on Unix; 120s gives ample headroom for the heaviest
+    // file-backed suites. Unix drains the fd synchronously, so 30s is
+    // plenty and keeps a hung hook from stalling the run.
+    hookTimeout: process.platform === "win32" ? 120_000 : 30_000,
   },
 });

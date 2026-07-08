@@ -1,7 +1,7 @@
 import { ResultAsync } from "neverthrow";
 import type { DatabaseUnavailable } from "../../domain/workspace-repository.js";
 import type { Db } from "./workspace-db.js";
-import { workspaces } from "./workspace-schema.js";
+import { workspaces } from "./workspace-db.js";
 
 /**
  * Read-side port for the workspace CQRS query model. Exposes the table so

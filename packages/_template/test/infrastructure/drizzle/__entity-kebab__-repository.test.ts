@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __Entity__Entity } from "../../../src/domain/__entity-kebab__-entity.js";
 import type { __Entity__Id } from "../../../src/domain/__entity-kebab__-id.js";
 import type { __Entity__Name } from "../../../src/domain/__entity-kebab__-name.js";
-import { openDb } from "../../../src/infrastructure/drizzle/__entity-kebab__-db.js";
 import { Drizzle__Entity__Repository } from "../../../src/infrastructure/drizzle/__entity-kebab__-repository.js";
+import { openTestDb } from "../../testing.js";
 
 function setupRepo(): { repo: Drizzle__Entity__Repository; close(): void } {
-  const { db, close } = openDb(":memory:");
+  const { db, close } = openTestDb(":memory:");
   return { repo: new Drizzle__Entity__Repository({ db }), close };
 }
 

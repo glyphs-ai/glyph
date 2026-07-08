@@ -8,13 +8,13 @@ import { SessionIdSchema } from "../../src/domain/session-id.js";
 import type { DatabaseUnavailable } from "../../src/domain/session-repository.js";
 import type { SessionSandbox } from "../../src/domain/session-sandbox.js";
 import type { Db } from "../../src/infrastructure/drizzle/session-db.js";
-import { openDb } from "../../src/infrastructure/drizzle/session-db.js";
+import { sessions } from "../../src/infrastructure/drizzle/session-db.js";
 import { SessionMapper } from "../../src/infrastructure/drizzle/session-mapper.js";
 import {
   DrizzleSessionQueries,
   type SessionQueries,
 } from "../../src/infrastructure/drizzle/session-queries.js";
-import { sessions } from "../../src/infrastructure/drizzle/session-schema.js";
+import { openTestDb } from "../testing.js";
 
 const ID = SessionIdSchema.parse("20260508-9dfbdf05");
 const WORKDIR = `/ws/sessions/${ID}`;
@@ -37,14 +37,14 @@ function entity(runtimeSessionId: string | null): RehydrateSessionArgs {
   };
 }
 
-function setup(): {
+async function setup(): Promise<{
   readonly db: Db;
   readonly useCase: GetSessionUseCase;
   readonly runtimeRegistry: MockProxy<RuntimeRegistry>;
   readonly runtime: MockProxy<Runtime>;
   readonly sandbox: MockProxy<SessionSandbox>;
-} {
-  const { db } = openDb(":memory:");
+}> {
+  const { db } = await openTestDb(":memory:");
   const runtimeRegistry = mock<RuntimeRegistry>();
   const runtime = mock<Runtime>();
   const sandbox = mock<SessionSandbox>();
@@ -67,7 +67,7 @@ function setup(): {
 function failingQueries(): SessionQueries {
   return {
     sessions,
-    query<T>(_fn: (db: Db) => T) {
+    query<T>(_fn: (db: Db) => T | Promise<T>) {
       return errAsync<T, DatabaseUnavailable>({
         type: "DatabaseUnavailable",
         cause: new Error("boom"),
@@ -78,19 +78,19 @@ function failingQueries(): SessionQueries {
 
 describe("GetSessionUseCase", () => {
   it("returns null when the session is absent", async () => {
-    const { useCase } = setup();
+    const { useCase } = await setup();
     expect((await useCase.execute({ id: ID }))._unsafeUnwrap()).toBeNull();
   });
 
   it("returns null when the session's runtime is no longer registered", async () => {
-    const { db, useCase, runtimeRegistry } = setup();
+    const { db, useCase, runtimeRegistry } = await setup();
     await seed(db, entity("rsid-1"));
     runtimeRegistry.get.mockReturnValue(err({ type: "UnknownRuntime", runtime: "copilot" }));
     expect((await useCase.execute({ id: ID }))._unsafeUnwrap()).toBeNull();
   });
 
   it("projects the base view when there is no runtime session yet", async () => {
-    const { db, useCase, runtime } = setup();
+    const { db, useCase, runtime } = await setup();
     await seed(db, entity(null));
     const view = (await useCase.execute({ id: ID }))._unsafeUnwrap();
     expect(view).toEqual({
@@ -108,7 +108,7 @@ describe("GetSessionUseCase", () => {
   });
 
   it("refreshes lastActiveAt + preview from live runtime metadata", async () => {
-    const { db, useCase, runtime } = setup();
+    const { db, useCase, runtime } = await setup();
     await seed(db, entity("rsid-1"));
     const meta: RuntimeSessionMetadata = {
       title: "Draft the post",

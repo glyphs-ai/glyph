@@ -17,13 +17,6 @@
       "entry": ["scripts/*.mjs"],
       "project": ["scripts/*.mjs"],
       "ignoreDependencies": [
-        // Root deps consumed by sub-packages but pinned at the root so
-        // `prepublishOnly: pnpm bundle` finds them in the deduped node_modules,
-        // and because `pnpm.overrides.better-sqlite3` only applies when
-        // declared as a direct dependency.
-        "better-sqlite3",
-        // Transitive native-binding loader pulled by better-sqlite3.
-        "bindings",
         // Pino + transports are intentionally NOT bundled (see RELEASING.md
         // "Bundle layout") — they live at the root so `npm install -g`
         // resolves them at runtime.

@@ -10,7 +10,6 @@
  */
 
 import { eq } from "drizzle-orm";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
 import type { McpEntity } from "../../domain/mcp-entity.js";
@@ -20,10 +19,9 @@ import type {
   McpNotFound,
   McpRepository,
 } from "../../domain/mcp-repository.js";
+import type { Db } from "./catalog-db.js";
 import { McpMapper } from "./mcp-mapper.js";
 import { mcps } from "./mcp-schema.js";
-
-type Db = BetterSQLite3Database<{ mcps: typeof mcps }>;
 
 export class DrizzleMcpRepository implements McpRepository {
   private readonly db: Db;
@@ -48,7 +46,7 @@ export class DrizzleMcpRepository implements McpRepository {
     where: ReturnType<typeof eq>,
   ): ResultAsync<McpEntity | undefined, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      (async () => this.db.select().from(mcps).where(where).get())(),
+      this.db.select().from(mcps).where(where).get(),
       DrizzleMcpRepository.asDatabaseUnavailable,
     ).map((row) => (row ? McpMapper.toDomain(row) : undefined));
   }
@@ -57,7 +55,7 @@ export class DrizzleMcpRepository implements McpRepository {
     return ResultAsync.fromPromise(
       (async () => {
         const row = McpMapper.toRow(mcp);
-        this.db
+        await this.db
           .insert(mcps)
           .values(row)
           .onConflictDoUpdate({ target: mcps.fqn, set: { origin: row.origin, spec: row.spec } })
@@ -70,7 +68,7 @@ export class DrizzleMcpRepository implements McpRepository {
   delete(fqn: McpFqn): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       (async () => {
-        this.db.delete(mcps).where(eq(mcps.fqn, fqn)).run();
+        await this.db.delete(mcps).where(eq(mcps.fqn, fqn)).run();
       })(),
       DrizzleMcpRepository.asDatabaseUnavailable,
     );

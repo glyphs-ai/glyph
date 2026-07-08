@@ -15,10 +15,11 @@ import type { McpFqn } from "../../../src/domain/mcp-fqn.js";
 import { SkillEntity } from "../../../src/domain/skill-entity.js";
 import type { SkillFqn } from "../../../src/domain/skill-fqn.js";
 import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
-import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import type { Db } from "../../../src/infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
 import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-repository.js";
 import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
+import { openTestDb } from "../../testing.js";
 
 const MCP_ID = "azure/mcp" as McpFqn;
 const ORIGIN = "file://catalog/azure.json";
@@ -71,8 +72,8 @@ let agentRepo: DrizzleAgentRepository;
 let skillRepo: DrizzleSkillRepository;
 let useCase: GetMcpUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   close = opened.close;
   mcpRepo = new DrizzleMcpRepository({ db });

@@ -10,8 +10,8 @@ import type {
 } from "../../domain/task-repository.js";
 import { TERMINAL_TASK_STATUSES } from "../../domain/task-status.js";
 import type { Db } from "./task-db.js";
+import { type NewTaskRow, tasks } from "./task-db.js";
 import { TaskMapper } from "./task-mapper.js";
-import { type NewTaskRow, tasks } from "./task-schema.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
@@ -47,7 +47,7 @@ export class DrizzleTaskRepository implements TaskRepository {
 
   get(id: TaskId): ResultAsync<TaskEntity, TaskNotFound | CorruptedTask | DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      (async () => this.db.select().from(tasks).where(eq(tasks.id, id)).get())(),
+      this.db.select().from(tasks).where(eq(tasks.id, id)).get(),
       DrizzleTaskRepository.asDatabaseUnavailable,
     ).andThen((row) => {
       if (row === undefined) {
@@ -63,33 +63,25 @@ export class DrizzleTaskRepository implements TaskRepository {
   save(entity: TaskEntity): ResultAsync<void, DatabaseUnavailable> {
     const current = TaskMapper.toRow(entity);
     const snapshot = this.snapshots.get(entity);
-    // Untracked entity ⇒ never loaded ⇒ INSERT (a freshly created task).
     if (snapshot === undefined) {
       return ResultAsync.fromPromise(
-        (async () => {
-          this.db.insert(tasks).values(current).run();
-        })(),
+        this.db.insert(tasks).values(current).run(),
         DrizzleTaskRepository.asDatabaseUnavailable,
       ).map(() => this.track(entity, current));
     }
-    // Tracked entity: UPDATE only the columns that diverged from the snapshot.
     const diff = diffRow(snapshot, current);
     if (Object.keys(diff).length === 0) return okAsync(undefined);
     return ResultAsync.fromPromise(
-      (async () => {
-        this.db.update(tasks).set(diff).where(eq(tasks.id, entity.id)).run();
-      })(),
+      this.db.update(tasks).set(diff).where(eq(tasks.id, entity.id)).run(),
       DrizzleTaskRepository.asDatabaseUnavailable,
     ).map(() => this.track(entity, current));
   }
 
   delete(id: TaskId): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      (async () => {
-        this.db.delete(tasks).where(eq(tasks.id, id)).run();
-      })(),
+      this.db.delete(tasks).where(eq(tasks.id, id)).run(),
       DrizzleTaskRepository.asDatabaseUnavailable,
-    );
+    ).map(() => undefined);
   }
 
   listTerminalByOrigin(opts: {
@@ -97,27 +89,23 @@ export class DrizzleTaskRepository implements TaskRepository {
     readonly originId: string;
   }): ResultAsync<TaskEntity[], DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      (async () =>
-        this.db
-          .select()
-          .from(tasks)
-          .where(
-            and(
-              eq(tasks.origin, opts.origin),
-              eq(tasks.originId, opts.originId),
-              inArray(tasks.status, [...TERMINAL_TASK_STATUSES]),
-            ),
-          )
-          .all())(),
+      this.db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.origin, opts.origin),
+            eq(tasks.originId, opts.originId),
+            inArray(tasks.status, [...TERMINAL_TASK_STATUSES]),
+          ),
+        )
+        .all(),
       DrizzleTaskRepository.asDatabaseUnavailable,
     ).map((rows) => {
       const out: TaskEntity[] = [];
       for (const row of rows) {
         const entity = TaskMapper.toEntity(row);
         if (entity.isErr()) {
-          // A corrupt row can't be reconstructed, so it can't be purged
-          // safely — leave it in place (logged) rather than deleting and
-          // orphaning its physical resources.
           this.logger.warn(
             { taskId: row.id, reason: entity.error.reason, op: "listTerminalByOrigin" },
             "tasks: skipping corrupted task row",

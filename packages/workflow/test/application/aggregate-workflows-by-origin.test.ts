@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { workflows } from "../../src/infrastructure/drizzle/workflow-schema.js";
+import { workflows } from "../../src/infrastructure/drizzle/workflow-db.js";
 import { buildWorkflowFixture, type WorkflowFixture } from "./workflow-fixture.js";
 
 let f: WorkflowFixture;
@@ -11,13 +11,13 @@ afterEach(async () => {
   await f.close();
 });
 
-function insertWorkflow(args: {
+async function insertWorkflow(args: {
   id: string;
   origin: string;
   originId: string | null;
   status: string;
-}): void {
-  f.db
+}): Promise<void> {
+  await f.db
     .insert(workflows)
     .values({
       id: args.id,
@@ -45,19 +45,19 @@ describe("WorkflowRepository.aggregateByOrigin", () => {
   });
 
   it("counts totalCount and runningCount keyed by originId", async () => {
-    insertWorkflow({
+    await insertWorkflow({
       id: "20260607-00000001",
       origin: "fake-origin-x",
       originId: "r1",
       status: "running",
     });
-    insertWorkflow({
+    await insertWorkflow({
       id: "20260607-00000002",
       origin: "fake-origin-x",
       originId: "r1",
       status: "running",
     });
-    insertWorkflow({
+    await insertWorkflow({
       id: "20260607-00000003",
       origin: "fake-origin-x",
       originId: "r2",
@@ -76,13 +76,13 @@ describe("WorkflowRepository.aggregateByOrigin", () => {
   });
 
   it("respects statusIn filter", async () => {
-    insertWorkflow({
+    await insertWorkflow({
       id: "20260607-00000001",
       origin: "fake-origin-x",
       originId: "r1",
       status: "running",
     });
-    insertWorkflow({
+    await insertWorkflow({
       id: "20260607-00000002",
       origin: "fake-origin-x",
       originId: "r1",
@@ -109,13 +109,13 @@ describe("WorkflowRepository.aggregateByOrigin", () => {
   });
 
   it("does not match workflows from a different origin", async () => {
-    insertWorkflow({
+    await insertWorkflow({
       id: "20260607-00000001",
       origin: "fake-origin-x",
       originId: "r1",
       status: "running",
     });
-    insertWorkflow({
+    await insertWorkflow({
       id: "20260607-00000002",
       origin: "standalone",
       originId: "r1",

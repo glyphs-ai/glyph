@@ -18,9 +18,8 @@ import type {
   WorkflowEntityCorruption,
   WorkflowRepository,
 } from "../../domain/workflow/workflow-repository.js";
-import type { Db } from "../../infrastructure/drizzle/workflow-db.js";
+import type { Db, WorkflowNodeRow } from "../../infrastructure/drizzle/workflow-db.js";
 import type { WorkflowQueries } from "../../infrastructure/drizzle/workflow-queries.js";
-import type { WorkflowNodeRow } from "../../infrastructure/drizzle/workflow-schema.js";
 import {
   runnerFor,
   type WorkflowNodeRunner,
@@ -94,7 +93,9 @@ export class WorkflowEngine implements WorkflowDispatchCoordinator {
   listEligibleNodeIdsForDispatch(
     workflowId: string,
   ): ResultAsync<readonly WorkflowNodeId[], DatabaseUnavailable> {
-    return this.query.query((db) => this.listEligibleNodeIdsForDispatchSync(db, workflowId));
+    return this.query.query(
+      async (db) => await this.listEligibleNodeIdsForDispatchQuery(db, workflowId),
+    );
   }
 
   dispatch(
@@ -117,12 +118,13 @@ export class WorkflowEngine implements WorkflowDispatchCoordinator {
     workflowId: WorkflowId,
     opts: { readonly excludeRunningCoords: boolean },
   ): Promise<void> {
-    const nodesResult = await this.query.query((db) =>
-      db
-        .select()
-        .from(this.query.workflowNodes)
-        .where(eq(this.query.workflowNodes.workflowId, workflowId))
-        .all(),
+    const nodesResult = await this.query.query(
+      async (db) =>
+        await db
+          .select()
+          .from(this.query.workflowNodes)
+          .where(eq(this.query.workflowNodes.workflowId, workflowId))
+          .all(),
     );
     if (nodesResult.isErr()) {
       this.logger.warn({ workflowId, err: nodesResult.error }, "reconcile: listing nodes failed");
@@ -204,24 +206,24 @@ export class WorkflowEngine implements WorkflowDispatchCoordinator {
     );
   }
 
-  private listEligibleNodeIdsForDispatchSync(
+  private async listEligibleNodeIdsForDispatchQuery(
     db: Db,
     workflowId: string,
-  ): readonly WorkflowNodeId[] {
+  ): Promise<readonly WorkflowNodeId[]> {
     const parsedWorkflowId = WorkflowIdSchema.safeParse(workflowId);
     if (!parsedWorkflowId.success) return [];
-    const workflow = db
+    const workflow = await db
       .select()
       .from(this.query.workflows)
       .where(eq(this.query.workflows.id, parsedWorkflowId.data))
       .get();
     if (workflow === undefined || workflow.status !== "running") return [];
-    const nodeRows = db
+    const nodeRows = await db
       .select()
       .from(this.query.workflowNodes)
       .where(eq(this.query.workflowNodes.workflowId, parsedWorkflowId.data))
       .all();
-    const edgeRows = db
+    const edgeRows = await db
       .select()
       .from(this.query.workflowEdges)
       .where(eq(this.query.workflowEdges.workflowId, parsedWorkflowId.data))

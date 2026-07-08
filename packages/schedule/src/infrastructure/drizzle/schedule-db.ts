@@ -1,32 +1,67 @@
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
-import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
-import { applyScheduleMigrations } from "./schedule-migrations.js";
-import * as schema from "./schedule-schema.js";
-
-/** The pkg's drizzle DB handle, parameterized by the schedules table. */
-export type Db = BetterSQLite3Database<typeof schema>;
+import type { ResultSet } from "@libsql/client";
+import {
+  type BaseSQLiteDatabase,
+  index,
+  integer,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 
 /**
- * Open the schedule DB in WAL mode, apply migrations, and return the drizzle
- * handle plus `close`. The file is the per-workspace `workspace.db`, shared
- * with sibling packages via per-pkg migration tables
- * (`__drizzle_migrations_schedule`); each opens its own connection. Tests
- * pass `:memory:`.
+ * Persisted row for one schedule. Single table + JSON `target_json`
+ * column (single-table envelope storage): target payloads are small,
+ * stable, and isolated by `target_kind`.
+ *
+ * **Indexes.** `schedules_target_agent_idx` is a functional partial
+ * index on `json_extract(target_json, '$.agent')` filtered to
+ * `target_kind = 'task'`. drizzle-kit cannot express a functional
+ * partial index in the TS schema, so it is declared in a hand-written
+ * migration; a query engages it only when it filters on both
+ * `target_kind = 'task'` and the same `json_extract(target_json, '$.agent')`
+ * expression (the list use-case does this for its list-by-agent filter).
+ *
+ * `next_fire_at` is persisted (despite being derivable from
+ * trigger + last_fired_at) so the list query can ORDER BY
+ * next_fire_at without an N×cron-compute per request. It is recomputed
+ * whenever a schedule's next fire changes (create, patch, fire, run,
+ * recover).
+ *
+ * No DB-level FK to `agents` — validation is application-level: the
+ * registered `ScheduleKindHandler` owns the existence lookup for
+ * whatever entity its kind references, run during its `validate`.
  */
-export function openDb(dbFile: string): { db: Db; close(): void } {
-  const sqlite: BetterSqliteDatabase = new Database(dbFile);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("synchronous = NORMAL");
-  sqlite.pragma("busy_timeout = 5000");
-  const db: Db = drizzle(sqlite, { schema });
-  // Migration failure must close the SQLite handle before propagating: a
-  // leaked handle would hold the WAL lock and break a subsequent retry from
-  // the same caller (EBUSY until process exit).
-  try {
-    applyScheduleMigrations(db);
-  } catch (err) {
-    sqlite.close();
-    throw err;
-  }
-  return { db, close: () => sqlite.close() };
-}
+export const schedules = sqliteTable(
+  "schedules",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    triggerKind: text("trigger_kind").notNull(),
+    triggerExpr: text("trigger_expr").notNull(),
+    triggerTz: text("trigger_tz").notNull(),
+    targetKind: text("target_kind").notNull(),
+    targetJson: text("target_json").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    lastFiredAt: text("last_fired_at"),
+    nextFireAt: text("next_fire_at"),
+  },
+  (t) => [
+    index("schedules_enabled_idx").on(t.enabled),
+    index("schedules_next_fire_idx").on(t.nextFireAt),
+    // schedules_target_agent_idx (a functional partial index over
+    // json_extract(target_json, '$.agent') filtered to target_kind='task')
+    // is declared in a hand-written migration; drizzle-kit can't express a
+    // functional partial index in the TS schema.
+  ],
+);
+
+export type ScheduleRow = typeof schedules.$inferSelect;
+export type NewScheduleRow = typeof schedules.$inferInsert;
+
+/**
+ * The pkg's drizzle DB handle, parameterized by the schedules table above.
+ * A request-scoped drizzle transaction also satisfies this type, so
+ * repositories and queries stay unaware of whether they run inside one.
+ */
+export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof import("./schedule-db.js")>;

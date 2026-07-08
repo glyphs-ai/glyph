@@ -8,8 +8,8 @@ import type {
   DatabaseUnavailable,
 } from "../../domain/__entity-kebab__-repository.js";
 import type { Db } from "./__entity-kebab__-db.js";
+import { __entities__ } from "./__entity-kebab__-db.js";
 import { __Entity__Mapper } from "./__entity-kebab__-mapper.js";
-import { __entities__ } from "./__entity-kebab__-schema.js";
 
 /** Drizzle-backed write-side adapter for {@link __Entity__Repository}. */
 export class Drizzle__Entity__Repository implements __Entity__Repository {

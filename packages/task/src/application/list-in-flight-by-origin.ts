@@ -59,19 +59,20 @@ export class ListInFlightByOriginUseCase
   ): UseCaseResult<ListInFlightByOriginResponse, ListInFlightByOriginError> {
     const { origin, originId } = ListInFlightByOriginRequestSchema.parse(request);
     const q = this.deps.query;
-    return q.query((db) =>
-      db
-        .select()
-        .from(q.tasks)
-        .where(
-          and(
-            eq(q.tasks.origin, origin),
-            eq(q.tasks.originId, originId),
-            notInArray(q.tasks.status, [...TERMINAL_TASK_STATUSES]),
-          ),
-        )
-        .all()
-        .map(projectTaskRow),
+    return q.query(async (db) =>
+      (
+        await db
+          .select()
+          .from(q.tasks)
+          .where(
+            and(
+              eq(q.tasks.origin, origin),
+              eq(q.tasks.originId, originId),
+              notInArray(q.tasks.status, [...TERMINAL_TASK_STATUSES]),
+            ),
+          )
+          .all()
+      ).map(projectTaskRow),
     );
   }
 }

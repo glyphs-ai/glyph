@@ -117,7 +117,7 @@ afterEach(async () => {
       /* best-effort */
     }
   }
-  await rm(scratch, { recursive: true, force: true });
+  await rm(scratch, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 });
 
 async function makeApp(): Promise<Application> {

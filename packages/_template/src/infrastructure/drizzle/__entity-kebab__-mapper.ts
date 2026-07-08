@@ -3,9 +3,7 @@
 import { __Entity__Entity } from "../../domain/__entity-kebab__-entity.js";
 import type { __Entity__Id } from "../../domain/__entity-kebab__-id.js";
 import type { __Entity__Name } from "../../domain/__entity-kebab__-name.js";
-import type { __entities__ } from "./__entity-kebab__-schema.js";
-
-export type __Entity__Row = typeof __entities__.$inferSelect;
+import type { __Entity__Row } from "./__entity-kebab__-db.js";
 
 export const __Entity__Mapper = {
   toDomain(row: __Entity__Row): __Entity__Entity {

@@ -5,10 +5,10 @@ import { TaskBriefSchema } from "../../src/domain/task-brief.js";
 import { TaskEntity } from "../../src/domain/task-entity.js";
 import { type TaskId, TaskIdSchema } from "../../src/domain/task-id.js";
 import type { Db } from "../../src/infrastructure/drizzle/task-db.js";
-import { openDb } from "../../src/infrastructure/drizzle/task-db.js";
 import { DrizzleTaskQueries } from "../../src/infrastructure/drizzle/task-queries.js";
 import { DrizzleTaskRepository } from "../../src/infrastructure/drizzle/task-repository.js";
 import { LocalTaskSandbox, tasksRoot } from "../../src/infrastructure/file/local-task-sandbox.js";
+import { openTestDb } from "../testing.js";
 
 const ID: TaskId = TaskIdSchema.parse("20260508-00000001");
 const CREATED_AT = "2026-05-08T01:05:00.000Z";
@@ -19,8 +19,8 @@ let closeDb: () => void = () => {};
 let repo: DrizzleTaskRepository;
 let useCase: ResolveArtifactPathUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   closeDb = opened.close;
   repo = new DrizzleTaskRepository({ db });

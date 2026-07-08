@@ -33,11 +33,12 @@ const PKGS = [
     driver: "libsql",
     migrationsFile: "src/infrastructure/drizzle/workspace-migrations.ts",
   },
-  { dir: "session", entity: "Session", tableSuffix: "session", migrationsFile: "src/infrastructure/drizzle/session-migrations.ts" },
+  { dir: "session", entity: "Session", tableSuffix: "session", driver: "libsql", migrationsFile: "src/infrastructure/drizzle/session-migrations.ts" },
   {
     dir: "task",
     entity: "Task",
     tableSuffix: "task",
+    driver: "libsql",
     migrationsFile: "src/infrastructure/drizzle/task-migrations.ts",
     journalNote:
       "This package's journal table is `__drizzle_migrations_task`; its\n * migrations share one lineage with the `tasks` schema in a shared\n * workspace.db.",
@@ -46,18 +47,21 @@ const PKGS = [
     dir: "catalog",
     entity: "Catalog",
     tableSuffix: "catalog",
+    driver: "libsql",
     migrationsFile: "src/infrastructure/drizzle/catalog-migrations.ts",
   },
   {
     dir: "workflow",
     entity: "Workflow",
     tableSuffix: "workflow",
+    driver: "libsql",
     migrationsFile: "src/infrastructure/drizzle/workflow-migrations.ts",
   },
   {
     dir: "schedule",
     entity: "Schedule",
     tableSuffix: "schedule",
+    driver: "libsql",
     migrationsFile: "src/infrastructure/drizzle/schedule-migrations.ts",
   },
   // Template uses placeholder tokens substituted by scripts/new-pkg.mjs.
@@ -69,6 +73,7 @@ const PKGS = [
     dir: "_template",
     entity: "__Entity__",
     tableSuffix: "__PKG__",
+    driver: "libsql",
     migrationsFile: "src/infrastructure/drizzle/__entity-kebab__-migrations.ts",
   },
 ];
@@ -78,12 +83,8 @@ function escapeForTemplateLiteral(s) {
 }
 
 for (const { dir, entity, tableSuffix, migrationsFile, journalNote, driver } of PKGS) {
-  const isLibsql = driver === "libsql";
-  const dbTypeImport = isLibsql
-    ? `import type { Client } from "@libsql/client";`
-    : `import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";`;
-  const dbType = isLibsql ? "LibSQLDatabase" : "BetterSQLite3Database";
-  const migratorPath = isLibsql ? "drizzle-orm/libsql/migrator" : "drizzle-orm/better-sqlite3/migrator";
+  const dbTypeImport = `import type { Client } from "@libsql/client";`;
+  const dbType = "Client";
   const drizzleDir = join(repoRoot, "packages", dir, "drizzle");
   // Packages may place generated migrations under their current
   // infrastructure layout; packages without `migrationsFile` default to
@@ -132,12 +133,11 @@ import type { MigrationMeta } from "drizzle-orm/migrator";
   // from its directory name (kept out of other packages' output when absent).
   const journalNoteBlock = journalNote ? `\n *\n * ${journalNote}` : "";
 
-  body += isLibsql
-    ? `/**
+  body += `/**
  * Apply migrations against a libsql \`client\` using \`batch(..., "write")\`,
  * which runs each migration's statements atomically on the *single* client
  * connection. This is deliberately NOT drizzle's \`migrate()\` (from
- * \`${migratorPath}\`): that opens a separate interactive-transaction
+ * \`drizzle-orm/libsql/migrator\`): that opens a separate interactive-transaction
  * connection, which a plain \`:memory:\` url cannot share (every libsql
  * connection is its own in-memory db) — so drizzle's migrator can only run
  * against a file. Batch keeps a single connection, so the same applier works
@@ -170,32 +170,6 @@ export async function apply${entity}Migrations(client: Client): Promise<void> {
       "write",
     );
   }
-}
-`
-    : `/**
- * Run drizzle's official migration applier against \`db\`. Thin typed
- * shim over drizzle's \`@internal\` \`dialect\` + \`session\` props (same
- * props drizzle's own \`migrate()\` from \`${migratorPath}\`
- * touches) so consumers don't repeat the cast.
- *
- * **Per-pkg \`migrationsTable\`**: \`__drizzle_migrations_${tableSuffix}\`.
- * Each entity pkg owns its own journal table so co-tenant pkgs in the
- * same SQLite file don't trip drizzle's global \`folderMillis\` watermark
- * check — drizzle's own bookkeeping is namespaced by table, so per-pkg
- * tables let migrations apply independently. Every glyph pkg follows
- * the \`__drizzle_migrations_<pkg>\` convention; deviating from it would
- * silently re-apply migrations or skip them.${journalNoteBlock}
- */
-export function apply${entity}Migrations<T extends Record<string, unknown>>(
-  db: ${dbType}<T>,
-): void {
-  const internals = db as unknown as {
-    dialect: { migrate(m: readonly MigrationMeta[], s: unknown, c?: { migrationsTable: string }): void };
-    session: unknown;
-  };
-  internals.dialect.migrate(MIGRATIONS, internals.session, {
-    migrationsTable: "__drizzle_migrations_${tableSuffix}",
-  });
 }
 `;
 

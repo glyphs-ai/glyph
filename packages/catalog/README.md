@@ -66,7 +66,7 @@ packages/catalog/src/
   infrastructure/drizzle/   persistence adapter (sole DB syscall site)
     catalog-schema.ts        Drizzle tables (private; only types exported)
     catalog-migrations.ts    applyCatalogMigrations
-    catalog-db.ts            openDb(dbFile): prod + test factory
+    catalog-db.ts            Db type + applyCatalogMigrations re-export
     agent-repository.ts      per-entity repository (skill / mcp mirror)
   infrastructure/source/    outbound content adapter (origin → bytes): File / GitHub / ADO
 drizzle/                   generated SQL migrations (committed)
@@ -135,8 +135,7 @@ Catalog use-cases return discriminated-union error objects through
 pnpm --filter @glyphs-ai/catalog test
 ```
 
-Vitest runs in `forks` pool (better-sqlite3's native binding
-segfaults on worker-thread teardown on Windows).
+Vitest runs in `forks` pool (libsql's native binding requires process-level isolation on Windows).
 
 ## License
 

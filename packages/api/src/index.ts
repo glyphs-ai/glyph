@@ -112,6 +112,7 @@ export {
   WorkflowWorkerSpecError,
 } from "./wiring/workflow-worker-task-runner.js";
 export {
+  type ScopeDbHandles,
   type WorkspaceContext,
   type WorkspaceContextState,
   WorkspaceHasLiveTasksError,

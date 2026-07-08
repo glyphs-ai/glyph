@@ -1,7 +1,7 @@
 import { ResultAsync } from "neverthrow";
 import type { DatabaseUnavailable } from "../../domain/schedule/schedule-repository.js";
 import type { Db } from "./schedule-db.js";
-import { schedules } from "./schedule-schema.js";
+import { schedules } from "./schedule-db.js";
 
 /**
  * Read-side port for the schedule CQRS query model. Exposes the table so read
@@ -16,7 +16,7 @@ import { schedules } from "./schedule-schema.js";
 export interface ScheduleQueries {
   readonly schedules: typeof schedules;
   /** Run one read fn; a driver throw becomes DatabaseUnavailable. */
-  query<T>(fn: (db: Db) => T): ResultAsync<T, DatabaseUnavailable>;
+  query<T>(fn: (db: Db) => T | Promise<T>): ResultAsync<T, DatabaseUnavailable>;
 }
 
 export class DrizzleScheduleQueries implements ScheduleQueries {
@@ -27,7 +27,7 @@ export class DrizzleScheduleQueries implements ScheduleQueries {
     this.db = opts.db;
   }
 
-  query<T>(fn: (db: Db) => T): ResultAsync<T, DatabaseUnavailable> {
+  query<T>(fn: (db: Db) => T | Promise<T>): ResultAsync<T, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
       Promise.resolve().then(() => fn(this.db)),
       (cause) => ({ type: "DatabaseUnavailable", cause }),

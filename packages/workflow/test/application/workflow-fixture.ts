@@ -39,10 +39,11 @@ import {
 import type { WorkflowNodeKind } from "../../src/domain/node/workflow-node-kind.js";
 import type { WorkflowNodeStatus } from "../../src/domain/node/workflow-node-status.js";
 import { type WorkflowId, WorkflowIdSchema } from "../../src/domain/workflow/workflow-id.js";
-import { type Db, openDb } from "../../src/infrastructure/drizzle/workflow-db.js";
-import { workflowNodes } from "../../src/infrastructure/drizzle/workflow-schema.js";
+import type { Db } from "../../src/infrastructure/drizzle/workflow-db.js";
+import { workflowNodes } from "../../src/infrastructure/drizzle/workflow-db.js";
 import { workflowRoot } from "../../src/infrastructure/file/workflow-sandbox.js";
 import { composeWorkflowModule, type WorkflowModule } from "../../src/workflow-module.js";
+import { openTestDb } from "../testing.js";
 
 export interface ValidateCall {
   readonly spec: unknown;
@@ -155,7 +156,7 @@ export async function buildWorkflowFixture(
     readonly humanRunner?: StubRunner;
   } = {},
 ): Promise<WorkflowFixture> {
-  const { db, close: closeDb } = openDb(":memory:");
+  const { db, close: closeDb } = await openTestDb(":memory:");
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-test-"));
   // Mirror @glyphs-ai/workspace's `register` provisioning step: create the
   // `workflows/` parent that `WorkflowSandbox.reserve` assumes exists (it
@@ -336,7 +337,7 @@ export async function addIteration(
  * to drive nodes into states the ordinary API won't easily produce (e.g. a
  * `succeeded` node so a mutation rejects with `WorkflowNodeNotMutable`).
  */
-export function setNodeLifecycle(
+export async function setNodeLifecycle(
   f: WorkflowFixture,
   opts: {
     readonly id: string;
@@ -345,7 +346,7 @@ export function setNodeLifecycle(
     readonly runningAt?: string | null;
     readonly endedAt?: string | null;
   },
-): void {
+): Promise<void> {
   const patch: {
     status?: WorkflowNodeStatus;
     readyAt?: string | null;
@@ -356,6 +357,10 @@ export function setNodeLifecycle(
   if (opts.readyAt !== undefined) patch.readyAt = opts.readyAt;
   if (opts.runningAt !== undefined) patch.runningAt = opts.runningAt;
   if (opts.endedAt !== undefined) patch.endedAt = opts.endedAt;
-  const result = f.db.update(workflowNodes).set(patch).where(eq(workflowNodes.id, opts.id)).run();
-  if (result.changes === 0) throw new Error(`setNodeLifecycle: node not found: ${opts.id}`);
+  const result = await f.db
+    .update(workflowNodes)
+    .set(patch)
+    .where(eq(workflowNodes.id, opts.id))
+    .run();
+  if (result.rowsAffected === 0) throw new Error(`setNodeLifecycle: node not found: ${opts.id}`);
 }

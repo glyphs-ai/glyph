@@ -7,12 +7,12 @@ import type { WorkspaceId } from "../../src/domain/workspace-id.js";
 import type { WorkspaceName } from "../../src/domain/workspace-name.js";
 import type { DatabaseUnavailable } from "../../src/domain/workspace-repository.js";
 import type { Db } from "../../src/infrastructure/drizzle/workspace-db.js";
+import { workspaces } from "../../src/infrastructure/drizzle/workspace-db.js";
 import { WorkspaceMapper } from "../../src/infrastructure/drizzle/workspace-mapper.js";
 import {
   DrizzleWorkspaceQueries,
   type WorkspaceQueries,
 } from "../../src/infrastructure/drizzle/workspace-queries.js";
-import { workspaces } from "../../src/infrastructure/drizzle/workspace-schema.js";
 import { openTestWorkspaceDb } from "../support/open-test-workspace-db.js";
 
 const ID_A = "11111111-1111-4111-8111-111111111111" as WorkspaceId;

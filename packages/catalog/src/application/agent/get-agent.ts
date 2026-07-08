@@ -40,8 +40,8 @@ export class GetAgentUseCase implements UseCase<GetAgentRequest, GetAgentRespons
   execute(request: GetAgentRequest): UseCaseResult<GetAgentResponse, GetAgentError> {
     const { id } = request;
     return this.deps.queries
-      .query((db): GetAgentResponse | undefined => {
-        const agent = selectAgentByFqn(db, id);
+      .query(async (db): Promise<GetAgentResponse | undefined> => {
+        const agent = await selectAgentByFqn(db, id);
         if (agent === undefined) return undefined;
         const dependencies =
           agent.dependencyRefs.skills.length > 0 ||

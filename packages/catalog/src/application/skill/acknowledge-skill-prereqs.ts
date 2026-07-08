@@ -46,7 +46,9 @@ export class AcknowledgePrereqsUseCase
       const skill = yield* deps.skillRepo.get(request.id);
       skill.acknowledgePrereqs();
       yield* deps.skillRepo.save(skill);
-      const referencedSkillFqns = yield* deps.queries.query((db) => collectReferencedSkillFqns(db));
+      const referencedSkillFqns = yield* deps.queries.query(
+        async (db) => await collectReferencedSkillFqns(db),
+      );
       const dependencies =
         skill.dependencyRefs.skills.length > 0 || skill.dependencyRefs.mcps.length > 0
           ? {

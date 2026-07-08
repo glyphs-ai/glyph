@@ -165,8 +165,6 @@ so `npm install -g` materialises them into the user's tree:
 
 - `pino`, `pino-pretty`, `pino-roll`, `thread-stream` — pino loads
   transports through `worker_threads` with runtime-resolved paths.
-- `better-sqlite3`, `bindings` — native `.node` binding loaded via
-  filesystem walk from the module location.
 - `@libsql/client` — re-exports `libsql`, whose JS shim calls
   `require('@libsql/<platform>')` (e.g. `@libsql/win32-x64-msvc`) at
   startup. The platform packages are `optionalDependencies` of
@@ -175,7 +173,7 @@ so `npm install -g` materialises them into the user's tree:
   `import.meta.resolve('@github/copilot/sdk')`, which walks the SDK's
   own `node_modules`.
 
-The rule of thumb: if a package uses `__dirname`, `bindings`,
+The rule of thumb: if a package uses `__dirname`,
 `worker_threads`, or any `import.meta.resolve` / `requireNative`
 trick to find sibling files at runtime, externalise it and add it to
 the root `dependencies`.

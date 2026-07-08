@@ -29,12 +29,12 @@ import {
   type WorkflowSuccess,
   WorkflowSuccessSchema,
 } from "../domain/workflow/workflow-success.js";
-import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries.js";
 import type {
   WorkflowEdgeRow,
   WorkflowNodeRow,
   WorkflowRow,
-} from "../infrastructure/drizzle/workflow-schema.js";
+} from "../infrastructure/drizzle/workflow-db.js";
+import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const GetWorkflowDagRequestSchema = z.object({ workflowId: WorkflowIdSchema }).strict();
@@ -98,10 +98,14 @@ export class GetWorkflowDagUseCase
     const { workflowId } = GetWorkflowDagRequestSchema.parse(request);
     const q = this.deps.query;
     return q
-      .query((db) => {
-        const workflow = db.select().from(q.workflows).where(eq(q.workflows.id, workflowId)).get();
+      .query(async (db) => {
+        const workflow = await db
+          .select()
+          .from(q.workflows)
+          .where(eq(q.workflows.id, workflowId))
+          .get();
         if (workflow === undefined) return null;
-        const nodes = db
+        const nodes = await db
           .select()
           .from(q.workflowNodes)
           .where(eq(q.workflowNodes.workflowId, workflowId))
@@ -111,7 +115,7 @@ export class GetWorkflowDagUseCase
             asc(q.workflowNodes.id),
           )
           .all();
-        const edges = db
+        const edges = await db
           .select()
           .from(q.workflowEdges)
           .where(eq(q.workflowEdges.workflowId, workflowId))
@@ -126,7 +130,7 @@ export class GetWorkflowDagUseCase
       .andThen((snapshot) =>
         snapshot === null
           ? errAsync({ type: "WorkflowNotFound" as const, workflowId })
-          : q.query(() => snapshot),
+          : q.query(async () => snapshot),
       );
   }
 }

@@ -1,33 +1,67 @@
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
-import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
-import { applyTaskMigrations } from "./task-migrations.js";
-import * as schema from "./task-schema.js";
-
-/** The pkg's drizzle DB handle, parameterized by the task tables. */
-export type Db = BetterSQLite3Database<typeof schema>;
+import type { ResultSet } from "@libsql/client";
+import { type BaseSQLiteDatabase, index, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
- * Open the task DB in WAL mode, apply migrations, and return the drizzle
- * handle plus `close`. The file is the per-workspace `workspace.db`, shared
- * with sibling packages via per-pkg migration tables (`__drizzle_migrations_task`);
- * each opens its own connection. Tests pass `:memory:`.
+ * Persisted task row. Mirrors the `TaskEntity` (in `../../domain/task-entity.ts`)
+ * field set; the `TaskMapper` (`./task-mapper.ts`) maps row ↔ entity via
+ * `toEntity` / `toRow`.
+ *
+ * `runtime` is promoted out of `metadata` into a first-class indexed
+ * column so the dashboard's runtime filter reads cleanly.
+ *
+ * `origin_id` is the first-class routing id for a cross-package
+ * origin: the schedule id for `origin = 'schedule'` rows and the
+ * workflow-node id for `origin = 'workflow'` rows. It is NULL for
+ * `standalone` tasks. Promoting it out of `metadata` lets routing
+ * lookups query a typed `(origin, origin_id)` pair instead of probing
+ * JSON.
+ *
+ * **Indexes.** `tasks_origin_pair_idx` is a **composite partial
+ * index** on `(origin, origin_id)` filtered `WHERE origin_id IS NOT
+ * NULL`. Declared via hand-written `drizzle/0002_tasks_origin_id.sql`
+ * because drizzle-kit cannot express partial indexes in schema; the
+ * column itself is declared below so the planner engages the index
+ * for any `WHERE origin = ? AND origin_id = ?` lookup. The same
+ * hand-written-partial-index pattern is used in `@glyphs-ai/schedule`
+ * for `schedules_target_agent_idx`.
  */
-export function openDb(dbFile: string): { db: Db; close(): void } {
-  const sqlite: BetterSqliteDatabase = new Database(dbFile);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("synchronous = NORMAL");
-  // No `foreign_keys = ON`: the schema has no FK constraints, so the pragma
-  // would be a no-op that misleads readers.
-  sqlite.pragma("busy_timeout = 5000");
-  const db: Db = drizzle(sqlite, { schema });
-  // Migration failure must close the SQLite handle before propagating: a
-  // leaked handle would hold the WAL lock and break a subsequent retry from
-  // the same caller (EBUSY until process exit).
-  try {
-    applyTaskMigrations(db);
-  } catch (err) {
-    sqlite.close();
-    throw err;
-  }
-  return { db, close: () => sqlite.close() };
-}
+export const tasks = sqliteTable(
+  "tasks",
+  {
+    id: text("id").primaryKey(),
+    agent: text("agent").notNull(),
+    runtime: text("runtime"),
+    status: text("status").notNull(),
+    brief: text("brief").notNull(),
+    details: text("details"),
+    origin: text("origin").notNull(),
+    originId: text("origin_id"),
+    createdAt: text("created_at").notNull(),
+    startedAt: text("started_at").notNull(),
+    endedAt: text("ended_at"),
+    success: text("success"),
+    failure: text("failure"),
+    cancellation: text("cancellation"),
+    metadata: text("metadata").notNull(),
+  },
+  (t) => [
+    index("tasks_agent_idx").on(t.agent),
+    index("tasks_runtime_idx").on(t.runtime),
+    index("tasks_status_idx").on(t.status),
+    index("tasks_origin_idx").on(t.origin),
+    // tasks_origin_pair_idx is a composite partial index defined in
+    // drizzle/0002_tasks_origin_id.sql ((origin, origin_id) WHERE
+    // origin_id IS NOT NULL); drizzle-kit can't express partial
+    // indexes in the TS schema.
+  ],
+);
+
+export type TaskRow = typeof tasks.$inferSelect;
+export type NewTaskRow = typeof tasks.$inferInsert;
+
+/**
+ * The pkg's drizzle DB handle, parameterized by the task tables above. A
+ * request-scoped drizzle transaction also satisfies this type, so
+ * repositories and queries stay unaware of whether they run inside one.
+ */
+export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof import("./task-db.js")>;

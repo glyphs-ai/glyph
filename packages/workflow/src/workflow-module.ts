@@ -19,10 +19,10 @@ import { PruneWorkflowSubgraphUseCase } from "./application/prune-workflow-subgr
 import { ResolveWorkflowArtifactPathUseCase } from "./application/resolve-workflow-artifact-path.js";
 import { RespondToHumanNodeUseCase } from "./application/respond-to-human-node.js";
 import { UpdateWorkflowNodeSpecUseCase } from "./application/update-workflow-node-spec.js";
-import { type Db, openDb } from "./infrastructure/drizzle/workflow-db.js";
+import type { Db } from "./infrastructure/drizzle/workflow-db.js";
+import * as schema from "./infrastructure/drizzle/workflow-db.js";
 import { DrizzleWorkflowQueries } from "./infrastructure/drizzle/workflow-queries.js";
 import { DrizzleWorkflowRepository } from "./infrastructure/drizzle/workflow-repository.js";
-import * as schema from "./infrastructure/drizzle/workflow-schema.js";
 import { WorkflowSandbox, workflowRoot } from "./infrastructure/file/workflow-sandbox.js";
 
 /**
@@ -32,8 +32,8 @@ import { WorkflowSandbox, workflowRoot } from "./infrastructure/file/workflow-sa
  *
  * The engine is the single stateful dependency, shared by every mutation
  * use-case (which nudges it post-commit) and exposed directly so hosts can
- * `drain()` it on shutdown. `close()` drains the engine then closes the SQLite
- * connection the module owns (a caller-supplied `db` is left open).
+ * `drain()` it on shutdown. `close()` drains the engine; the caller-supplied
+ * `db` is left open for the host to close.
  */
 export interface WorkflowModule {
   readonly createWorkflow: CreateWorkflowUseCase;
@@ -55,14 +55,12 @@ export interface WorkflowModule {
   readonly aggregateByOrigin: AggregateWorkflowsByOriginUseCase;
   /** The event-driven engine; hosts may `drain()` it directly on shutdown. */
   readonly engine: WorkflowEngine;
-  /** Drain the engine and close the module-owned SQLite connection. */
+  /** Drain the engine. The host owns and closes the shared connection. */
   close(): Promise<void>;
 }
 
-export type WorkflowModuleOptions = (
-  | { readonly db: Db; readonly dbFile?: never }
-  | { readonly dbFile: string; readonly db?: never }
-) & {
+export type WorkflowModuleOptions = {
+  readonly db: Db;
   readonly workspaceDir: string;
   /** One runner per `WorkflowNodeKind`; injected at compose time. */
   readonly runners: WorkflowRunners;
@@ -76,9 +74,9 @@ export type WorkflowModuleOptions = (
 };
 
 /**
- * Open the workflow DB (WAL + migrations) and assemble the module. Production
- * callers pass `dbFile` (the per-workspace `workspace.db`); tests pass an
- * existing `db` (e.g. `:memory:`) which the module does NOT close.
+ * Assemble the module around a caller-provided drizzle handle over the
+ * per-workspace `workspace.db`. The host owns the connection lifecycle;
+ * package tests build one via `openTestDb` in `test/testing.ts`.
  */
 export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promise<WorkflowModule> {
   const logger = opts.logger ?? pino({ level: "silent" });
@@ -86,16 +84,7 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
   const randomBytes = opts.randomBytes ?? cryptoRandomBytes;
   const randomUUID = opts.randomUUID ?? cryptoRandomUUID;
 
-  let db: Db;
-  let closeDb: () => void;
-  if ("db" in opts && opts.db !== undefined) {
-    db = opts.db;
-    closeDb = () => {};
-  } else {
-    const opened = openDb(opts.dbFile as string);
-    db = opened.db;
-    closeDb = opened.close;
-  }
+  const { db } = opts;
 
   const repo = new DrizzleWorkflowRepository({ db, logger });
   const query = new DrizzleWorkflowQueries({ db });
@@ -159,7 +148,6 @@ export async function composeWorkflowModule(opts: WorkflowModuleOptions): Promis
     engine,
     async close() {
       await engine.drain();
-      closeDb();
     },
   };
 }

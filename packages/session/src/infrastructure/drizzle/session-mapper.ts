@@ -2,9 +2,7 @@
 
 import { SessionEntity } from "../../domain/session-entity.js";
 import type { SessionId } from "../../domain/session-id.js";
-import type { sessions } from "./session-schema.js";
-
-export type SessionRow = typeof sessions.$inferSelect;
+import type { SessionRow } from "./session-db.js";
 
 export const SessionMapper = {
   toDomain(row: SessionRow): SessionEntity {

@@ -5,8 +5,9 @@ import { AgentFqnSchema } from "../../../src/domain/agent-fqn.js";
 import { McpFqnSchema } from "../../../src/domain/mcp-fqn.js";
 import { SkillFqnSchema } from "../../../src/domain/skill-fqn.js";
 import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
-import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import type { Db } from "../../../src/infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
+import { openTestDb } from "../../testing.js";
 
 const AGENT_ID = AgentFqnSchema.parse("public/triage");
 const asAgentFqn = (value: string) => AgentFqnSchema.parse(value);
@@ -34,8 +35,8 @@ let close: () => void;
 let agentRepo: DrizzleAgentRepository;
 let useCase: ListAgentsUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   close = opened.close;
   agentRepo = new DrizzleAgentRepository({ db });

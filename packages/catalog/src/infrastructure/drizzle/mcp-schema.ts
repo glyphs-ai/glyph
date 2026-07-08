@@ -20,3 +20,6 @@ export const mcps = sqliteTable(
   },
   (t) => [index("mcps_origin").on(t.origin), index("mcps_updated_at").on(t.updatedAt)],
 );
+
+export type McpRow = typeof mcps.$inferSelect;
+export type NewMcpRow = typeof mcps.$inferInsert;

@@ -7,13 +7,14 @@ import {
 import { WorkflowBriefSchema } from "../../../src/domain/workflow/workflow-brief.js";
 import { WorkflowEntity } from "../../../src/domain/workflow/workflow-entity.js";
 import { type WorkflowId, WorkflowIdSchema } from "../../../src/domain/workflow/workflow-id.js";
-import { type Db, openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
-import { DrizzleWorkflowRepository } from "../../../src/infrastructure/drizzle/workflow-repository.js";
+import type { Db } from "../../../src/infrastructure/drizzle/workflow-db.js";
 import {
   workflowEdges,
   workflowNodes,
   workflows,
-} from "../../../src/infrastructure/drizzle/workflow-schema.js";
+} from "../../../src/infrastructure/drizzle/workflow-db.js";
+import { DrizzleWorkflowRepository } from "../../../src/infrastructure/drizzle/workflow-repository.js";
+import { openTestDb } from "../../testing.js";
 
 const NOW = "2026-06-07T00:00:00.000Z";
 const NODE_UUIDS = [
@@ -73,8 +74,8 @@ let db: Db;
 let close: () => void;
 let repo: DrizzleWorkflowRepository;
 
-beforeEach(() => {
-  ({ db, close } = openDb(":memory:"));
+beforeEach(async () => {
+  ({ db, close } = await openTestDb(":memory:"));
   repo = new DrizzleWorkflowRepository({ db });
 });
 
@@ -115,7 +116,8 @@ describe("DrizzleWorkflowRepository — save insert / get round-trip", () => {
 
   it("get surfaces WorkflowEntityCorruption for a row with an invalid status enum", async () => {
     (await repo.save(makeWorkflow(wfId(1))))._unsafeUnwrap();
-    db.update(workflows)
+    await db
+      .update(workflows)
       .set({ status: "bogus" })
       .where(eq(workflows.id, "20260607-00000001"))
       .run();
@@ -198,21 +200,21 @@ describe("DrizzleWorkflowRepository — delete", () => {
     expect(r.isErr()).toBe(true);
     expect(r._unsafeUnwrapErr().type).toBe("WorkflowNotFound");
     expect(
-      db
+      await db
         .select()
         .from(workflows)
         .where(eq(workflows.id, wfId(1)))
         .all(),
     ).toEqual([]);
     expect(
-      db
+      await db
         .select()
         .from(workflowNodes)
         .where(eq(workflowNodes.workflowId, wfId(1)))
         .all(),
     ).toEqual([]);
     expect(
-      db
+      await db
         .select()
         .from(workflowEdges)
         .where(eq(workflowEdges.workflowId, wfId(1)))

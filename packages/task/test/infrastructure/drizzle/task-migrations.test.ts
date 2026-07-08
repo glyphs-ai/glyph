@@ -1,42 +1,63 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import Database from "better-sqlite3";
+import { createClient } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openDb } from "../../../src/infrastructure/drizzle/task-db.js";
+import { openTestDb } from "../../testing.js";
+
+async function removeDir(path: string): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      rmSync(path, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error)) throw error;
+      if (error.code !== "EPERM" && error.code !== "EBUSY") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  try {
+    rmSync(path, { recursive: true, force: true });
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error)) throw error;
+    if (error.code !== "EPERM" && error.code !== "EBUSY") throw error;
+  }
+}
 
 let dir: string;
 let dbFile: string;
+let raw: ReturnType<typeof createClient> | undefined;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "task-mig-"));
   dbFile = join(dir, "workspace.db");
 });
 
-afterEach(() => {
-  rmSync(dir, { recursive: true, force: true });
+afterEach(async () => {
+  raw?.close();
+  raw = undefined;
+  await removeDir(dir);
 });
 
-describe("openDb / applyTaskMigrations", () => {
-  it("creates the tasks table with the origin_id column and the task journal", () => {
-    const { close } = openDb(dbFile);
+describe("openTestDb / applyTaskMigrations", () => {
+  it("creates the tasks table with the origin_id column and the task journal", async () => {
+    const { close } = await openTestDb(dbFile);
     close();
 
-    const raw = new Database(dbFile);
+    raw = createClient({ url: `file:${dbFile}` });
     try {
-      const tables = raw
-        .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-        .all()
-        .map((r) => (r as { name: string }).name);
+      const tables = (
+        (await raw.execute("SELECT name FROM sqlite_master WHERE type='table'"))
+          .rows as unknown as Array<{ name: string }>
+      ).map((r) => (r as { name: string }).name);
       expect(tables).toContain("tasks");
       // Shared-lineage journal table — must be `task`, not `task`, so a DB
       // already migrated by @glyphs-ai/task is recognised and not re-applied.
       expect(tables).toContain("__drizzle_migrations_task");
 
-      const columns = raw
-        .prepare("PRAGMA table_info(tasks)")
-        .all()
-        .map((r) => (r as { name: string }).name);
+      const columns = (
+        (await raw.execute("PRAGMA table_info(tasks)")).rows as unknown as Array<{ name: string }>
+      ).map((r) => (r as { name: string }).name);
       expect(columns).toEqual(
         expect.arrayContaining([
           "id",
@@ -58,11 +79,13 @@ describe("openDb / applyTaskMigrations", () => {
       );
     } finally {
       raw.close();
+      raw = undefined;
     }
   });
 
-  it("is idempotent — reopening an already-migrated file does not throw", () => {
-    openDb(dbFile).close();
-    expect(() => openDb(dbFile).close()).not.toThrow();
+  it("is idempotent — reopening an already-migrated file does not throw", async () => {
+    (await openTestDb(dbFile)).close();
+    const reopened = await openTestDb(dbFile);
+    reopened.close();
   });
 });

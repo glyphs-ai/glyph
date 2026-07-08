@@ -31,11 +31,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { TaskModule } from "@glyphs-ai/task";
 import {
+  applyWorkflowMigrations,
   composeWorkflowModule,
   type WorkflowModule,
   type WorkflowNodeRunner,
   type WorkflowNodeTerminalResult,
+  schema as workflowSchema,
 } from "@glyphs-ai/workflow";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import { okAsync } from "neverthrow";
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -121,8 +125,11 @@ async function makeHarness(): Promise<Harness> {
   const coord = makeAutoSucceedRunner("coord", { gated: true });
   const worker = makeAutoSucceedRunner("worker", { gated: false });
   const workspaceDir = mkdtempSync(path.join(tmpdir(), "wf-e2e-coord-"));
+  const client = createClient({ url: "file::memory:" });
+  await applyWorkflowMigrations(client);
+  const db = drizzle(client, { schema: workflowSchema });
   const module = await composeWorkflowModule({
-    dbFile: ":memory:",
+    db,
     workspaceDir,
     runners: {
       coordinator: coord,
@@ -153,6 +160,7 @@ async function makeHarness(): Promise<Harness> {
     worker,
     async cleanup() {
       await module.close();
+      client.close();
       rmSync(workspaceDir, { recursive: true, force: true });
     },
   };

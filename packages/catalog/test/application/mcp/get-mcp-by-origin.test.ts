@@ -8,9 +8,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GetMcpByOriginUseCase } from "../../../src/application/mcp/get-mcp-by-origin.js";
 import { McpEntity } from "../../../src/domain/mcp-entity.js";
 import type { McpFqn } from "../../../src/domain/mcp-fqn.js";
-import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import type { Db } from "../../../src/infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
 import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-repository.js";
+import { openTestDb } from "../../testing.js";
 
 const MCP_ID = "azure/mcp" as McpFqn;
 const ORIGIN = "file://catalog/azure.json";
@@ -31,8 +32,8 @@ let close: () => void;
 let mcpRepo: DrizzleMcpRepository;
 let useCase: GetMcpByOriginUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   close = opened.close;
   mcpRepo = new DrizzleMcpRepository({ db });

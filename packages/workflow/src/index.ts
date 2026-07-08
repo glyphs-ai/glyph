@@ -164,6 +164,11 @@ export {
 } from "./application/update-workflow-node-spec.js";
 // ─── Shared cross-use-case surface (re-exported from domain) ───────
 export * from "./application/workflow-public.js";
+export { applyWorkflowMigrations } from "./infrastructure/drizzle/workflow-migrations.js";
+export {
+  createWorkflowScope,
+  type WorkflowScope,
+} from "./infrastructure/drizzle/workflow-scope.js";
 // ─── Path helpers ──────────────────────────────────────────────────
 export {
   WORKFLOW_SUBDIR,

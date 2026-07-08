@@ -7,10 +7,11 @@ import { McpFqnSchema } from "../../../src/domain/mcp-fqn.js";
 import { SkillEntity, type SkillEntityArgs } from "../../../src/domain/skill-entity.js";
 import { SkillFqnSchema } from "../../../src/domain/skill-fqn.js";
 import { DrizzleAgentRepository } from "../../../src/infrastructure/drizzle/agent-repository.js";
-import { type Db, openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
+import type { Db } from "../../../src/infrastructure/drizzle/catalog-db.js";
 import { DrizzleCatalogQueries } from "../../../src/infrastructure/drizzle/catalog-queries.js";
 import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-repository.js";
 import { DrizzleSkillRepository } from "../../../src/infrastructure/drizzle/skill-repository.js";
+import { openTestDb } from "../../testing.js";
 
 const AGENT_ID = AgentFqnSchema.parse("public/triage");
 const SKILL_ID = SkillFqnSchema.parse("public/tool-use");
@@ -96,8 +97,8 @@ let skillRepo: DrizzleSkillRepository;
 let mcpRepo: DrizzleMcpRepository;
 let useCase: ListAgentEntriesUseCase;
 
-beforeEach(() => {
-  const opened = openDb(":memory:");
+beforeEach(async () => {
+  const opened = await openTestDb(":memory:");
   db = opened.db;
   close = opened.close;
   agentRepo = new DrizzleAgentRepository({ db });

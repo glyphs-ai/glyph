@@ -141,10 +141,10 @@ function indexByOrigin(graph: ResolvedGraph): Map<string, ResolvedNode> {
 }
 
 /** Installed origin for a dependency fqn, or `undefined` when not installed. */
-function originForFqn(db: Db, kind: CatalogKind, fqn: string): string | undefined {
-  if (kind === "skill") return selectSkillByFqn(db, fqn)?.origin;
-  if (kind === "agent") return selectAgentByFqn(db, fqn)?.origin;
-  return selectMcpByFqn(db, fqn)?.origin;
+async function originForFqn(db: Db, kind: CatalogKind, fqn: string): Promise<string | undefined> {
+  if (kind === "skill") return (await selectSkillByFqn(db, fqn))?.origin;
+  if (kind === "agent") return (await selectAgentByFqn(db, fqn))?.origin;
+  return (await selectMcpByFqn(db, fqn))?.origin;
 }
 
 export class ResolvePlanUseCase
@@ -160,7 +160,7 @@ export class ResolvePlanUseCase
     // agents when the user accidentally re-installs an existing entry.
     if (parsed.origin !== undefined) {
       return this.deps.queries
-        .query((db) => this.isOriginInstalled(db, parsed.kind, parsed.origin!))
+        .query(async (db) => await this.isOriginInstalled(db, parsed.kind, parsed.origin!))
         .andThen((installed): ResultAsync<ResolvePlanResponse, ResolvePlanError> => {
           if (installed) {
             return okAsync({
@@ -192,7 +192,7 @@ export class ResolvePlanUseCase
     const raw = request.fqn ?? "";
     const kind = request.kind;
     return this.deps.queries
-      .query((db) => originForFqn(db, kind, raw))
+      .query(async (db) => await originForFqn(db, kind, raw))
       .andThen((origin): ResultAsync<string, ResolvePlanError> => {
         if (origin !== undefined) return okAsync(origin);
         if (kind === "skill")
@@ -204,10 +204,10 @@ export class ResolvePlanUseCase
   }
 
   /** Check if an origin is already installed locally (any kind). */
-  private isOriginInstalled(db: Db, kind: CatalogKind, origin: string): boolean {
-    if (kind === "skill") return selectSkillByOrigin(db, origin) !== undefined;
-    if (kind === "agent") return selectAgentByOrigin(db, origin) !== undefined;
-    return selectMcpByOrigin(db, origin) !== undefined;
+  private async isOriginInstalled(db: Db, kind: CatalogKind, origin: string): Promise<boolean> {
+    if (kind === "skill") return (await selectSkillByOrigin(db, origin)) !== undefined;
+    if (kind === "agent") return (await selectAgentByOrigin(db, origin)) !== undefined;
+    return (await selectMcpByOrigin(db, origin)) !== undefined;
   }
 
   private async build(kind: CatalogKind, origin: string): Promise<ResolvePlanResponse> {
@@ -215,7 +215,7 @@ export class ResolvePlanUseCase
     // A driver fault while flagging degrades to the unflagged graph (no
     // conflicts surfaced).
     const upstream = (
-      await this.deps.queries.query((db) => this.flagOriginConflicts(db, fetched))
+      await this.deps.queries.query(async (db) => await this.flagOriginConflicts(db, fetched))
     ).unwrapOr(fetched);
     // getTree only fails on DatabaseUnavailable; an empty local graph (the
     // install case, nothing installed yet) resolves to ok with no nodes.
@@ -227,10 +227,12 @@ export class ResolvePlanUseCase
     // installed elsewhere (e.g. skillB installed as dep of agentC, now also
     // needed by agentA). Without this, the diff sees them as "new".
     const augmented = (
-      await this.deps.queries.query((db) => this.augmentWithInstalled(db, upstream, local))
+      await this.deps.queries.query(
+        async (db) => await this.augmentWithInstalled(db, upstream, local),
+      )
     ).unwrapOr(local);
     const reverseDepIndex = (
-      await this.deps.queries.query((db) => this.reverseDepIndex(db, origin))
+      await this.deps.queries.query(async (db) => await this.reverseDepIndex(db, origin))
     ).unwrapOr(new Set<string>());
     const diff = this.diff(upstream, augmented, origin, kind, reverseDepIndex);
     const settled =
@@ -310,16 +312,16 @@ export class ResolvePlanUseCase
   }
 
   /** Flag upstream nodes whose fqn is installed under a DIFFERENT origin. */
-  private flagOriginConflicts(db: Db, graph: ResolvedGraph): ResolvedGraph {
+  private async flagOriginConflicts(db: Db, graph: ResolvedGraph): Promise<ResolvedGraph> {
     const conflicts: CatalogConflict[] = [...graph.conflicts];
     const nodes: ResolvedNode[] = [];
     for (const node of graph.nodes) {
       const existing =
         node.kind === "skill"
-          ? selectSkillByFqn(db, node.fqn)
+          ? await selectSkillByFqn(db, node.fqn)
           : node.kind === "agent"
-            ? selectAgentByFqn(db, node.fqn)
-            : selectMcpByFqn(db, node.fqn);
+            ? await selectAgentByFqn(db, node.fqn)
+            : await selectMcpByFqn(db, node.fqn);
       if (existing === undefined || existing.origin === node.origin) {
         nodes.push(node);
         continue;
@@ -335,24 +337,24 @@ export class ResolvePlanUseCase
   }
 
   /** Origins referenced by any installed entry OTHER than the root. */
-  private reverseDepIndex(db: Db, rootOrigin: string): Set<string> {
+  private async reverseDepIndex(db: Db, rootOrigin: string): Promise<Set<string>> {
     const referenced = new Set<string>();
-    const addOrigins = (kind: CatalogKind, fqns: readonly string[]): void => {
+    const addOrigins = async (kind: CatalogKind, fqns: readonly string[]): Promise<void> => {
       for (const fqn of fqns) {
-        const origin = originForFqn(db, kind, fqn);
+        const origin = await originForFqn(db, kind, fqn);
         if (origin !== undefined) referenced.add(origin);
       }
     };
-    for (const skill of selectAllSkills(db)) {
+    for (const skill of await selectAllSkills(db)) {
       if (skill.origin === rootOrigin) continue;
-      addOrigins("skill", skill.dependencyRefs.skills);
-      addOrigins("mcp", skill.dependencyRefs.mcps);
+      await addOrigins("skill", skill.dependencyRefs.skills);
+      await addOrigins("mcp", skill.dependencyRefs.mcps);
     }
-    for (const agent of selectAllAgents(db)) {
+    for (const agent of await selectAllAgents(db)) {
       if (agent.origin === rootOrigin) continue;
-      addOrigins("skill", agent.dependencyRefs.skills);
-      addOrigins("mcp", agent.dependencyRefs.mcps);
-      addOrigins("agent", agent.dependencyRefs.agents);
+      await addOrigins("skill", agent.dependencyRefs.skills);
+      await addOrigins("mcp", agent.dependencyRefs.mcps);
+      await addOrigins("agent", agent.dependencyRefs.agents);
     }
     return referenced;
   }
@@ -364,25 +366,29 @@ export class ResolvePlanUseCase
    * "new". This handles shared deps (e.g. skillB installed via agentC, now
    * also required by agentA).
    */
-  private augmentWithInstalled(
+  private async augmentWithInstalled(
     db: Db,
     upstream: ResolvedGraph,
     local: ResolvedGraph,
-  ): ResolvedGraph {
+  ): Promise<ResolvedGraph> {
     const localOrigins = new Set(local.nodes.map((n) => n.origin));
     const extra: ResolvedNode[] = [];
     for (const node of upstream.nodes) {
       if (localOrigins.has(node.origin)) continue;
-      const installed = this.lookupInstalled(db, node.kind, node.origin);
+      const installed = await this.lookupInstalled(db, node.kind, node.origin);
       if (installed) extra.push(installed);
     }
     if (extra.length === 0) return local;
     return { nodes: [...local.nodes, ...extra], conflicts: local.conflicts };
   }
 
-  private lookupInstalled(db: Db, kind: CatalogKind, origin: string): ResolvedNode | null {
+  private async lookupInstalled(
+    db: Db,
+    kind: CatalogKind,
+    origin: string,
+  ): Promise<ResolvedNode | null> {
     if (kind === "skill") {
-      const s = selectSkillByOrigin(db, origin);
+      const s = await selectSkillByOrigin(db, origin);
       if (s)
         return {
           kind: "skill",
@@ -393,7 +399,7 @@ export class ResolvePlanUseCase
           dependencyRefs: { skills: [], mcps: [], agents: [] },
         };
     } else if (kind === "agent") {
-      const a = selectAgentByOrigin(db, origin);
+      const a = await selectAgentByOrigin(db, origin);
       if (a)
         return {
           kind: "agent",
@@ -404,7 +410,7 @@ export class ResolvePlanUseCase
           dependencyRefs: { skills: [], mcps: [], agents: [] },
         };
     } else {
-      const m = selectMcpByOrigin(db, origin);
+      const m = await selectMcpByOrigin(db, origin);
       if (m)
         return {
           kind: "mcp",

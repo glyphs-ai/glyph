@@ -65,7 +65,8 @@ export {
 // ─── Shared cross-use-case surface (re-exported from domain) ─────
 export * from "./application/workspace-public.js";
 // ─── Composition root ────────────────────────────────────────────
-export { type Db, openWorkspaceDb } from "./infrastructure/drizzle/workspace-db.js";
+export type { Db } from "./infrastructure/drizzle/workspace-db.js";
+export { applyWorkspaceMigrations } from "./infrastructure/drizzle/workspace-migrations.js";
 export {
   composeWorkspaceModule,
   type WorkspaceModule,

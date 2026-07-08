@@ -3,8 +3,8 @@ import { ScheduleEntity } from "../../../src/domain/schedule/schedule-entity.js"
 import { ScheduleIdSchema } from "../../../src/domain/schedule/schedule-id.js";
 import type { ScheduleTargetEnvelope } from "../../../src/domain/schedule/schedule-target.js";
 import type { ScheduleTrigger } from "../../../src/domain/schedule/schedule-trigger.js";
+import type { ScheduleRow } from "../../../src/infrastructure/drizzle/schedule-db.js";
 import { ScheduleMapper } from "../../../src/infrastructure/drizzle/schedule-mapper.js";
-import type { ScheduleRow } from "../../../src/infrastructure/drizzle/schedule-schema.js";
 
 const VALID_ID = ScheduleIdSchema.parse("550e8400-e29b-41d4-a716-446655440000");
 const FIXED_NOW = new Date("2026-05-01T00:00:00.000Z");

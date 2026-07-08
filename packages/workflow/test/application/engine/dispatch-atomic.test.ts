@@ -45,7 +45,7 @@ describe("WorkflowEngine.dispatch", () => {
     expect((await f.module.getNode.execute({ workflowId, nodeId: a }))._unsafeUnwrap().status).toBe(
       "not_started",
     );
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: initialCoordNodeId,
       status: "succeeded",
       endedAt: "2026-06-07T01:00:00.000Z",
@@ -88,12 +88,12 @@ describe("WorkflowEngine.dispatch", () => {
       coordSpec: { agent: "coord-b" },
     });
     const parentTask = workerIds.parent!;
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: parentTask,
       status: "failed",
       endedAt: "2026-06-07T01:00:00.000Z",
     });
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: initialCoordNodeId,
       status: "succeeded",
       endedAt: "2026-06-07T01:00:00.000Z",
@@ -148,7 +148,7 @@ describe("WorkflowEngine.dispatch", () => {
 
   it("on runner.dispatch throw, marks the node failed via a separate tx", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: initialCoordNodeId,
       status: "succeeded",
       endedAt: "2026-06-07T01:00:00.000Z",
@@ -176,7 +176,7 @@ describe("WorkflowEngine.dispatch", () => {
 
   it("eager dispatch reaction from addSubgraph commits then dispatches once", async () => {
     const { workflowId, initialCoordNodeId } = await bootstrap(f);
-    setNodeLifecycle(f, {
+    await setNodeLifecycle(f, {
       id: initialCoordNodeId,
       status: "succeeded",
       endedAt: "2026-06-07T01:00:00.000Z",

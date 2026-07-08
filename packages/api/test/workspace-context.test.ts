@@ -63,6 +63,15 @@ vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(async () => undefined),
 }));
 
+// Phase 2: the shared libsql client is opened by workspace-context
+// before any compose function runs. Mock it to avoid real disk I/O.
+vi.mock("@libsql/client", () => ({
+  createClient: vi.fn(() => ({
+    execute: vi.fn(async () => ({ rows: [] })),
+    close: vi.fn(),
+  })),
+}));
+
 vi.mock("@glyphs-ai/catalog", () => ({
   composeCatalog: vi.fn(
     () =>
@@ -72,6 +81,8 @@ vi.mock("@glyphs-ai/catalog", () => ({
         }),
       }) as unknown as CatalogModule,
   ),
+  applyCatalogMigrations: vi.fn(async () => undefined),
+  schema: {},
 }));
 
 vi.mock("@glyphs-ai/session", () => ({
@@ -83,6 +94,8 @@ vi.mock("@glyphs-ai/session", () => ({
       }),
     };
   }),
+  applySessionMigrations: vi.fn(async () => undefined),
+  schema: {},
 }));
 
 vi.mock("@glyphs-ai/task", () => ({
@@ -100,6 +113,8 @@ vi.mock("@glyphs-ai/task", () => ({
         }),
       }) as unknown as TaskModule,
   ),
+  applyTaskMigrations: vi.fn(async () => undefined),
+  schema: {},
 }));
 
 vi.mock("@glyphs-ai/schedule", () => ({
@@ -115,6 +130,8 @@ vi.mock("@glyphs-ai/schedule", () => ({
       }),
     } as unknown as ScheduleModule;
   }),
+  applyScheduleMigrations: vi.fn(async () => undefined),
+  schema: {},
 }));
 
 // `composeWorkflowModule` is mocked so the test never touches the
@@ -132,6 +149,8 @@ vi.mock("@glyphs-ai/workflow", () => ({
       }),
     } as unknown as WorkflowModule;
   }),
+  applyWorkflowMigrations: vi.fn(async () => undefined),
+  schema: {},
 }));
 
 // The coord-runner factory dereferences `tasks` / `catalog` only on

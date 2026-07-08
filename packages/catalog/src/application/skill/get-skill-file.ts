@@ -22,8 +22,8 @@ export class GetSkillFileUseCase
 
   execute(request: GetSkillFileRequest): UseCaseResult<GetSkillFileResponse, GetSkillFileError> {
     const { id, relPath } = request;
-    return this.deps.queries.query((db) => {
-      const row = db
+    return this.deps.queries.query(async (db) => {
+      const row = await db
         .select({ content: skillFiles.content })
         .from(skillFiles)
         .where(and(eq(skillFiles.skillFqn, id), eq(skillFiles.relPath, relPath)))

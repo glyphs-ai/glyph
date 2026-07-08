@@ -1,31 +1,48 @@
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
+import { type Client, createClient } from "@libsql/client";
 import { describe, expect, it } from "vitest";
-import { openDb } from "../../../src/infrastructure/drizzle/workflow-db.js";
 import {
   applyWorkflowMigrations,
   MIGRATIONS,
 } from "../../../src/infrastructure/drizzle/workflow-migrations.js";
+import { openTestDb } from "../../testing.js";
+
+async function removeDir(path: string): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      rmSync(path, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error)) throw error;
+      if (error.code !== "EPERM" && error.code !== "EBUSY") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  try {
+    rmSync(path, { recursive: true, force: true });
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error)) throw error;
+    if (error.code !== "EPERM" && error.code !== "EBUSY") throw error;
+  }
+}
 
 /** Open a migrated workflow DB on a tmp file, exposing a raw read connection. */
-function openMigratedFileDb(): {
-  db: ReturnType<typeof openDb>["db"];
-  sqlite: BetterSqliteDatabase;
-  close(): void;
-} {
+async function openMigratedFileDb(): Promise<{
+  client: Client;
+  close(): Promise<void>;
+}> {
   const dir = mkdtempSync(join(tmpdir(), "wf-mig-"));
   const dbFile = join(dir, "workspace.db");
-  const { db, close } = openDb(dbFile);
-  const sqlite = new Database(dbFile);
+  const { close } = await openTestDb(dbFile);
+  close();
+  const client = createClient({ url: `file:${dbFile}` });
   return {
-    db,
-    sqlite,
-    close() {
-      sqlite.close();
-      close();
-      rmSync(dir, { recursive: true, force: true });
+    client,
+    async close() {
+      client.close();
+      await removeDir(dir);
     },
   };
 }
@@ -77,38 +94,39 @@ const ORIGIN_ID_MIGRATION_INDEX = MIGRATIONS.findIndex((m) =>
 );
 
 /** Exec one inlined migration's statements against a raw connection. */
-function applyMigration(sqlite: BetterSqliteDatabase, index: number): void {
+async function applyMigration(client: Client, index: number): Promise<void> {
   const m = MIGRATIONS[index];
   if (m === undefined) throw new Error(`no migration at index ${index}`);
   for (const stmt of m.sql) {
     const trimmed = stmt.trim();
-    if (trimmed.length > 0) sqlite.exec(trimmed);
+    if (trimmed.length > 0) await client.execute(trimmed);
   }
 }
 
 /** Apply migrations `[0, uptoExclusive)` — i.e. the pre-origin_id schema. */
-function applyThrough(sqlite: BetterSqliteDatabase, uptoExclusive: number): void {
-  for (let i = 0; i < uptoExclusive; i++) applyMigration(sqlite, i);
+async function applyThrough(client: Client, uptoExclusive: number): Promise<void> {
+  for (let i = 0; i < uptoExclusive; i++) await applyMigration(client, i);
 }
 
 /** Insert a legacy (pre-origin_id) workflow row carrying its id in metadata. */
-function insertLegacyWorkflow(
-  sqlite: BetterSqliteDatabase,
+async function insertLegacyWorkflow(
+  client: Client,
   row: { id: string; origin: string; metadata: Record<string, unknown> },
-): void {
-  sqlite
-    .prepare(
+): Promise<void> {
+  await client.execute({
+    sql:
       "INSERT INTO `workflows` (`id`, `brief`, `coordinator_agent`, `created_at`, `metadata`, `status`, `origin`) " +
-        "VALUES (?, 'b', 'official/engineer', '2026-01-01T00:00:00.000Z', ?, 'running', ?)",
-    )
-    .run(row.id, JSON.stringify(row.metadata), row.origin);
+      "VALUES (?, 'b', 'official/engineer', '2026-01-01T00:00:00.000Z', ?, 'running', ?)",
+    args: [row.id, JSON.stringify(row.metadata), row.origin],
+  });
 }
 
 describe("workflows origin_id migration: post-state", () => {
-  it("creates the (origin, origin_id) composite partial index and drops the legacy schedule-id index", () => {
-    const orm = openMigratedFileDb();
+  it("creates the (origin, origin_id) composite partial index and drops the legacy schedule-id index", async () => {
+    const orm = await openMigratedFileDb();
     try {
-      const indexes = orm.sqlite.prepare("PRAGMA index_list('workflows')").all() as Array<{
+      const indexes = (await orm.client.execute("PRAGMA index_list('workflows')"))
+        .rows as unknown as Array<{
         name: string;
         partial: number;
       }>;
@@ -117,7 +135,8 @@ describe("workflows origin_id migration: post-state", () => {
       expect(pair?.partial, "it is a partial index (WHERE origin_id IS NOT NULL)").toBe(1);
 
       const cols = (
-        orm.sqlite.prepare("PRAGMA index_info('workflows_origin_pair_idx')").all() as Array<{
+        (await orm.client.execute("PRAGMA index_info('workflows_origin_pair_idx')"))
+          .rows as unknown as Array<{
           name: string | null;
         }>
       ).map((r) => r.name);
@@ -126,68 +145,65 @@ describe("workflows origin_id migration: post-state", () => {
       const legacy = indexes.find((r) => r.name === "workflows_schedule_id_idx");
       expect(legacy, "workflows_schedule_id_idx must be dropped").toBeUndefined();
     } finally {
-      orm.close();
+      await orm.close();
     }
   });
 });
 
 describe("workflows origin_id migration: backfill (pre → post)", () => {
-  it("backfills scheduleId onto origin_id for schedule-origin rows; standalone stays NULL", () => {
-    const sqlite = new Database(":memory:");
+  it("backfills scheduleId onto origin_id for schedule-origin rows; standalone stays NULL", async () => {
+    const client = createClient({ url: "file::memory:" });
     try {
-      applyThrough(sqlite, ORIGIN_ID_MIGRATION_INDEX);
+      await applyThrough(client, ORIGIN_ID_MIGRATION_INDEX);
 
-      insertLegacyWorkflow(sqlite, {
+      await insertLegacyWorkflow(client, {
         id: "wf-sched",
         origin: "schedule",
         metadata: { scheduleId: "sched-7" },
       });
-      insertLegacyWorkflow(sqlite, { id: "wf-std", origin: "standalone", metadata: {} });
+      await insertLegacyWorkflow(client, { id: "wf-std", origin: "standalone", metadata: {} });
 
-      applyMigration(sqlite, ORIGIN_ID_MIGRATION_INDEX);
+      await applyMigration(client, ORIGIN_ID_MIGRATION_INDEX);
 
-      const rows = sqlite
-        .prepare("SELECT id, origin_id FROM `workflows` ORDER BY id ASC")
-        .all() as Array<{ id: string; origin_id: string | null }>;
+      const rows = (await client.execute("SELECT id, origin_id FROM `workflows` ORDER BY id ASC"))
+        .rows as unknown as Array<{ id: string; origin_id: string | null }>;
       const byId = new Map(rows.map((r) => [r.id, r.origin_id]));
       expect(byId.get("wf-sched")).toBe("sched-7");
       expect(byId.get("wf-std")).toBeNull();
     } finally {
-      sqlite.close();
+      client.close();
     }
   });
 
-  it("aborts when a schedule-origin row cannot be backfilled (RAISE(FAIL) guard)", () => {
-    const sqlite = new Database(":memory:");
+  it("aborts when a schedule-origin row cannot be backfilled (RAISE(FAIL) guard)", async () => {
+    const client = createClient({ url: "file::memory:" });
     try {
-      applyThrough(sqlite, ORIGIN_ID_MIGRATION_INDEX);
-      insertLegacyWorkflow(sqlite, { id: "wf-broken", origin: "schedule", metadata: {} });
+      await applyThrough(client, ORIGIN_ID_MIGRATION_INDEX);
+      await insertLegacyWorkflow(client, { id: "wf-broken", origin: "schedule", metadata: {} });
 
-      expect(() => applyMigration(sqlite, ORIGIN_ID_MIGRATION_INDEX)).toThrow(
+      await expect(applyMigration(client, ORIGIN_ID_MIGRATION_INDEX)).rejects.toThrow(
         /backfill incomplete/,
       );
     } finally {
-      sqlite.close();
+      client.close();
     }
   });
 });
 
 describe("workflows origin_id migration: idempotent rerun", () => {
-  it("a second applyWorkflowMigrations is a no-op (journal-gated), not a double-apply error", () => {
-    const orm = openMigratedFileDb();
+  it("a second applyWorkflowMigrations is a no-op (journal-gated), not a double-apply error", async () => {
+    const orm = await openMigratedFileDb();
     try {
-      const before = orm.sqlite
-        .prepare("SELECT count(*) AS n FROM __drizzle_migrations_workflow")
-        .get() as { n: number };
-      expect(() => {
-        applyWorkflowMigrations(orm.db);
-      }).not.toThrow();
-      const after = orm.sqlite
-        .prepare("SELECT count(*) AS n FROM __drizzle_migrations_workflow")
-        .get() as { n: number };
+      const before = (
+        await orm.client.execute("SELECT count(*) AS n FROM __drizzle_migrations_workflow")
+      ).rows[0] as unknown as { n: number };
+      await expect(applyWorkflowMigrations(orm.client)).resolves.toBeUndefined();
+      const after = (
+        await orm.client.execute("SELECT count(*) AS n FROM __drizzle_migrations_workflow")
+      ).rows[0] as unknown as { n: number };
       expect(after.n).toBe(before.n);
     } finally {
-      orm.close();
+      await orm.close();
     }
   });
 });

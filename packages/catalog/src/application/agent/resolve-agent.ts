@@ -72,14 +72,14 @@ export class ResolveAgentUseCase
   execute(request: ResolveAgentRequest): UseCaseResult<ResolveAgentResponse, ResolveAgentError> {
     const { id } = request;
     return this.deps.queries
-      .query((db): ResolveAgentResponse | undefined => {
-        const agents = selectAllAgents(db);
+      .query(async (db): Promise<ResolveAgentResponse | undefined> => {
+        const agents = await selectAllAgents(db);
         const root = agents.find((agent) => agent.fqn === id);
         if (root === undefined) return undefined;
 
-        const skills = selectAllSkills(db);
-        const referencedSkillFqns = collectReferencedSkillFqns(db);
-        const installedMcpFqns = selectInstalledMcpFqns(db);
+        const skills = await selectAllSkills(db);
+        const referencedSkillFqns = await collectReferencedSkillFqns(db);
+        const installedMcpFqns = await selectInstalledMcpFqns(db);
         const skillByFqn = new Map<string, SkillView>(skills.map((skill) => [skill.fqn, skill]));
 
         const visited = new Set<string>();

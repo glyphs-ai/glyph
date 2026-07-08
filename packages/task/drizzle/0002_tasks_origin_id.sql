@@ -12,13 +12,7 @@ CREATE TEMP TABLE `_assert_tasks_origin_backfill` (`x`);
 --> statement-breakpoint
 CREATE TEMP TRIGGER `_assert_tasks_origin_backfill_trg` BEFORE INSERT ON `_assert_tasks_origin_backfill`
 BEGIN
-  SELECT RAISE(
-    FAIL,
-    'tasks backfill incomplete: '
-      || (SELECT count(*) FROM `tasks` WHERE `origin` NOT IN ('standalone') AND `origin_id` IS NULL)
-      || ' non-standalone row(s) without origin_id; offending ids: '
-      || (SELECT group_concat(`id`) FROM `tasks` WHERE `origin` NOT IN ('standalone') AND `origin_id` IS NULL)
-  )
+  SELECT RAISE(FAIL, 'tasks backfill incomplete')
   WHERE EXISTS (SELECT 1 FROM `tasks` WHERE `origin` NOT IN ('standalone') AND `origin_id` IS NULL);
 END;
 --> statement-breakpoint

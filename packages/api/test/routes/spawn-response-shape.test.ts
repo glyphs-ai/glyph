@@ -20,13 +20,17 @@ import type { CatalogModule } from "@glyphs-ai/catalog";
 import { type AgentContentSource, InMemoryRuntimeRegistry } from "@glyphs-ai/runtime";
 import {
   type AgentResolver,
+  applySessionMigrations,
   composeSessionModule,
   type LaunchCommand,
   type ResolvedAgent,
   type SessionModule,
+  schema as sessionSchema,
 } from "@glyphs-ai/session";
 import type { TaskModule } from "@glyphs-ai/task";
 import type { Spawner, SpawnFailed } from "@glyphs-ai/terminal";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import { errAsync, okAsync } from "neverthrow";
 import { describe, expect, it, vi } from "vitest";
 import { sessionsRoutes } from "../../src/routes/sessions.js";
@@ -59,8 +63,13 @@ async function buildModule(spawner: Spawner): Promise<SessionModule> {
       return {};
     },
   };
+  // Production builds the drizzle handle once in workspace-context and passes
+  // it as { db }; mirror that here with a throwaway in-memory client.
+  const client = createClient({ url: "file::memory:" });
+  await applySessionMigrations(client);
+  const db = drizzle(client, { schema: sessionSchema });
   const module = await composeSessionModule({
-    dbFile: ":memory:",
+    db,
     agentResolver,
     contentSource,
     runtimeRegistry: new InMemoryRuntimeRegistry(),
@@ -69,7 +78,14 @@ async function buildModule(spawner: Spawner): Promise<SessionModule> {
     workspaceId: "ws-pin",
   });
   vi.spyOn(module.buildInteractiveLaunch, "execute").mockReturnValue(okAsync(sampleLaunch));
-  return module;
+  // The module holds no handle to close ({ db } is host-owned); release the
+  // throwaway client when the caller closes the module.
+  return {
+    ...module,
+    async close() {
+      client.close();
+    },
+  };
 }
 
 function buildContext(sessions: SessionModule): WorkspaceContext {

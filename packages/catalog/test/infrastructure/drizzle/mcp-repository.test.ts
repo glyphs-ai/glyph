@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { McpEntity } from "../../../src/domain/mcp-entity.js";
 import type { McpFqn } from "../../../src/domain/mcp-fqn.js";
-import { openDb } from "../../../src/infrastructure/drizzle/catalog-db.js";
 import { DrizzleMcpRepository } from "../../../src/infrastructure/drizzle/mcp-repository.js";
+import { openTestDb } from "../../testing.js";
 
 /**
- * Uses in-memory SQLite with migrations applied by `openDb`. Repository
+ * Uses in-memory SQLite with migrations applied by `openTestDb`. Repository
  * reads and writes exercise persisted MCP metadata and JSON specs.
  */
 let repo: DrizzleMcpRepository;
 
-beforeEach(() => {
-  repo = new DrizzleMcpRepository({ db: openDb(":memory:").db });
+beforeEach(async () => {
+  repo = new DrizzleMcpRepository({ db: await (await openTestDb(":memory:")).db });
 });
 
 const NOW = "2025-01-01T00:00:00.000Z";

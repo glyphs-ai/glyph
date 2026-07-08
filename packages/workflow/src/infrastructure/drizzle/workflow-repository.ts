@@ -14,10 +14,9 @@ import type {
   WorkflowNotFound,
   WorkflowRepository,
 } from "../../domain/workflow/workflow-repository.js";
-import type { Db } from "./workflow-db.js";
+import type { Db, NewWorkflowNodeRow, NewWorkflowRow, WorkflowNodeRow } from "./workflow-db.js";
+import { workflowEdges, workflowNodes, workflows } from "./workflow-db.js";
 import { WorkflowMapper } from "./workflow-mapper.js";
-import type { NewWorkflowNodeRow, NewWorkflowRow, WorkflowNodeRow } from "./workflow-schema.js";
-import { workflowEdges, workflowNodes, workflows } from "./workflow-schema.js";
 
 const silentLogger: Logger = pino({ level: "silent" });
 
@@ -38,15 +37,19 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
     WorkflowNotFound | WorkflowEntityCorruption | DatabaseUnavailable
   > {
     return ResultAsync.fromPromise(
-      Promise.resolve().then(() => {
-        const workflowRow = this.db.select().from(workflows).where(eq(workflows.id, id)).get();
+      (async () => {
+        const workflowRow = await this.db
+          .select()
+          .from(workflows)
+          .where(eq(workflows.id, id))
+          .get();
         if (workflowRow === undefined) return { kind: "missing" as const };
-        const nodeRows = this.db
+        const nodeRows = await this.db
           .select()
           .from(workflowNodes)
           .where(eq(workflowNodes.workflowId, id))
           .all();
-        const edgeRows = this.db
+        const edgeRows = await this.db
           .select()
           .from(workflowEdges)
           .where(eq(workflowEdges.workflowId, id))
@@ -60,7 +63,7 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
           return { kind: "corrupt" as const, error: entity.error };
         }
         return { kind: "ok" as const, entity: entity.value };
-      }),
+      })(),
       mapToDatabaseUnavailable,
     ).andThen((result) => {
       if (result.kind === "missing")
@@ -72,66 +75,68 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
 
   save(entity: WorkflowEntity): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      Promise.resolve().then(() =>
-        this.db.transaction((tx) => {
-          const snapshot = entity.__snapshot();
-          if (snapshot.header === null) {
-            tx.insert(workflows).values(WorkflowMapper.toWorkflowRow(entity)).run();
-            for (const node of entity.nodes)
-              tx.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
-            for (const edge of entity.edges)
-              tx.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
-            return;
-          }
-          if (headerChanged(snapshot.header, entity))
-            tx.update(workflows)
-              .set(workflowPatch(entity))
-              .where(eq(workflows.id, entity.id))
-              .run();
-          const currentNodes = new Map(entity.nodes.map((node) => [node.id, node]));
+      (async () => {
+        const snapshot = entity.__snapshot();
+        if (snapshot.header === null) {
+          await this.db.insert(workflows).values(WorkflowMapper.toWorkflowRow(entity)).run();
           for (const node of entity.nodes)
-            if (!snapshot.nodes.has(node.id))
-              tx.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
-          for (const id of snapshot.nodes.keys())
-            if (!currentNodes.has(id))
-              tx.delete(workflowNodes).where(eq(workflowNodes.id, id)).run();
-          for (const [id, snap] of snapshot.nodes) {
-            const node = currentNodes.get(id);
-            if (node !== undefined && nodeChanged(snap, node))
-              tx.update(workflowNodes).set(nodePatch(node)).where(eq(workflowNodes.id, id)).run();
-          }
-          const currentEdgeKeys = new Set(entity.edges.map((edge) => edgeKey(edge.from, edge.to)));
-          for (const key of snapshot.edgeKeys)
-            if (!currentEdgeKeys.has(key)) {
-              const edge = splitEdgeKey(key);
-              tx.delete(workflowEdges)
-                .where(
-                  and(
-                    eq(workflowEdges.workflowId, entity.id),
-                    eq(workflowEdges.fromNodeId, edge.from),
-                    eq(workflowEdges.toNodeId, edge.to),
-                  ),
-                )
-                .run();
-            }
+            await this.db.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
           for (const edge of entity.edges)
-            if (!snapshot.edgeKeys.has(edgeKey(edge.from, edge.to)))
-              tx.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
-        }),
-      ),
+            await this.db.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
+          return;
+        }
+        if (headerChanged(snapshot.header, entity))
+          await this.db
+            .update(workflows)
+            .set(workflowPatch(entity))
+            .where(eq(workflows.id, entity.id))
+            .run();
+        const currentNodes = new Map(entity.nodes.map((node) => [node.id, node]));
+        for (const node of entity.nodes)
+          if (!snapshot.nodes.has(node.id))
+            await this.db.insert(workflowNodes).values(WorkflowMapper.toNodeRow(node)).run();
+        for (const id of snapshot.nodes.keys())
+          if (!currentNodes.has(id))
+            await this.db.delete(workflowNodes).where(eq(workflowNodes.id, id)).run();
+        for (const [id, snap] of snapshot.nodes) {
+          const node = currentNodes.get(id);
+          if (node !== undefined && nodeChanged(snap, node))
+            await this.db
+              .update(workflowNodes)
+              .set(nodePatch(node))
+              .where(eq(workflowNodes.id, id))
+              .run();
+        }
+        const currentEdgeKeys = new Set(entity.edges.map((edge) => edgeKey(edge.from, edge.to)));
+        for (const key of snapshot.edgeKeys)
+          if (!currentEdgeKeys.has(key)) {
+            const edge = splitEdgeKey(key);
+            await this.db
+              .delete(workflowEdges)
+              .where(
+                and(
+                  eq(workflowEdges.workflowId, entity.id),
+                  eq(workflowEdges.fromNodeId, edge.from),
+                  eq(workflowEdges.toNodeId, edge.to),
+                ),
+              )
+              .run();
+          }
+        for (const edge of entity.edges)
+          if (!snapshot.edgeKeys.has(edgeKey(edge.from, edge.to)))
+            await this.db.insert(workflowEdges).values(WorkflowMapper.toEdgeRow(edge)).run();
+      })(),
       mapToDatabaseUnavailable,
     );
   }
 
   delete(id: WorkflowId): ResultAsync<void, DatabaseUnavailable> {
     return ResultAsync.fromPromise(
-      Promise.resolve().then(() =>
-        this.db.transaction((tx) => {
-          tx.delete(workflowEdges).where(eq(workflowEdges.workflowId, id)).run();
-          tx.delete(workflowNodes).where(eq(workflowNodes.workflowId, id)).run();
-          tx.delete(workflows).where(eq(workflows.id, id)).run();
-        }),
-      ),
+      (async () => {
+        await this.db.delete(workflowEdges).where(eq(workflowEdges.workflowId, id)).run();
+        await this.db.delete(workflowNodes).where(eq(workflowNodes.workflowId, id)).run();
+        await this.db.delete(workflows).where(eq(workflows.id, id)).run();
+      })(),
       mapToDatabaseUnavailable,
     );
   }

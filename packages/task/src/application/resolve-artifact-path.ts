@@ -41,8 +41,8 @@ export class ResolveArtifactPathUseCase
     const { id, relPath } = ResolveArtifactPathRequestSchema.parse(request);
     const q = this.deps.query;
     return q
-      .query((db): boolean => {
-        const row = db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
+      .query(async (db): Promise<boolean> => {
+        const row = await db.select().from(q.tasks).where(eq(q.tasks.id, id)).get();
         if (row === undefined || row.status === "running") return false;
         const success = row.success !== null ? (JSON.parse(row.success) as TaskSuccess) : undefined;
         const allowed = (success?.artifacts ?? []).map((a) => normalizeArtifactRel(a, id));

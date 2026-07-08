@@ -49,7 +49,7 @@ export class GetSessionUseCase
     const deps = this.deps;
     const q = deps.query;
     return q
-      .query((db) => db.select().from(q.sessions).where(eq(q.sessions.id, id)).get())
+      .query(async (db) => await db.select().from(q.sessions).where(eq(q.sessions.id, id)).get())
       .andThen((row) => {
         if (row === undefined) return okAsync<GetSessionResponse>(null);
         const resolved = deps.runtimeRegistry.get(row.runtime);

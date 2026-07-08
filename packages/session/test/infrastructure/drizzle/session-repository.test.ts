@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { SessionEntity } from "../../../src/domain/session-entity.js";
 import { SessionIdSchema } from "../../../src/domain/session-id.js";
-import { openDb } from "../../../src/infrastructure/drizzle/session-db.js";
 import { DrizzleSessionRepository } from "../../../src/infrastructure/drizzle/session-repository.js";
+import { openTestDb } from "../../testing.js";
 
-function setupRepo(): DrizzleSessionRepository {
-  const { db } = openDb(":memory:");
+async function setupRepo(): Promise<DrizzleSessionRepository> {
+  const { db } = await openTestDb(":memory:");
   return new DrizzleSessionRepository({ db });
 }
 
 let repo: DrizzleSessionRepository;
 
-beforeEach(() => {
-  repo = setupRepo();
+beforeEach(async () => {
+  repo = await setupRepo();
 });
 
 const STATE_A = {

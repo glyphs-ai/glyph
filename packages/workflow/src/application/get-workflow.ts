@@ -20,8 +20,8 @@ import {
   type WorkflowSuccess,
   WorkflowSuccessSchema,
 } from "../domain/workflow/workflow-success.js";
+import type { WorkflowRow } from "../infrastructure/drizzle/workflow-db.js";
 import type { WorkflowQueries } from "../infrastructure/drizzle/workflow-queries.js";
-import type { WorkflowRow } from "../infrastructure/drizzle/workflow-schema.js";
 import type { UseCase, UseCaseResult } from "./use-case.js";
 
 export const GetWorkflowRequestSchema = z.object({ workflowId: WorkflowIdSchema }).strict();
@@ -55,11 +55,14 @@ export class GetWorkflowUseCase
     const { workflowId } = GetWorkflowRequestSchema.parse(request);
     const q = this.deps.query;
     return q
-      .query((db) => db.select().from(q.workflows).where(eq(q.workflows.id, workflowId)).get())
+      .query(
+        async (db) =>
+          await db.select().from(q.workflows).where(eq(q.workflows.id, workflowId)).get(),
+      )
       .andThen((row) =>
         row === undefined
           ? errAsync({ type: "WorkflowNotFound" as const, workflowId })
-          : q.query(() => toGetWorkflowResponse(row)),
+          : q.query(async () => toGetWorkflowResponse(row)),
       );
   }
 }

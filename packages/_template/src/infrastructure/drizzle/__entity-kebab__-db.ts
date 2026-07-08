@@ -1,26 +1,20 @@
-import Database, { type Database as BetterSqliteDatabase } from "better-sqlite3";
-import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
-import { apply__Entity__Migrations } from "./__entity-kebab__-migrations.js";
-import * as schema from "./__entity-kebab__-schema.js";
+import type { ResultSet } from "@libsql/client";
+import { type BaseSQLiteDatabase, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-/** The pkg's drizzle DB handle, parameterized by the __PKG__ tables. */
-export type Db = BetterSQLite3Database<typeof schema>;
+/** Table for the __Entity__ aggregate; rows map to `__Entity__Entity`. */
+export const __entities__ = sqliteTable("__entities__", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  createdAt: text("created_at").notNull(),
+  archived: integer("archived", { mode: "boolean" }).notNull(),
+});
+
+export type __Entity__Row = typeof __entities__.$inferSelect;
+export type New__Entity__Row = typeof __entities__.$inferInsert;
 
 /**
- * Open the SQLite DB in WAL mode, apply migrations, and return the
- * drizzle handle plus `close`.
+ * The pkg's drizzle DB handle, parameterized by the __PKG__ tables above.
+ * A request-scoped drizzle transaction also satisfies this type, so
+ * repositories and queries stay unaware of whether they run inside one.
  */
-export function openDb(dbFile: string): { db: Db; close(): void } {
-  const sqlite: BetterSqliteDatabase = new Database(dbFile);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("synchronous = NORMAL");
-  sqlite.pragma("busy_timeout = 5000");
-  const db: Db = drizzle(sqlite, { schema });
-  try {
-    apply__Entity__Migrations(db);
-  } catch (err) {
-    sqlite.close();
-    throw err;
-  }
-  return { db, close: () => sqlite.close() };
-}
+export type Db = BaseSQLiteDatabase<"async", ResultSet, typeof import("./__entity-kebab__-db.js")>;

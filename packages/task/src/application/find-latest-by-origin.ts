@@ -57,8 +57,8 @@ export class FindLatestByOriginUseCase
   ): UseCaseResult<FindLatestByOriginResponse, FindLatestByOriginError> {
     const { origin, originId } = FindLatestByOriginRequestSchema.parse(request);
     const q = this.deps.query;
-    return q.query((db): FindLatestByOriginResponse => {
-      const row = db
+    return q.query(async (db): Promise<FindLatestByOriginResponse> => {
+      const row = await db
         .select()
         .from(q.tasks)
         .where(and(eq(q.tasks.origin, origin), eq(q.tasks.originId, originId)))
