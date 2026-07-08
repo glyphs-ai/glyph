@@ -610,23 +610,51 @@ export class WorkflowEntity {
     nowIso: string,
   ): Result<
     { readonly retryCoordInserted: WorkflowNodeId | null; readonly workflowFailed: boolean },
-    WorkflowNodeNotFound | IllegalNodeTransition
+    WorkflowNodeNotFound
   > {
     const node = this.nodeById(nodeId);
     if (node === undefined || node.workflowId !== this.id)
       return err({ type: "WorkflowNodeNotFound", workflowId: this.id, nodeId });
+
+    // Idempotent: already terminal → no-op.
     if (isTerminalWorkflowNodeStatus(node.status))
       return ok({ retryCoordInserted: null, workflowFailed: false });
-    if (this.status !== "running" && status !== "cancelled")
-      return err({
-        type: "IllegalNodeTransition",
-        workflowId: this.id,
-        nodeId,
-        status: this.status,
-        verb: "markNodeTerminal",
-      });
-    this.replaceNode(node.withPatch({ status, endedAt: nowIso }));
-    return ok(this.checkStuckAndRecover(nowIso));
+
+    // Narrow invariant: `workflow.status = "succeeded"` is our strongest external
+    // promise. A late `failed` runner callback is fully explained by post-decision
+    // runner noise (a subprocess crashing after `finishWorkflow(succeeded)` was
+    // already called) and has no downstream utility — the workflow won't retry,
+    // won't flip, won't notify. Recording it verbatim would leak a "failed node
+    // inside a succeeded workflow" surprise into every downstream consumer and
+    // force them to defensively re-check node statuses. Coerce to `cancelled`,
+    // which already covers "runner did not deliver a successful verdict and the
+    // workflow moved on" (see `reconcileCancel`'s use of `cancelled` for the same
+    // shape of event).
+    //
+    // All other crossovers keep the iter2 write-through semantics: node.status
+    // and workflow.status live on independent axes, and rejecting a legitimate
+    // runner fact is the class of bug iter1 introduced.
+    if (this.status === "succeeded" && status === "failed") {
+      console.warn(
+        JSON.stringify({
+          event: "workflow.markNodeTerminal.crossover_coerced",
+          workflowId: this.id,
+          nodeId,
+          workflowStatus: this.status,
+          runnerStatus: status,
+          recordedStatus: "cancelled",
+        }),
+      );
+    }
+    const effectiveStatus =
+      this.status === "succeeded" && status === "failed" ? "cancelled" : status;
+
+    this.replaceNode(node.withPatch({ status: effectiveStatus, endedAt: nowIso }));
+
+    // Stuck-recovery only has something to recover to while the workflow is
+    // still running; once terminal there is nothing to synthesize.
+    if (this.status === "running") return ok(this.checkStuckAndRecover(nowIso));
+    return ok({ retryCoordInserted: null, workflowFailed: false });
   }
 
   __snapshot(): WorkflowSnapshot {

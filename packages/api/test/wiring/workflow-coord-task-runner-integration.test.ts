@@ -61,14 +61,22 @@ interface Harness {
 
 interface MakeHarnessOpts {
   readonly initialTaskStatus?: "running" | "succeeded" | "failed" | "cancelled";
+  /**
+   * Mutable status holder read by the fake `dispatchTask` / `getTask` on every
+   * call, so a test can flip the backing task's status mid-scenario (e.g. keep
+   * it `running` while `finishWorkflow` is called, then flip to `succeeded` so a
+   * later poll fires a late terminal callback). Defaults to a fixed holder
+   * seeded from `initialTaskStatus`.
+   */
+  readonly taskStatusRef?: { current: "running" | "succeeded" | "failed" | "cancelled" };
 }
 
 async function makeHarness(opts: MakeHarnessOpts = {}): Promise<Harness> {
-  const initialStatus = opts.initialTaskStatus ?? "succeeded";
+  const statusRef = opts.taskStatusRef ?? { current: opts.initialTaskStatus ?? "succeeded" };
 
-  const dispatch = vi.fn(() => okAsync(fakeTaskRow({ id: "tid-1", status: initialStatus })));
+  const dispatch = vi.fn(() => okAsync(fakeTaskRow({ id: "tid-1", status: statusRef.current })));
   const get = vi.fn((_req: { id: string }) =>
-    okAsync(fakeTaskRow({ id: "tid-1", status: initialStatus })),
+    okAsync(fakeTaskRow({ id: "tid-1", status: statusRef.current })),
   );
   const hasInFlightForWorkflowNode = vi.fn(() => okAsync(false));
   const listInFlightForWorkflowNode = vi.fn(() => okAsync([]));
@@ -290,5 +298,84 @@ describe("makeCoordNodeRunner — integration with composeWorkflowModule", () =>
     // dispatches via the same fake tasks.dispatchTask.execute. Total calls = 2.
     expect(h.dispatch).toHaveBeenCalledTimes(2);
     expect(h.get.mock.calls.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("makeCoordNodeRunner — late terminal callback after self-triggered finish", () => {
+  it("I4: coord task poll lands 'succeeded' AFTER finishWorkflow(succeeded) → coord node closes succeeded, not stuck running", async () => {
+    // Races a coordinator's self-triggered finish against its own task poll:
+    // the last coordinator calls finishWorkflow(succeeded) from inside its own
+    // still-running subprocess, so the workflow settles `succeeded` before the
+    // coord's runner-side success callback lands. reconcileCancel excludes the
+    // running coord (killing its subprocess would abort the in-flight finish
+    // call), deferring closure to that callback. The late callback must still
+    // close the coord node instead of leaving it stuck `running`.
+    const taskStatusRef = {
+      current: "running" as "running" | "succeeded" | "failed" | "cancelled",
+    };
+    const h = await makeHarness({ taskStatusRef });
+    try {
+      const created = await h.module.createWorkflow.execute({
+        brief: "late-finish-race",
+        coordinatorAgent: "coord-agent",
+      });
+      if (created.isErr()) throw new Error(created.error.type);
+      const { workflowId, initialCoordNodeId } = created.value;
+
+      // Coord auto-dispatches and reaches `running`; its task poll sees
+      // `running` and no-ops (no terminal callback yet).
+      await waitUntil(
+        async () => {
+          const node = await h.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId });
+          return node.isOk() && node.value.status === "running";
+        },
+        2000,
+        "coord node observed running before finish",
+      );
+
+      // The coord finishes the workflow from its own (still-running) frame.
+      (
+        await h.module.finishWorkflow.execute({
+          workflowId,
+          outcome: "succeeded",
+          success: { output: "all green" },
+        })
+      )._unsafeUnwrap();
+
+      // Workflow is now `succeeded`; the finishing coord is deliberately still
+      // `running` (reconcileCancel excludes running coords), awaiting its poll.
+      expect((await h.module.getWorkflow.execute({ workflowId }))._unsafeUnwrap().status).toBe(
+        "succeeded",
+      );
+      const mid = (
+        await h.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })
+      )._unsafeUnwrap();
+      expect(mid.status).toBe("running");
+
+      // The coord's backing task now reaches `succeeded`; the next poll fires
+      // the late terminal callback into the already-succeeded workflow.
+      taskStatusRef.current = "succeeded";
+
+      await waitUntil(
+        async () => {
+          const node = await h.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId });
+          return node.isOk() && node.value.status === "succeeded";
+        },
+        2000,
+        "coord node closes succeeded after the late poll",
+      );
+
+      const final = (
+        await h.module.getNode.execute({ workflowId, nodeId: initialCoordNodeId })
+      )._unsafeUnwrap();
+      expect(final.status).toBe("succeeded");
+      expect(final.endedAt).toBeDefined();
+      // The late node closure does not disturb the settled workflow outcome.
+      expect((await h.module.getWorkflow.execute({ workflowId }))._unsafeUnwrap().status).toBe(
+        "succeeded",
+      );
+    } finally {
+      await h.cleanup();
+    }
   });
 });
