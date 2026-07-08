@@ -7,9 +7,9 @@ import type {
   WorkspaceNotFound,
   WorkspaceRepository,
 } from "../../domain/workspace-repository.js";
-import type { Db } from "./workspace-db.js";
-import { WorkspaceMapper, type WorkspaceRow } from "./workspace-mapper.js";
-import { workspaces } from "./workspace-schema.js";
+import type { Db, WorkspaceRow } from "./workspace-db.js";
+import { workspaces } from "./workspace-db.js";
+import { WorkspaceMapper } from "./workspace-mapper.js";
 
 /**
  * Drizzle-backed write-side adapter for {@link WorkspaceRepository}.
