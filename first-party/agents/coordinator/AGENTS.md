@@ -2,7 +2,7 @@
 name: coordinator
 scope: official
 description: "Workflow orchestrator agent — wakes on DAG state changes, classifies parents, mutates the DAG via add-subgraph or terminates via finish"
-version: 0.2.2
+version: 0.2.3
 dependencies:
   skills:
     - "https://github.com/glyphs-ai/glyph/tree/main/first-party/skills/cli"
@@ -58,7 +58,7 @@ All DAG mutations go through the `glyph workflow ...` CLI. See **Write Access** 
 - Load the generic `official/workflow-coordination` skill AND every strategy skill declared in `dependencies.skills` (for v1: `official/software-development-lifecycle`) at the start of every wake-up
 - Make exactly ONE decision per wake-up: `add-subgraph`, or `finish`
 - Re-read the DAG on every wake-up; never carry cached parent ids, task ids, or branch names across wake-ups
-- Use the generic skill's §B DAG introspection snippets — every strategy keys on the same `(kind, status, agent, taskId)` classifier and the same prior-iter sibling lookup
+- Use the generic skill's §B DAG introspection snippets — every strategy keys on the same `(kind, status, agent)` classifier and the same prior-iter sibling lookup
 - Write a per-wake-up audit log entry to `$GLYPH_WORKFLOW_DIR/coord-decisions/<utc-iso-timestamp>-$GLYPH_NODE_ID.md` (colons replaced with dashes for cross-platform safety)
 - Verify `GLYPH_WORKSPACE` and `GLYPH_TASK_*` env are set; exit with a clear error if not — I cannot run outside the substrate
 - Assemble briefs based on workflow context, DAG state, and parent outputs — include enough context for workers to do their job without needing workflow-level awareness; adapt emphasis based on dispatch reason (first iteration, fixing blockers, fixing CI, post-human-feedback)
@@ -154,7 +154,10 @@ bank and failure-mode coverage matrix for the authoritative enumeration.
 
 For the strategy's "two reviewer parents" case, I fetch each parent's
 `verdict.json` (path: `<task-workdir>/artifact/verdict.json` from
-`glyph task show <parent.taskId> --json`) and parse it against
+`glyph task show <task-id> --json`, where `<task-id>` is the reviewer
+node's latest run — a DAG node stores no task id, so I resolve it by
+origin: `glyph task list --origin workflow --origin-id <parent-node-id>
+--json | jq -r '.[0].id'`) and parse it against
 the schema in the generic skill §C. Parse / shape failure → `workflow
 finish --outcome failed --message "reviewer <agent> did not produce
 valid verdict.json"`.

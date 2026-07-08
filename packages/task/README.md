@@ -27,7 +27,8 @@ the package boundary. Every use-case implements
   `artifact/` files, persist the transition, and reconcile crashed tasks
   on boot via `recoverOrphanedTasks`.
 - **Observe** a task: `getTask` (with a live `lastActiveAt` refresh for
-  running tasks), `listTasks` (indexed filters), and the runtime activity
+  running tasks), `listTasks` (indexed filters, optionally scoped by
+  `origin` + `originId`), and the runtime activity
   surface (`getTaskActivity` one-shot + `getTaskActivityStream` live tail).
 - **End** a task: `cancelTask` (best-effort SIGTERM, awaits the terminal
   persistence) and `deleteTask` (record removal, optional purge
@@ -141,6 +142,7 @@ const task = (
 )._unsafeUnwrap();
 
 await tasks.listTasks.execute({ status: "running", agent: "writer" }); // ListTasksResponse
+await tasks.listTasks.execute({ origin: "workflow", originId: "<nodeId>" }); // tasks for a workflow node
 await tasks.getTask.execute({ id: task.id }); // GetTaskResponse (task view | null)
 await tasks.cancelTask.execute({ id: task.id }); // best-effort SIGTERM
 await tasks.deleteTask.execute({ id: task.id, purge: false });
@@ -201,8 +203,8 @@ pnpm --filter @glyphs-ai/task typecheck
 pnpm --filter @glyphs-ai/task test
 ```
 
-Vitest runs in `forks` pool (better-sqlite3's native binding segfaults on
-worker-thread teardown on Windows).
+Vitest runs in `forks` pool (libsql's native binding requires process-level
+isolation on Windows).
 
 ## License
 

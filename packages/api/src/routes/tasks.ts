@@ -177,14 +177,25 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       method: "get",
       path: "/",
       tags: ["tasks"],
-      summary: "List standalone tasks",
-      // Query reuses the task read-model's list contract, dropping only the
-      // server-owned `origin` / `originId` scoping (this route is
-      // standalone-only) and staying lenient about unknown params (`.strip()`).
-      // `status` is the shared `TaskStatus` enum — an invalid value is rejected
-      // at the boundary.
+      summary: "List tasks (standalone by default, or scoped to an origin)",
+      // Query reuses the task read-model's list contract, but `origin` is
+      // re-typed to a closed `z.enum` of the two scopable origin kinds and,
+      // when supplied together with `originId`, scopes the listing to that
+      // origin pair — the reverse-lookup a workflow coordinator uses to
+      // enumerate a node's tasks (`origin="workflow"`, `originId=<nodeId>`).
+      // `standalone` is intentionally excluded: standalone rows carry a NULL
+      // `origin_id`, so scoping to one could never match — the default
+      // (no-`origin`) path already pins standalone server-side. An unknown or
+      // `standalone` `origin` is rejected at the boundary as a `ValidationError`
+      // (as is an invalid `status`). Omitted, the route stays standalone-only.
+      // Unknown params are stripped (`.strip()`).
       request: {
-        query: ListTasksRequestSchema.omit({ origin: true, originId: true }).strip(),
+        query: ListTasksRequestSchema.omit({ origin: true, originId: true })
+          .extend({
+            origin: z.enum(["schedule", "workflow"]).optional(),
+            originId: z.string().min(1).optional(),
+          })
+          .strip(),
       },
       responses: {
         200: jsonResponse(ListTasksResponseSchema, "Tasks"),
@@ -193,7 +204,17 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
       },
     }),
     async (c) => {
-      const { agent, runtime, createdSince, status } = c.req.valid("query");
+      const { agent, runtime, createdSince, status, origin, originId } = c.req.valid("query");
+
+      // Origin-scoped lookup is both-or-neither: an origin kind is meaningless
+      // without its id and vice versa. A partial pair is a client bug, not an
+      // empty result.
+      if ((origin === undefined) !== (originId === undefined)) {
+        return problemResponse(c, 400, {
+          code: "OriginQueryMalformed",
+          detail: "origin and originId must be supplied together",
+        });
+      }
 
       let createdSinceIso: string | undefined;
       if (createdSince !== undefined) {
@@ -207,13 +228,18 @@ export function tasksRoutes(resolve: (c: Context) => TaskModule): OpenAPIHono {
         createdSinceIso = new Date(t).toISOString();
       }
 
+      // With a valid origin pair, the origin filter REPLACES the standalone pin
+      // (returns every status unless `status` narrows it); without one, the
+      // route is standalone-only as before.
       const opts: {
         agent?: string;
         runtime?: string;
         createdSince?: string;
         status?: TaskStatus;
-        origin: "standalone";
-      } = { origin: "standalone" };
+        origin: string;
+        originId?: string;
+      } = { origin: origin ?? "standalone" };
+      if (originId !== undefined) opts.originId = originId;
       if (agent !== undefined) opts.agent = agent;
       if (runtime !== undefined) opts.runtime = runtime;
       if (createdSinceIso !== undefined) opts.createdSince = createdSinceIso;
