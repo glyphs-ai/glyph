@@ -6,10 +6,12 @@
  * Coord-callback mutation primitives that back the coordinator-agent
  * contract:
  *  - `add-node` / `add-subgraph` / `add-edge`         -- grow the DAG
+ *  - `prune-subgraph`                                 -- retract not-started nodes
  *  - `cancel-node`                                    -- terminate one worker
  *  - `finish`                                         -- flip the workflow terminal
  *
- * The DAG is append-only: nodes/edges can be added but not removed, and a
+ * The DAG grows by append; retraction is limited to still-`not_started`
+ * nodes via `prune-subgraph`. Once a node has started it is immutable, and a
  * node's spec cannot be replaced.
  *
  * Layout: this file is a thin facade. Command implementations live in

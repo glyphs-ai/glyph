@@ -5,12 +5,17 @@
  * parser, and the `--spec-file` subgraph-body validator.
  */
 
-import type { PostApiWorkspacesByIdWorkflowsByWfidSubgraphData } from "@glyphs-ai/sdk";
+import type {
+  PostApiWorkspacesByIdWorkflowsByWfidPruneData,
+  PostApiWorkspacesByIdWorkflowsByWfidSubgraphData,
+} from "@glyphs-ai/sdk";
 
 type SubgraphBody = PostApiWorkspacesByIdWorkflowsByWfidSubgraphData["body"];
 type SubgraphNode = SubgraphBody["nodes"][number];
 type SubgraphEdge = SubgraphBody["edges"][number];
 type SubgraphNodeRef = SubgraphEdge["from"];
+
+type PruneBody = PostApiWorkspacesByIdWorkflowsByWfidPruneData["body"];
 
 export type WorkflowNodeKind = SubgraphNode["kind"];
 
@@ -122,6 +127,36 @@ export function validateAddSubgraphRequest(
   }
 
   return { ok: true, body: { nodes, edges } };
+}
+
+/**
+ * Validate the `--spec-file` body for `workflow prune-subgraph`: a JSON object
+ * with a non-empty `nodeIds` array of non-empty strings. The substrate performs
+ * the authoritative per-target checks (existence, `not_started`, root-coord
+ * protection, surviving-graph invariants); the CLI only shape-checks the input.
+ */
+export function validatePruneSubgraphRequest(
+  raw: unknown,
+): { ok: true; body: PruneBody } | { ok: false; error: string } {
+  if (!isPlainObject(raw)) {
+    return { ok: false, error: "--spec-file must be a JSON object with a `nodeIds` array" };
+  }
+  const nodeIdsRaw = raw.nodeIds;
+  if (!Array.isArray(nodeIdsRaw)) {
+    return { ok: false, error: "--spec-file must be a JSON object with a `nodeIds` array" };
+  }
+  if (nodeIdsRaw.length === 0) {
+    return { ok: false, error: "`nodeIds` must contain at least one node id" };
+  }
+  const nodeIds: string[] = [];
+  for (let i = 0; i < nodeIdsRaw.length; i += 1) {
+    const nodeId = nodeIdsRaw[i];
+    if (typeof nodeId !== "string" || nodeId.length === 0) {
+      return { ok: false, error: `nodeIds[${i}] must be a non-empty string` };
+    }
+    nodeIds.push(nodeId);
+  }
+  return { ok: true, body: { nodeIds } };
 }
 
 function validateNodeRefInput(

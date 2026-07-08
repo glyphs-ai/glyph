@@ -15,7 +15,7 @@ import type { AgentContentSource, ResolvedAgent } from "../types.js";
  * original key order are NOT preserved (gray-matter / js-yaml limitation).
  */
 function applyFrontmatterPatch(raw: string, patch: Record<string, unknown>): string {
-  const file = matter(raw);
+  const file = matter(raw, {});
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined || v === null) delete file.data[k];
     else file.data[k] = v;

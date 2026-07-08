@@ -37,15 +37,25 @@ export interface TaskListOpts extends WorkspaceFlagOpts {
   readonly createdSince?: string;
   /** One of the TaskStatus values (running, succeeded, failed, cancelled). */
   readonly status?: string;
+  /**
+   * Origin kind to scope the listing to (`workflow`, `schedule`). Replaces the
+   * default standalone scoping. Must be paired with `originId`.
+   */
+  readonly origin?: string;
+  /** Origin id within `origin` (nodeId for `workflow`, scheduleId for `schedule`). */
+  readonly originId?: string;
 }
 
 /**
- * `glyph task list` — lists standalone tasks for the workspace.
+ * `glyph task list` — lists standalone tasks for the workspace by default,
+ * or every task for a given origin pair when `--origin`/`--origin-id` are
+ * supplied (e.g. `--origin workflow --origin-id <nodeId>` enumerates a
+ * workflow node's tasks across all statuses, newest first — the reverse
+ * lookup a coordinator uses to find a node's dispatched task).
  *
- * `/scheduled-tasks` is split from `/tasks` at the REST layer; this
- * command targets the standalone-only `/tasks` route. Schedule-launched
- * tasks are exposed through `glyph schedule` and its underlying
- * `/scheduled-tasks` surface, not through this command.
+ * The dedicated `glyph schedule` surface (backed by `/scheduled-tasks`)
+ * stays the ergonomic way to browse a schedule's runs; `--origin schedule
+ * --origin-id <scheduleId>` reaches the same rows through this generic path.
  */
 export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> {
   await makeSdkClient(opts);
@@ -62,6 +72,16 @@ export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> 
         NonNullable<GetApiWorkspacesByIdTasksData["query"]>["status"]
       >;
     }
+    // Origin scoping. `opts.origin` is a raw CLI string; the server validates
+    // it against the `origin` enum and returns a 400 ValidationError (surfaced
+    // as-is) for an unknown or non-scopable kind (e.g. `standalone`). The
+    // registrar guarantees both or neither.
+    if (opts.origin !== undefined) {
+      query.origin = opts.origin as NonNullable<
+        NonNullable<GetApiWorkspacesByIdTasksData["query"]>["origin"]
+      >;
+    }
+    if (opts.originId !== undefined) query.originId = opts.originId;
     const list = unwrap(
       await getApiWorkspacesByIdTasks({
         path: { id: workspaceId },
@@ -70,19 +90,23 @@ export async function taskList(opts: TaskListOpts = {}): Promise<CommandResult> 
     );
     const fmt = pickFormat(opts, "table");
     if (fmt === "json") return { exitCode: 0, stdout: formatJson(list) };
-    return {
-      exitCode: 0,
-      stdout: formatTable(
-        ["id", "agent", "status", "origin", "createdAt"],
-        list.map((t) => [
-          (t as { id?: string }).id ?? "",
-          (t as { agent?: string }).agent ?? "",
-          (t as { status?: string }).status ?? "",
-          (t as { origin?: string }).origin ?? "",
-          (t as { createdAt?: string }).createdAt ?? "",
-        ]),
-      ),
-    };
+    const table = formatTable(
+      ["id", "agent", "status", "origin", "createdAt"],
+      list.map((t) => [
+        (t as { id?: string }).id ?? "",
+        (t as { agent?: string }).agent ?? "",
+        (t as { status?: string }).status ?? "",
+        (t as { origin?: string }).origin ?? "",
+        (t as { createdAt?: string }).createdAt ?? "",
+      ]),
+    );
+    // When an origin filter is active, prefix the table with the scope so the
+    // human reader knows these are not standalone tasks.
+    const stdout =
+      opts.origin !== undefined && opts.originId !== undefined
+        ? `origin: ${opts.origin}:${opts.originId}\n${table}`
+        : table;
+    return { exitCode: 0, stdout };
   } catch (err) {
     return formatError(err);
   }

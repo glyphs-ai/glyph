@@ -113,6 +113,7 @@ function stubModule(overrides: Partial<Record<keyof WorkflowModule, unknown>>): 
     getNode: stubUseCase(makeWorkerView()),
     cancelWorkflow: stubUseCase(undefined),
     addSubgraph: stubUseCase({ insertedNodes: [] }),
+    pruneSubgraph: stubUseCase({ prunedNodeIds: [], prunedEdges: [] }),
     cancelNode: stubUseCase(undefined),
     finishWorkflow: stubUseCase(undefined),
     respondHumanNode: stubUseCase(makeWorkerView()),
@@ -761,6 +762,75 @@ describe("workflowsRoutes — addSubgraph (POST /:wfid/subgraph)", () => {
         nodes: [{ tempId: "t1", kind: "worker", spec: {} }],
         edges: [{ from: { nodeId: COORD_NID }, to: { tempId: "t1" } }],
       }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("workflowsRoutes — pruneSubgraph (POST /:wfid/prune)", () => {
+  it("forwards nodeIds and returns the pruned nodes + edges", async () => {
+    const pruneSubgraph = stubUseCase({
+      prunedNodeIds: [WORKER_NID],
+      prunedEdges: [{ from: COORD_NID, to: WORKER_NID }],
+    });
+    const module = stubModule({ pruneSubgraph });
+    const res = await mountRoutes(module).request(`/${WID}/prune`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nodeIds: [WORKER_NID] }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      prunedNodeIds: string[];
+      prunedEdges: Array<Record<string, unknown>>;
+    };
+    expect(body.prunedNodeIds).toEqual([WORKER_NID]);
+    expect(body.prunedEdges).toEqual([{ from: COORD_NID, to: WORKER_NID }]);
+    expect(pruneSubgraph.execute).toHaveBeenCalledWith({
+      workflowId: WID,
+      nodeIds: [WORKER_NID],
+    });
+  });
+
+  it("maps WorkflowPruneRejected to 422 with the reason in the body", async () => {
+    const pruneSubgraph = {
+      execute: vi.fn(() =>
+        errAsync({
+          type: "WorkflowPruneRejected" as const,
+          reason: { kind: "rootCoordProtected" as const, workflowId: WID, nodeId: COORD_NID },
+        }),
+      ),
+    };
+    const module = stubModule({ pruneSubgraph });
+    const res = await mountRoutes(module).request(`/${WID}/prune`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nodeIds: [COORD_NID] }),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { reason?: { kind?: string } };
+    expect(body.reason?.kind).toBe("rootCoordProtected");
+  });
+
+  it("maps WorkflowNotFound to 404", async () => {
+    const pruneSubgraph = {
+      execute: vi.fn(() => errAsync({ type: "WorkflowNotFound" as const, workflowId: WID })),
+    };
+    const module = stubModule({ pruneSubgraph });
+    const res = await mountRoutes(module).request(`/${WID}/prune`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nodeIds: [WORKER_NID] }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects an empty nodeIds array with 400", async () => {
+    const module = stubModule({ pruneSubgraph: { execute: vi.fn() } });
+    const res = await mountRoutes(module).request(`/${WID}/prune`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nodeIds: [] }),
     });
     expect(res.status).toBe(400);
   });

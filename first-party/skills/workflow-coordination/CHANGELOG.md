@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1 (2026-07-07)
+
+- Correct §B parent classification: a DAG node carries **no** `taskId`, so the classifier key is the 3-tuple `(kind, status, agent)` (was mislabelled a 4-tuple that read a non-existent `.taskId` off the node). A worker node's task run(s) are now resolved by origin — a new "Resolve a worker node's task run(s)" sub-section uses `glyph task list --origin workflow --origin-id <nodeId> --json` (newest-first, `.[0]` is the latest run). The prior-iter sibling snippet resolves `PRIOR_TASK_ID` the same way instead of reading `.taskId` off the sibling node.
+- Update the framework command-name list to cite `task list`, and the strategy "Context sources table" guidance to pull a parent's latest task id via the origin lookup.
+
+## 0.5.0 (2026-07-07)
+
+- Document `prune-subgraph`, the structural inverse of `add-subgraph`, in §B. A new "Retract a mis-planned fan-out via prune-subgraph" sub-section teaches when to retract still-`not_started` nodes (a queued batch a wake-up now knows is wrong) rather than letting dead work dispatch, gives the `--spec-file` `{ "nodeIds": [...] }` body shape, and states the three constraints that keep the surviving DAG connected and coord-anchored: only `not_started` nodes are prunable, the phase-0 bootstrap coordinator is protected, and removal may neither orphan a survivor nor strip a surviving coordinator of its last coord parent. A companion `WorkflowPruneRejected` rejection table maps each `reason.kind` (`nodeNotFound`, `nodeNotStarted`, `rootCoordProtected`, `orphan`, `coordChainBroken`) to a concrete forward fix, mirroring the existing `add-subgraph` rejection tables so a coord recovers from a refused prune in one wake-up. The framework command-name list in the lead-in now cites `prune-subgraph` alongside `add-subgraph`.
+
+## 0.4.4 (2026-07-07)
+
+- Make the `next-coord` coord-parent requirement explicit in §B. The prior `add-subgraph` JSON template omitted `existingParents` on the `next-coord` node, which read as "the intra-batch edges from workers are the only wiring needed." The domain invariant (`enforceCoordChainInvariants`) actually requires the new coord node to have at least one coord-kind parent: workers-only parents are rejected with `WorkflowDagConflict / orphanCoordInsert`. The template now sets `existingParents: ["<self-node-id>"]` on the coord node, the surrounding prose grew from two universal rules to three (rule 3 states the coord-to-coord chain explicitly and calls out that the resulting mixed-parents shape drives the phase computation), and a new `Common add-subgraph rejections` sub-section groups the failures by error `type`: `WorkflowDagConflict` (coord-chain / parent-state rules — `orphanCoordInsert`, `successorCoordExists`, `parentState`, `invariant`), `WorkflowSubgraphInvalid` (payload shape — `empty`, `tempIdInvalid`, `tempParentless`, `nodeRefUnresolved`, `cyclic`, `multipleCoordTemps`), and `WorkflowNodeNotMutable` (edge target already started). Each entry maps to a concrete forward fix so coord recovers from a rejection in one wake-up instead of trial-and-error across many.
+
 ## 0.4.3 (2026-07-07)
 
 - Replace remaining concrete strategy / worker / VCS names in body examples with placeholders (`<your-coord-agent-fqn>`, `<your-strategy-name>`, `<your-scope>`, generic "the agent's VCS skill"). Framework skill is now strategy-neutral end-to-end.

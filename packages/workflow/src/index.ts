@@ -130,6 +130,13 @@ export {
   type WorkflowRunners,
 } from "./application/ports/workflow-node-runner.js";
 export {
+  type PruneWorkflowSubgraphError,
+  type PruneWorkflowSubgraphRequest,
+  PruneWorkflowSubgraphRequestSchema,
+  type PruneWorkflowSubgraphResponse,
+  PruneWorkflowSubgraphResponseSchema,
+} from "./application/prune-workflow-subgraph.js";
+export {
   type ResolveWorkflowArtifactPathError,
   type ResolveWorkflowArtifactPathRequest,
   ResolveWorkflowArtifactPathRequestSchema,
