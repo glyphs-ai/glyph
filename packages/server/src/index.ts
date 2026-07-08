@@ -29,6 +29,7 @@ import {
   assertCopilotSdkResolvable,
   CopilotRuntime,
   InMemoryRuntimeRegistry,
+  OpencodeRuntime,
   sharedDir,
 } from "@glyphs-ai/runtime";
 import { serve } from "@hono/node-server";
@@ -185,6 +186,17 @@ export async function runServer(opts: RunServerOpts = {}): Promise<void> {
       // Session / Task add their own work-context env (`GLYPH_WORK_*`,
       // `GLYPH_WORKSPACE*`) on top via the runtime's launchHeadless
       // / buildInteractiveLaunch.
+      subprocessEnvBase: buildSubprocessEnvBase({
+        hostname,
+        port,
+        sharedDir: sharedDir(home),
+      }),
+      subprocessEnvScrub: SUBPROCESS_ENV_SCRUB_KEYS,
+    }),
+  );
+  runtimeRegistry.register(
+    new OpencodeRuntime({
+      sharedDir: sharedDir(home),
       subprocessEnvBase: buildSubprocessEnvBase({
         hostname,
         port,

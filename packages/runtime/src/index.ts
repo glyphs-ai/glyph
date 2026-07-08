@@ -1,7 +1,7 @@
 // Public surface for @glyphs-ai/runtime.
 
-export type { CopilotRuntimeConfig } from "./copilot/copilot-runtime.js";
 // Copilot runtime
+export type { CopilotRuntimeConfig } from "./copilot/copilot-runtime.js";
 export { CopilotRuntime } from "./copilot/copilot-runtime.js";
 export { CopilotSdkUnavailableError } from "./copilot/errors.js";
 export {
@@ -30,6 +30,9 @@ export type {
   RuntimeStateDeletionFailed,
   UnknownRuntime,
 } from "./errors.js";
+// opencode runtime
+export type { OpencodeRuntimeConfig } from "./opencode/opencode-runtime.js";
+export { OpencodeRuntime } from "./opencode/opencode-runtime.js";
 export {
   PLACEHOLDER_NAMES,
   type PlaceholderContext,
