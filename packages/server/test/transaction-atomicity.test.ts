@@ -128,4 +128,34 @@ describe("request-scoped transaction atomicity", () => {
     const taskCount = await client.execute("SELECT COUNT(*) as cnt FROM tasks");
     expect(Number(taskCount.rows[0]!.cnt)).toBe(0);
   });
+
+  it("BEGIN DEFERRED + ROLLBACK via raw SQL rolls back writes (middleware pattern)", async () => {
+    // This mirrors the actual middleware code path: raw BEGIN DEFERRED /
+    // COMMIT / ROLLBACK via sql.raw() on the shared drizzle handle.
+    await catalogDb.run(sql.raw("BEGIN DEFERRED"));
+    await catalogDb.run(
+      sql`INSERT INTO agents (fqn, origin, description, version, prereqs_ack, disabled_by_user, installed_at, updated_at) VALUES ('test/deferred-rb', 'file:/tmp', 'x', '1.0.0', 0, 0, '2026-01-01', '2026-01-01')`,
+    );
+    // Verify visible within the tx.
+    const inside = await catalogDb.all(sql`SELECT COUNT(*) as cnt FROM agents`);
+    expect(Number((inside[0] as Record<string, unknown>).cnt)).toBe(1);
+    // Rollback — simulates middleware detecting c.error / 500.
+    await catalogDb.run(sql.raw("ROLLBACK"));
+
+    // After rollback: nothing persisted.
+    const rows = await client.execute("SELECT COUNT(*) as cnt FROM agents");
+    expect(Number(rows.rows[0]!.cnt)).toBe(0);
+  });
+
+  it("BEGIN DEFERRED + COMMIT via raw SQL commits writes (middleware pattern)", async () => {
+    await catalogDb.run(sql.raw("BEGIN DEFERRED"));
+    await catalogDb.run(
+      sql`INSERT INTO agents (fqn, origin, description, version, prereqs_ack, disabled_by_user, installed_at, updated_at) VALUES ('test/deferred-ok', 'file:/tmp', 'x', '1.0.0', 0, 0, '2026-01-01', '2026-01-01')`,
+    );
+    await catalogDb.run(sql.raw("COMMIT"));
+
+    // Committed: row persists.
+    const rows = await client.execute("SELECT COUNT(*) as cnt FROM agents");
+    expect(Number(rows.rows[0]!.cnt)).toBe(1);
+  });
 });

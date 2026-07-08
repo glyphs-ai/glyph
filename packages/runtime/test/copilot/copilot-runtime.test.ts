@@ -820,6 +820,7 @@ describe("CopilotRuntime", () => {
       // the file's existing content. This is the documented
       // SSE-resume contract.
       await appendFile(eventsPath, seed(3));
+      await delay(100);
       await appendFile(eventsPath, seed(4));
       await delay(500);
       ac.abort();

@@ -47,8 +47,9 @@ import {
   schema as workflowSchema,
 } from "@glyphs-ai/workflow";
 import type { GetWorkspaceResponse, WorkspaceId, WorkspaceModule } from "@glyphs-ai/workspace";
-import { type Client, createClient } from "@libsql/client";
+import { type Client, createClient, type ResultSet } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 import { type Result, ResultAsync } from "neverthrow";
 import pino, { type Logger } from "pino";
 import { makeTaskKindHandler } from "./wiring/schedule-task-handler.js";
@@ -123,6 +124,17 @@ export type WorkspaceContextState = "cached" | "loading" | "unloaded" | "not-reg
  * `WorkspaceContext` embeds it and api must not import from server.
  */
 export interface ScopeDbHandles {
+  /**
+   * Schema-agnostic drizzle handle over the shared libsql client, used ONLY
+   * for transaction lifecycle (BEGIN / COMMIT / ROLLBACK) at the middleware
+   * layer. Business reads/writes must go through the per-package handles
+   * (catalogDb, sessionDb, ...) so pkg boundaries stay enforceable.
+   *
+   * The empty `Record<string, unknown>` schema type is intentional — it
+   * prevents this handle from being used for typed queries and keeps
+   * middleware code decoupled from any package's schema.
+   */
+  readonly db: BaseSQLiteDatabase<"async", ResultSet, Record<string, unknown>>;
   readonly catalogDb: CatalogDb;
   readonly sessionDb: SessionDb;
   readonly taskDb: TaskDb;
@@ -700,7 +712,7 @@ export class WorkspaceContextRegistry {
       tasks: taskModule,
       schedules: scheduleModule,
       workflows: workflowModule,
-      dbHandles: { catalogDb, sessionDb, taskDb, scheduleDb, workflowDb },
+      dbHandles: { db, catalogDb, sessionDb, taskDb, scheduleDb, workflowDb },
       async close() {
         // Per-module try/catch: a throw from one module's close()
         // must NOT skip the others. Without per-module catches a
