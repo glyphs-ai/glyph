@@ -44,9 +44,8 @@ export async function setupTestSubsystem(opts: {
 }
 
 export async function teardownTestSubsystem(sys: ServerTestSubsystem): Promise<void> {
+  await new Promise((r) => setTimeout(r, 100));
   try {
-    // `application.close()` closes the internal per-workspace context
-    // registry first, then the global registry handle. Idempotent.
     await sys.close();
   } catch {
     // best-effort
@@ -82,16 +81,17 @@ export async function registerTestWorkspace(
  *      mkdtemps a fresh dir) and must never fail the teardown hook.
  */
 export async function rmScratch(scratch: string): Promise<void> {
-  // Let libuv/libsql drain and the Windows lock manager release the WAL fd.
-  await new Promise((r) => setTimeout(r, 500));
+  // Best-effort cleanup. On Windows, libsql WAL file locks can linger
+  // after client.close(). We give it a very short budget — if it doesn't
+  // work, just leak the temp dir (CI will reap it, next test uses a fresh dir).
   try {
     await rm(scratch, {
       recursive: true,
       force: true,
-      maxRetries: 10,
-      retryDelay: 200,
+      maxRetries: 3,
+      retryDelay: 100,
     });
   } catch {
-    // best-effort — WAL lock outlived the retry budget; leak and move on.
+    // WAL lock outlived budget — acceptable in tests.
   }
 }
