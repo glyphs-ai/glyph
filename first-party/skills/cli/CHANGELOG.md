@@ -2,17 +2,10 @@
 
 ## 0.4.1 (2026-07-08)
 
-Tighten the `task list --origin` contract: only `schedule` and `workflow` are scopable kinds.
+Document origin-scoped task listing, tighten the `--origin` contract, and correct the workflow-node task-linkage shape.
 
-- `references/commands.md#task` — `--origin` now accepts `schedule` / `workflow` only. `standalone` is the default when `--origin` is omitted and is rejected as an explicit value: standalone rows carry a NULL `originId`, so `--origin standalone` (HTTP `?origin=standalone`) could never match and always returned an empty list. The default (no-`--origin`) listing continues to serve standalone tasks.
-- `references/error-codes.md` — the Tasks section no longer carries a bespoke unknown-kind 400 row. `--origin` is a closed wire enum (`schedule | workflow`), so an out-of-set value (including `standalone`) surfaces as the shared `ValidationError` (400) that names `origin` as the offending field. `OriginQueryMalformed` (partial `--origin` / `--origin-id` pair) is unchanged.
-
-## 0.4.0 (2026-07-07)
-
-Document origin-scoped task listing and correct the workflow-node task-linkage shape.
-
-- `references/commands.md#task` — document `task list --origin <kind> --origin-id <id>`: both-or-neither flags (partial pair exits `2`), valid kinds `standalone | schedule | workflow`, newest-first `Task[]` across all statuses, and the `origin: <kind>:<id>` table scope header. Note that a bare `task list` still defaults to `standalone` origin.
-- `references/error-codes.md` — add `OriginQueryMalformed` (400, partial origin pair) under Tasks.
+- `references/commands.md#task` — document `task list --origin <kind> --origin-id <id>`: both-or-neither flags (partial pair exits `2`), valid kinds `schedule | workflow`, newest-first `Task[]` across all statuses, and the `origin: <kind>:<id>` table scope header. Standalone tasks are returned by default when `--origin` is omitted — no explicit `--origin standalone` is needed (standalone tasks have no `originId`).
+- `references/error-codes.md` — add `OriginQueryMalformed` (400, partial origin pair) under Tasks. `--origin` is a closed wire enum (`schedule | workflow`), so an out-of-set value surfaces as the shared `ValidationError` (400).
 - Correct the `Task` wire shape in `references/json-shapes.md`: `origin` is the kind alone (`standalone | schedule | workflow`) paired with a top-level `originId`, not a compound `schedule:<sid>` string, and the routing id is **not** nested under `metadata`.
 - Kill the `WorkflowNode.taskId` fiction: a DAG node carries **no** `taskId`. `references/commands.md#workflow` (`dag`, `node-show`, `cancel-node`) and `references/json-shapes.md#workflownode` now resolve a node's task run(s) by origin (`task list --origin workflow --origin-id <nodeId>`), and the node's human-response fields are documented under `metadata.response`, not as top-level `responseInput` / `responseChoiceId`.
 - `schedule list-tasks` output note now states `origin: "schedule"`, `originId: <sid>` (equivalent to `task list --origin schedule --origin-id <sid>`).

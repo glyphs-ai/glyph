@@ -114,7 +114,7 @@ Per-group subcommand reference for `glyph workspace / session / task / schedule 
 ### `task list`
 
 - Optional filters: `--agent <name>`, `--runtime <kind>`, `--created-since <iso>`, `--status <csv>` (subset of `running,succeeded,failed,cancelled`)
-- Origin scope: `--origin <kind>` + `--origin-id <id>` narrows to one origin's tasks (e.g. a workflow node's runs: `--origin workflow --origin-id <nodeId>`). The two flags are **both-or-neither** — passing one without the other exits `2` before any request. Valid kinds: `schedule`, `workflow` (`standalone` is the default when `--origin` is omitted and is **not** accepted as an explicit `--origin` value — standalone rows carry no `originId`, so scoping to them would always be empty).
+- Origin scope: `--origin <kind>` + `--origin-id <id>` narrows to one origin's tasks (e.g. a workflow node's runs: `--origin workflow --origin-id <nodeId>`). The two flags are **both-or-neither** — passing one without the other exits `2` before any request. Valid kinds: `schedule`, `workflow`. Standalone tasks are the default when `--origin` is omitted — there is no need to pass `--origin standalone` (standalone tasks have no `originId`, so explicit scoping is not applicable).
 - Route: `GET /workspaces/:id/tasks` (query: `origin`, `originId`, plus the filters above)
 - Output: `Task[]`, newest first — all statuses unless `--status` narrows them (see [json-shapes.md#task](./json-shapes.md#task))
 - Table mode prints an `origin: <kind>:<id>` scope header when `--origin` is active; `--json` emits the array unchanged
