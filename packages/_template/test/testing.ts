@@ -13,16 +13,17 @@ import { apply__Entity__Migrations } from "../src/infrastructure/drizzle/__entit
  * the shared client there.
  */
 export async function openTestDb(dbFile: string): Promise<{ db: Db; close(): void }> {
-  const client = createClient({ url: `file:${dbFile}` });
+  const url = dbFile === ":memory:" ? "file::memory:" : `file:${dbFile}`;
+  const client = createClient({ url });
   await client.execute("PRAGMA journal_mode = WAL");
   await client.execute("PRAGMA synchronous = NORMAL");
   await client.execute("PRAGMA busy_timeout = 5000");
-  const db: Db = drizzle(client, { schema });
   try {
     await apply__Entity__Migrations(client);
   } catch (err) {
     client.close();
     throw err;
   }
+  const db: Db = drizzle(client, { schema });
   return { db, close: () => client.close() };
 }
